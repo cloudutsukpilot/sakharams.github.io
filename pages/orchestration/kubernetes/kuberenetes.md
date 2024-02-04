@@ -14,9 +14,3 @@ title: Kubernetes
 4. Services
 5. Devices
 
-
-### Cloud Service Providers:
-
-1. [Microsoft Azure](/cloud/azure)
-2. [Amazon Web Services](/cloud/aws)
-3. [Google Cloud Platform](/cloud/gcp)
