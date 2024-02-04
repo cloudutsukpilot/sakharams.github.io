@@ -1,8 +1,6 @@
 ---
 layout: page
-title: Cloud
-icon: fas fa-cloud
-order: 3
+title: Google Cloud Platform(GCP)
 ---
 
 ### What is Cloud Computing?
@@ -15,10 +13,3 @@ order: 3
 3. Storage
 4. Services
 5. Devices
-
-
-### Cloud Service Providers:
-
-1. [Microsoft Azure](/pages/cloud/azure/azure)
-2. [Amazon Web Services](/pages/cloud/aws/aws)
-3. [Google Cloud Platform](/pages/cloud/gcp/gcp)

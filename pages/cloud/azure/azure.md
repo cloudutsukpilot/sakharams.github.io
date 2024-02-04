@@ -1,8 +1,7 @@
 ---
 layout: page
-title: Cloud
+title: Microsoft Azure
 icon: fas fa-cloud
-order: 3
 ---
 
 ### What is Cloud Computing?
@@ -16,9 +15,3 @@ order: 3
 4. Services
 5. Devices
 
-
-### Cloud Service Providers:
-
-1. [Microsoft Azure](/pages/cloud/azure/azure)
-2. [Amazon Web Services](/pages/cloud/aws/aws)
-3. [Google Cloud Platform](/pages/cloud/gcp/gcp)

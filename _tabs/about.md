@@ -1,5 +1,6 @@
 ---
-# the default layout is 'page'
+layout: page
+title: About Me
 icon: fas fa-info-circle
 order: 5
 ---
@@ -8,9 +9,9 @@ order: 5
 My name is Sakharam Shinde and I am a Cloud & DevOps Architect.
 
 
-As a Cloud & DevOps Architect , I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. With 12 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. I am an Azure Administrator and a Terraform Associate certified. 
+As a *Cloud & DevOps Architect* , I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. With 12 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. I am an Azure Administrator and a Terraform Associate certified. 
 
-You can reach out to me on LinkedIn or checkout the rest of my blog where I share my learning and experiences.
+You can reach out to me on [LinkedIn](https://www.linkedin.com/in/sakharamshinde/) or checkout my blog where I share my learnings and experiences.
 
 
 As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud and DevOps.
@@ -60,8 +61,8 @@ I started my career started with Office365 and Microsoft Exchange providing expe
 
 
 In my spare time I like to go on short day cycle trips to enjoy the weather and stay fit. The maximum distance that I have been able to acheive in a trip was 80 kms.
-
-
+<br />
+<br />
 
 | Category | Tools & Technlogies | 
 | -------- | ------------------- |

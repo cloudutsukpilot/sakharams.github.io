@@ -1,8 +1,6 @@
 ---
 layout: page
-title: Cloud
-icon: fas fa-cloud
-order: 3
+title: Docker
 ---
 
 ### What is Cloud Computing?
@@ -19,6 +17,6 @@ order: 3
 
 ### Cloud Service Providers:
 
-1. [Microsoft Azure](/pages/cloud/azure/azure)
-2. [Amazon Web Services](/pages/cloud/aws/aws)
-3. [Google Cloud Platform](/pages/cloud/gcp/gcp)
+1. [Microsoft Azure](/cloud/azure)
+2. [Amazon Web Services](/cloud/aws)
+3. [Google Cloud Platform](/cloud/gcp)
