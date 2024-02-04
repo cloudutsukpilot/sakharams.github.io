@@ -3,6 +3,7 @@ title: Terrform
 date: 2023-10-10 00:00:00
 categories: [orchestration, terraform]
 tags: [terraform, iac]
+permalin: /:categories
 ---
 
 # Terraform

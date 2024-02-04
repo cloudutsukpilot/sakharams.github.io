@@ -1,11 +1,12 @@
 ---
 title: Azure
-date: 2023-05-05 00:00:00
+date: 2023-10-10 00:00:00
 categories: [cloud, azure]
 tags: [cloud, azure]
+permalink: /:categories
 ---
 
-# Azure
+# Terraform
 
 This is a Azure page
 
@@ -17,6 +18,6 @@ Getting started
 
 Operating System
 
-## Azure 
+## AWS
 
 Configure Azure
