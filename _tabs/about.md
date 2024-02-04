@@ -15,9 +15,45 @@ You can reach out to me on LinkedIn or checkout the rest of my blog where I shar
 
 As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud and DevOps.
 
+\
+\
+<!-- Certifications Start -->
+<div class="container">
+    <div class="d-flex flex-row flex-wrap justify-content-center">
+    <div class="d-flex flex-row">
+        <img
+        alt="Azure Fundamentals"
+        src="../assets/img/certifications/Azure_Fundamentals.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Azure Administrator Associate"
+        src="../assets/img/certifications/Azure_Administrator_Associate.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Azure Data Fundamentals"
+        src="../assets/img/certifications/Azure_Data_Fundamentals.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Terraform Associate"
+        src="../assets/img/certifications/Terraform_Associate.png"
+        class="img-fluid"
+        />
+        <img
+        alt="ITIL Foundation"
+        src="../assets/img/certifications/ITIL_Foundation.png"
+        class="img-fluid"
+        />
+    </div>
+    </div>
+</div>
+<!-- Certifications End -->
 
 
-
+\
+\
 I started my career started with Office365 and Microsoft Exchange providing expert guidance to Microsoft customers by understanding their queries. Later, I got a change to work on the database technologies like MS SQL, Postgres, etc. and automating all the daily operations for a database engineer. For the past 8 years, I have been continously learning multiple cloud and devops technologies (listed below) with hand-on experience on multiple projects.
 
 
