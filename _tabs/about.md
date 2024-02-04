@@ -15,34 +15,6 @@ You can reach out to me on LinkedIn or checkout the rest of my blog where I shar
 
 As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud and DevOps.
 
-<!-- Certifications Start -->
-<div class="container">
-    <div class="d-flex flex-row flex-wrap justify-content-center">
-    <div class="d-flex flex-row">
-        <img
-        src="../assets/img/certifications/Azure_Fundamentals.png"
-        class="img-fluid"
-        />
-        <img
-        src="../assets/img/certifications/Azure_Administrator_Associate.png"
-        class="img-fluid"
-        />
-        <img
-        src="../assets/img/certifications/Azure_Data_Fundamentals.png"
-        class="img-fluid"
-        />
-        <img
-        src="../assets/img/certifications/Terraform_Associate.png"
-        class="img-fluid"
-        />
-        <img
-        src="../assets/img/certifications/ITIL_Foundation.png"
-        class="img-fluid"
-        />
-    </div>
-    </div>
-</div>
-<!-- Certifications End -->
 
 
 
