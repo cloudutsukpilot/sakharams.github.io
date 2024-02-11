@@ -9,6 +9,11 @@ cache:
   paths:
     - vendor/
 
+stages:
+  - test
+  - testhtml
+  - deploy
+
 before_script:
   - gem install bundler
   - bundle install --path vendor
@@ -18,6 +23,30 @@ before_script:
 # Jekyll will output the files to public directory
 # Docker image for the runner
 
+test:
+  stage: test
+  script:
+    - bundle exec jekyll build -d test
+  artifacts:
+    paths:
+      - test/
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+testhtml:
+  stage: testhtml
+  dependencies:
+    - test
+  script:
+    - bundle exec htmlproofer test/ \
+      \-\-disable-external=true \
+      \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
+  artifacts:
+    paths:
+      - testhtml
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
 pages:
   stage: deploy
   script:
@@ -25,27 +54,5 @@ pages:
   artifacts:
     paths:
       - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-
-test:
-  stage: test
-  script:
-    - bundle exec jekyll build -d test
-  artifacts:
-    paths:
-      - test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-
-testhtml:
-  stage: test
-  script:
-    - bundle exec htmlproofer test \
-      \-\-disable-external=true \
-      \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
-  artifacts:
-    paths:
-      - testhtml
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
