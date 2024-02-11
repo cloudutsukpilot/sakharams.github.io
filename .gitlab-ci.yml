@@ -16,6 +16,8 @@ before_script:
 # Defining the job to execute on the runner
 # For Gitlab pages, the job has a specific name called pages
 # Jekyll will output the files to public directory
+# Docker image for the runner
+
 pages:
   stage: deploy
   script:
@@ -34,10 +36,10 @@ test:
     paths:
       - test
   rules:
-    - if: $CI_COMMIT_BRANCH = "main"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 testhtml:
-  statge: testhtml
+  stage: test
   script:
     - bundle exec htmlproofer _site \
       \-\-disable-external=true \
@@ -46,4 +48,4 @@ testhtml:
     paths:
       - testhtml
   rules:
-    - if: $CI_COMMIT_BRANCH = "main"
+    - if: $CI_COMMIT_BRANCH == "main"
