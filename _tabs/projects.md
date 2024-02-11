@@ -7,4 +7,4 @@ order: 6
 
 Below are the projects:
 
-1. [Network Operations Center(NOC)](/projects/noc)
+1. [Network Operations Center(NOC)](../projects/networkoperationsconsole/noc)

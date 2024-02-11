@@ -866,6 +866,3 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
 </div>
 <!-- Virtualization End -->
 
-
-[def]: ./pages/de
-[def2]: assets/img/i
