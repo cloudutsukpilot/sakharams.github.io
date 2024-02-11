@@ -38,9 +38,7 @@ testhtml:
   dependencies:
     - test
   script:
-    - bundle exec htmlproofer test/ \
-      \-\-disable-external=true \
-      \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
+    - bundle exec htmlproofer test/ --disable-external=true --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
   artifacts:
     paths:
       - testhtml
