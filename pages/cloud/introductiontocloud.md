@@ -1,6 +1,8 @@
 ---
 layout: page
-title: Amazon Web Services(AWS)
+title: Introduction to Cloud
+icon: fas fa-cloud
+order: 3
 ---
 
 ### What is Cloud Computing?
@@ -15,3 +17,8 @@ title: Amazon Web Services(AWS)
 5. Devices
 
 
+### Cloud Service Providers:
+
+1. [Microsoft Azure](/pages/cloud/azure/azure)
+2. [Amazon Web Services](/pages/cloud/aws/aws)
+3. [Google Cloud Platform](/pages/cloud/gcp/gcp)

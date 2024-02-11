@@ -1,6 +1,7 @@
 ---
 layout: page
-title: Kubernetes
+title: Amazon Web Services(AWS)
+icon: fab fa-terraform
 ---
 
 ### What is Cloud Computing?
@@ -13,4 +14,5 @@ title: Kubernetes
 3. Storage
 4. Services
 5. Devices
+
 
