@@ -22,7 +22,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img alt="Cloud" src="/assets/lib/icons/cloud-18.svg" />
+        <img alt="Cloud" src="/assets/img/icons/cloud-18.svg" />
         <a href="/pages/cloud/introductiontocloud" class="ml-1 mr-2">Cloud</a>
     </span>
     <a
@@ -39,15 +39,13 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/microsoft-azure-18.svg" />
+            <img alt="Microsoft Azure" src="/assets/img/icons/microsoft-azure-18.svg" />
             <a href="/pages/cloud/azure/introductiontoazure" class="ml-1 mr-2"
             >Microsoft Azure</a
             >
         </div>
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/amazonwebservices-18.svg"
-            />
+            <img alt="Amanzon Web Services" src="/assets/img/icons/amazonwebservices-18.svg" />
             <a href="/pages/cloud/aws/introductiontoaws" class="ml-1 mr-2"
             >Amazon Web Services (AWS)</a
             >
@@ -55,8 +53,8 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/googlecloudplatform-18.svg"
+            <img alt="Google Cloud Platform"
+            src="/assets/img/icons/googlecloudplatform-18.svg"
             />
             <a href="/pages/cloud/gcp/introductiontogcp" class="ml-1 mr-2"
             >Google Cloud Platform (GCP)</a
@@ -74,7 +72,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/orchestration-18.svg" />
+        <img alt="Orchestration" src="/assets/img/icons/orchestration-18.svg" />
         <a href="/pages/devops/orchestration/introductiontoorchestration" class="ml-1 mr-2"
         >Orchestration</a
         >
@@ -93,7 +91,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/docker-18.svg" />
+            <img alt="Docker" src="/assets/img/icons/docker-18.svg" />
             <a
             href="../pages/devops/orchestration/docker/introductiontodocker"
             class="ml-1 mr-2"
@@ -101,7 +99,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/kuberentes-18.svg" />
+            <img alt="Kubernetes" src="/assets/img/icons/kuberentes-18.svg" />
             <a
             href="../pages/devops/orchestration/kubernetes/introductiontokubernetes"
             class="ml-1 mr-2"
@@ -109,9 +107,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/awscloudformation-18.svg"
-            />
+            <img alt="Cloud Formation" src="/assets/img/icons/awscloudformation-18.svg" />
             <a
             href="/categories/orchestration/awscloudformation/"
             class="ml-1 mr-2"
@@ -119,8 +115,8 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/azureresourcemanager-18.svg"
+            <img alt="Azure Resource Manager"
+            src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
             href="/categories/orchestration/azureresourcemanager/"
@@ -129,7 +125,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/helm-18.svg" />
+            <img alt="Helm" src="/assets/img/icons/helm-18.svg" />
             <a
             href="/categories/orchestration/helm/"
             class="ml-1 mr-2"
@@ -139,7 +135,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/terraform-18.svg" />
+            <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
             href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
             class="ml-1 mr-2"
@@ -147,7 +143,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/redhatansible-18.svg" />
+            <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
             href="/categories/orchestration/redhatansible/"
             class="ml-1 mr-2"
@@ -155,7 +151,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/cloudify-18.jpeg" />
+            <img alt="Cloudify" src="/assets/img/icons/cloudify-18.jpeg" />
             <a
             href="/categories/orchestration/cloudify/"
             class="ml-1 mr-2"
@@ -163,7 +159,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/morpheus-18.svg" />
+            <img alt="Morpheus" src="/assets/img/icons/morpheus-18.svg" />
             <a
             href="/categories/orchestration/morpheus/"
             class="ml-1 mr-2"
@@ -183,7 +179,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img
-        src="/assets/lib/icons/configuration-management-18.svg"
+        src="/assets/img/icons/configuration-management-18.svg"
         />
         <a
         href="/categories/configurationmanagement/"
@@ -205,7 +201,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/powershell-18.svg" />
+            <img src="/assets/img/icons/powershell-18.svg" />
             <a
             href="/pages/devops/configurationmanagement/powershell/introductiontopowershell"
             class="ml-1 mr-2"
@@ -213,7 +209,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/puppet-18.svg" />
+            <img alt="Puppet" src="/assets/img/icons/puppet-18.svg" />
             <a
             href="/categories/configurationmanagement/puppet"
             class="ml-1 mr-2"
@@ -221,7 +217,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/chef-18.svg" />
+            <img alt="Chef" src="/assets/img/icons/chef-18.svg" />
             <a
             href="/categories/configurationmanagement/chef"
             class="ml-1 mr-2"
@@ -229,7 +225,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/saltstack-18.svg" />
+            <img alt="Saltstack" src="/assets/img/icons/saltstack-18.svg" />
             <a
             href="/categories/configurationmanagement/saltstack"
             class="ml-1 mr-2"
@@ -239,7 +235,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/terraform-18.svg" />
+            <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
             href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
             class="ml-1 mr-2"
@@ -247,7 +243,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/redhatansible-18.svg" />
+            <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
             href="/categories/orchestration/redhatansible/"
             class="ml-1 mr-2"
@@ -255,7 +251,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/vagrant-18.svg" />
+            <img alt="Vagrant" src="/assets/img/icons/vagrant-18.svg" />
             <a
             href="/categories/configurationmanagement/vagrant"
             class="ml-1 mr-2"
@@ -263,7 +259,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/consul-18.svg" />
+            <img alt="Consul" src="/assets/img/icons/consul-18.svg" />
             <a
             href="/categories/configurationmanagement/consul"
             class="ml-1 mr-2"
@@ -282,7 +278,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/coding-18.svg" />
+        <img src="/assets/img/icons/coding-18.svg" />
         <a
         href="/categories/infrastructureascode/"
         class="ml-1 mr-2"
@@ -303,19 +299,19 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/jenkins-18.svg" />
+            <img alt="Jenkins" src="/assets/img/icons/jenkins-18.svg" />
             <a href="/categories/cicd/jenkins/" class="ml-1 mr-2"
             >Jenkins</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/gitlab-18.svg" />
+            <img alt="Gitlab" src="/assets/img/icons/gitlab-18.svg" />
             <a href="/categories/cicd/gitlab/" class="ml-1 mr-2"
             >GitLab</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/azuredevops-18.svg" />
+            <img alt="Azure DevOps" src="/assets/img/icons/azuredevops-18.svg" />
             <a
             href="/categories/cicd/azuredevops/"
             class="ml-1 mr-2"
@@ -323,7 +319,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/teamcity-18.svg" />
+            <img alt="TeamCity" src="/assets/img/icons/teamcity-18.svg" />
             <a href="/categories/cicd/teamcity/" class="ml-1 mr-2"
             >TeamCity</a
             >
@@ -331,19 +327,19 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/bamboo-18.svg" />
+            <img alt="Bamboo" src="/assets/img/icons/bamboo-18.svg" />
             <a href="/categories/cicd/bamboo/" class="ml-1 mr-2"
             >Bamboo</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/travisci-18.svg" />
+            <img alt="TravisCI" src="/assets/img/icons/travisci-18.svg" />
             <a href="/categories/cicd/travisci/" class="ml-1 mr-2"
             >Travis CI</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/spinnaker-18.svg" />
+            <img alt="Spinnaker" src="/assets/img/icons/spinnaker-18.svg" />
             <a
             href="/categories/cicd/spinnaker/"
             class="ml-1 mr-2"
@@ -351,7 +347,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/githubactions-18.svg" />
+            <img alt="GitHub Actions" src="/assets/img/icons/githubactions-18.svg" />
             <a
             href="/categories/cicd/githubactions/"
             class="ml-1 mr-2"
@@ -370,7 +366,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/coding-18.svg" />
+        <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
         <a
         href="/categories/infrastructureascode/"
         class="ml-1 mr-2"
@@ -391,7 +387,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/terraform-18.svg" />
+            <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
             href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
             class="ml-1 mr-2"
@@ -399,8 +395,8 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/azureresourcemanager-18.svg"
+            <img alt="Azure Resource Manager"
+            src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
             href="/categories/orchestration/azureresourcemanager/"
@@ -411,8 +407,8 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img
-            src="/assets/lib/icons/awscloudformation-18.svg"
+            <img alt="Cloud Formation"
+            src="/assets/img/icons/awscloudformation-18.svg"
             />
             <a
             href="/categories/orchestration/awscloudformation/"
@@ -432,7 +428,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/coding-18.svg" />
+        <img alt="DevSecOps Tools" src="/assets/img/icons/coding-18.svg" />
         <a href="/categories/devsecopstools/" class="ml-1 mr-2"
         >DevSecOps Tools</a
         >
@@ -451,7 +447,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/sonarqube-18.svg" />
+            <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
             href="/categories/devsecopstools/sonarcube/"
             class="ml-1 mr-2"
@@ -459,7 +455,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/tfsec-18.svg" />
+            <img alt="TFSec" src="/assets/img/icons/tfsec-18.svg" />
             <a
             href="/categories/devsecopstools/tfsec/"
             class="ml-1 mr-2"
@@ -467,7 +463,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/folder-18.svg" />
+            <img alt="CheckMarx" src="/assets/img/icons/folder-18.svg" />
             <a
             href="/categories/devsecopstools/checkmarx/"
             class="ml-1 mr-2"
@@ -475,7 +471,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/folder-18.svg" />
+            <img alt="BurpSuite" src="/assets/img/icons/folder-18.svg" />
             <a
             href="/categories/devsecopstools/burpsuite/"
             class="ml-1 mr-2"
@@ -483,7 +479,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/folder-18.svg" />
+            <img alt="AppScan" src="/assets/img/icons/folder-18.svg" />
             <a
             href="/categories/devsecopstools/appscan/"
             class="ml-1 mr-2"
@@ -493,7 +489,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/snyk-18.svg" />
+            <img alt="Snyk" src="/assets/img/icons/snyk-18.svg" />
             <a
             href="/categories/devsecopstools/snyk/"
             class="ml-1 mr-2"
@@ -501,7 +497,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/owaspzap-18.svg" />
+            <img alt="OWASPZap" src="/assets/img/icons/owaspzap-18.svg" />
             <a
             href="/categories/devsecopstools/owaspzap/"
             class="ml-1 mr-2"
@@ -509,7 +505,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/fortify-18.svg" />
+            <img alt="Fortify" src="/assets/img/icons/fortify-18.svg" />
             <a
             href="/categories/devsecopstools/fortify/"
             class="ml-1 mr-2"
@@ -517,7 +513,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/folder-18.svg" />
+            <img alt="Coverity" src="/assets/img/icons/folder-18.svg" />
             <a
             href="/categories/devsecopstools/coverity/"
             class="ml-1 mr-2"
@@ -536,7 +532,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/monitoring-18.svg" />
+        <img alt="Monitoring" src="/assets/img/icons/monitoring-18.svg" />
         <a href="/categories/monitoring/" class="ml-1 mr-2"
         >Monitoring</a
         >
@@ -555,7 +551,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/prometheus-18.svg" />
+            <img alt="Prometheus" src="/assets/img/icons/prometheus-18.svg" />
             <a
             href="/categories/monitoring/prometheus/"
             class="ml-1 mr-2"
@@ -563,7 +559,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/grafana-18.svg" />
+            <img alt="Grafana" src="/assets/img/icons/grafana-18.svg" />
             <a
             href="/categories/monitoring/grafana/"
             class="ml-1 mr-2"
@@ -573,7 +569,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/loki-18.svg" />
+            <img alt="Loki" src="/assets/img/icons/loki-18.svg" />
             <a
             href="/categories/monitoring/loki/"
             class="ml-1 mr-2"
@@ -581,7 +577,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/datadog-18.svg" />
+            <img alt="Datadog" src="/assets/img/icons/datadog-18.svg" />
             <a
             href="/categories/monitoring/datadog/"
             class="ml-1 mr-2"
@@ -600,7 +596,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/databases-18.svg" />
+        <img alt="Databases" src="/assets/img/icons/databases-18.svg" />
         <a href="/categories/databases/" class="ml-1 mr-2"
         >Databases</a
         >
@@ -619,7 +615,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/mssql-18.svg" />
+            <img alt="MSSQL" src="/assets/img/icons/mssql-18.svg" />
             <a
             href="/categories/databases/mssql/"
             class="ml-1 mr-2"
@@ -629,7 +625,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/postgresql-18.svg" />
+            <img alt="PostgreSQL" src="/assets/img/icons/postgresql-18.svg" />
             <a
             href="/categories/databases/postgreSQL/"
             class="ml-1 mr-2"
@@ -648,7 +644,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/operatingsystem-18.svg" />
+        <img alt="Operating Systems" src="/assets/img/icons/operatingsystem-18.svg" />
         <a href="/categories/operatingsystems/" class="ml-1 mr-2"
         >Operating Systems</a
         >
@@ -667,7 +663,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/windows-18.svg" />
+            <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
             <a
             href="/categories/operatingsystems/windows/"
             class="ml-1 mr-2"
@@ -677,7 +673,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/ubuntu-18.svg" />
+            <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntu-18.svg" />
             <a
             href="/categories/operatingsystems/linux-ubuntu/"
             class="ml-1 mr-2"
@@ -696,7 +692,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/iam-18.svg" />
+        <img alt="IAM" src="/assets/img/icons/iam-18.svg" />
         <a href="/categories/iam/" class="ml-1 mr-2"
         >Identity and Access Management</a
         >
@@ -715,13 +711,13 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/azuread-18.svg" />
+            <img alt="Entra ID" src="/assets/img/icons/azuread-18.svg" />
             <a href="/categories/iam/msazuread/" class="ml-1 mr-2"
-            >Azure Active Directory</a
+            >Azure Entra ID</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/gcpiam-18.svg" />
+            <img alt="GCP IAM" src="/assets/img/icons/gcpiam-18.svg" />
             <a href="/categories/iam/gcpiam/" class="ml-1 mr-2"
             >GCP IAM</a
             >
@@ -729,13 +725,13 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/awsiam-18.svg" />
+            <img alt="AWS IAM" src="/assets/img/icons/awsiam-18.svg" />
             <a href="/categories/iam/awsiam/" class="ml-1 mr-2"
             >AWS IAM</a
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/sso-18.svg" />
+            <img alt="SSO" src="/assets/img/icons/sso-18.svg" />
             <a href="/categories/iam/sso/" class="ml-1 mr-2"
             >Single Sign On (SSO)</a
             >
@@ -752,7 +748,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/virtualization-18.svg" />
+        <img alt="Virtualization" src="/assets/img/icons/virtualization-18.svg" />
         <a href="/categories/virtualization/" class="ml-1 mr-2"
         >Virtualization</a
         >
@@ -771,7 +767,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/lib/icons/docker-18.svg" />
+            <img alt="Docker" src="/assets/img/icons/docker-18.svg" />
             <a
             href="/categories/orchestration/docker/"
             class="ml-1 mr-2"
@@ -779,7 +775,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             >
         </div>
         <div class="p-2">
-            <img src="/assets/lib/icons/hyperv-18.svg" />
+            <img alt="Hyper-V" src="/assets/img/icons/hyperv-18.svg" />
             <a
             href="/categories/virtualization/hyper-v/"
             class="ml-1 mr-2"
@@ -789,7 +785,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img src="/assets/lib/icons/vmware-18.svg" />
+            <img alt="VMWare" src="/assets/img/icons/vmware-18.svg" />
             <a
             href="/categories/virtualization/vmware/"
             class="ml-1 mr-2"
@@ -801,7 +797,3 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     </div>
 </div>
 <!-- Virtualization End -->
-
-
-[def]: page
-[def2]: /
