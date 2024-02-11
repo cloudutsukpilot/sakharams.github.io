@@ -41,7 +41,7 @@ test:
 testhtml:
   stage: test
   script:
-    - bundle exec htmlproofer public \
+    - bundle exec htmlproofer test \
       \-\-disable-external=true \
       \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
   artifacts:
