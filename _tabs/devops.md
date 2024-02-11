@@ -751,7 +751,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Linux Debian" src="/assets/img/icons/debianos-18.svg" />
                 <a
-                href="../pages/operatingsystems/linux/ubuntu/introudctiontodebian"
+                href="../pages/operatingsystems/linux/debian/introductiontodebian"
                 class="ml-1 mr-2"
                 >Linux - Debian</a
                 >
