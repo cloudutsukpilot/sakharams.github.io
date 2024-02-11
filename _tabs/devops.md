@@ -2,7 +2,7 @@
 layout: page
 title: DevOps
 icon: fas fa-cloud
-order: 3
+order: 4
 ---
 
 
@@ -411,7 +411,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             src="/assets/img/icons/awscloudformation-18.svg"
             />
             <a
-            href="../pages/devops/orchestration/awscloudformation/introductiontoawscloudformation.md"
+            href="../pages/devops/orchestration/awscloudformation/introductiontoawscloudformation"
             class="ml-1 mr-2"
             >AWS CloudFormation</a
             >
@@ -421,7 +421,6 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     </div>
 </div>
 <!-- IAC End -->
-
 <!-- Git Start -->
 <div class="card categories">
     <div
@@ -474,7 +473,6 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     </div>
 </div>
 <!-- Git End -->
-
 <!-- DevSecOps Tools Start -->
 <div class="card categories">
     <div
@@ -483,7 +481,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="DevSecOps Tools" src="/assets/img/icons/coding-18.svg" />
-        <a href="/categories/devsecopstools/" class="ml-1 mr-2"
+        <a href="../pages/devsecops/introducutiontodevsecops" class="ml-1 mr-2"
         >DevSecOps Tools</a
         >
     </span>
@@ -503,7 +501,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
-            href="/categories/devsecopstools/sonarcube/"
+            href="../pages/devsecops/sonarcube/introuductiontosonarcube"
             class="ml-1 mr-2"
             >SonarQube</a
             >
@@ -511,7 +509,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="TFSec" src="/assets/img/icons/tfsec-18.svg" />
             <a
-            href="/categories/devsecopstools/tfsec/"
+            href="../pages/devsecops/tfsec/introductiontotfsec"
             class="ml-1 mr-2"
             >tfsec</a
             >
@@ -519,7 +517,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="CheckMarx" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="/categories/devsecopstools/checkmarx/"
+            href="../pages/devsecops/checkmarx/introductiontocheckmarx"
             class="ml-1 mr-2"
             >checkmarx</a
             >
@@ -527,7 +525,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="BurpSuite" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="/categories/devsecopstools/burpsuite/"
+            href="../pages/devsecops/burpsuite/introuductiontoburpsuite"
             class="ml-1 mr-2"
             >Burp Suite/PortSwigger</a
             >
@@ -535,7 +533,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="AppScan" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="/categories/devsecopstools/appscan/"
+            href="../pages/devsecops/appscan/introductiontoappscan"
             class="ml-1 mr-2"
             >App Scan</a
             >
@@ -545,7 +543,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Snyk" src="/assets/img/icons/snyk-18.svg" />
             <a
-            href="/categories/devsecopstools/snyk/"
+            href="../pages/devsecops/snyk/introductiontosnyk"
             class="ml-1 mr-2"
             >Snyk</a
             >
@@ -553,7 +551,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="OWASPZap" src="/assets/img/icons/owaspzap-18.svg" />
             <a
-            href="/categories/devsecopstools/owaspzap/"
+            href="../pages/devsecops/owaspzap/introductiontoowaspzap"
             class="ml-1 mr-2"
             >OWASP SAP</a
             >
@@ -561,7 +559,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Fortify" src="/assets/img/icons/fortify-18.svg" />
             <a
-            href="/categories/devsecopstools/fortify/"
+            href="../pages/devsecops/fortify/introductiontofortify"
             class="ml-1 mr-2"
             >Fortify</a
             >
@@ -569,7 +567,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Coverity" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="/categories/devsecopstools/coverity/"
+            href="../pages/devsecops/coverity/introductiontocoverity"
             class="ml-1 mr-2"
             >Coverity</a
             >
@@ -587,7 +585,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="Monitoring" src="/assets/img/icons/monitoring-18.svg" />
-        <a href="/categories/monitoring/" class="ml-1 mr-2"
+        <a href="../pages/monitoring/introductiontomonitoring" class="ml-1 mr-2"
         >Monitoring</a
         >
     </span>
@@ -607,7 +605,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Prometheus" src="/assets/img/icons/prometheus-18.svg" />
             <a
-            href="/categories/monitoring/prometheus/"
+            href="../pages/monitoring/prometheus/introductiontoprometheus"
             class="ml-1 mr-2"
             >Prometheus</a
             >
@@ -625,7 +623,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Loki" src="/assets/img/icons/loki-18.svg" />
             <a
-            href="/categories/monitoring/loki/"
+            href="../pages/monitoring/loki/introductiontoloki"
             class="ml-1 mr-2"
             >Loki</a
             >
@@ -633,7 +631,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Datadog" src="/assets/img/icons/datadog-18.svg" />
             <a
-            href="/categories/monitoring/datadog/"
+            href="../pages/monitoring/datadog/introductiontodatadog"
             class="ml-1 mr-2"
             >Datadog</a
             >

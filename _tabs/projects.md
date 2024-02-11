@@ -2,7 +2,7 @@
 layout: post
 title: Projects
 icon: fas fa-project-diagram
-order: 3
+order: 6
 ---
 
 Below are the projects:
