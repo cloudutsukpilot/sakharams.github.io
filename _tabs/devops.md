@@ -22,7 +22,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/lib/icons/cloud-18.svg" />
+        <img alt="Cloud" src="/assets/lib/icons/cloud-18.svg" />
         <a href="/pages/cloud/introductiontocloud" class="ml-1 mr-2">Cloud</a>
     </span>
     <a
