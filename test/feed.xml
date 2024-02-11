@@ -1,0 +1,230 @@
+
+
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://sakharams.github.io/</id>
+  <title>Cloudustuk</title>
+  <subtitle>A complete blog post about cloud, devops and security.</subtitle>
+  <updated>2024-02-11T20:40:27+05:30</updated>
+  <author>
+    <name>Sakharam Shinde</name>
+    <uri>https://sakharams.github.io/</uri>
+  </author>
+  <link rel="self" type="application/atom+xml" href="https://sakharams.github.io/feed.xml"/>
+  <link rel="alternate" type="text/html" hreflang="en"
+    href="https://sakharams.github.io/"/>
+  <generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator>
+  <rights> © 2024 Sakharam Shinde </rights>
+  <icon>/assets/img/favicons/favicon.ico</icon>
+  <logo>/assets/img/favicons/favicon-96x96.png</logo>
+
+
+  
+  <entry>
+    <title>Python dotenv module</title>
+    <link href="https://sakharams.github.io/posts/2022/01/Python-dotenv-module/" rel="alternate" type="text/html" title="Python dotenv module" />
+    <published>2022-01-01T00:00:00+05:30</published>
+  
+    <updated>2022-01-01T00:00:00+05:30</updated>
+  
+    <id>https://sakharams.github.io/posts/2022/01/Python-dotenv-module/</id>
+    <content src="https://sakharams.github.io/posts/2022/01/Python-dotenv-module/" />
+    <author>
+      <name>Sakharam Shinde</name>
+    </author>
+
+  
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      Error:
+ModuleNotFoundError: No module named ‘dotenv’
+
+Reason:
+Python env was not set
+
+Solution:
+python3 -m venv ~/pythonvenv/
+ls -al ~/pythonvenv/
+pip3 install python-dotenv
+source ~/pythonvenv/bin/activate
+pip install –upgrade pip
+
+    </summary>
+  
+
+  </entry>
+
+  
+  <entry>
+    <title>MacOS Environment Variables</title>
+    <link href="https://sakharams.github.io/posts/2022/01/MacOS-Environment-Variables/" rel="alternate" type="text/html" title="MacOS Environment Variables" />
+    <published>2022-01-01T00:00:00+05:30</published>
+  
+    <updated>2022-01-01T00:00:00+05:30</updated>
+  
+    <id>https://sakharams.github.io/posts/2022/01/MacOS-Environment-Variables/</id>
+    <content src="https://sakharams.github.io/posts/2022/01/MacOS-Environment-Variables/" />
+    <author>
+      <name>Sakharam Shinde</name>
+    </author>
+
+  
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      
+  To display the list of currently set environment variables:
+    printenv
+    
+  
+  To display the value of any specific environment variable:
+    echo $[variable name]
+    
+  
+  To check the value of the PATH variable which stores a list of directories with executable files:
+    echo $PATH
+    
+  
+  To set a temporary environment variable:
+    export [variable_name]=[variable_value]
+    
+  
+...
+    </summary>
+  
+
+  </entry>
+
+  
+  <entry>
+    <title>Bitbucket Git Clone with MFA Enabled</title>
+    <link href="https://sakharams.github.io/posts/2022/01/Bitbucket-Git-Clone-with-MFA-Enabled/" rel="alternate" type="text/html" title="Bitbucket Git Clone with MFA Enabled" />
+    <published>2022-01-01T00:00:00+05:30</published>
+  
+    <updated>2022-01-01T00:00:00+05:30</updated>
+  
+    <id>https://sakharams.github.io/posts/2022/01/Bitbucket-Git-Clone-with-MFA-Enabled/</id>
+    <content src="https://sakharams.github.io/posts/2022/01/Bitbucket-Git-Clone-with-MFA-Enabled/" />
+    <author>
+      <name>Sakharam Shinde</name>
+    </author>
+
+  
+    
+    <category term="blog" />
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      In this post, we will go through the stpes that you can follow to clone a Bitbucket git repository to your local machine when multi factor authentication (MFA) is enabled on your Bitbucket account.
+
+Since we have MFA enabled on the Bitbucket account, we cannot clone the git repository directly. Instead, we can use tokens to authenticate git operations to the respository.
+
+
+  Login into your bit...
+    </summary>
+  
+
+  </entry>
+
+  
+  <entry>
+    <title>MyPost</title>
+    <link href="https://sakharams.github.io/posts/2021/10/mypost/" rel="alternate" type="text/html" title="MyPost" />
+    <published>2021-10-10T00:00:00+05:30</published>
+  
+    <updated>2021-10-10T00:00:00+05:30</updated>
+  
+    <id>https://sakharams.github.io/posts/2021/10/mypost/</id>
+    <content src="https://sakharams.github.io/posts/2021/10/mypost/" />
+    <author>
+      <name>Sakharam Shinde</name>
+    </author>
+
+  
+    
+    <category term="template" />
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      Sample Post
+
+    </summary>
+  
+
+  </entry>
+
+  
+  <entry>
+    <title>Enable Google Analytics in Jekyll(Chirpy) Static Site Generator</title>
+    <link href="https://sakharams.github.io/posts/2021/02/Enable-Google-Analytics-in-Jekyll-Chirpy/" rel="alternate" type="text/html" title="Enable Google Analytics in Jekyll(Chirpy) Static Site Generator" />
+    <published>2021-02-01T00:00:00+05:30</published>
+  
+    <updated>2021-02-01T00:00:00+05:30</updated>
+  
+    <id>https://sakharams.github.io/posts/2021/02/Enable-Google-Analytics-in-Jekyll-Chirpy/</id>
+    <content src="https://sakharams.github.io/posts/2021/02/Enable-Google-Analytics-in-Jekyll-Chirpy/" />
+    <author>
+      <name>Sakharam Shinde</name>
+    </author>
+
+  
+    
+    <category term="blog" />
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      In this post, we will go through the stpes that I have used to get this blog (https://www.sakharams.github.io/) running on GitHub Pages with the chirpy-starter template to enable Google Analytics and Adsense.
+
+Prerequisities
+
+
+  Github pages site if setup using the Jekyll static site generator with the chirpy theme.
+  Google Account is created and google tag manager account for this site is cre...
+    </summary>
+  
+
+  </entry>
+
+</feed>
+
+

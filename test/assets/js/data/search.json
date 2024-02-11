@@ -1,0 +1,140 @@
+[
+  
+  {
+    "title": "Python dotenv module",
+    "url": "/posts/2022/01/Python-dotenv-module/",
+    "categories": "",
+    "tags": "",
+    "date": "2022-01-01 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "Error:ModuleNotFoundError: No module named ‘dotenv’Reason:Python env was not setSolution:python3 -m venv ~/pythonvenv/ls -al ~/pythonvenv/pip3 install python-dotenvsource ~/pythonvenv/bin/activatep...",
+    "content": "Error:ModuleNotFoundError: No module named ‘dotenv’Reason:Python env was not setSolution:python3 -m venv ~/pythonvenv/ls -al ~/pythonvenv/pip3 install python-dotenvsource ~/pythonvenv/bin/activatepip install –upgrade pip"
+  },
+  
+  {
+    "title": "MacOS Environment Variables",
+    "url": "/posts/2022/01/MacOS-Environment-Variables/",
+    "categories": "",
+    "tags": "",
+    "date": "2022-01-01 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "  To display the list of currently set environment variables:    printenv        To display the value of any specific environment variable:    echo $[variable name]        To check the value of the...",
+    "content": "  To display the list of currently set environment variables:    printenv        To display the value of any specific environment variable:    echo $[variable name]        To check the value of the PATH variable which stores a list of directories with executable files:    echo $PATH        To set a temporary environment variable:    export [variable_name]=[variable_value]        To add value to an existing environment variable:    export [existing_variable_name]=[new_variable_value]:$[existing_variable_name]        Example:    export PATH=/Users/exec/tok:$PATH        To set permanent environment variable          Find the path to .bash_profile using:        ~/.bash_profile                    Open the .bash_profile file with a text editor and add the new environmental variable to the end of the file using:        export [variable_name]=[variable_value]                    Save the file and refresh the terminal using the below command or restart the terminal.        source ~/.bash_profile                      To unset the environmental variable:    unset [variable =_name]      "
+  },
+  
+  {
+    "title": "Bitbucket Git Clone with MFA Enabled",
+    "url": "/posts/2022/01/Bitbucket-Git-Clone-with-MFA-Enabled/",
+    "categories": "blog",
+    "tags": "Bitbucket, MFA, Git",
+    "date": "2022-01-01 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "In this post, we will go through the stpes that you can follow to clone a Bitbucket git repository to your local machine when multi factor authentication (MFA) is enabled on your Bitbucket account....",
+    "content": "In this post, we will go through the stpes that you can follow to clone a Bitbucket git repository to your local machine when multi factor authentication (MFA) is enabled on your Bitbucket account.Since we have MFA enabled on the Bitbucket account, we cannot clone the git repository directly. Instead, we can use tokens to authenticate git operations to the respository.  Login into your bitbucket repository.  Navigate to Profile -&gt; Manage Account -&gt; HTTP Access Tokens.  Create a tocket with appropiate name and selected the required permissions which will be associated with the token.  Once the tocken is generated, please save it in a secure place as it is visible only once.  On your machine, type the below command and enter the tocken as your password:    git clone &lt;repository_rule&gt;Username for &lt;repository_url&gt; : Password for &lt;username&gt;:         The git repository should be cloned to your machine in the current directory."
+  },
+  
+  {
+    "title": "MyPost",
+    "url": "/posts/2021/10/mypost/",
+    "categories": "template",
+    "tags": "templates, sample",
+    "date": "2021-10-10 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "Sample Post",
+    "content": "Sample Post"
+  },
+  
+  {
+    "title": "Enable Google Analytics in Jekyll(Chirpy) Static Site Generator",
+    "url": "/posts/2021/02/Enable-Google-Analytics-in-Jekyll-Chirpy/",
+    "categories": "blog",
+    "tags": "blog, jekyll, chiry, googleanalytics",
+    "date": "2021-02-01 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "In this post, we will go through the stpes that I have used to get this blog (https://www.sakharams.github.io/) running on GitHub Pages with the chirpy-starter template to enable Google Analytics a...",
+    "content": "In this post, we will go through the stpes that I have used to get this blog (https://www.sakharams.github.io/) running on GitHub Pages with the chirpy-starter template to enable Google Analytics and Adsense.Prerequisities  Github pages site if setup using the Jekyll static site generator with the chirpy theme.  Google Account is created and google tag manager account for this site is created."
+  },
+  
+  {
+    "title": "Building a Website",
+    "url": "/posts/2021/01/Building-a-website/",
+    "categories": "website",
+    "tags": "website, blog",
+    "date": "2021-01-01 00:00:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "Creating a personal website to share your knowledge on DevOps using HTML, CSS, and JavaScript is a great idea! Below are the steps and some sample code to help you get started:Step 1: Plan Your Web...",
+    "content": "Creating a personal website to share your knowledge on DevOps using HTML, CSS, and JavaScript is a great idea! Below are the steps and some sample code to help you get started:Step 1: Plan Your WebsiteBefore diving into coding, it’s essential to plan your website’s structure and content. Consider what topics you want to cover, how you want to organize them, and any additional features you want to include, such as a blog or a contact page.Step 2: Set Up Your Development EnvironmentYou’ll need a code editor (e.g., Visual Studio Code, Sublime Text) and a web browser for testing. You can also use version control tools like Git to track changes in your code.Step 3: Create HTML StructureStart by creating the basic HTML structure for your website. Here’s a simple example:Step 4: Create CSS StylesCreate a separate CSS file (e.g., styles.css) to style your website. Customize the styles according to your preferences and branding. Here’s a simple example to get you started:Step 5: Add JavaScript InteractivityYou can enhance your website with JavaScript to make it interactive. For example, you can create a navigation menu that smoothly scrolls to different sections of the page when clicked.Step 6: Create and Add ContentAdd your DevOps articles, blog posts, and any other content to the appropriate sections of your website.Step 7: Test and DeployTest your website in different web browsers to ensure compatibility. Once you’re satisfied with how it looks and functions, you can deploy it to a web hosting platform or service of your choice. Some popular options include GitHub Pages, Netlify, or a traditional web hosting provider.Remember to continuously update and improve your website with new content and features to share your DevOps knowledge effectively.Step 8: Create a Blog PageIf you plan to share blog posts, create a dedicated blog page where you can list and link to your articles. You can create individual HTML files for each blog post and link to them from the blog page. Here’s an example of how the blog section could look:Step 9: Add Blog Post PagesFor each blog post, create a separate HTML file (e.g., blog-post1.html, blog-post2.html). Include the content of each post in these files. Here’s an example structure for a blog post page:Repeat this process for each blog post, updating the title, content, and date accordingly.Step 10: Style Your Blog PostsYou can style your blog post pages to make them visually appealing. Use CSS to format text, add images, and create a consistent design. You can also consider using CSS frameworks like Bootstrap for more advanced styling options.Step 11: Add InteractivityEnhance the interactivity of your website with JavaScript. For instance, you can add a comment section to your blog posts or create interactive diagrams or tools related to DevOps. JavaScript libraries like React or Vue.js can help you build more complex interactive features.Step 12: Optimize for Mobile DevicesEnsure that your website is responsive and looks good on various screen sizes, including mobile devices. You can use media queries in your CSS to adjust the layout and styling for smaller screens.Step 13: SEO OptimizationImprove your website’s visibility in search engines by optimizing it for search engines (SEO). Include relevant keywords in your content, add meta tags, and create a sitemap. This can help increase organic traffic to your site.Step 14: Regularly Update ContentTo maintain an engaged audience, regularly update your website with new blog posts, tutorials, or insights about DevOps. Engage with your readers through comments or a contact form to encourage discussion and feedback.Step 15: Backup and SecurityRegularly backup your website and ensure that it’s secure. Use secure passwords, update your software (including CMS if you’re using one), and consider implementing security measures like HTTPS encryption.Step 16: Launch and PromoteFinally, launch your website and promote it within the DevOps community. Share your articles on social media, participate in relevant forums or communities, and engage with your audience to build a readership.Remember that building and maintaining a website is an ongoing process. Continuously seek ways to improve and provide value to your audience, and your DevOps website will grow over time. Good luck with your DevOps knowledge-sharing journey!Step 17: Implement a Search FunctionIf your website contains a lot of content, consider adding a search function. You can use JavaScript or integrate third-party search services like Algolia to provide users with an easy way to find specific topics or articles.Step 18: Create Interactive DevOps ToolsConsider building interactive tools or calculators related to DevOps. For example, you could create a deployment time calculator, a cost optimization tool, or a CI/CD pipeline visualizer. These tools can engage your audience and showcase your technical expertise.Step 19: Offer Downloadable ResourcesProvide downloadable resources such as PDF guides, templates, checklists, or code snippets that can help your audience in their DevOps endeavors. This can also be an excellent way to capture email addresses for a newsletter.Step 20: Start a NewsletterConsider starting a newsletter where you send out curated content, updates, and exclusive insights to your subscribers. Building an email list can help you stay connected with your audience and notify them of new content.Step 21: Social Media IntegrationIntegrate social media sharing buttons on your articles to encourage readers to share your content. Also, create social media profiles for your website to expand your reach and engage with the DevOps community.Step 22: Analytics and InsightsSet up website analytics (e.g., Google Analytics) to track visitor behavior and gain insights into which content is popular and where your traffic is coming from. This data can help you refine your content strategy.Step 23: Collaborate and Guest PostingCollaborate with other experts in the DevOps field. Consider writing guest posts for other websites or inviting guest authors to contribute to your site. This can broaden your audience and establish you as an authority in the DevOps community.Step 24: Monitor and Update RegularlyContinuously monitor your website for broken links, outdated content, and performance issues. Regularly update your content to ensure its accuracy and relevance. A well-maintained site is more likely to attract and retain visitors.Step 25: Consider a Content Management System (CMS)If you plan to frequently add and manage content, consider using a CMS like WordPress, Joomla, or Drupal. These platforms offer user-friendly interfaces for content management.Step 26: Legal and Privacy ConsiderationsEnsure your website complies with legal and privacy regulations, such as GDPR for handling user data and copyright laws for content. Include a privacy policy and terms of use where necessary.Step 27: Community EngagementEngage with the DevOps community by participating in discussions on platforms like Stack Overflow, Reddit, or DevOps-related forums. Share your insights and link to your website when relevant.Step 28: Gather FeedbackEncourage feedback from your audience and use it to improve your website. You can add a feedback form or survey to collect input on content topics, website design, and user experience.Step 29: Monetization (Optional)If you want to monetize your website, consider options such as affiliate marketing, sponsored content, or selling premium resources like courses or e-books. However, ensure that any monetization methods align with your website’s goals and audience.Remember that building a successful DevOps website takes time and effort. Be patient and stay committed to providing value to your audience. Over time, your website can become a valuable resource in the DevOps community and a platform for sharing your technical knowledge."
+  },
+  
+  {
+    "title": "Text and Typography",
+    "url": "/posts/2019/08/post_template/",
+    "categories": "Templates",
+    "tags": "typography, template",
+    "date": "2019-08-08 09:03:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "This post is to show Markdown syntax rendering on Chirpy, you can also use it as an example of writing. Now, let’s start looking at text and typography.HeadingsH1 - headingH2 - headingH3 - headingH...",
+    "content": "This post is to show Markdown syntax rendering on Chirpy, you can also use it as an example of writing. Now, let’s start looking at text and typography.HeadingsH1 - headingH2 - headingH3 - headingH4 - headingH5 - heading centerParagraphQuisque egestas convallis ipsum, ut sollicitudin risus tincidunt a. Maecenas interdum malesuada egestas. Duis consectetur porta risus, sit amet vulputate urna facilisis ac. Phasellus semper dui non purus ultrices sodales. Aliquam ante lorem, ornare a feugiat ac, finibus nec mauris. Vivamus ut tristique nisi. Sed vel leo vulputate, efficitur risus non, posuere mi. Nullam tincidunt bibendum rutrum. Proin commodo ornare sapien. Vivamus interdum diam sed sapien blandit, sit amet aliquam risus mattis. Nullam arcu turpis, mollis quis laoreet at, placerat id nibh. Suspendisse venenatis eros eros.Break LineListsOrdered list  Firstly  Secondly  ThirdlyUnordered list  Chapter          Section                  Paragraph                    ToDo list  Job          Step 1      Step 2      Step 3      Description list  Sun  the star around which the earth orbits  Moon  the natural satellite of the earth, visible by reflected light from the sunBlock Quote  This line shows the block quote.Prompts  An example showing the tip type prompt.  An example showing the info type prompt.  An example showing the warning type prompt.  An example showing the danger type prompt.Tables            Company      Contact      Country                  Alfreds Futterkiste      Maria Anders      Germany              Island Trading      Helen Bennett      UK              Magazzini Alimentari Riuniti      Giovanni Rovelli      Italy      Linkshttp://127.0.0.1:4000FootnoteClick the hook will locate the footnote1, and here is another footnote2.Inline codeThis is an example of Inline Code.FilepathHere is the /path/to/the/file.extend.Code blocksCommonThis is a common code snippet, without syntax highlight and line number.Specific Languageif [ $? -ne 0 ]; then  echo \"The command was not successful.\";  #do the needful / exitfi;Specific filename@import  \"colors/light-typography\",  \"colors/dark-typography\";MathematicsThe mathematics powered by MathJax:\\[\\begin{equation}  \\sum_{n=1}^\\infty 1/n^2 = \\frac{\\pi^2}{6}  \\label{eq:series}\\end{equation}\\]We can reference the equation as \\eqref{eq:series}.When $a \\ne 0$, there are two solutions to $ax^2 + bx + c = 0$ and they are\\[x = {-b \\pm \\sqrt{b^2-4ac} \\over 2a}\\]Mermaid SVG gantt  title  Adding GANTT diagram functionality to mermaid  apple :a, 2017-07-20, 1w  banana :crit, b, 2017-07-23, 1d  cherry :active, c, after b a, 1dImagesDefault (with caption)Full screen width and center alignmentLeft alignedFloat to leftPraesent maximus aliquam sapien. Sed vel neque in dolor pulvinar auctor. Maecenas pharetra, sem sit amet interdum posuere, tellus lacus eleifend magna, ac lobortis felis ipsum id sapien. Proin ornare rutrum metus, ac convallis diam volutpat sit amet. Phasellus volutpat, elit sit amet tincidunt mollis, felis mi scelerisque mauris, ut facilisis leo magna accumsan sapien. In rutrum vehicula nisl eget tempor. Nullam maximus ullamcorper libero non maximus. Integer ultricies velit id convallis varius. Praesent eu nisl eu urna finibus ultrices id nec ex. Mauris ac mattis quam. Fusce aliquam est nec sapien bibendum, vitae malesuada ligula condimentum.Float to rightPraesent maximus aliquam sapien. Sed vel neque in dolor pulvinar auctor. Maecenas pharetra, sem sit amet interdum posuere, tellus lacus eleifend magna, ac lobortis felis ipsum id sapien. Proin ornare rutrum metus, ac convallis diam volutpat sit amet. Phasellus volutpat, elit sit amet tincidunt mollis, felis mi scelerisque mauris, ut facilisis leo magna accumsan sapien. In rutrum vehicula nisl eget tempor. Nullam maximus ullamcorper libero non maximus. Integer ultricies velit id convallis varius. Praesent eu nisl eu urna finibus ultrices id nec ex. Mauris ac mattis quam. Fusce aliquam est nec sapien bibendum, vitae malesuada ligula condimentum.VideoReverse Footnote            The footnote source &#8617;              The 2nd footnote source &#8617;      "
+  },
+  
+  {
+    "title": "Ruby/Jeykll - Certificate Verify Failed",
+    "url": "/posts/2019/08/ruby-jekyll-certificate-verify-failed/",
+    "categories": "Programming, Ruby",
+    "tags": "programming, ruby, jekyll, openssl",
+    "date": "2019-08-08 05:30:00 +0530",
+    
+
+
+
+
+
+    
+    "snippet": "Error Messages:  ERROR: SSL verification error at depth 2: unable to get local issuer certificate (20)  ERROR: You must add certificate to your local trusted store  ERROR: SSL_connect returned=1 er...",
+    "content": "Error Messages:  ERROR: SSL verification error at depth 2: unable to get local issuer certificate (20)  ERROR: You must add certificate to your local trusted store  ERROR: SSL_connect returned=1 errno=0 state=SSLv3 read server certificate B: certificate verify failedSystem Configuration:  Operating System: MacOS  Version: 14.3  Name: DarwinWhat steps resulted in this error?  Installing the Jekyll static site generator using gem:    gem install jekyll        Upgrading RubyGems using the self-update command:    gem update --system      What does this error mean?  This error means that your machine was unable to establish a secure connection to RubyGems.org over SSL.Why did this error occur?  The openssl installed on the machine did not trust the Zscalar certificate which was installed on the machine.Solution  For openssl to trust the Zscalar certificate, we need to add the cert to its trusted folder.  We can identify the path of the openssl certs fodler and the copy the certificate:    openssl version -dcp /&lt;path-to-cert&gt;/cert.pen /opt/homebrew/etc/openssl@3/certs      "
+  }
+  
+]
+
