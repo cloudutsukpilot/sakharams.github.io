@@ -1,10 +1,49 @@
+# Docker image for the runner
 image: ruby:3.2
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+cache:
+  paths:
+    - vendor/
+
+before_script:
+  - gem install bundler
+  - bundle install --path vendor
+
+# Defining the job to execute on the runner
+# For Gitlab pages, the job has a specific name called pages
+# Jekyll will output the files to public directory
 pages:
+  stage: deploy
   script:
-    - gem install bundler
-    - bundle install
     - bundle exec jekyll build -d public
   artifacts:
     paths:
       - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+test:
+  stage: test
+  script:
+    - bundle exec jekyll build -d test
+  artifacts:
+    paths:
+      - test
+  rules:
+    - if: $CI_COMMIT_BRANCH = "main"
+
+testhtml:
+  statge: testhtml
+  script:
+    - bundle exec htmlproofer _site \
+      \-\-disable-external=true \
+      \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
+  artifacts:
+    paths:
+      - testhtml
+  rules:
+    - if: $CI_COMMIT_BRANCH = "main"
