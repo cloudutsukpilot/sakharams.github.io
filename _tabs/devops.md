@@ -182,7 +182,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         src="/assets/img/icons/configuration-management-18.svg"
         />
         <a
-        href="/categories/configurationmanagement/"
+        href="../pages/devops/configurationmanagement/introductiontoconfigurationmanagement"
         class="ml-1 mr-2"
         >Configuration Management</a
         >
@@ -211,7 +211,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Puppet" src="/assets/img/icons/puppet-18.svg" />
             <a
-            href="/categories/configurationmanagement/puppet"
+            href="../pages/devops/configurationmanagement/puppet/introductiontopuppet"
             class="ml-1 mr-2"
             >Puppet</a
             >
@@ -219,7 +219,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Chef" src="/assets/img/icons/chef-18.svg" />
             <a
-            href="/categories/configurationmanagement/chef"
+            href="../pages/devops/configurationmanagement/chef/introductiontochef"
             class="ml-1 mr-2"
             >Chef</a
             >
@@ -227,7 +227,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Saltstack" src="/assets/img/icons/saltstack-18.svg" />
             <a
-            href="/categories/configurationmanagement/saltstack"
+            href="../pages/devops/configurationmanagement/saltstack/introductiontosaltstack"
             class="ml-1 mr-2"
             >SaltStack</a
             >
@@ -253,7 +253,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Vagrant" src="/assets/img/icons/vagrant-18.svg" />
             <a
-            href="/categories/configurationmanagement/vagrant"
+            href="../pages/devops/configurationmanagement/vagrant/introductiontovagrant"
             class="ml-1 mr-2"
             >Vagrant</a
             >
@@ -261,7 +261,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Consul" src="/assets/img/icons/consul-18.svg" />
             <a
-            href="/categories/configurationmanagement/consul"
+            href="../pages/devops/configurationmanagement/consul/introductiontoconsul"
             class="ml-1 mr-2"
             >Consul</a
             >
@@ -280,7 +280,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <span>
         <img alt="CICD" src="/assets/img/icons/coding-18.svg" />
         <a
-        href="/categories/infrastructureascode/"
+        href="../pages/devops/cicd/introductiontocicd"
         class="ml-1 mr-2"
         >Continous Integration/Continous Deployment (CI/CD)</a
         >
@@ -300,27 +300,27 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Jenkins" src="/assets/img/icons/jenkins-18.svg" />
-            <a href="/categories/cicd/jenkins/" class="ml-1 mr-2"
+            <a href="../pages/devops/cicd/jenkins/introductiontojenkins" class="ml-1 mr-2"
             >Jenkins</a
             >
         </div>
         <div class="p-2">
             <img alt="Gitlab" src="/assets/img/icons/gitlab-18.svg" />
-            <a href="/categories/cicd/gitlab/" class="ml-1 mr-2"
+            <a href="../pages/devops/cicd/gitlab/introductiontogitlab" class="ml-1 mr-2"
             >GitLab</a
             >
         </div>
         <div class="p-2">
             <img alt="Azure DevOps" src="/assets/img/icons/azuredevops-18.svg" />
             <a
-            href="/categories/cicd/azuredevops/"
+            href="../pages/devops/cicd/azuredevops/introductiontoazuredevops"
             class="ml-1 mr-2"
             >Azure DevOps</a
             >
         </div>
         <div class="p-2">
             <img alt="TeamCity" src="/assets/img/icons/teamcity-18.svg" />
-            <a href="/categories/cicd/teamcity/" class="ml-1 mr-2"
+            <a href="../pages/devops/cicd/teamcity/introuductiontoteamcity" class="ml-1 mr-2"
             >TeamCity</a
             >
         </div>
@@ -328,20 +328,20 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="Bamboo" src="/assets/img/icons/bamboo-18.svg" />
-            <a href="/categories/cicd/bamboo/" class="ml-1 mr-2"
+            <a href="../pages/devops/cicd/bamboo/introductiontobamboo" class="ml-1 mr-2"
             >Bamboo</a
             >
         </div>
         <div class="p-2">
             <img alt="TravisCI" src="/assets/img/icons/travisci-18.svg" />
-            <a href="/categories/cicd/travisci/" class="ml-1 mr-2"
+            <a href="../pages/devops/cicd/travisci/introductiontotravisci" class="ml-1 mr-2"
             >Travis CI</a
             >
         </div>
         <div class="p-2">
             <img alt="Spinnaker" src="/assets/img/icons/spinnaker-18.svg" />
             <a
-            href="/categories/cicd/spinnaker/"
+            href="../pages/devops/cicd/spinnaker/introductiontospinnaker"
             class="ml-1 mr-2"
             >Spinnaker</a
             >
@@ -349,7 +349,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="GitHub Actions" src="/assets/img/icons/githubactions-18.svg" />
             <a
-            href="../pages/devops/cicd/github/introductiontogithub"
+            href="../pages/devops/cicd/githubactions/introductiontogithubactions"
             class="ml-1 mr-2"
             >GitHub Actions</a
             >
@@ -368,7 +368,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <span>
         <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
         <a
-        href="/categories/infrastructureascode/"
+        href="../pages/devops/iac/introductiontoiac"
         class="ml-1 mr-2"
         >Infrastructure as Code (IAC)</a
         >
@@ -421,6 +421,60 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     </div>
 </div>
 <!-- IAC End -->
+
+<!-- Git Start -->
+<div class="card categories">
+    <div
+    id="h_3"
+    class="card-header d-flex justify-content-between hide-border-bottom"
+    >
+    <span>
+        <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
+        <a
+        href="../pages/devops/git/introductiontogit"
+        class="ml-1 mr-2"
+        >Git</a
+        >
+    </span>
+    <a
+        href="#l_3"
+        data-toggle="collapse"
+        aria-expanded="true"
+        aria-label="h_3-trigger"
+        class="category-trigger hide-border-bottom"
+    >
+        <i class="fas fa-fw fa-angle-down"></i>
+    </a>
+    </div>
+    <div id="l_3" class="collapse show" aria-expanded="true">
+    <div class="container d-flex flex-wrap align-items-top">
+        <div class="d-flex flex-column w-50">
+            <div class="p-2">
+                <img alt="Gitlab" src="/assets/img/icons/gitlab-18.svg" />
+                <a
+                href="/pages/devops/git/gitlab/introductiontogitlab"
+                class="ml-1 mr-2"
+                >GitLab</a
+                >
+            </div>
+        </div>
+        <div class="d-flex flex-column">
+            <div class="p-2">
+                <img alt="GitHub"
+                src="../assets/img/icons/github-18.svg"
+                />
+                <a
+                href="../pages/devops/git/github/introductiontogithub"
+                class="ml-1 mr-2"
+                >GitHub</a
+                >
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+<!-- Git End -->
+
 <!-- DevSecOps Tools Start -->
 <div class="card categories">
     <div
@@ -800,3 +854,4 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
 
 
 [def]: ./pages/de
+[def2]: assets/img/i

@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Introduction to GitHub and GitHub Actions
+title: Introduction to GitHub Actions
 ---
 
 
