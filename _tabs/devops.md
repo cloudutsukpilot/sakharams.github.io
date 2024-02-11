@@ -109,7 +109,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Cloud Formation" src="/assets/img/icons/awscloudformation-18.svg" />
             <a
-            href="/categories/orchestration/awscloudformation/"
+            href="../pages/devops/orchestration/awscloudformation/introductiontoawscloudformation"
             class="ml-1 mr-2"
             >AWS CloudFormation</a
             >
@@ -119,7 +119,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
-            href="/categories/orchestration/azureresourcemanager/"
+            href="../pages/devops/orchestration/arm/introductiontoarm"
             class="ml-1 mr-2"
             >Azure Resource Manager</a
             >
@@ -127,7 +127,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Helm" src="/assets/img/icons/helm-18.svg" />
             <a
-            href="/categories/orchestration/helm/"
+            href="../pages/devops/orchestration/helm/introductiontohelm"
             class="ml-1 mr-2"
             >Helm</a
             >
@@ -145,7 +145,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
-            href="/categories/orchestration/redhatansible/"
+            href="../pages/devops/orchestration/ansible/introductiontoansible"
             class="ml-1 mr-2"
             >RedHat Ansible</a
             >
@@ -153,7 +153,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Cloudify" src="/assets/img/icons/cloudify-18.jpeg" />
             <a
-            href="/categories/orchestration/cloudify/"
+            href="../pages/devops/orchestration/cloudify/introductiontocloudify"
             class="ml-1 mr-2"
             >Cloudify</a
             >
@@ -161,7 +161,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Morpheus" src="/assets/img/icons/morpheus-18.svg" />
             <a
-            href="/categories/orchestration/morpheus/"
+            href="../pages/devops/orchestration/morpheus/introductiontomorpheus"
             class="ml-1 mr-2"
             >Morpheus</a
             >
@@ -178,7 +178,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img
+        <img alt="Configuration Management"
         src="/assets/img/icons/configuration-management-18.svg"
         />
         <a
@@ -201,7 +201,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img src="/assets/img/icons/powershell-18.svg" />
+            <img alt="Powershell" src="/assets/img/icons/powershell-18.svg" />
             <a
             href="/pages/devops/configurationmanagement/powershell/introductiontopowershell"
             class="ml-1 mr-2"
@@ -245,7 +245,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
-            href="/categories/orchestration/redhatansible/"
+            href="../pages/devops/orchestration/ansible/introductiontoansible"
             class="ml-1 mr-2"
             >RedHat Ansible</a
             >
@@ -278,7 +278,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     class="card-header d-flex justify-content-between hide-border-bottom"
     >
     <span>
-        <img src="/assets/img/icons/coding-18.svg" />
+        <img alt="CICD" src="/assets/img/icons/coding-18.svg" />
         <a
         href="/categories/infrastructureascode/"
         class="ml-1 mr-2"
@@ -349,7 +349,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="GitHub Actions" src="/assets/img/icons/githubactions-18.svg" />
             <a
-            href="/categories/cicd/githubactions/"
+            href="../pages/devops/cicd/github/introductiontogithub"
             class="ml-1 mr-2"
             >GitHub Actions</a
             >
@@ -399,7 +399,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
-            href="/categories/orchestration/azureresourcemanager/"
+            href="../pages/devops/orchestration/arm/introductiontoarm"
             class="ml-1 mr-2"
             >Azure Resource Manager (ARM)</a
             >
@@ -411,7 +411,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
             src="/assets/img/icons/awscloudformation-18.svg"
             />
             <a
-            href="/categories/orchestration/awscloudformation/"
+            href="../pages/devops/orchestration/awscloudformation/introductiontoawscloudformation.md"
             class="ml-1 mr-2"
             >AWS CloudFormation</a
             >
@@ -797,3 +797,6 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     </div>
 </div>
 <!-- Virtualization End -->
+
+
+[def]: ./pages/de
