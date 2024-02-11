@@ -4,4 +4,4 @@ title: Introduction to GitHub
 ---
 
 
-[Git Clone using SSH Authentication](/pages/devops/cicd/github/sshauthentication)
+[Git Clone using SSH Authentication](./sshauthentication)
