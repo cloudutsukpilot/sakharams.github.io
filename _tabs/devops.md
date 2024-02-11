@@ -613,7 +613,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Grafana" src="/assets/img/icons/grafana-18.svg" />
             <a
-            href="/categories/monitoring/grafana/"
+            href="../pages/monitoring/grafana/introductiontografana"
             class="ml-1 mr-2"
             >Grafana</a
             >
@@ -649,7 +649,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="Databases" src="/assets/img/icons/databases-18.svg" />
-        <a href="/categories/databases/" class="ml-1 mr-2"
+        <a href="../pages/databases/introductiontodatabases" class="ml-1 mr-2"
         >Databases</a
         >
     </span>
@@ -669,7 +669,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="MSSQL" src="/assets/img/icons/mssql-18.svg" />
             <a
-            href="/categories/databases/mssql/"
+            href="../pages/databases/mssql/introductiontomssql"
             class="ml-1 mr-2"
             >Microsoft SQL Server</a
             >
@@ -679,7 +679,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="PostgreSQL" src="/assets/img/icons/postgresql-18.svg" />
             <a
-            href="/categories/databases/postgreSQL/"
+            href="../pages/databases/postgresql/introductiontopostgresql"
             class="ml-1 mr-2"
             >PostgreSQL</a
             >
@@ -697,7 +697,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="Operating Systems" src="/assets/img/icons/operatingsystem-18.svg" />
-        <a href="/categories/operatingsystems/" class="ml-1 mr-2"
+        <a href="../pages/operatingsystems/introductiontoos" class="ml-1 mr-2"
         >Operating Systems</a
         >
     </span>
@@ -714,24 +714,48 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div id="l_7" class="collapse show" aria-expanded="true">
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
-        <div class="p-2">
-            <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
-            <a
-            href="/categories/operatingsystems/windows/"
-            class="ml-1 mr-2"
-            >Windows</a
-            >
-        </div>
+            <div class="p-2">
+                <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
+                <a
+                href="../pages/operatingsystems/windowsos/introductiontowindowsos"
+                class="ml-1 mr-2"
+                >Windows</a
+                >
+            </div>
+                <div class="p-2">
+                <img alt="MacOS" src="/assets/img/icons/macos-18.svg" />
+                <a
+                href="../pages/operatingsystems/macos/introductiontomacos"
+                class="ml-1 mr-2"
+                >MacOS</a
+                >
+            </div>
         </div>
         <div class="d-flex flex-column">
-        <div class="p-2">
-            <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntu-18.svg" />
-            <a
-            href="/categories/operatingsystems/linux-ubuntu/"
-            class="ml-1 mr-2"
-            >Linux - Ubuntu</a
-            >
-        </div>
+            <div class="p-2">
+                <img alt="Linux Ubuntu" src="/assets/img/icons/linuxos-18.svg" />
+                <a
+                href="../pages/operatingsystems/linux/introductiontolinux"
+                class="ml-1 mr-2"
+                >Linux</a
+                >
+            </div>
+            <div class="p-2">
+                <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntuos-18.svg" />
+                <a
+                href="../pages/operatingsystems/linux/ubuntu/introudctiontoubuntu"
+                class="ml-1 mr-2"
+                >Linux - Ubuntu</a
+                >
+            </div>
+            <div class="p-2">
+                <img alt="Linux Debian" src="/assets/img/icons/debianos-18.svg" />
+                <a
+                href="../pages/operatingsystems/linux/ubuntu/introudctiontodebian"
+                class="ml-1 mr-2"
+                >Linux - Debian</a
+                >
+            </div>
         </div>
     </div>
     </div>
@@ -745,7 +769,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="IAM" src="/assets/img/icons/iam-18.svg" />
-        <a href="/categories/iam/" class="ml-1 mr-2"
+        <a href="../pages/iam/introductiontoiam" class="ml-1 mr-2"
         >Identity and Access Management</a
         >
     </span>
@@ -764,13 +788,13 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Entra ID" src="/assets/img/icons/azuread-18.svg" />
-            <a href="/categories/iam/msazuread/" class="ml-1 mr-2"
+            <a href="../pages/iam/azureentraid/introductiontoazureentraid" class="ml-1 mr-2"
             >Azure Entra ID</a
             >
         </div>
         <div class="p-2">
             <img alt="GCP IAM" src="/assets/img/icons/gcpiam-18.svg" />
-            <a href="/categories/iam/gcpiam/" class="ml-1 mr-2"
+            <a href="../pages/iam/gcpiam/introductiontogcpiam" class="ml-1 mr-2"
             >GCP IAM</a
             >
         </div>
@@ -778,13 +802,13 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="AWS IAM" src="/assets/img/icons/awsiam-18.svg" />
-            <a href="/categories/iam/awsiam/" class="ml-1 mr-2"
+            <a href="../pages/iam/awsiam/introductiontoawsiam" class="ml-1 mr-2"
             >AWS IAM</a
             >
         </div>
         <div class="p-2">
             <img alt="SSO" src="/assets/img/icons/sso-18.svg" />
-            <a href="/categories/iam/sso/" class="ml-1 mr-2"
+            <a href="../pages/iam/sso/introductiontosso" class="ml-1 mr-2"
             >Single Sign On (SSO)</a
             >
         </div>
@@ -801,7 +825,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     >
     <span>
         <img alt="Virtualization" src="/assets/img/icons/virtualization-18.svg" />
-        <a href="/categories/virtualization/" class="ml-1 mr-2"
+        <a href="../pages/virtualization/introductiontovirtualization" class="ml-1 mr-2"
         >Virtualization</a
         >
     </span>
@@ -819,17 +843,9 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
     <div class="container d-flex flex-wrap align-items-top">
         <div class="d-flex flex-column w-50">
         <div class="p-2">
-            <img alt="Docker" src="/assets/img/icons/docker-18.svg" />
-            <a
-            href="/categories/orchestration/docker/"
-            class="ml-1 mr-2"
-            >Docker</a
-            >
-        </div>
-        <div class="p-2">
             <img alt="Hyper-V" src="/assets/img/icons/hyperv-18.svg" />
             <a
-            href="/categories/virtualization/hyper-v/"
+            href="../pages/virtualization/hyperv/introductiontohyperv"
             class="ml-1 mr-2"
             >Hyper-V</a
             >
@@ -839,7 +855,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="VMWare" src="/assets/img/icons/vmware-18.svg" />
             <a
-            href="/categories/virtualization/vmware/"
+            href="../pages/virtualization/vmware/introductionvmware"
             class="ml-1 mr-2"
             >VMWare</a
             >
