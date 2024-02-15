@@ -19,7 +19,39 @@ As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few 
 \
 \
 
-
+<!-- Certifications Start -->
+<div class="container">
+    <div class="d-flex flex-row flex-wrap justify-content-center">
+    <div class="d-flex flex-row">
+        <img
+        alt="Azure Fundamentals"
+        src="/assets/img/certifications/Azure_Administrator_Associate.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Azure Administrator Associate"
+        src="/assets/img/certifications/Azure_Administrator_Associate.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Azure Data Fundamentals"
+        src="/assets/img/certifications/Azure_Data_Fundamentals.png"
+        class="img-fluid"
+        />
+        <img
+        alt="Terraform Associate"
+        src="/assets/img/certifications/Terraform_Associate.png"
+        class="img-fluid"
+        />
+        <img
+        alt="ITIL Foundation"
+        src="/assets/img/certifications/ITIL_Foundation.png"
+        class="img-fluid"
+        />
+    </div>
+    </div>
+</div>
+<!-- Certifications End -->
 
 
 \

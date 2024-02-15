@@ -460,7 +460,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="d-flex flex-column">
             <div class="p-2">
                 <img alt="GitHub"
-                src="../assets/img/icons/github-18.svg"
+                src="/assets/img/icons/github-18.svg"
                 />
                 <a
                 href="../pages/devops/git/github/introductiontogithub"
