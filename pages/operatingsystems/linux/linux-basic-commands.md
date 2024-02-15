@@ -70,9 +70,14 @@ sudo ufw status
 To check if a port is open
 nc -v cloudutsuk.com 443
 
-### DNS
+#### DNS
 To retrieve information about DNS Nameservers
 
 dig cloudutsuk.com
+
+
+#### Logging
+| dmesg | Prints the messages provided by device drivers. | 
+| cat /var/log/syslog | To get the system logs | 
 
 
