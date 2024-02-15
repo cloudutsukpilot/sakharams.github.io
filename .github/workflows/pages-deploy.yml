@@ -52,7 +52,7 @@ jobs:
           JEKYLL_ENV: "production"
       
       - name: List Folders and Files
-        run: ls "_site${{ steps.pages.outputs.base_path }}"
+        run: ls "_site${{ steps.pages.outputs.base_path }}" -l -R
         env:
           JEKYLL_ENV: "production"
 
