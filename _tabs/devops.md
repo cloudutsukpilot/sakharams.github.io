@@ -137,17 +137,9 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
-            href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
+            href="/pages/devops/orchestration/terraform/introductiontoterraform"
             class="ml-1 mr-2"
             >Terraform</a
-            >
-        </div>
-        <div class="p-2">
-            <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
-            <a
-            href="../pages/devops/orchestration/ansible/introductiontoansible"
-            class="ml-1 mr-2"
-            >RedHat Ansible</a
             >
         </div>
         <div class="p-2">
@@ -235,17 +227,9 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         </div>
         <div class="d-flex flex-column">
         <div class="p-2">
-            <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
-            <a
-            href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
-            class="ml-1 mr-2"
-            >Terraform</a
-            >
-        </div>
-        <div class="p-2">
             <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
-            href="../pages/devops/orchestration/ansible/introductiontoansible"
+            href="../pages/devops/configurationmanagement/ansible/introductiontoansible"
             class="ml-1 mr-2"
             >RedHat Ansible</a
             >
@@ -389,7 +373,7 @@ Read More at [DevOps Introduction](/pages/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
-            href="/pages/devops/configurationmanagement/terraform/introductiontoterraform"
+            href="/pages/devops/orchestration/terraform/introductiontoterraform"
             class="ml-1 mr-2"
             >Terraform</a
             >

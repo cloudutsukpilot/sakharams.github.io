@@ -65,11 +65,17 @@ title: Terraform Interview Questions
     | for | |
     | for_each | | 
 
-9. What's Terraform State? Where is it stored? 
+9. What is the difference between lists, tuples and set type in terraform?
+
+    | Set | Similar to lists and tuples, but does not contains duplicate values and ordering of elements is lost | 
+    | List | Lists are mutable, which means you can add, remove, or modify elements after the list is created |
+    | Tuples | Tuples are immutable, which means they cannot be changed once created | 
+
+10. What's Terraform State? Where is it stored? 
 - Terraform state is used by Terraform to map real world resources to your configuration, keep track of metadata, and to improve performance for large infrastructures.
 - Local or remote storage - Depends upon the requirement.
 
-10. What is Terraform state locking? 
+11. What is Terraform state locking? 
 - If there are two users or processes concurrently editing the state file it can result in invalid state file that doesn't actually represents the state of resources.
 - To avoid it, terraform applies lock on the state file.
 

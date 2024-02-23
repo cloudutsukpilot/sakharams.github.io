@@ -17,3 +17,6 @@ Postfix Configuration File Location
 
 To check the logs:
 /var/log/mail.log
+
+To check the postfix service status
+sudo postfix status
