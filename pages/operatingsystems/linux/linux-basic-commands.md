@@ -81,3 +81,6 @@ dig cloudutsuk.com
 | cat /var/log/syslog | To get the system logs | 
 
 
+
+#### To encode a string to base64
+echo -n '<string>' | openssl base64
