@@ -1,7 +1,8 @@
 ---
 layout: post
-title: Amazon Web Services(AWS)
-icon: fab fa-terraform
+title: Introduction to Cloud
+categories: [cloud]
+tags: [cloud]
 ---
 
 ### What is Cloud Computing?
@@ -15,7 +16,9 @@ icon: fab fa-terraform
 4. Services
 5. Devices
 
-ElB
 
+### Cloud Service Providers:
 
-
+1. [Microsoft Azure](../cloud/azure/introductiontoazure)
+2. [Amazon Web Services](../cloud/aws/introductiontoaws)
+3. [Google Cloud Platform](../cloud/gcp/introductiontogcp)

@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Introduction to Cloud
-icon: fas fa-cloud
-order: 3
+title: Amazon Web Services(AWS)
+categories: [cloud, aws]
+tags: [cloud, aws]
 ---
 
 ### What is Cloud Computing?
@@ -16,9 +16,7 @@ order: 3
 4. Services
 5. Devices
 
+ElB
 
-### Cloud Service Providers:
 
-1. [Microsoft Azure](../cloud/azure/introductiontoazure)
-2. [Amazon Web Services](../cloud/aws/introductiontoaws)
-3. [Google Cloud Platform](../cloud/gcp/introductiontogcp)
+

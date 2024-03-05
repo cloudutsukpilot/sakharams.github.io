@@ -1,7 +1,8 @@
 ---
 layout: post
 title: Microsoft Azure
-icon: fas fa-cloud
+categories: [cloud, azure]
+tags: [cloud, azure]
 ---
 
 ### What is Cloud Computing?

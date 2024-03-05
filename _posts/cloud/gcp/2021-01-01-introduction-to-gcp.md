@@ -1,6 +1,8 @@
 ---
 layout: post
 title: Google Cloud Platform(GCP)
+categories: [cloud, gcp]
+tags: [cloud, gcp]
 ---
 
 ### What is Cloud Computing?
