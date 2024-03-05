@@ -19,6 +19,6 @@ In conclusion, cloud computing has transformed the way businesses operate by pro
 
 To learn more about cloud computing and the services offered by Microsoft Azure, AWS, and GCP, check out the following resources:
 
-1. [Microsoft Azure](/_posts/cloud/azure/2021-01-01-introduction-to-azure)
-2. [Amazon Web Services](/_posts/cloud/aws/2022-01-01-introduction-to-aws)
-3. [Google Cloud Platform](/_posts/cloud/gcp/2021-01-01-introduction-to-gcp)
+1. [Microsoft Azure](../posts/cloud/azure.html)
+2. [Amazon Web Services](../posts/cloud/aws.html)
+3. [Google Cloud Platform](../posts/cloud/gcp.html)
