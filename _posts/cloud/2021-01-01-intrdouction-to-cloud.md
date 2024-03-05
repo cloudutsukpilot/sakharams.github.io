@@ -19,6 +19,6 @@ tags: [cloud]
 
 ### Cloud Service Providers:
 
-1. [Microsoft Azure](../cloud/azure/introductiontoazure)
-2. [Amazon Web Services](../cloud/aws/introductiontoaws)
-3. [Google Cloud Platform](../cloud/gcp/introductiontogcp)
+1. [Microsoft Azure](../cloud/azure/introduction-to-azure)
+2. [Amazon Web Services](../cloud/aws/introduction-to-aws)
+3. [Google Cloud Platform](../cloud/gcp/introduction-to-gcp)

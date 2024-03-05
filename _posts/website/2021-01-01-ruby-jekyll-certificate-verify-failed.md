@@ -1,9 +1,8 @@
 ---
 layout: post
 title: Ruby/Jeykll - Certificate Verify Failed
-date: 2019-08-08 00:00:00 +0000
-categories: [Programming, Ruby]
-tags: [programming, ruby, jekyll, openssl]
+categories: [website, jekyll]
+tags: [website, jekyll, ruby, openssl]
 ---
 
 ## Error Messages:

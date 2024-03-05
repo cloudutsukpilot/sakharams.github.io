@@ -1,6 +1,8 @@
 ---
 layout: post
 title: Email Journaling
+categories: [projects, email journaling]
+tags: [projects, email journaling]
 ---
 
 

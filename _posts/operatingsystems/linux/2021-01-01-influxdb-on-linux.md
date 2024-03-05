@@ -1,6 +1,8 @@
 ---
 layout: post
 title: Install InfluxDB on Linux
+categories: [operating systems, linux]
+tags: [operating systems, linux]
 ---
 
 #### What is InfluxDB?

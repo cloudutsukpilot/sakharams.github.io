@@ -48,7 +48,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="TFSec" src="/assets/img/icons/tfsec-18.svg" />
             <a
-            href="../posts/devsecops/tfsec/introductiontotfsec"
+            href="../posts/devsecops/tfsec/introduction-to-tfsec"
             class="ml-1 mr-2"
             >tfsec</a
             >
@@ -56,7 +56,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="CheckMarx" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/checkmarx/introductiontocheckmarx"
+            href="../posts/devsecops/checkmarx/introduction-to-checkmarx"
             class="ml-1 mr-2"
             >checkmarx</a
             >
@@ -72,7 +72,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="AppScan" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/appscan/introductiontoappscan"
+            href="../posts/devsecops/appscan/introduction-to-appscan"
             class="ml-1 mr-2"
             >App Scan</a
             >
@@ -82,7 +82,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="Snyk" src="/assets/img/icons/snyk-18.svg" />
             <a
-            href="../posts/devsecops/snyk/introductiontosnyk"
+            href="../posts/devsecops/snyk/introduction-to-snyk"
             class="ml-1 mr-2"
             >Snyk</a
             >
@@ -90,7 +90,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="OWASPZap" src="/assets/img/icons/owaspzap-18.svg" />
             <a
-            href="../posts/devsecops/owaspzap/introductiontoowaspzap"
+            href="../posts/devsecops/owaspzap/introduction-to-owaspzap"
             class="ml-1 mr-2"
             >OWASP SAP</a
             >
@@ -98,7 +98,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="Fortify" src="/assets/img/icons/fortify-18.svg" />
             <a
-            href="../posts/devsecops/fortify/introductiontofortify"
+            href="../posts/devsecops/fortify/introduction-to-fortify"
             class="ml-1 mr-2"
             >Fortify</a
             >
@@ -106,7 +106,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="Coverity" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/coverity/introductiontocoverity"
+            href="../posts/devsecops/coverity/introduction-to-coverity"
             class="ml-1 mr-2"
             >Coverity</a
             >

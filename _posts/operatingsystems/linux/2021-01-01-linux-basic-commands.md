@@ -1,6 +1,8 @@
 ---
 layout: post
 title: Linux Basic Commands
+categories: [operating systems, linux]
+tags: [operating systems, linux]
 ---
 
 

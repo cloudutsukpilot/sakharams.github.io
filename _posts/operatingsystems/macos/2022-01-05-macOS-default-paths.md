@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Default Paths of DevOps Tools in macOS
-categories: [operatingsystem]
-tags: [macOS]
+categories: [operating systems, macos]
+tags: [operating systems, macos]
 ---
 
 When working with DevOps tools on macOS, it's important to know the default installation and configuration paths for various tools. This knowledge can help you locate and configure these tools more efficiently. 
