@@ -9,7 +9,7 @@ order: 5
 
 - Development + Security + Operations
 
-More Details [here](/posts/devsecops/introducutiontodevsecops)
+More Details [here](/posts/devsecops/introduction-to-devsecops)
 
 ### DevSecOps Tools:
 <!-- DevSecOps Tools Start -->
@@ -20,7 +20,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
     >
     <span>
         <img alt="DevSecOps Tools" src="/assets/img/icons/coding-18.svg" />
-        <a href="../posts/devsecops/introducutiontodevsecops" class="ml-1 mr-2"
+        <a href="../posts/devsecops/introduction-to-devsecops" class="ml-1 mr-2"
         >DevSecOps Tools</a
         >
     </span>
@@ -40,7 +40,7 @@ More Details [here](/posts/devsecops/introducutiontodevsecops)
         <div class="p-2">
             <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
-            href="../posts/devsecops/sonarcube/introuductiontosonarcube"
+            href="../posts/devsecops/sonarcube/introduction-to-sonarcube"
             class="ml-1 mr-2"
             >SonarQube</a
             >

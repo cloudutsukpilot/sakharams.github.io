@@ -727,7 +727,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntuos-18.svg" />
                 <a
-                href="/posts/operatingsystems/linux/ubuntu/introudctiontoubuntu"
+                href="/posts/operatingsystems/ubuntu/introduction-to-ubuntu"
                 class="ml-1 mr-2"
                 >Linux - Ubuntu</a
                 >
@@ -735,7 +735,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Linux Debian" src="/assets/img/icons/debianos-18.svg" />
                 <a
-                href="/posts/operatingsystems/linux/debian/introduction-to-debian"
+                href="/posts/operatingsystems/debian/introduction-to-debian"
                 class="ml-1 mr-2"
                 >Linux - Debian</a
                 >
@@ -772,13 +772,13 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Entra ID" src="/assets/img/icons/azuread-18.svg" />
-            <a href="/posts/iam/azureentraid/introduction-to-azureentraid" class="ml-1 mr-2"
+            <a href="/posts/iam/azureentraid/introduction-to-azure-entraid" class="ml-1 mr-2"
             >Azure Entra ID</a
             >
         </div>
         <div class="p-2">
             <img alt="GCP IAM" src="/assets/img/icons/gcpiam-18.svg" />
-            <a href="/posts/iam/gcpiam/introduction-to-gcpiam" class="ml-1 mr-2"
+            <a href="/posts/iam/gcpiam/introduction-to-gcp-iam" class="ml-1 mr-2"
             >GCP IAM</a
             >
         </div>
@@ -786,7 +786,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="AWS IAM" src="/assets/img/icons/awsiam-18.svg" />
-            <a href="/posts/iam/awsiam/introduction-to-awsiam" class="ml-1 mr-2"
+            <a href="/posts/iam/awsiam/introduction-to-aws-iam" class="ml-1 mr-2"
             >AWS IAM</a
             >
         </div>
@@ -839,7 +839,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="p-2">
             <img alt="VMWare" src="/assets/img/icons/vmware-18.svg" />
             <a
-            href="/posts/virtualization/vmware/introductionvmware"
+            href="/posts/virtualization/vmware/introduction-to-vmware"
             class="ml-1 mr-2"
             >VMWare</a
             >
