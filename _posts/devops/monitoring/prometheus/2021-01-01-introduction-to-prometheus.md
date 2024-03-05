@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Introduction to Prometheus Monitoring Tool in DevOps
-categories: [monitoring, prometheus, devops]
-tags: [monitoring, prometheus, devops]
+categories: [devops, monitoring, prometheus]
+tags: [devops, monitoring, prometheus]
 ---
 
 ## Introduction

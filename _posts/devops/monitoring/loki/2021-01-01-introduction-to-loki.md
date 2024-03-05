@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Introduction to Loki
-categories: [monitoring, loki]
-tags: [monitoring, loki, devops]
+categories: [devops, monitoring, loki]
+tags: [devops, monitoring, loki, devops]
 ---
 
 Loki is a powerful log aggregation system that is commonly used in DevOps practices. It is designed to be highly efficient and scalable, making it an ideal choice for managing logs in large-scale distributed systems.

@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Introduction to Datadog Monitoring Tool in DevOps
-categories: [monitoring, datadog, devops]
-tags: [monitoring, datadog, devops]
+categories: [devops, monitoring, datadog]
+tags: [devops, monitoring, datadog]
 ---
 
 ## Introduction

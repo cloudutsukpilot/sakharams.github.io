@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Introduction to Grafana as a Monitoring Tool in DevOps
-categories: [monitoring, grafana, devops]
-tags: [monitoring, grafana, devops]
+categories: [devops, monitoring, grafana]
+tags: [devops, monitoring, grafana]
 ---
 
 Grafana is a powerful open-source analytics and monitoring platform that is widely used in the DevOps world. It provides a flexible and customizable dashboard for visualizing and analyzing metrics from various data sources. In this blog post, we will explore the key features and benefits of using Grafana as a monitoring tool in a DevOps environment.
