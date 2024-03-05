@@ -701,7 +701,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
                 <a
-                href="/posts/operating systems/windowsos/introduction-to-windows"
+                href="/posts/operating systems/windows/introduction-to-windows"
                 class="ml-1 mr-2"
                 >Windows</a
                 >
