@@ -10,7 +10,7 @@ order: 4
 
 DevOps combines development and operations to increase the efficiency, speed, and security of software development and delivery compared to traditional processes.
 
-Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
+Read More at [DevOps Introduction](/_posts/devops/introductiontodevops)
 
 
 ### DevOps Tools:
@@ -23,7 +23,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Cloud" src="/assets/img/icons/cloud-18.svg" />
-        <a href="/_post/cloud/introductiontocloud" class="ml-1 mr-2">Cloud</a>
+        <a href="/_posts/cloud/introductiontocloud" class="ml-1 mr-2">Cloud</a>
     </span>
     <a
         href="#l_0"
@@ -40,13 +40,13 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Microsoft Azure" src="/assets/img/icons/microsoft-azure-18.svg" />
-            <a href="/_post/cloud/azure/introductiontoazure" class="ml-1 mr-2"
+            <a href="/_posts/cloud/azure/introductiontoazure" class="ml-1 mr-2"
             >Microsoft Azure</a
             >
         </div>
         <div class="p-2">
             <img alt="Amanzon Web Services" src="/assets/img/icons/amazonwebservices-18.svg" />
-            <a href="/_post/cloud/aws/introductiontoaws" class="ml-1 mr-2"
+            <a href="/_posts/cloud/aws/introductiontoaws" class="ml-1 mr-2"
             >Amazon Web Services (AWS)</a
             >
         </div>
@@ -56,7 +56,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <img alt="Google Cloud Platform"
             src="/assets/img/icons/googlecloudplatform-18.svg"
             />
-            <a href="/_post/cloud/gcp/introductiontogcp" class="ml-1 mr-2"
+            <a href="/_posts/cloud/gcp/introductiontogcp" class="ml-1 mr-2"
             >Google Cloud Platform (GCP)</a
             >
         </div>
@@ -73,7 +73,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Orchestration" src="/assets/img/icons/orchestration-18.svg" />
-        <a href="/_post/devops/orchestration/introductiontoorchestration" class="ml-1 mr-2"
+        <a href="/_posts/devops/orchestration/introductiontoorchestration" class="ml-1 mr-2"
         >Orchestration</a
         >
     </span>
@@ -93,7 +93,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Docker" src="/assets/img/icons/docker-18.svg" />
             <a
-            href="../_post/devops/orchestration/docker/introductiontodocker"
+            href="../_posts/devops/orchestration/docker/introductiontodocker"
             class="ml-1 mr-2"
             >Docker</a
             >
@@ -101,7 +101,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Kubernetes" src="/assets/img/icons/kuberentes-18.svg" />
             <a
-            href="../_post/devops/orchestration/kubernetes/introductiontokubernetes"
+            href="../_posts/devops/orchestration/kubernetes/introductiontokubernetes"
             class="ml-1 mr-2"
             >Kubernetes</a
             >
@@ -109,7 +109,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Cloud Formation" src="/assets/img/icons/awscloudformation-18.svg" />
             <a
-            href="../_post/devops/orchestration/awscloudformation/introductiontoawscloudformation"
+            href="../_posts/devops/orchestration/awscloudformation/introductiontoawscloudformation"
             class="ml-1 mr-2"
             >AWS CloudFormation</a
             >
@@ -119,7 +119,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
-            href="../_post/devops/orchestration/arm/introductiontoarm"
+            href="../_posts/devops/orchestration/arm/introductiontoarm"
             class="ml-1 mr-2"
             >Azure Resource Manager</a
             >
@@ -127,7 +127,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Helm" src="/assets/img/icons/helm-18.svg" />
             <a
-            href="../_post/devops/orchestration/helm/introductiontohelm"
+            href="../_posts/devops/orchestration/helm/introductiontohelm"
             class="ml-1 mr-2"
             >Helm</a
             >
@@ -137,7 +137,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
-            href="/_post/devops/orchestration/terraform/introductiontoterraform"
+            href="/_posts/devops/orchestration/terraform/introductiontoterraform"
             class="ml-1 mr-2"
             >Terraform</a
             >
@@ -145,7 +145,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Cloudify" src="/assets/img/icons/cloudify-18.jpeg" />
             <a
-            href="../_post/devops/orchestration/cloudify/introductiontocloudify"
+            href="../_posts/devops/orchestration/cloudify/introductiontocloudify"
             class="ml-1 mr-2"
             >Cloudify</a
             >
@@ -153,7 +153,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Morpheus" src="/assets/img/icons/morpheus-18.svg" />
             <a
-            href="../_post/devops/orchestration/morpheus/introductiontomorpheus"
+            href="../_posts/devops/orchestration/morpheus/introductiontomorpheus"
             class="ml-1 mr-2"
             >Morpheus</a
             >
@@ -174,7 +174,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         src="/assets/img/icons/configuration-management-18.svg"
         />
         <a
-        href="../_post/devops/configurationmanagement/introductiontoconfigurationmanagement"
+        href="../_posts/devops/configurationmanagement/introductiontoconfigurationmanagement"
         class="ml-1 mr-2"
         >Configuration Management</a
         >
@@ -195,7 +195,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Powershell" src="/assets/img/icons/powershell-18.svg" />
             <a
-            href="/_post/devops/configurationmanagement/powershell/introductiontopowershell"
+            href="/_posts/devops/configurationmanagement/powershell/introductiontopowershell"
             class="ml-1 mr-2"
             >Powershell</a
             >
@@ -203,7 +203,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Puppet" src="/assets/img/icons/puppet-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/puppet/introductiontopuppet"
+            href="../_posts/devops/configurationmanagement/puppet/introductiontopuppet"
             class="ml-1 mr-2"
             >Puppet</a
             >
@@ -211,7 +211,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Chef" src="/assets/img/icons/chef-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/chef/introductiontochef"
+            href="../_posts/devops/configurationmanagement/chef/introductiontochef"
             class="ml-1 mr-2"
             >Chef</a
             >
@@ -219,7 +219,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Saltstack" src="/assets/img/icons/saltstack-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/saltstack/introductiontosaltstack"
+            href="../_posts/devops/configurationmanagement/saltstack/introductiontosaltstack"
             class="ml-1 mr-2"
             >SaltStack</a
             >
@@ -229,7 +229,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Ansible" src="/assets/img/icons/redhatansible-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/ansible/introductiontoansible"
+            href="../_posts/devops/configurationmanagement/ansible/introductiontoansible"
             class="ml-1 mr-2"
             >RedHat Ansible</a
             >
@@ -237,7 +237,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Vagrant" src="/assets/img/icons/vagrant-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/vagrant/introductiontovagrant"
+            href="../_posts/devops/configurationmanagement/vagrant/introductiontovagrant"
             class="ml-1 mr-2"
             >Vagrant</a
             >
@@ -245,7 +245,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Consul" src="/assets/img/icons/consul-18.svg" />
             <a
-            href="../_post/devops/configurationmanagement/consul/introductiontoconsul"
+            href="../_posts/devops/configurationmanagement/consul/introductiontoconsul"
             class="ml-1 mr-2"
             >Consul</a
             >
@@ -264,7 +264,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     <span>
         <img alt="CICD" src="/assets/img/icons/coding-18.svg" />
         <a
-        href="../_post/devops/cicd/introductiontocicd"
+        href="../_posts/devops/cicd/introductiontocicd"
         class="ml-1 mr-2"
         >Continous Integration/Continous Deployment (CI/CD)</a
         >
@@ -284,27 +284,27 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Jenkins" src="/assets/img/icons/jenkins-18.svg" />
-            <a href="../_post/devops/cicd/jenkins/introductiontojenkins" class="ml-1 mr-2"
+            <a href="../_posts/devops/cicd/jenkins/introductiontojenkins" class="ml-1 mr-2"
             >Jenkins</a
             >
         </div>
         <div class="p-2">
             <img alt="Gitlab" src="/assets/img/icons/gitlab-18.svg" />
-            <a href="../_post/devops/cicd/gitlab/introductiontogitlab" class="ml-1 mr-2"
+            <a href="../_posts/devops/cicd/gitlab/introductiontogitlab" class="ml-1 mr-2"
             >GitLab</a
             >
         </div>
         <div class="p-2">
             <img alt="Azure DevOps" src="/assets/img/icons/azuredevops-18.svg" />
             <a
-            href="../_post/devops/cicd/azuredevops/introductiontoazuredevops"
+            href="../_posts/devops/cicd/azuredevops/introductiontoazuredevops"
             class="ml-1 mr-2"
             >Azure DevOps</a
             >
         </div>
         <div class="p-2">
             <img alt="TeamCity" src="/assets/img/icons/teamcity-18.svg" />
-            <a href="../_post/devops/cicd/teamcity/introuductiontoteamcity" class="ml-1 mr-2"
+            <a href="../_posts/devops/cicd/teamcity/introuductiontoteamcity" class="ml-1 mr-2"
             >TeamCity</a
             >
         </div>
@@ -312,20 +312,20 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="Bamboo" src="/assets/img/icons/bamboo-18.svg" />
-            <a href="../_post/devops/cicd/bamboo/introductiontobamboo" class="ml-1 mr-2"
+            <a href="../_posts/devops/cicd/bamboo/introductiontobamboo" class="ml-1 mr-2"
             >Bamboo</a
             >
         </div>
         <div class="p-2">
             <img alt="TravisCI" src="/assets/img/icons/travisci-18.svg" />
-            <a href="../_post/devops/cicd/travisci/introductiontotravisci" class="ml-1 mr-2"
+            <a href="../_posts/devops/cicd/travisci/introductiontotravisci" class="ml-1 mr-2"
             >Travis CI</a
             >
         </div>
         <div class="p-2">
             <img alt="Spinnaker" src="/assets/img/icons/spinnaker-18.svg" />
             <a
-            href="../_post/devops/cicd/spinnaker/introductiontospinnaker"
+            href="../_posts/devops/cicd/spinnaker/introductiontospinnaker"
             class="ml-1 mr-2"
             >Spinnaker</a
             >
@@ -333,7 +333,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="GitHub Actions" src="/assets/img/icons/githubactions-18.svg" />
             <a
-            href="../_post/devops/cicd/githubactions/introductiontogithubactions"
+            href="../_posts/devops/cicd/githubactions/introductiontogithubactions"
             class="ml-1 mr-2"
             >GitHub Actions</a
             >
@@ -352,7 +352,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     <span>
         <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
         <a
-        href="../_post/devops/iac/introductiontoiac"
+        href="../_posts/devops/iac/introductiontoiac"
         class="ml-1 mr-2"
         >Infrastructure as Code (IAC)</a
         >
@@ -373,7 +373,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Terraform" src="/assets/img/icons/terraform-18.svg" />
             <a
-            href="/_post/devops/orchestration/terraform/introductiontoterraform"
+            href="/_posts/devops/orchestration/terraform/introductiontoterraform"
             class="ml-1 mr-2"
             >Terraform</a
             >
@@ -383,7 +383,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             src="/assets/img/icons/azureresourcemanager-18.svg"
             />
             <a
-            href="../_post/devops/orchestration/arm/introductiontoarm"
+            href="../_posts/devops/orchestration/arm/introductiontoarm"
             class="ml-1 mr-2"
             >Azure Resource Manager (ARM)</a
             >
@@ -395,7 +395,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             src="/assets/img/icons/awscloudformation-18.svg"
             />
             <a
-            href="../_post/devops/orchestration/awscloudformation/introductiontoawscloudformation"
+            href="../_posts/devops/orchestration/awscloudformation/introductiontoawscloudformation"
             class="ml-1 mr-2"
             >AWS CloudFormation</a
             >
@@ -414,7 +414,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     <span>
         <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
         <a
-        href="../_post/devops/git/introductiontogit"
+        href="../_posts/devops/git/introductiontogit"
         class="ml-1 mr-2"
         >Git</a
         >
@@ -435,7 +435,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Gitlab" src="/assets/img/icons/gitlab-18.svg" />
                 <a
-                href="/_post/devops/git/gitlab/introductiontogitlab"
+                href="/_posts/devops/git/gitlab/introductiontogitlab"
                 class="ml-1 mr-2"
                 >GitLab</a
                 >
@@ -447,7 +447,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
                 src="/assets/img/icons/github-18.svg"
                 />
                 <a
-                href="../_post/devops/git/github/introductiontogithub"
+                href="../_posts/devops/git/github/introductiontogithub"
                 class="ml-1 mr-2"
                 >GitHub</a
                 >
@@ -465,7 +465,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="DevSecOps Tools" src="/assets/img/icons/coding-18.svg" />
-        <a href="../_post/devsecops/introducutiontodevsecops" class="ml-1 mr-2"
+        <a href="../_posts/devsecops/introducutiontodevsecops" class="ml-1 mr-2"
         >DevSecOps Tools</a
         >
     </span>
@@ -485,7 +485,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
-            href="../_post/devsecops/sonarcube/introuductiontosonarcube"
+            href="../_posts/devsecops/sonarcube/introuductiontosonarcube"
             class="ml-1 mr-2"
             >SonarQube</a
             >
@@ -493,7 +493,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="TFSec" src="/assets/img/icons/tfsec-18.svg" />
             <a
-            href="../_post/devsecops/tfsec/introductiontotfsec"
+            href="../_posts/devsecops/tfsec/introductiontotfsec"
             class="ml-1 mr-2"
             >tfsec</a
             >
@@ -501,7 +501,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="CheckMarx" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../_post/devsecops/checkmarx/introductiontocheckmarx"
+            href="../_posts/devsecops/checkmarx/introductiontocheckmarx"
             class="ml-1 mr-2"
             >checkmarx</a
             >
@@ -509,7 +509,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="BurpSuite" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../_post/devsecops/burpsuite/introuductiontoburpsuite"
+            href="../_posts/devsecops/burpsuite/introuductiontoburpsuite"
             class="ml-1 mr-2"
             >Burp Suite/PortSwigger</a
             >
@@ -517,7 +517,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="AppScan" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../_post/devsecops/appscan/introductiontoappscan"
+            href="../_posts/devsecops/appscan/introductiontoappscan"
             class="ml-1 mr-2"
             >App Scan</a
             >
@@ -527,7 +527,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Snyk" src="/assets/img/icons/snyk-18.svg" />
             <a
-            href="../_post/devsecops/snyk/introductiontosnyk"
+            href="../_posts/devsecops/snyk/introductiontosnyk"
             class="ml-1 mr-2"
             >Snyk</a
             >
@@ -535,7 +535,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="OWASPZap" src="/assets/img/icons/owaspzap-18.svg" />
             <a
-            href="../_post/devsecops/owaspzap/introductiontoowaspzap"
+            href="../_posts/devsecops/owaspzap/introductiontoowaspzap"
             class="ml-1 mr-2"
             >OWASP SAP</a
             >
@@ -543,7 +543,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Fortify" src="/assets/img/icons/fortify-18.svg" />
             <a
-            href="../_post/devsecops/fortify/introductiontofortify"
+            href="../_posts/devsecops/fortify/introductiontofortify"
             class="ml-1 mr-2"
             >Fortify</a
             >
@@ -551,7 +551,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Coverity" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../_post/devsecops/coverity/introductiontocoverity"
+            href="../_posts/devsecops/coverity/introductiontocoverity"
             class="ml-1 mr-2"
             >Coverity</a
             >
@@ -569,7 +569,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Monitoring" src="/assets/img/icons/monitoring-18.svg" />
-        <a href="../_post/monitoring/introductiontomonitoring" class="ml-1 mr-2"
+        <a href="../_posts/monitoring/introductiontomonitoring" class="ml-1 mr-2"
         >Monitoring</a
         >
     </span>
@@ -589,7 +589,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Prometheus" src="/assets/img/icons/prometheus-18.svg" />
             <a
-            href="../_post/monitoring/prometheus/introductiontoprometheus"
+            href="../_posts/monitoring/prometheus/introductiontoprometheus"
             class="ml-1 mr-2"
             >Prometheus</a
             >
@@ -597,7 +597,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Grafana" src="/assets/img/icons/grafana-18.svg" />
             <a
-            href="../_post/monitoring/grafana/introductiontografana"
+            href="../_posts/monitoring/grafana/introductiontografana"
             class="ml-1 mr-2"
             >Grafana</a
             >
@@ -607,7 +607,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Loki" src="/assets/img/icons/loki-18.svg" />
             <a
-            href="../_post/monitoring/loki/introductiontoloki"
+            href="../_posts/monitoring/loki/introductiontoloki"
             class="ml-1 mr-2"
             >Loki</a
             >
@@ -615,7 +615,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Datadog" src="/assets/img/icons/datadog-18.svg" />
             <a
-            href="../_post/monitoring/datadog/introductiontodatadog"
+            href="../_posts/monitoring/datadog/introductiontodatadog"
             class="ml-1 mr-2"
             >Datadog</a
             >
@@ -633,7 +633,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Databases" src="/assets/img/icons/databases-18.svg" />
-        <a href="../_post/databases/introductiontodatabases" class="ml-1 mr-2"
+        <a href="../_posts/databases/introductiontodatabases" class="ml-1 mr-2"
         >Databases</a
         >
     </span>
@@ -653,7 +653,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="MSSQL" src="/assets/img/icons/mssql-18.svg" />
             <a
-            href="../_post/databases/mssql/introductiontomssql"
+            href="../_posts/databases/mssql/introductiontomssql"
             class="ml-1 mr-2"
             >Microsoft SQL Server</a
             >
@@ -663,7 +663,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="PostgreSQL" src="/assets/img/icons/postgresql-18.svg" />
             <a
-            href="../_post/databases/postgresql/introductiontopostgresql"
+            href="../_posts/databases/postgresql/introductiontopostgresql"
             class="ml-1 mr-2"
             >PostgreSQL</a
             >
@@ -681,7 +681,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Operating Systems" src="/assets/img/icons/operatingsystem-18.svg" />
-        <a href="../_post/operatingsystems/introductiontoos" class="ml-1 mr-2"
+        <a href="../_posts/operatingsystems/introductiontoos" class="ml-1 mr-2"
         >Operating Systems</a
         >
     </span>
@@ -701,7 +701,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
                 <a
-                href="../_post/operatingsystems/windowsos/introductiontowindowsos"
+                href="../_posts/operatingsystems/windowsos/introductiontowindowsos"
                 class="ml-1 mr-2"
                 >Windows</a
                 >
@@ -709,7 +709,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
                 <div class="p-2">
                 <img alt="MacOS" src="/assets/img/icons/macos-18.svg" />
                 <a
-                href="../_post/operatingsystems/macos/introductiontomacos"
+                href="../_posts/operatingsystems/macos/introductiontomacos"
                 class="ml-1 mr-2"
                 >MacOS</a
                 >
@@ -719,7 +719,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Linux Ubuntu" src="/assets/img/icons/linuxos-18.svg" />
                 <a
-                href="../_post/operatingsystems/linux/introductiontolinux"
+                href="../_posts/operatingsystems/linux/introductiontolinux"
                 class="ml-1 mr-2"
                 >Linux</a
                 >
@@ -727,7 +727,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntuos-18.svg" />
                 <a
-                href="../_post/operatingsystems/linux/ubuntu/introudctiontoubuntu"
+                href="../_posts/operatingsystems/linux/ubuntu/introudctiontoubuntu"
                 class="ml-1 mr-2"
                 >Linux - Ubuntu</a
                 >
@@ -735,7 +735,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
             <div class="p-2">
                 <img alt="Linux Debian" src="/assets/img/icons/debianos-18.svg" />
                 <a
-                href="../_post/operatingsystems/linux/debian/introductiontodebian"
+                href="../_posts/operatingsystems/linux/debian/introductiontodebian"
                 class="ml-1 mr-2"
                 >Linux - Debian</a
                 >
@@ -753,7 +753,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="IAM" src="/assets/img/icons/iam-18.svg" />
-        <a href="../_post/iam/introductiontoiam" class="ml-1 mr-2"
+        <a href="../_posts/iam/introductiontoiam" class="ml-1 mr-2"
         >Identity and Access Management</a
         >
     </span>
@@ -772,13 +772,13 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Entra ID" src="/assets/img/icons/azuread-18.svg" />
-            <a href="../_post/iam/azureentraid/introductiontoazureentraid" class="ml-1 mr-2"
+            <a href="../_posts/iam/azureentraid/introductiontoazureentraid" class="ml-1 mr-2"
             >Azure Entra ID</a
             >
         </div>
         <div class="p-2">
             <img alt="GCP IAM" src="/assets/img/icons/gcpiam-18.svg" />
-            <a href="../_post/iam/gcpiam/introductiontogcpiam" class="ml-1 mr-2"
+            <a href="../_posts/iam/gcpiam/introductiontogcpiam" class="ml-1 mr-2"
             >GCP IAM</a
             >
         </div>
@@ -786,13 +786,13 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="AWS IAM" src="/assets/img/icons/awsiam-18.svg" />
-            <a href="../_post/iam/awsiam/introductiontoawsiam" class="ml-1 mr-2"
+            <a href="../_posts/iam/awsiam/introductiontoawsiam" class="ml-1 mr-2"
             >AWS IAM</a
             >
         </div>
         <div class="p-2">
             <img alt="SSO" src="/assets/img/icons/sso-18.svg" />
-            <a href="../_post/iam/sso/introductiontosso" class="ml-1 mr-2"
+            <a href="../_posts/iam/sso/introductiontosso" class="ml-1 mr-2"
             >Single Sign On (SSO)</a
             >
         </div>
@@ -809,7 +809,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
     >
     <span>
         <img alt="Virtualization" src="/assets/img/icons/virtualization-18.svg" />
-        <a href="../_post/virtualization/introductiontovirtualization" class="ml-1 mr-2"
+        <a href="../_posts/virtualization/introductiontovirtualization" class="ml-1 mr-2"
         >Virtualization</a
         >
     </span>
@@ -829,7 +829,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="Hyper-V" src="/assets/img/icons/hyperv-18.svg" />
             <a
-            href="../_post/virtualization/hyperv/introductiontohyperv"
+            href="../_posts/virtualization/hyperv/introductiontohyperv"
             class="ml-1 mr-2"
             >Hyper-V</a
             >
@@ -839,7 +839,7 @@ Read More at [DevOps Introduction](/_post/devops/introductiontodevops)
         <div class="p-2">
             <img alt="VMWare" src="/assets/img/icons/vmware-18.svg" />
             <a
-            href="../_post/virtualization/vmware/introductionvmware"
+            href="../_posts/virtualization/vmware/introductionvmware"
             class="ml-1 mr-2"
             >VMWare</a
             >
