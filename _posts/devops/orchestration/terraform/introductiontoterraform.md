@@ -6,16 +6,16 @@ order: 3
 ---
 
 
-[Variables Types](/_posts/devops/orchestration/terraform/terraform-variables)
+[Variables Types](/posts/devops/orchestration/terraform/terraform-variables)
 
-[Complex Variable Types](/_posts/devops/orchestration/terraform/terraform-complex-type-variables)
+[Complex Variable Types](/posts/devops/orchestration/terraform/terraform-complex-type-variables)
 
-[Variables Type Conversion](/_posts/devops/orchestration/terraform/terraform-variable-type-conversion)
-
-
-[Iterators](/_posts/devops/orchestration/terraform/terraform-iterators)
+[Variables Type Conversion](/posts/devops/orchestration/terraform/terraform-variable-type-conversion)
 
 
-[Terraform Coding Exercises](/_posts/devops/orchestration/terraform/terraform-coding-exercises)
+[Iterators](/posts/devops/orchestration/terraform/terraform-iterators)
 
-[Terraform Interview Questions](/_posts/devops/orchestration/terraform/terraform-interview-questions)
+
+[Terraform Coding Exercises](/posts/devops/orchestration/terraform/terraform-coding-exercises)
+
+[Terraform Interview Questions](/posts/devops/orchestration/terraform/terraform-interview-questions)

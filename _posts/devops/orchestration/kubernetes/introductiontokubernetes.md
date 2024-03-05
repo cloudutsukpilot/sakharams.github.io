@@ -5,5 +5,5 @@ title: Kubernetes
 
 
 
-[Kubernetes Interview Questions](/_posts/devops/orchestration/kubernetes/kuberentes-interview-questions)
+[Kubernetes Interview Questions](/posts/devops/orchestration/kubernetes/kuberentes-interview-questions)
 
