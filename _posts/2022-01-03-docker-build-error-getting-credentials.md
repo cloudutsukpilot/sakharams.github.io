@@ -1,9 +1,8 @@
 ---
 layout: post
 title: Docker Build - error getting credentials
-date: 2019-08-08 00:00:00 +0000
-categories: [Docker, Docker Build]
-tags: [macos, docker, docker build, openssl]
+categories: [orchestration]
+tags: [macOS, docker]
 
 ---
 
