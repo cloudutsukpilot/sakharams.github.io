@@ -19,6 +19,6 @@ order: 5
 
 ### Cloud Service Providers:
 
-1. [Microsoft Azure](/_posts/cloud/azure)
-2. [Amazon Web Services](/_posts/cloud/aws)
-3. [Google Cloud Platform](/_posts/cloud/gcp)
+1. [Microsoft Azure](/posts/cloud/azure)
+2. [Amazon Web Services](/posts/cloud/aws)
+3. [Google Cloud Platform](/posts/cloud/gcp)
