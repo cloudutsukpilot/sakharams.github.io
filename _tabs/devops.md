@@ -663,7 +663,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="p-2">
             <img alt="PostgreSQL" src="/assets/img/icons/postgresql-18.svg" />
             <a
-            href="/posts/databases/postgresql/introduction-to-postgresql"
+            href="/posts/databases/postgres/introduction-to-postgresql"
             class="ml-1 mr-2"
             >PostgreSQL</a
             >
@@ -681,7 +681,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
     >
     <span>
         <img alt="Operating Systems" src="/assets/img/icons/operatingsystem-18.svg" />
-        <a href="/posts/operatingsystems/introduction-to-os" class="ml-1 mr-2"
+        <a href="/posts/operating systems/introduction-to-os" class="ml-1 mr-2"
         >Operating Systems</a
         >
     </span>
@@ -701,7 +701,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Windows" src="/assets/img/icons/windows-18.svg" />
                 <a
-                href="/posts/operatingsystems/windowsos/introduction-to-windowsos"
+                href="/posts/operating systems/windowsos/introduction-to-windows"
                 class="ml-1 mr-2"
                 >Windows</a
                 >
@@ -709,7 +709,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
                 <div class="p-2">
                 <img alt="MacOS" src="/assets/img/icons/macos-18.svg" />
                 <a
-                href="/posts/operatingsystems/macos/introduction-to-macos"
+                href="/posts/operating systems/macos/introduction-to-macos"
                 class="ml-1 mr-2"
                 >MacOS</a
                 >
@@ -719,7 +719,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Linux Ubuntu" src="/assets/img/icons/linuxos-18.svg" />
                 <a
-                href="/posts/operatingsystems/linux/introduction-to-linux"
+                href="/posts/operating systems/linux/introduction-to-linux"
                 class="ml-1 mr-2"
                 >Linux</a
                 >
@@ -727,7 +727,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Linux Ubuntu" src="/assets/img/icons/ubuntuos-18.svg" />
                 <a
-                href="/posts/operatingsystems/ubuntu/introduction-to-ubuntu"
+                href="/posts/operating systems/ubuntu/introduction-to-ubuntu"
                 class="ml-1 mr-2"
                 >Linux - Ubuntu</a
                 >
@@ -735,7 +735,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
             <div class="p-2">
                 <img alt="Linux Debian" src="/assets/img/icons/debianos-18.svg" />
                 <a
-                href="/posts/operatingsystems/debian/introduction-to-debian"
+                href="/posts/operating systems/debian/introduction-to-debian"
                 class="ml-1 mr-2"
                 >Linux - Debian</a
                 >
@@ -772,13 +772,13 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Entra ID" src="/assets/img/icons/azuread-18.svg" />
-            <a href="/posts/iam/azureentraid/introduction-to-azure-entraid" class="ml-1 mr-2"
+            <a href="/posts/iam/entraid/introduction-to-azure-entraid" class="ml-1 mr-2"
             >Azure Entra ID</a
             >
         </div>
         <div class="p-2">
             <img alt="GCP IAM" src="/assets/img/icons/gcpiam-18.svg" />
-            <a href="/posts/iam/gcpiam/introduction-to-gcp-iam" class="ml-1 mr-2"
+            <a href="/posts/iam/gcp/introduction-to-gcp-iam" class="ml-1 mr-2"
             >GCP IAM</a
             >
         </div>
@@ -786,7 +786,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="d-flex flex-column">
         <div class="p-2">
             <img alt="AWS IAM" src="/assets/img/icons/awsiam-18.svg" />
-            <a href="/posts/iam/awsiam/introduction-to-aws-iam" class="ml-1 mr-2"
+            <a href="/posts/iam/aws/introduction-to-aws-iam" class="ml-1 mr-2"
             >AWS IAM</a
             >
         </div>
