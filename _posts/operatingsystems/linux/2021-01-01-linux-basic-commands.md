@@ -38,58 +38,44 @@ hostnamectl
 | top | Displays dynamic real-time information about running tasks | 
 
 
-#### To check the disk space utilization
+#### Disks
+
+| fdisk -l | To list the different partitions |
+| lsblk | To list the block devices | 
+
+#### Disk Space Utilization
 
 | df -h | Disk Usage in Human Readble Format | 
 | du -sh * | Disk Usage at the folder level |
 | du -s * | sort -n | To get the largest folders and files | 
 
+#### Directories
+| mkdir | To create a directory | 
+| rm <dir-name> -r | To remove a directory | 
 
 #### User Management
-To list all the users on the host
-cat /etc/passwd
 
-
-
-### Directories
-To list the disk space usage:
-df
-
-To list the different partitions 
-fdisk -l
-
-To list the block devices
-lsblk
-
-
-
-#### To add a directory
-
-#### To remove a directory
-
-
-
+| cat /etc/passwd | To list all the users on the host | 
 
 #### Firewall
-To allow ports via firewall
 
-sudo ufw allow <portno>
-sudo ufw status
+| sudo ufw allow <portno> | To allow ports via firewall | 
+| sudo ufw status | To check the status of the firewall | 
 
 To check if a port is open
 nc -v cloudutsuk.com 443
 
 #### DNS
-To retrieve information about DNS Nameservers
 
-dig cloudutsuk.com
+| dig domain.com | To retrieve information about DNS Nameservers | 
 
 
 #### Logging
+
 | dmesg | Prints the messages provided by device drivers. | 
 | cat /var/log/syslog | To get the system logs | 
 
 
+#### Common Commands
 
-#### To encode a string to base64
-echo -n '<string>' | openssl base64
+| echo -n '<string>' | openssl base64 | To encode a string to base64 |
