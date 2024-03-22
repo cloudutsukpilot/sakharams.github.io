@@ -8,11 +8,9 @@ tags: [operating systems, linux, cheatsheet]
 
 #### Hardware Information
 
-|  | Processor | 
-|  | Memory | 
-|  | Storage | 
-|  | Motherboard | 
-|  | Graphics Card | 
+| lscpu | Processor | 
+| free | Memory | 
+| df / du | Storage | 
 
 #### To get the list of processes running on the linux host:
 
@@ -42,8 +40,9 @@ top
 htop
 
 #### To check the disk space utilization
-df -h
-du -a /var | sort -n -r | head -n 10
+| df -h | Disk Usage in Human Readble Format | 
+| du -sh * | Disk Usage at the folder level |
+| du -s * | sort -n | To get the largest folders and files | 
 
 
 #### User Management
