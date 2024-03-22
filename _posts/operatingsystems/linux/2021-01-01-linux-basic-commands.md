@@ -1,10 +1,18 @@
 ---
 layout: post
-title: Linux Basic Commands
+title: Linux Command Cheatsheet
 categories: [operating systems, linux]
-tags: [operating systems, linux]
+tags: [operating systems, linux, cheatsheet]
 ---
 
+
+#### Hardware Information
+
+|  | Processor | 
+|  | Memory | 
+|  | Storage | 
+|  | Motherboard | 
+|  | Graphics Card | 
 
 #### To get the list of processes running on the linux host:
 
