@@ -12,7 +12,7 @@ tags: [operating systems, linux, cheatsheet]
 | free | Memory | 
 | df / du | Storage | 
 
-#### To get the list of processes running on the linux host:
+#### Processes:
 
 | ps -A/-e |  all running processes in the system | 
 | ps ef | detailed overview in  full format | 
@@ -22,8 +22,7 @@ tags: [operating systems, linux, cheatsheet]
 | ps x | This option prints the processes those have not been executed from the terminal. | 
 
 
-
-#### To check the operating system
+#### Operating System
 ```bash
 cat /etc/os-release
 lsb_release -a
@@ -31,15 +30,16 @@ hostnamectl
 ```
 
 
-#### To check the memory utilization
+#### Memory Utilization
 
-cat /proc/meminfo
-free -m
-free -g
-top
-htop
+| cat /proc/meminfo | Displays system's memory usage | 
+| free -m | Displays total amount of free and used physical and swap memory, buffers and caches used by kernel in MB | 
+| free -g | Same as above in GB | 
+| top | Displays dynamic real-time information about running tasks | 
+
 
 #### To check the disk space utilization
+
 | df -h | Disk Usage in Human Readble Format | 
 | du -sh * | Disk Usage at the folder level |
 | du -s * | sort -n | To get the largest folders and files | 
