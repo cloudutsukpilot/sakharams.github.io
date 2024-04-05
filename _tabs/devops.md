@@ -405,6 +405,48 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
     </div>
 </div>
 <!-- IAC End -->
+<!-- DAC Start -->
+<div class="card categories">
+    <div
+    id="h_3"
+    class="card-header d-flex justify-content-between hide-border-bottom"
+    >
+    <span>
+        <img alt="Coding" src="/assets/img/icons/coding-18.svg" />
+        <a
+        href="/posts/devops/dac/introduction-to-dac"
+        class="ml-1 mr-2"
+        >Diagram as Code (IAC)</a
+        >
+    </span>
+    <a
+        href="#l_3"
+        data-toggle="collapse"
+        aria-expanded="true"
+        aria-label="h_3-trigger"
+        class="category-trigger hide-border-bottom"
+    >
+        <i class="fas fa-fw fa-angle-down"></i>
+    </a>
+    </div>
+    <div id="l_3" class="collapse show" aria-expanded="true">
+    <div class="container d-flex flex-wrap align-items-top">
+        <div class="d-flex flex-column w-50">
+        <div class="p-2">
+            <img alt="Diagrams" src="/assets/img/icons/diagrams.svg" />
+            <a
+            href="/posts/devops/dac/diagrams/introduction-to-diagrams"
+            class="ml-1 mr-2"
+            >Diagrams</a
+            >
+        </div>
+        </div>
+        <div class="d-flex flex-column">
+        </div>
+    </div>
+    </div>
+</div>
+<!-- DAC End -->
 <!-- Git Start -->
 <div class="card categories">
     <div

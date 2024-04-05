@@ -161,4 +161,19 @@ tags: [devops, orchestration, terraform]
         -- backend.tf
 ```
 
-5. Explain the step-by-step process to move a virtual machine from resource group 
+5. What are the locations where the terraform would search for providers if the internet is not accessible from a machine?
+- Below is the order:
+    a. The current working directory.
+    b. The .terraform directory in your current working directory. This is where Terraform stores the plugins it downloads.
+    c. The user plugins directory. The location of this directory varies by operating system:
+        On Unix-like systems (including Linux and macOS), the directory is $HOME/.terraform.d/plugins.
+        On Windows, the directory is %APPDATA%\terraform.d\plugins.
+    d. The system plugins directory. The location of this directory also varies by operating system:
+        On Unix-like systems, the directory is /usr/local/share/terraform/plugins.
+        On Windows, the directory is %PROGRAMDATA%\terraform.d\plugins.
+    e. Any directories specified by the plugin_cache_dir configuration in the Terraform CLI configuration file.
+
+6. What is Terraform Plugin Cache? How do we manage it in an controlled environment where internet is not accessible?
+- The Terraform plugin cache is a directory (defined by env variable plugin_cache_dir )where Terraform stores downloaded provider plugins. 
+- When you run Terraform commands that require a specific provider, Terraform checks if the provider plugin is already installed in the plugin cache. If it is not found, Terraform automatically downloads the plugin and stores it in the cache for future use.
+- In a controlled environment, the providers needs to be already downloaded to the machine/container/image
