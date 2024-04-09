@@ -19,4 +19,5 @@ az ad app list --query "[].{Name:displayName, Created:createdDateTime}"
 3. Filter the az command output and select specfic attribute:
 ```
 az network public-ip list -g resourceGroupName --query "[?name=='publicIpResourceName'].ipAddress
+az network vnet list --query "[?name=='vnet1'].subnets[].addressPrefix"
 ```
