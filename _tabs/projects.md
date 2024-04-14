@@ -2,7 +2,7 @@
 layout: page
 title: Projects
 icon: fas fa-project-diagram
-order: 6
+order: 9
 ---
 
 Below are the projects:

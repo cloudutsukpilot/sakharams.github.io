@@ -2,7 +2,7 @@
 layout: page
 title: About Me
 icon: fas fa-info-circle
-order: 8
+order: 10
 ---
 
 
