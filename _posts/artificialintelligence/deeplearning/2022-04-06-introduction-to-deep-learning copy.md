@@ -31,7 +31,6 @@ tags: [Artificial Intelligence, AI, Deep Learning]
 
 #### Contents:
 
-1. [Introduction to Deep Learning](/posts/artificialintelligence/deeplearning/introduction-to-deep-learning)
-2. [Building Neural Networks](/posts/artificialintelligence/deeplearning/building-neural-networks)
-3. [How Neural Networks Work](/posts/artificialintelligence/deeplearning/how-neural-networks-learn)
-4. [Deep Learning Use Cases](/posts/artificialintelligence/deeplearning/deep-learning-use-cases)
+1. [Building Neural Networks](/posts/artificialintelligence/deeplearning/building-neural-networks)
+2. [How Neural Networks Work](/posts/artificialintelligence/deeplearning/how-neural-networks-learn)
+3. [Deep Learning Use Cases](/posts/artificialintelligence/deeplearning/deep-learning-use-cases)
