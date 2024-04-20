@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Cloudify
 categories: [devops, orchestration, cloudify]
-tags: [devops, orchestration, cloudify]
+tags: [DevOps, Orchestration, Cloudify]
 ---
 
 Cloudify is an open-source cloud orchestration platform that allows you to automate and manage your applications and infrastructure. It provides a powerful set of tools and features that enable you to deploy, scale, and manage complex applications across multiple clouds and environments.

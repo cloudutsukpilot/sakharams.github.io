@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to TFSec
 categories: [devsecops, tfsec]
-tags: [devsecops, tfsec]
+tags: [OWASP ZAP, tfsec]
 ---
 
 TFSec: Enhancing Security in Terraform

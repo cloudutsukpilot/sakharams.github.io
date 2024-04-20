@@ -2,7 +2,7 @@
 layout: post
 title: Terraform Interview Questions
 categories: [devops, orchestration, terraform]
-tags: [devops, orchestration, terraform]
+tags: [DevOps, Orchestration, Terraform]
 ---
 
 

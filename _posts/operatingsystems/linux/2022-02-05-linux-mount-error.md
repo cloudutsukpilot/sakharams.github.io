@@ -2,7 +2,7 @@
 layout: post
 title: Linux Mounting an Azure File Share - mount error 13 - Permission denied - 
 categories: [operating systems, linux]
-tags: [operating systems, linux, azure]
+tags: [Operating Systems, Linux, Azure]
 ---
 
 

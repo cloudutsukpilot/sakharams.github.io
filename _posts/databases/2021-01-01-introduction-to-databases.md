@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Databases and Types of Databases
 categories: [databases]
-tags: [databases]
+tags: [Databases]
 ---
 
 ## Introduction to Databases

@@ -2,7 +2,7 @@
 layout: post
 title: AWS CLI Command CheatSheet
 categories: [cloud, aws]
-tags: [cloud, aws, cheatsheet]
+tags: [Cloud, AWS, Cheatsheet]
 ---
 
 ## Introduction

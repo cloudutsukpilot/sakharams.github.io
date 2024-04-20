@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Single Sign-On (SSO)
 categories: [iam, sso]
-tags: [iam, sso]
+tags: [IAM, SSO]
 ---
 
 Single Sign-On (SSO) is a mechanism that allows users to authenticate once and gain access to multiple applications or systems without the need to re-enter their credentials. It provides a seamless and convenient user experience while improving security and reducing administrative overhead.

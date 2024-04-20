@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Chef
 categories: [devops, configuration management, chef]
-tags: [devops, configuration management, chef]
+tags: [DevOps, Configuration Management, Chef]
 ---
 
 Chef is a powerful configuration management tool that helps automate the process of managing and deploying infrastructure. In this blog post, we will explore the basics of Chef and its role in the DevOps ecosystem.

@@ -2,7 +2,7 @@
 layout: post
 title: Az CLI Commands - CheatSheet
 categories: [cloud, azure, az cli]
-tags: [cloud, azure, az cli, cheatsheet]
+tags: [Cloud, Azure, Az Cli, Cheatsheet]
 ---
 
 # Shell

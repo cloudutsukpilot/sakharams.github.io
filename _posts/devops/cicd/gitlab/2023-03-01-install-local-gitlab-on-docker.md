@@ -2,7 +2,7 @@
 layout: post
 title: Install Local GitLab Server on Docker
 categories: [devops, cicd, gitlab]
-tags: [devops, cicd, gitlab, docker]
+tags: [DevOps, CICD, Gitlab, Docker]
 ---
 
 ### Prerequisities

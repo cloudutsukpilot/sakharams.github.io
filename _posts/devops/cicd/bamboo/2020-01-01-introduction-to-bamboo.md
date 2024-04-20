@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Bamboo CI/CD
 categories: [devops, cicd, bamboo]
-tags: [devops, cicd, bamboo]
+tags: [DevOps, CICD, Bamboo]
 ---
 
 Bamboo is a popular Continuous Integration and Continuous Deployment (CI/CD) tool that helps automate the build, test, and release processes of software development projects. In this blog post, we will explore the key features and benefits of Bamboo and how it can streamline your CI/CD workflows.

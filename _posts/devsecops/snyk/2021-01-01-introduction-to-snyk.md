@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Snyk
 categories: [devsecops, snyk]
-tags: [devsecops, snyk]
+tags: [OWASP ZAP, Snyk]
 ---
 
 [Snyk](https://snyk.io/) is a powerful tool that helps developers find and fix vulnerabilities in their open source dependencies. It provides a comprehensive solution for managing security risks in your software supply chain.

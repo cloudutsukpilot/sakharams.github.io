@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Identity and Access Management (IAM)
 categories: [iam]
-tags: [iam]
+tags: [IAM]
 ---
 
 Identity and Access Management (IAM) is a crucial aspect of modern software systems. It involves managing and controlling access to resources within an organization. IAM ensures that only authorized individuals or entities can access sensitive information, systems, and applications.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Azure DevOps
 categories: [devops, cicd, azure devops]
-tags: [devops, cicd, azure devops]
+tags: [DevOps, CICD, Azure DevOps]
 ---
 Azure DevOps is a comprehensive set of development tools and services provided by Microsoft. It offers a wide range of features and capabilities to support the entire software development lifecycle.
 

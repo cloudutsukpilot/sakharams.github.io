@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Azure Entra ID
 categories: [iam, entraid]
-tags: [iam, entraid, azure]
+tags: [IAM, Entra ID, Azure]
 ---
 
 Azure Entra ID is a powerful identity and access management (IAM) solution offered by Microsoft Azure. It provides a comprehensive set of tools and services to manage user identities, access controls, and security policies within Azure environments.

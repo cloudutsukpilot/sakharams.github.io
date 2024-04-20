@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Ubuntu - Linux OS
 categories: [operating systems, ubuntu]
-tags: [operating systems, ubuntu]
+tags: [Operating Systems, Ubuntu]
 ---
 
 Ubuntu is a popular Linux-based operating system known for its user-friendly interface, stability, and extensive software ecosystem. In this blog post, we will explore the key features and benefits of Ubuntu, as well as provide a step-by-step guide on how to get started with this powerful operating system.

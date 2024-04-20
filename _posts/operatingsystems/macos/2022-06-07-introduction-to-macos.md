@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Macintosh Operating System
 categories: [operating systems, macos]
-tags: [operating systems, macos]
+tags: [Operating Systems, MacOS]
 ---
 
 macOS is the operating system developed by Apple Inc. for their Macintosh computers. It is known for its sleek design, user-friendly interface, and seamless integration with other Apple devices. In this blog post, we will explore the key features and functionalities of macOS.

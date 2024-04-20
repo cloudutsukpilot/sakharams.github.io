@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Powershell
 categories: [devops, configuration management, powershell]
-tags: [devops, configuration management, powershell]
+tags: [DevOps, Configuration Management, Powershell]
 ---
 
 PowerShell is a powerful scripting language and automation framework developed by Microsoft. It is designed specifically for system administrators and IT professionals to manage and automate the configuration of Windows systems.

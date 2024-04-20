@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to GitHub
 categories: [devops, git, github]
-tags: [devops, git, github]
+tags: [DevOps, Git, Github]
 ---
 
 GitHub is a web-based platform that provides version control and collaboration tools for software development projects. It allows developers to host their code repositories, track changes, and work together with others on the same project. GitHub offers features such as issue tracking, pull requests, branching, and integration with CI/CD tools. It is widely used by individuals, open-source projects, and organizations to streamline the development process and ensure code quality. With its rich ecosystem of integrations and workflows, GitHub has become an essential tool for modern software development.

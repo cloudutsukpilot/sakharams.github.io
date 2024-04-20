@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to AppScan
 categories: [devsecops, appscan]
-tags: [devsecops, appscan]
+tags: [DevSecOps, AppScan]
 ---
 
 AppScan is a powerful DevSecOps tool that helps organizations identify and remediate security vulnerabilities in their applications. With the increasing number of cyber threats, integrating security into the development process has become crucial.

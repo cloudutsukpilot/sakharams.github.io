@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to TeamCity
 categories: [devops, cicd, teamcity]
-tags: [devops, cicd, teamcity]
+tags: [DevOps, CICD, TeamCity]
 ---
 
 Continuous Integration and Continuous Deployment (CI/CD) is a software development practice that aims to automate the process of building, testing, and deploying applications. It helps teams deliver high-quality software faster and more efficiently.

@@ -2,7 +2,7 @@
 layout: post
 title: GitHub Clone
 categories: [devops, git, github]
-tags: [devops, git, github, ssh]
+tags: [DevOps, Git, Github, SSH]
 ---
 
 ### Switch Repository from HTTPS to SSH

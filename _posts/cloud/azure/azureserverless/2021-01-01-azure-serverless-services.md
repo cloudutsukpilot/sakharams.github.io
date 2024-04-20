@@ -2,7 +2,7 @@
 layout: post
 title: Azure Serverless
 categories: [cloud, azure, serverless]
-tags: [cloud, azure, serverless]
+tags: [Cloud, Azure, Serverless]
 ---
 
 ###  Azure Serverless:

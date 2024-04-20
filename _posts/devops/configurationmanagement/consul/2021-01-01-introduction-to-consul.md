@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Consul
 categories: [devops, configuration management, consul]
-tags: [devops, configuration management, consul]
+tags: [DevOps, Configuration Management, Consul]
 ---
 
 Consul is a powerful tool in the world of DevOps that provides service discovery, health checking, and key-value storage capabilities. It is designed to simplify the management of distributed systems and enable seamless communication between services.

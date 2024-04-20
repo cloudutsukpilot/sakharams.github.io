@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Microsoft Azure
 categories: [cloud, azure]
-tags: [cloud, azure]
+tags: [Cloud, Azure]
 ---
 
 

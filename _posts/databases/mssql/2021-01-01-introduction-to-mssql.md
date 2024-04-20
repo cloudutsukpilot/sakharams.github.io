@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Microsoft SQL Server
 categories: [databases, mssql]
-tags: [database, mssql]
+tags: [Databases, MSSQL]
 ---
 
 Microsoft SQL Server is a powerful relational database management system (RDBMS) developed by Microsoft. It is widely used in the industry for managing and storing data efficiently. In this blog post, we will explore the key features and benefits of Microsoft SQL Server.

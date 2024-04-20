@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Linux Operating System
 categories: [operating systems, linux]
-tags: [operating systems, linux]
+tags: [Operating Systems, Linux]
 ---
 
 Linux is a popular open-source operating system that has gained immense popularity over the years. It was initially developed as a Unix-like operating system and has since become a powerful and versatile platform used by millions of individuals and organizations worldwide.

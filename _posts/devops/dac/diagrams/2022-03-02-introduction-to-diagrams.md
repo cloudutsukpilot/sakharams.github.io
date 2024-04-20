@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Diagrams
 categories: [devops, dac, diagrams]
-tags: [devops, dac, digrams]
+tags: [DevOps, DAC,Diagrams]
 ---
 
 

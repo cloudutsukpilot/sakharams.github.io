@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Fortify
 categories: [devsecops, fortify]
-tags: [devsecops, fortify]
+tags: [DevSecOps, Fortify]
 ---
 
 Fortify is a powerful application security tool that helps developers identify and fix security vulnerabilities in their code. It provides a comprehensive set of features for static code analysis, dynamic application security testing, and software composition analysis.

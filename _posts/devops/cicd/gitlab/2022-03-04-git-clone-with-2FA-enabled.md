@@ -1,8 +1,8 @@
 ---
 layout: post
-title: GitLab - Git Clone with 2FA Enabled
+title: GitLab - Git Clone with MFA Enabled
 categories: [devops, cicd, gitlab]
-tags: [devops, cicd, gitlab, 2FA]
+tags: [DevOps, CICD, Gitlab, MFA]
 ---
 
 ### Instructions to login into GitLab when 2FA is enabled

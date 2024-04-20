@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to DevSecOps
 categories: [devsecops]
-tags: [devsecops]
+tags: [DevSecOps]
 ---
 
 DevSecOps is a software development approach that integrates security practices into the DevOps process. It aims to ensure that security is not an afterthought but an integral part of the entire software development lifecycle.

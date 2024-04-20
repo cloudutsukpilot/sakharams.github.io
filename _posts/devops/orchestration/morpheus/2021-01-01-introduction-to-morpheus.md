@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Morpheus
 categories: [devops, orchestration, morpheus]
-tags: [devops, orchestration, morpheus]
+tags: [DevOps, Orchestration, Morpheus]
 ---
 
 Morpheus is a powerful orchestration platform that simplifies the management and deployment of applications and infrastructure. In this blog post, we will explore the key features and benefits of Morpheus and how it can enhance your DevOps practices.

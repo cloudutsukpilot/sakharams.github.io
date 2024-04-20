@@ -2,7 +2,7 @@
 layout: post
 title: MacOS Environment Variables
 categories: [operating systems, macos]
-tags: [operating systems, macos]
+tags: [Operating Systems, MacOS]
 ---
 
 * To display the list of currently set environment variables:

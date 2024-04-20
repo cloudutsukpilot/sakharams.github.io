@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Monitoring
 categories: [devops, monitoring]
-tags: [devops, monitoring]
+tags: [DevOps, Monitoring]
 ---
 
 Monitoring plays a crucial role in the DevOps process, ensuring the stability, performance, and availability of software systems. It involves collecting and analyzing data from various sources to gain insights into the system's behavior and identify potential issues.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Configuration Management
 categories: [devops, configuration management]
-tags: [devops, configuration management]
+tags: [DevOps, Configuration Management]
 ---
 
 Configuration management is a crucial aspect of DevOps, as it enables organizations to effectively manage and control their infrastructure and application configurations. In this blog post, we will explore the fundamentals of configuration management and its importance in the DevOps lifecycle.

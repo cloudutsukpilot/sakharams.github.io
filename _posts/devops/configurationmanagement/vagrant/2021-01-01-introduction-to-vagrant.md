@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Vagrant
 categories: [devops, configuration management, vagrant]
-tags: [devops, configuration management, vagrant]
+tags: [DevOps, Configuration Management, Vagrant]
 ---
 
 Vagrant is an open-source tool for creating and managing virtual development environments. It provides a simple and consistent way to set up and configure virtual machines, making it easier to reproduce development environments across different machines.

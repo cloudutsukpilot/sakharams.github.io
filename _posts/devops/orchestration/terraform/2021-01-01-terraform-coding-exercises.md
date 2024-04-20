@@ -2,7 +2,7 @@
 layout: post
 title: Terraform Coding Exercises
 categories: [devops, orchestration, terraform]
-tags: [devops, orchestration, terraform]
+tags: [DevOps, Orchestration, Terraform]
 ---
 
 1. Write a piece of code which demonstrates use of locals.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to DevOps
 categories: [devops]
-tags: [devops]
+tags: [DevOps]
 ---
 
 ### Core DevOps Principles

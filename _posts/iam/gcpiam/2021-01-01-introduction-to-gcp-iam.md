@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to GCP IAM
 categories: [iam, gcp]
-tags: [iam, gcp]
+tags: [IAM, GCP]
 ---
 
 GCP IAM (Identity and Access Management) is a service that allows you to manage access control for your Google Cloud Platform resources. With IAM, you can define who (identity) has what access (roles) to which resources. It provides a centralized and fine-grained control over permissions, ensuring the security and compliance of your GCP environment.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Travis CI
 categories: [devops, cicd, travisci]
-tags: [devops, cicd, travisci]
+tags: [DevOps, CICD, TravisCI]
 ---
 
 Travis CI is a popular cloud-based continuous integration and deployment platform that helps automate the software development process. It integrates with version control systems like GitHub, Bitbucket, and GitLab, allowing developers to automatically build, test, and deploy their applications.

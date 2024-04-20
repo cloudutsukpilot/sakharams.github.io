@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to SonarCube
 categories: [devsecops, sonarcube]
-tags: [devsecops, sonarcube]
+tags: [OWASP ZAP, SonarQube]
 ---
 
 SonarCube is a powerful code quality management tool that helps developers and teams to continuously inspect and analyze their codebase. It provides valuable insights into code quality, security vulnerabilities, and potential bugs, enabling developers to deliver high-quality software.

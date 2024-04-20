@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes Interview Questions
 categories: [devops, orchestration, kuberentes]
-tags: [devops, orchestration, kubernetes, interview questions]
+tags: [DevOps, Orchestration, Kubernetes, Interview Questions]
 ---
 
 #### Beginner

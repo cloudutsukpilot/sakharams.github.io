@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to BitBucket
 categories: [devops, git, bitbucket]
-tags: [devops, git, bitbucket]
+tags: [DevOps, Git, Bitbucket]
 ---
 
 

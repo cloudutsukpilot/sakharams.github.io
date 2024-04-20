@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Hyper-V
 categories: [virtualization, hyperv]
-tags: [virtualization, hyperv]
+tags: [Virtualization, HyperV]
 ---
 
 Hyper-V is a powerful virtualization tool developed by Microsoft. It allows you to create and manage virtual machines on Windows operating systems. In this blog post, we will explore the key features and benefits of Hyper-V.

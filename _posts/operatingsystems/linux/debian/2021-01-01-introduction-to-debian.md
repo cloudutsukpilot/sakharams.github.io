@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Debian - Linux OS
 categories: [operating systems, debian]
-tags: [operating systems, debian]
+tags: [Operating Systems, Debian]
 ---
 
 Debian is a popular and influential operating system in the Linux ecosystem. It is known for its stability, security, and extensive package management system. In this blog post, we will explore the key features and benefits of Debian, as well as its role in the open-source community.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to OWASP ZAP
 categories: [devsecops, owaspzap]
-tags: [devsecops, owaspzap]
+tags: [DevSecOps, Zap]
 ---
 
 OWASP ZAP (Zed Attack Proxy) is a widely used open-source web application security scanner. It is designed to help developers and security professionals identify vulnerabilities in web applications during the development and testing phases.

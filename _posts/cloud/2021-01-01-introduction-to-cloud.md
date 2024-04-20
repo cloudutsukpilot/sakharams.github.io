@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Cloud
 categories: [cloud]
-tags: [cloud]
+tags: [Cloud]
 ---
 
 Cloud computing has revolutionized the way businesses and individuals store, manage, and access data and applications. With the advent of cloud service providers, such as Microsoft Azure, Amazon Web Services (AWS), and Google Cloud Platform (GCP), organizations can now leverage the power of the cloud to scale their operations, improve efficiency, and reduce costs.

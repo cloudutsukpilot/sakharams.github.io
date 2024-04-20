@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Gitlab
 categories: [devops, git, gitlab]
-tags: [devops, git, gitlab]
+tags: [DevOps, Git, Gitlab]
 ---
 
 GitLab is a powerful web-based Git repository manager that provides a complete DevOps platform for managing and collaborating on code. In this blog post, we will explore the basics of GitLab repositories and how to get started with them.

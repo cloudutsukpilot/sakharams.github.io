@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Virtualization
 categories: [virtualization]
-tags: [virtualization]
+tags: [Virtualization]
 ---
 
 Virtualization is a technology that allows multiple operating systems or applications to run on a single physical server or machine. It provides a layer of abstraction between the hardware and the software, enabling efficient utilization of resources and improved flexibility.

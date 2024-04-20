@@ -2,7 +2,7 @@
 layout: post
 title: Postfix Server Configuration
 categories: [operating systems, linux]
-tags: [operating systems, linux]
+tags: [Operating Systems, Linux]
 ---
 
 

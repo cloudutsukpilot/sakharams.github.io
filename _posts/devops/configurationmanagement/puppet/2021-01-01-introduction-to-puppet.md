@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Puppet
 categories: [devops, configuration management, puppet]
-tags: [devops, configuration management, puppet]
+tags: [DevOps, Configuration Management, Puppet]
 ---
 
 Puppet is a popular configuration management tool used in the field of DevOps. It allows you to automate the management of your infrastructure by defining the desired state of your systems using a declarative language.

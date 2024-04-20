@@ -2,7 +2,7 @@
 layout: post
 Title: Terraform Iterators
 categories: [devops, orchestration, terraform]
-tags: [devops, orchestration, terraform]
+tags: [DevOps, Orchestration, Terraform]
 ---
 
 1. Using for_each on a list of strings:

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Coverity
 categories: [devsecops, coverity]
-tags: [devsecops, coverity]
+tags: [DevSecOps, Coverity]
 ---
 
 Coverity is a powerful static analysis tool that helps developers identify and fix software defects early in the development process. It provides a comprehensive set of features to analyze source code and detect potential vulnerabilities, security issues, and quality problems.

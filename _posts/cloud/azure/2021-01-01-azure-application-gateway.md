@@ -2,7 +2,7 @@
 layout: post
 title: Microsoft Azure Application Gateway
 categories: [cloud, azure]
-tags: [cloud, azure, application gateway]
+tags: [Cloud, Azure, Application Gateway]
 ---
 
 # Introduction

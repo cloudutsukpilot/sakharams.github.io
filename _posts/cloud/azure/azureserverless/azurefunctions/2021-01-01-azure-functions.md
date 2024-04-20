@@ -2,7 +2,7 @@
 layout: post
 title: Azure Functions
 categories: [cloud, azure, serverless, azure functions]
-tags: [cloud, azure, serverless, azure functions]
+tags: [Cloud, Azure, Serverless, Azure Functions]
 ---
 
 ###  Introduction to Azure Functions:
@@ -39,21 +39,29 @@ tags: [cloud, azure, serverless, azure functions]
 
 
 #### Azure Function Benefits
-
-- Easily run small pieces of code in clooud.
-- Eliminate bolier plate code
+1. Simplified Programming Model
+    - Easily run small pieces of code in clooud.
+    - Eliminate bolier plate code
+2. Choice of Language
 - Use it to run code in different programming languages
-- Only pay for the time the code runs
-- Quickly creates prototypes at low cost
+3. Pay-per-use Pricing Model
+    - Only pay for the time the code runs
+4. Bring Your Own Dependencies
+    - NPM, NuGet and other package managers
+5. Scales Automaticaly
+    - Parallel invocation to meet demand
+6. Open Source Code
+7. Docker Runtime
+    - Run function runtime in docker on premise or in other clouds
+8. Serverless
+9. Low Cost Prototyping
+    - Quickly creates prototypes at low cost
 
 | Virtual Machines | Azure App Service | Azure Functions | 
 | ---------------- | ----------------- | --------------- |
 | Infrastructure as a Service(IaaS) | Platform as a Service(PaaS) | Function as a Service(FaaS) | 
 | Pay for Instance Per Hour | Pay fixed montly cost for reserved instances | Pay only when fucntion runs | 
 | Manual Scaling | Auto scales by adding server | Scales automatically | 
-
-#### Azure Development Environments
-
 
 #### Programming Language Support
 - Below are the supported lanaguages in Azure Functions:
@@ -65,3 +73,18 @@ tags: [cloud, azure, serverless, azure functions]
 6. Python
 7. TypeScript
 
+
+#### Azure Function Authorization Levels
+1. Anonymous 
+    - No Key required.
+    - Function can be called by anyone on the internet.
+
+2. Function
+    - Function or host key is required.
+    - Function is scoped to a specific function.
+    - Host key is scoped to all the functions within function app.
+
+3. Admin
+    - Master Key required.
+    - Provides admin level privileges.
+    - Should not be shared or used in client applications.

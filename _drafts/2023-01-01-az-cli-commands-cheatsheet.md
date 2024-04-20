@@ -2,7 +2,7 @@
 layout: post
 title: Az CLI Login with Micrsoft Graph
 categories: [cloud, azure, az cli]
-tags: [cloud, azure, az cli, microsoft graph]
+tags: [Cloud, Azure, Az Cli, Microsoft Graph]
 ---
 
 ### Error: 

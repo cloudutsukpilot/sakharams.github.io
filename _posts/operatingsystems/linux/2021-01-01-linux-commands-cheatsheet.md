@@ -2,7 +2,7 @@
 layout: post
 title: Linux Command Cheatsheet
 categories: [operating systems, linux]
-tags: [operating systems, linux, cheatsheet]
+tags: [Operating Systems, Linux, Cheatsheet]
 ---
 
 

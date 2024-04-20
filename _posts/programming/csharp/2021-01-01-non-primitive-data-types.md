@@ -2,7 +2,7 @@
 layout: post
 title: Non-Primitive Data Types
 categories: [programming, csharp]
-tags: [programming, csharp]
+tags: [Programming, CSharp]
 ---
 
 # Non-Primitive Data Types

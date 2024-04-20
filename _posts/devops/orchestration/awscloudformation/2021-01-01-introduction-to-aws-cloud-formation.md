@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to AWS CloudFormation
 categories: [devops, orchestration, aws cloud formation]
-tags: [devops, orchestration, aws cloud formation]
+tags: [DevOps, Orchestration, AWS Cloud Formation]
 ---
 
 AWS CloudFormation is a powerful infrastructure-as-code service provided by Amazon Web Services (AWS). It allows you to define and provision your AWS resources in a declarative manner, using a simple text file called a CloudFormation template.

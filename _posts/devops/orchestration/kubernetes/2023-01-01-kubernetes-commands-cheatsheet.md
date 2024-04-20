@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes Commands Cheatsheet
 categories: [devops, orchestration, kubernetes, cheatsheet]
-tags: [devops, orchestration, kubernetes, cheatsheet]
+tags: [DevOps, Orchestration, Kubernetes, Cheatsheet]
 ---
 
 #### Cluster Management

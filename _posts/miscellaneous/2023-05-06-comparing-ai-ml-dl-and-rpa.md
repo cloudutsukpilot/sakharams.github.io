@@ -1,11 +1,11 @@
 ---
 layout: post
 title: Segmenting AI, ML, DL and RPA
-categories: [udemy]
-tags: [udemy]
+categories: [miscellaneous]
+tags: [AI, ML, DL, RPA]
 ---
 
-![Segmentation of AL,ML,DL & RPA](/assets/img/artificialintelligence/AI-ML-DL-and-RPA.png)
+![Segmentation of AI,ML,DL & RPA](/assets/img/artificialintelligence/AI-ML-DL-and-RPA.png)
 
 
 1. **Artificial Intelligence (AI):**

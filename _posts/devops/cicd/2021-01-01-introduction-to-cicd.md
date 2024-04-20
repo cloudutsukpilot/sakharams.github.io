@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to CI/CD
 categories: [devops, cicd]
-tags: [devops, cicd]
+tags: [DevOps, CICD]
 ---
 
 Continuous Integration and Continuous Deployment (CI/CD) is a software development practice that enables teams to automate the process of building, testing, and deploying applications. It aims to deliver software changes more frequently and reliably, ensuring that the application is always in a deployable state.

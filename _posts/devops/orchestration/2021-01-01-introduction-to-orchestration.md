@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Orchestration
 categories: [devops, orchestration]
-tags: [devops, orchestration]
+tags: [DevOps, Orchestration]
 ---
 
 Orchestration plays a crucial role in the world of DevOps. It is the process of automating and coordinating various tasks, services, and systems to achieve a desired outcome. In this blog post, we will explore the fundamentals of orchestration and its importance in the DevOps ecosystem.

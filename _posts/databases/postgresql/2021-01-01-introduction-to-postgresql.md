@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to PostgreSQL
 categories: [databases, postgres]
-tags: [databases, postgres]
+tags: [Databases, Postgres]
 ---
 
 PostgreSQL is a powerful open-source relational database management system (RDBMS) known for its robustness, scalability, and extensibility. It offers a wide range of advanced features that make it a popular choice for both small-scale and enterprise-level applications.

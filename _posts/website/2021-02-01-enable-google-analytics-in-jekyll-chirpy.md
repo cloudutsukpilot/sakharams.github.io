@@ -1,7 +1,7 @@
 ---
 title: Enable Google Analytics in Jekyll(Chirpy) Static Site Generator
 categories: [website, jekyll]
-tags: [website, jekyll, chirpy, googleanalytics]
+tags: [Website, Jekyll, Chirpy, Google Analytics]
 ---
 
 In this post, we will go through the stpes that I have used to get this blog (https://www.sakharams.github.io/) running on GitHub Pages with the chirpy-starter template to enable Google Analytics and Adsense.

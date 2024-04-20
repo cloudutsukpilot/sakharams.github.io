@@ -2,7 +2,7 @@
 layout: post
 title: Push a Docker Image to DockerHub
 categories: [devops, orchestration, docker]
-tags: [devops, orchestration, docker]
+tags: [DevOps, Orchestration, Docker]
 ---
 
 Prerequisites:

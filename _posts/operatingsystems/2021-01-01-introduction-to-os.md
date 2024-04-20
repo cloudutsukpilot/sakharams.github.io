@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Operating Systems
 categories: [operating systems]
-tags: [operating systems]
+tags: [Operating Systems]
 ---
 
 An operating system (OS) is a software that manages computer hardware and software resources and provides common services for computer programs. It acts as an intermediary between the user and the computer hardware, allowing users to interact with the system and run applications.

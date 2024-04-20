@@ -2,7 +2,7 @@
 layout: post
 title: Control Flow
 categories: [programming, csharp]
-tags: [programming, csharp]
+tags: [Programming, CSharp]
 ---
 
 # Control Flow and Iterations

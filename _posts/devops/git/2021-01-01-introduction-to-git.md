@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Git
 categories: [devops, git]
-tags: [devops, git]
+tags: [DevOps, Git]
 ---
 
 Git is a distributed version control system that allows developers to track changes in their codebase, collaborate with others, and easily manage different versions of their projects. In this blog post, we will explore the basics of Git and how it can benefit developers in their day-to-day work.

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Spinnaker
 categories: [devops, cicd, spinnaker]
-tags: [devops, cicd, spinnaker]
+tags: [DevOps, CICD, Spinnaker]
 ---
 
 Spinnaker is an open-source continuous integration and delivery (CI/CD) platform that helps automate the deployment of applications to various cloud providers. It was originally developed by Netflix and is now maintained by the Spinnaker community.

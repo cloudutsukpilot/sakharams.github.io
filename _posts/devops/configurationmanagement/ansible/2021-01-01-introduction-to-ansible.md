@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Ansible
 categories: [devops, configuration management, ansible]
-tags: [devops, configuration management, ansible]
+tags: [DevOps, Configuration Management, Ansible]
 ---
 
 Ansible is an open-source automation tool that simplifies the management and configuration of IT infrastructure. It is widely used in the field of DevOps to automate repetitive tasks, streamline deployments, and ensure consistency across systems.

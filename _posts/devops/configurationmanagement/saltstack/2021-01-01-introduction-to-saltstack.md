@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to SaltStack
 categories: [devops, configuration management, saltstack]
-tags: [devops, configuration management, saltstack]
+tags: [DevOps, Configuration Management, SaltStack]
 ---
 
 SaltStack is a powerful configuration management and orchestration tool that allows you to automate the management of your infrastructure. It uses a master-minion architecture, where the master node controls and manages the minion nodes.

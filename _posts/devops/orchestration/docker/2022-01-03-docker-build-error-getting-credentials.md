@@ -2,7 +2,7 @@
 layout: post
 title: Docker Build - error getting credentials
 categories: [devops, orchestration, docker]
-tags: [devops, orchestration, docker, macos]
+tags: [DevOps, Orchestration, Docker, MacOS]
 ---
 
 #### Introduction:

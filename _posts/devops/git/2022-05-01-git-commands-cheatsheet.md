@@ -3,7 +3,7 @@
 layout: post
 title: Git Commands - CheatSheet
 categories: [devops, git, git commands]
-tags: [devops, git, git commands, cheatsheet]
+tags: [DevOps, Git, Git Commands, Cheatsheet]
 ---
 
 

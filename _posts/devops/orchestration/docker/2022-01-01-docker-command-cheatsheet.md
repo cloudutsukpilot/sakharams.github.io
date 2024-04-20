@@ -2,7 +2,7 @@
 layout: post
 title: Docker Commands Cheatsheet
 categories: [devops, orchestration, docker, cheatsheet]
-tags: [devops, orchestration, docker, cheatsheet]
+tags: [DevOps, Orchestration, Docker, Cheatsheet]
 ---
 
 

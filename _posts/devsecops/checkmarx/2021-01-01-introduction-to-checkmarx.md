@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to CheckMarx
 categories: [devsecops, checkmarx]
-tags: [devsecops, checkmarx]
+tags: [DevSecOps, Checkmarx]
 ---
 
 CheckMarx is a powerful static application security testing (SAST) tool that helps developers identify and fix security vulnerabilities in their code. It is widely used in the field of DevSecOps to ensure that applications are secure from the ground up.

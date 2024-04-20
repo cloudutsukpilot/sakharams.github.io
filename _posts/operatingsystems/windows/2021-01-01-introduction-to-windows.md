@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Windows Operating System
 categories: [operating systems, windows]
-tags: [operating systems, windows]
+tags: [Operating Systems, Windows]
 ---
 
 Windows is one of the most widely used operating systems in the world. It was developed by Microsoft and has evolved over the years to become a powerful and user-friendly platform for both personal and professional use.

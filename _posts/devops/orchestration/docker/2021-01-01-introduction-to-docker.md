@@ -2,7 +2,7 @@
 layout: post
 title: Docker
 categories: [devops, orchestration, docker]
-tags: [devops, orchestration, docker]
+tags: [DevOps, Orchestration, Docker]
 ---
 
 Docker is an open-source platform that allows you to automate the deployment, scaling, and management of applications using containerization. Containers are lightweight, isolated environments that package everything needed to run an application, including the code, runtime, system tools, and libraries.

@@ -2,7 +2,7 @@
 layout: post
 title: Terraform Complex Type Variables
 categories: [devops, orchestration, terraform]
-tags: [devops, orchestration, terraform]
+tags: [DevOps, Orchestration, Terraform]
 ---
 
 #### List

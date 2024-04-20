@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to VMWare
 categories: [virtualization, vmware]
-tags: [virtualization, vmware]
+tags: [Virtualization, VMWare]
 ---
 
 VMware is a leading virtualization software provider that enables organizations to run multiple operating systems and applications on a single physical server. With VMware, businesses can consolidate their IT infrastructure, improve resource utilization, and achieve cost savings.

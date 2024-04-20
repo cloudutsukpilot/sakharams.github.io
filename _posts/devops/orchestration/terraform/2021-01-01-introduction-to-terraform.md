@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Terraform
 categories: [devops, orchestration, terraform]
-tags: [devops, orchestration, terraform]
+tags: [DevOps, Orchestration, Terraform]
 ---
 
 Terraform is an open-source infrastructure as code (IaC) tool created by HashiCorp. It allows you to define and provision infrastructure resources in a declarative manner. With Terraform, you can manage resources across various cloud providers, such as AWS, Azure, and Google Cloud Platform, as well as on-premises infrastructure.

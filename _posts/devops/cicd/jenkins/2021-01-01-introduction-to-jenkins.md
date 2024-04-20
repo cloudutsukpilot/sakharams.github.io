@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Jenkins
 categories: [devops, cicd, jenkins]
-tags: [devops, cicd, jenkins]
+tags: [DevOps, CICD, Jenkins]
 ---
 
 Jenkins is an open-source automation server that is widely used in the field of DevOps and Continuous Integration/Continuous Deployment (CI/CD). It provides a platform for automating various stages of the software development lifecycle, including building, testing, and deploying applications.

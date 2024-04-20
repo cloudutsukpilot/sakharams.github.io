@@ -2,7 +2,7 @@
 layout: post
 title: Udemy Black Screen
 categories: [udemy]
-tags: [udemy]
+tags: [Udemy]
 ---
 
 #### Problem:

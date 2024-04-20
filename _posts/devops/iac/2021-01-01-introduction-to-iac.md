@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Infrastructure As Code (IAC)
 categories: [devops, iac]
-tags: [devops, iac]
+tags: [DevOps, IAC]
 ---
 
 Infrastructure as Code (IAC) is a software engineering approach that allows you to manage and provision infrastructure resources using code. Instead of manually configuring servers, networks, and other infrastructure components, IAC enables you to define and manage them through code.

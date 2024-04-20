@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to GitLab CI/CD
 categories: [devops, cicd, gitlab]
-tags: [devops, cicd, gitlab]
+tags: [DevOps, CICD, Gitlab]
 ---
 
 GitLab CI/CD is a powerful continuous integration and continuous deployment tool provided by GitLab. It allows developers to automate the build, test, and deployment processes of their applications.

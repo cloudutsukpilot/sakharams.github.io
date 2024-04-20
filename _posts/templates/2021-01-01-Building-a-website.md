@@ -2,7 +2,7 @@
 layout: post
 title: Building a Website
 categories: [website]
-tags: [website, blog]
+tags: [Website, Blogging]
 ---
 
 Creating a personal website to share your knowledge on DevOps using HTML, CSS, and JavaScript is a great idea! Below are the steps and some sample code to help you get started: 

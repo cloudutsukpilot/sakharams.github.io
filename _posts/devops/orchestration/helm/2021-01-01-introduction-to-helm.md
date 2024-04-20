@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Helm
 categories: [devops, orchestration, helm]
-tags: [devops, orchestration, helm]
+tags: [DevOps, Orchestration, Helm]
 ---
 
 Helm is a package manager for Kubernetes that helps you manage and deploy applications. It simplifies the process of installing, upgrading, and managing applications on a Kubernetes cluster.

@@ -33,6 +33,7 @@ In machine learning, there are two main types of learning: supervised learning a
 
 - **Supervised Learning**: In supervised learning, the algorithm learns from labeled data, where the input features are paired with the corresponding target values. The goal is to learn a mapping function that can predict the target value for new, unseen data.
 - **Unsupervised Learning**: In unsupervised learning, the algorithm learns from unlabeled data, where only the input features are available. The goal is to discover hidden patterns or structures in the data.
+- **Reinforcement Learning**: 
 
 ## Ethical Considerations in Machine Learning
 

@@ -2,7 +2,7 @@
 layout: post
 title: Arrays and Lists
 categories: [programming, csharp]
-tags: [programming, csharp]
+tags: [Programming, CSharp]
 ---
 
 # Arrays and Lists

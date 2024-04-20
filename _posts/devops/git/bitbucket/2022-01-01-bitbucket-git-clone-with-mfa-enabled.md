@@ -1,7 +1,7 @@
 ---
 title: Bitbucket Git Clone with MFA Enabled
 categories: [devops, git, bitbucket]
-tags: [devops, git, bitbucket, mfa]
+tags: [DevOps, Git, Bitbucket, MFA]
 ---
 
 In this post, we will go through the stpes that you can follow to clone a Bitbucket git repository to your local machine when multi factor authentication (MFA) is enabled on your Bitbucket account.

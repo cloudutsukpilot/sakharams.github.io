@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to BurpSuite
 categories: [devsecops, burpsuite]
-tags: [devsecops, burpsuite]
+tags: [DevSecOps, BurpSuite]
 ---
 
 BurpSuite is a powerful web application security testing tool widely used by security professionals and developers. It provides a comprehensive set of features for testing the security of web applications, identifying vulnerabilities, and aiding in their remediation.
