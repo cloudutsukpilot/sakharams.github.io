@@ -23,36 +23,16 @@ tags: [DevOps, Git, Git Commands, Cheatsheet]
 
 
 #### Branches 
+
 | `git branch` | To get the current git branch |
 | `git branch -r` | To list all branches |
 | `git checkout -b branch_path` | To create to a new branch |
 | `git branch -D <local-branch>` | To remove branch from local directory |
-
-
 | `git push origin [name_of_your_new_branch]` | To push the newly created branch to origin |
-
 | `git checkout -b branch_path` | To create to a new branch |
 | `git checkout -b branch_path` | To create to a new branch |
 | `git checkout -b branch_path` | To create to a new branch |
-
-
-
 | `git config --global --list` | Check all the global variables values | 
-
-	
-	
-	- 
-	
-	
-	- 
-	
-	
-	- 
-	
-	
-	- 
-	
-	
 	
 #### Cloning a Git Repository:
 - To pull contents from a repository(github) and upload to another(gitlab):

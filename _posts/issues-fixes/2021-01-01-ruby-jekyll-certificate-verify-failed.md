@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Ruby/Jeykll - Certificate Verify Failed
-categories: [website, jekyll]
+categories: [issues-fixes]
 tags: [Website, Jekyll, Ruby, OpenSSL]
 ---
 

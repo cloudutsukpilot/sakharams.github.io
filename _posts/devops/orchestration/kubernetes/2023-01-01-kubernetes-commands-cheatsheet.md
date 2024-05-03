@@ -32,7 +32,10 @@ tags: [DevOps, Orchestration, Kubernetes, Cheatsheet]
 | kubectl create deployment <deployment_name> | Create one a new deployment | 
 | kubectl delete deployment <deployment_name> | Delete deployments | 
 | kubectl rollout status deployment <deployment_name> | See the rollout status of a deployment | 
- 
+
+- Options:
+
+| --image=image_name | Provide an image name | 
 
 #### Events(ev)
 
@@ -115,7 +118,6 @@ tags: [DevOps, Orchestration, Kubernetes, Cheatsheet]
 | kubectl get replicasets | List ReplicaSets | 
 | kubectl describe replicasets <replicaset_name> | Display the detailed state of one or more ReplicaSets | 
 | kubectl scale --replicas=[x]  | Scale a ReplicaSet | 
- 
 
 #### Secrets
 
@@ -151,3 +153,20 @@ In Kubectl you can specify optional flags with commands. Here are some of the mo
 | -f | Filename, directory, or URL to files to use to create a resource. |  For example when creating a pod using data in a file named newpod.json. kubectl create -f ./newpod.json |
 | -l | Selector to filter on, supports ‘=’, ‘==’, and ‘!=’. | Example: | 
 | -h | Help for kubectl | Example: kubectl get pods -h | 
+| --dry-run=client | Used to preview the changes without applying | 
+
+### Imperative Approach Commands
+
+| kubectl run my-first-pod --image stacksimplify/kubenginx:1.0.0 | To create a pod | 
+| kubectl expose pod my-first-pod  --type=LoadBalancer --port=80 --name=my-first-service | To create a service | 
+| kubectl create deployment my-deployment --image=nginx | To create a deployment | 
+
+
+### Declarative Approach Commands
+
+| kubectl apply -f deployment.yaml | To create a deployment | 
+
+### kubectl Filtering
+
+| To filter based on labels | k get pods --selector env=dev  | 
+| | k get all --selector env=prod,bu=finance,tier=frontend |  

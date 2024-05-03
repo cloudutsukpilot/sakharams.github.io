@@ -31,6 +31,11 @@ tags: [DevOps, Orchestration, Docker, Cheatsheet]
 | `--workdir , -w` | Sets a working directory in a container | 
 
 
+#### Copy Command
+
+| docker cp <containerId>:/file/path/within/container /host/path/to/copy/files/to | Copy a file from container to localhost | 
+| docker cp /host/path/to/copy/files/from <containerId>:/file/path/within/container | Copy a file from localhost to container | 
+
 #### Clean Up Commands
 
 | `docker image prune` | Clears an unused image | 

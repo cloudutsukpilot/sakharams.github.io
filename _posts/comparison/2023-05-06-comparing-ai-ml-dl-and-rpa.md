@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Segmenting AI, ML, DL and RPA
-categories: [miscellaneous]
+categories: [comparison]
 tags: [AI, ML, DL, RPA]
 ---
 

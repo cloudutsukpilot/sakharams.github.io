@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Minikube Error - Failed to pull image 
-categories: [devops, orchestration, kubernetes, minikube]
+categories: [issues-fixes]
 tags: [DevOps, Orchestration, Kubernetes, Minikube, OpenSSL, Errors]
 ---
 
