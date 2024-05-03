@@ -33,9 +33,18 @@ tags: [DevOps, Git, Git Commands, Cheatsheet]
 
 
 #### Git Global Config
-| `git config --global --list` | Check all the global variables values | 
-
-
+| `git config --global --list` | List all settings in the global Git configuration | 
+| `git config --global user.name "Your Name"` | Set your name in the global Git configuration | 
+| `git config --global user.email "your.email@example.com"` | Set your email in the global Git configuration | 
+| `git config --global core.editor "code --wait"` | Set Visual Studio Code as your default editor for Git | 
+| `git config --global --edit` | Open the global configuration file in a text editor for manual editing |
+| `git config --global --unset user.name` |	Remove the user.name setting from the global Git configuration |
+| `git config --global --unset-all user.name` | Remove all user.name settings from the global Git configuration |
+| `git config --global --get user.name` | Get the user.name setting from the global Git configuration |
+| `git config --global --get-all user.name` | Get all user.name settings from the global Git configuration |
+| `git config --global --get-regexp user` | Get all settings in the global Git configuration that match the regular expression user |
+| `git config --global --rename-section user.email user.mail` |	Rename the section user.email to user.mail in the global Git configuration |
+| `git config --global --remove-section user.email` | Remove the section user.email from the global Git configuration | 
 
 
 #### Cloning a Git Repository:
