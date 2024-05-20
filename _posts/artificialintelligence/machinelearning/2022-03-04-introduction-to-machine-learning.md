@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Machine Learning (ML)
 categories: [ArtificialIntelligence, MachineLearning]
-tags: [Artificial Intelligence, AI, Machine Learning, ML]
+tags: [Artificial Intelligence(AI), Machine Learning(ML)]
 ---
 
 ### Introduction to Machine Learning

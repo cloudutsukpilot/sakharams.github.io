@@ -2,7 +2,7 @@
 layout: post
 title: Segmenting AI, ML, DL and RPA
 categories: [comparison]
-tags: [AI, ML, DL, RPA]
+tags: [Artificial Intelligence(AI), Machine Learning(ML), Deep Learning(DL), Robotic Process Automation(RPA)]
 ---
 
 ![Segmentation of AI,ML,DL & RPA](/assets/img/artificialintelligence/AI-ML-DL-and-RPA.png)

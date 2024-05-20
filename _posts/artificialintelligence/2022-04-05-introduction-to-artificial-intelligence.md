@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Artificial Intelligence
 categories: [ArtificialIntelligence]
-tags: [Artificial Intelligence, AI]
+tags: [Artificial Intelligence(AI)]
 ---
 
 ### Introduction:

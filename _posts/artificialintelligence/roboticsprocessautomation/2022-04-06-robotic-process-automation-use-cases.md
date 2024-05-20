@@ -2,7 +2,7 @@
 layout: post
 title: Robotic Process Automation - Use Cases
 categories: [ArtificialIntelligence, RoboticProcessAutomation]
-tags: [Artificial Intelligence, AI, Robotic Process Automation, RPA, Use Cases]
+tags: [Artificial Intelligence(AI), Robotic Process Automation(RPA), Use Cases]
 ---
 
 Below are few of the use-cases of reinforcement learing:

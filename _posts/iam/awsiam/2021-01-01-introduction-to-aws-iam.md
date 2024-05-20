@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to AWS IAM
 categories: [iam, aws]
-tags: [IAM, AWS]
+tags: [IAM, Amazon Web Services(AWS)]
 ---
 
 # Introduction to AWS IAM

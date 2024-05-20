@@ -2,10 +2,10 @@
 layout: post
 title: Amazon Web Services(AWS)
 categories: [cloud, aws]
-tags: [Cloud, AWS]
+tags: [Cloud, Amazon Web Services(AWS)]
 ---
 
-Amazon Web Services (AWS) is a cloud computing platform that offers a wide range of services and tools to help businesses and individuals build and manage their applications and infrastructure in the cloud. With AWS, you can easily provision resources, scale your applications, and pay only for what you use.
+Amazon Web Services (AWS) is a cloud computing platform that offers a wide range of services and tools to help businesses and individuals build and manage their applications and infrastructure in the cloud. With Amazon Web Services(AWS), you can easily provision resources, scale your applications, and pay only for what you use.
 
 AWS provides a comprehensive suite of services, including compute, storage, databases, networking, machine learning, analytics, and more. These services are designed to be highly scalable, reliable, and secure, allowing you to focus on building your applications without worrying about the underlying infrastructure.
 

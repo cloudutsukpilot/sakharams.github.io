@@ -1,6 +1,6 @@
 ---
 layout: post
 title: Azure Architect
-categories: [cloud, azure]
+categories: [architect, cloud, azure]
 tags: [Cloud, Azure, Archiect]
 ---

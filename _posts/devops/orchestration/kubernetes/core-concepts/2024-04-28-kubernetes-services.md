@@ -60,7 +60,7 @@ tags: [DevOps, Orchestration, Kubernetes]
     ```
 
 #### 3. LoadBalancer	
-- This service provisions a load balancer for your application in supported cloud providers (like AWS, GCP, Azure, etc.)
+- This service provisions a load balancer for your application in supported cloud providers (like Amazon Web Services(AWS), Google Cloud Platform(GCP), Azure, etc.)
 -  It exposes the service externally using the load balancer. The external load balancer routes the traffic to backend Pods.
 
     ![K8-Architecture](/assets/img/devops/orchestration/kubernetes/services/k8-services-loadbalancer.png)

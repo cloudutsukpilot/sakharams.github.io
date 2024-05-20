@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Cloud Migration
-categories: [cloud migration]
+categories: [architect, cloud migration]
 tags: [Cloud Migration, Architect]
 ---
 

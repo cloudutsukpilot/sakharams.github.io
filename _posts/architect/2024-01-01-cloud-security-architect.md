@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Cloud Security Architect
-categories: [cloud, security]
+categories: [architect, cloud, security]
 tags: [Cloud, Cloud Security, Architect]
 ---
 

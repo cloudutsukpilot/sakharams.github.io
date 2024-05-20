@@ -2,7 +2,7 @@
 layout: post
 title: Approaches for Machine Learning (ML)
 categories: [ArtificialIntelligence, MachineLearning]
-tags: [Artificial Intelligence, AI, Machine Learning, ML, Deep Learning]
+tags: [Artificial Intelligence(AI), Machine Learning(ML), Deep Learning(DL)]
 ---
 
 Shallow Learning and Deep Learning are two different approaches to machine learning, each with its own characteristics and applications.

@@ -2,7 +2,7 @@
 layout: post
 title: Building Neural Networks
 categories: [ArtificialIntelligence, DeepLearning]
-tags: [Artificial Intelligence, AI, Deep Learning]
+tags: [Artificial Intelligence(AI), Deep Learning(DL)]
 ---
 
 - Below we see a basic input-output type of neural network: It has one input layer with 4 neurons and one output layer with 1 neuron. - We can add another layer called a “hidden” layer with 6 neurosn in-between the input and output layers and this process can be keep repeating itself.

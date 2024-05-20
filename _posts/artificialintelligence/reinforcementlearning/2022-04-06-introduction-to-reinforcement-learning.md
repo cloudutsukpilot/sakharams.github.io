@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Reinforcement Learning
 categories: [ArtificialIntelligence, ReinforcementLearning]
-tags: [Artificial Intelligence, AI, Reinforcement Learning]
+tags: [Artificial Intelligence(AI), Reinforcement Learning]
 ---
 
 - There are three main groups of algorithms in ML: 

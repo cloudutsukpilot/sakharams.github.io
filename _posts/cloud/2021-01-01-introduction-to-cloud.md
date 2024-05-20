@@ -20,7 +20,7 @@ Cloud computing has revolutionized the way businesses and individuals store, man
 1. `Private Cloud`: 
 - A cloud infrastructure operated solely for a single organization, whether managed internally or by a third-party, and hosted either on-premises or remotely.
 2. `Public Cloud`: 
-- A cloud infrastructure that provides services over the internet and is open for public use, owned and operated by cloud service providers like AWS, Google Cloud, or Azure.
+- A cloud infrastructure that provides services over the internet and is open for public use, owned and operated by cloud service providers like Amazon Web Services(AWS), Google Cloud, or Azure.
 3. `Hybrid Cloud`: 
 - A cloud infrastructure that combines both private and public clouds, allowing data and applications to be shared between them for greater flexibility and optimization of your infrastructure.
 4. `Multi-Cloud`: 
@@ -41,9 +41,9 @@ Cloud computing has revolutionized the way businesses and individuals store, man
 
 #### Conclusion:
 - Cloud computing has transformed the way businesses operate by providing scalable, cost-effective, secure, and collaborative solutions. 
-- With cloud service providers like Microsoft Azure, AWS, and GCP, organizations can leverage the power of the cloud to drive innovation, streamline operations, and stay ahead in today's digital landscape.
+- With cloud service providers like Microsoft Azure, Amazon Web Services(AWS), and Google Cloud Platform(GCP), organizations can leverage the power of the cloud to drive innovation, streamline operations, and stay ahead in today's digital landscape.
 
-To learn more about cloud computing and the services offered by Microsoft Azure, AWS, and GCP, check out the following resources:
+To learn more about cloud computing and the services offered by Microsoft Azure, Amazon Web Services(AWS), and Google Cloud Platform(GCP), check out the following resources:
 
 1. [Microsoft Azure](/posts/cloud/azure/introduction-to-azure)
 2. [Amazon Web Services](/posts/cloud/aws/introduction-to-aws)

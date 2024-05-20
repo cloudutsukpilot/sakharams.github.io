@@ -2,7 +2,7 @@
 layout: post
 title: Reinforcement Learning Use Cases
 categories: [ArtificialIntelligence, ReinforcementLearning]
-tags: [Artificial Intelligence, AI, Reinforcement Learning, Use Cases]
+tags: [Artificial Intelligence(AI), Reinforcement Learning, Use Cases]
 ---
 
 Below are few of the use-cases of reinforcement learing:

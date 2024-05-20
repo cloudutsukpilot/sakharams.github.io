@@ -25,7 +25,7 @@ Datadog is a cloud-based monitoring and analytics platform that provides compreh
 
 5. **Alerting and Notification**: Datadog allows you to set up alerts based on predefined thresholds or custom conditions. You can receive notifications via email, Slack, PagerDuty, and other channels, ensuring that you are promptly notified of any issues.
 
-6. **Integrations**: Datadog integrates with a wide range of tools and services commonly used in DevOps environments, such as AWS, Azure, Kubernetes, Docker, and more. This allows you to centralize your monitoring data and gain a holistic view of your infrastructure and applications.
+6. **Integrations**: Datadog integrates with a wide range of tools and services commonly used in DevOps environments, such as Amazon Web Services(AWS), Azure, Kubernetes, Docker, and more. This allows you to centralize your monitoring data and gain a holistic view of your infrastructure and applications.
 
 ## Getting Started with Datadog
 

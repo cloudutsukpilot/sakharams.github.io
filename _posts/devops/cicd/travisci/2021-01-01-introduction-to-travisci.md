@@ -13,7 +13,7 @@ Travis CI supports various programming languages and frameworks, making it versa
 
 One of the key benefits of using Travis CI is its simplicity and ease of setup. You can quickly get started by connecting your repository to Travis CI and configuring the necessary settings. It automatically builds and tests your code on every commit, ensuring that your application remains in a deployable state.
 
-In addition to continuous integration, Travis CI also supports continuous deployment. You can configure it to automatically deploy your application to various hosting platforms, such as AWS, Heroku, or Firebase, based on predefined conditions.
+In addition to continuous integration, Travis CI also supports continuous deployment. You can configure it to automatically deploy your application to various hosting platforms, such as Amazon Web Services(AWS), Heroku, or Firebase, based on predefined conditions.
 
 Travis CI provides a user-friendly web interface to monitor build statuses, view logs, and manage project settings. It also offers extensive documentation and a vibrant community, making it easy to find help and resources.
 

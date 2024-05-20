@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Cloud Architect
-categories: [cloud]
+categories: [architect, cloud]
 tags: [Cloud, Architect]
 ---
 

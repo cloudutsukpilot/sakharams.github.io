@@ -2,14 +2,14 @@
 layout: post
 title: Introduction to Diagrams
 categories: [devops, dac, diagrams]
-tags: [DevOps, DAC,Diagrams]
+tags: [DevOps, Diagram as Code(DAC)]
 ---
 
 
 * Diagrams lets you draw the cloud system architecture in Python code.
 * It was born for prototyping a new system architecture without any design tools. You can also describe or visualize the existing system architecture as well.
 * Diagram as Code allows you to track the architecture diagram changes in any version control system.
-* Diagrams currently supports main major providers including: AWS, Azure, GCP, Kubernetes, Alibaba Cloud, Oracle Cloud etc... It also supports On-Premise nodes, SaaS and major Programming frameworks and languages.
+* Diagrams currently supports main major providers including: Amazon Web Services(AWS), Azure, Google Cloud Platform(GCP), Kubernetes, Alibaba Cloud, Oracle Cloud etc... It also supports On-Premise nodes, SaaS and major Programming frameworks and languages.
 
 
 #### Installation

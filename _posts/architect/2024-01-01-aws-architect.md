@@ -1,6 +1,6 @@
 ---
 layout: post
 title: AWS Architect
-categories: [cloud, aws]
-tags: [Cloud, AWS, Architect]
+categories: [architect, cloud, aws]
+tags: [Cloud, Amazon Web Services(AWS), Architect]
 ---

@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Large Language Models (LLMs)
 categories: [ArtificialIntelligence, LargeLanguageModel]
-tags: [Artificial Intelligence, AI, Large Language Models, LLMs]
+tags: [Artificial Intelligence(AI), Large Language Models, LLMs]
 ---
 
 - Large Language Models (LLMs) are a type of artificial intelligence model that are trained on a vast amount of text data. They are designed to generate human-like text based on the input they are given.

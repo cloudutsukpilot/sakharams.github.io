@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Natural Language Processing
 categories: [ArtificialIntelligence, NaturalLanguageProcessing]
-tags: [Artificial Intelligence, AI, Natural Language Processing, NLP ]
+tags: [Artificial Intelligence(AI), Natural Language Processing(NLP)]
 ---
 
 - NLP is the field of AI concerned with the interactions between computers and human (natural) languages, in particular how to program computers to process and analyze large amounts of natural language data.

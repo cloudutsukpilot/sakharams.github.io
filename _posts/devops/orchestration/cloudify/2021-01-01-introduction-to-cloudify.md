@@ -15,7 +15,7 @@ Cloudify is designed to simplify the process of deploying and managing applicati
 
 ### Multi-Cloud Support
 
-One of the key features of Cloudify is its ability to work across multiple cloud providers. Whether you're using AWS, Azure, Google Cloud, or any other cloud platform, Cloudify provides a consistent and unified interface to manage your applications and infrastructure.
+One of the key features of Cloudify is its ability to work across multiple cloud providers. Whether you're using Amazon Web Services(AWS), Azure, Google Cloud, or any other cloud platform, Cloudify provides a consistent and unified interface to manage your applications and infrastructure.
 
 ### Infrastructure as Code
 

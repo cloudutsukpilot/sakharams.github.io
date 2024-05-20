@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Choosing the Right Cloud Provider
-categories: [cloud]
+categories: [architect, cloud]
 tags: [Cloud, Architect]
 ---
 

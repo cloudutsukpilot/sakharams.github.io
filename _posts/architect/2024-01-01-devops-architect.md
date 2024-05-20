@@ -1,7 +1,7 @@
 ---
 layout: post
 title: DevOps Architect
-categories: [devops]
+categories: [architect, devops]
 tags: [DevOps, Architect]
 ---
 

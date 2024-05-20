@@ -2,7 +2,7 @@
 layout: post
 title: "Docker Interview Questions"
 categories: [devops, orchestration, docker]
-tags: [DevOps, Orchestration, Docker, Interview]
+tags: [DevOps, Orchestration, Docker, Interview Questions]
 ---
 
 ## Introduction

@@ -2,7 +2,7 @@
 layout: post
 title: How Neural Networks Learn
 categories: [ArtificialIntelligence, DeepLearning]
-tags: [Artificial Intelligence, AI, Deep Learning]
+tags: [Artificial Intelligence(AI), Deep Learning(DL)]
 ---
 
 - Neural networks learn through a process called training, where they adjust their internal parameters to minimize the difference between their predicted outputs and the desired outputs. 

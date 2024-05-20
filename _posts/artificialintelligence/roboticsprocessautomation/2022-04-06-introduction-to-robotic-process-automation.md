@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Robotic Process Automation (RPA)
 categories: [ArtificialIntelligence, RoboticProcessAutomation]
-tags: [Artificial Intelligence, AI, Robotic Process Automation, RPA]
+tags: [Artificial Intelligence(AI), Robotic Process Automation(RPA)]
 ---
 
 

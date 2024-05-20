@@ -1,7 +1,7 @@
 ---
 layout: post
 title: PCI HIPAA Certification
-categories: [security, pci, hipaa]
+categories: [architect, security, pci, hipaa]
 tags: [Security, PCI, HIPAA]
 ---
 

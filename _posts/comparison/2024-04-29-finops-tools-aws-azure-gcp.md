@@ -1,8 +1,8 @@
 ---
 layout: post
-title: FinOps Tools - AWS, Azure and GCP
+title: FinOps Tools - Amazon Web Services(AWS), Azure and Google Cloud Platform(GCP)
 categories: [comparison]
-tags: [FinOps, AWS, Azure, GCP]
+tags: [FinOps, Amazon Web Services(AWS), Azure, Google Cloud Platform(GCP)]
 ---
 
 ## FinOps Tools Comparison 

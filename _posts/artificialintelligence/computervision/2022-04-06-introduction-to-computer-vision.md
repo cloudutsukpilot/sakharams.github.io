@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Computer Vision (CV)
 categories: [ArtificialIntelligence, Computer Vision]
-tags: [Artificial Intelligence, AI, Computer Vision]
+tags: [Artificial Intelligence(AI), Computer Vision]
 ---
 
 ### Introduction to Computer Vision:

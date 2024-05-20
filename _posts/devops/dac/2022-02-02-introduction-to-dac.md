@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Diagram as Code
 categories: [devops, dac]
-tags: [DevOps, DAC]
+tags: [DevOps, Diagram as Code(DAC)]
 ---
 
 ## What is Diagram as Code?

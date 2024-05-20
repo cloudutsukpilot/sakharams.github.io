@@ -2,7 +2,7 @@
 layout: post
 title: Deep Learning Use Cases
 categories: [ArtificialIntelligence, DeepLearning]
-tags: [Artificial Intelligence, AI, Deep Learning, Use Cases]
+tags: [Artificial Intelligence(AI), Deep Learning(DL), Use Cases]
 ---
 
 1. Google AI

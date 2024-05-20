@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Deep Learning
 categories: [ArtificialIntelligence, DeepLearning]
-tags: [Artificial Intelligence, AI, Deep Learning]
+tags: [Artificial Intelligence(AI), Deep Learning(DL)]
 ---
 
 ### Introduction to Deep Learning:

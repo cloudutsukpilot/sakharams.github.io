@@ -2,7 +2,7 @@
 layout: post
 title: Natural Language Processing - Use Cases
 categories: [ArtificialIntelligence, NaturalLanguageProcessing]
-tags: [Artificial Intelligence, AI, Natural Language Processing, NLP, Use Cases ]
+tags: [Artificial Intelligence(AI), Natural Language Processing(NLP), Use Cases ]
 ---
 
 Below are few of the use cases of NLP:

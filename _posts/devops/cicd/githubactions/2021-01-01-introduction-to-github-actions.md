@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to GitHub Actions
 categories: [devops, cicd, github actions]
-tags: [DevOps, CIDCD, Github Actions]
+tags: [DevOps, CICD, Github Actions]
 ---
 
 GitHub Actions is a powerful and flexible automation tool provided by GitHub. It allows you to automate various tasks and workflows within your software development process. With GitHub Actions, you can build, test, and deploy your code directly from your GitHub repository.

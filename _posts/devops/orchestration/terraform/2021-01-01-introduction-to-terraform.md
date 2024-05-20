@@ -5,7 +5,7 @@ categories: [devops, orchestration, terraform]
 tags: [DevOps, Orchestration, Terraform]
 ---
 
-Terraform is an open-source infrastructure as code (IaC) tool created by HashiCorp. It allows you to define and provision infrastructure resources in a declarative manner. With Terraform, you can manage resources across various cloud providers, such as AWS, Azure, and Google Cloud Platform, as well as on-premises infrastructure.
+Terraform is an open-source infrastructure as code (IaC) tool created by HashiCorp. It allows you to define and provision infrastructure resources in a declarative manner. With Terraform, you can manage resources across various cloud providers, such as Amazon Web Services(AWS), Azure, and Google Cloud Platform, as well as on-premises infrastructure.
 
 One of the key features of Terraform is its ability to create a "desired state" for your infrastructure. You define the desired state in a Terraform configuration file, which is written in a domain-specific language (DSL) called HashiCorp Configuration Language (HCL). The configuration file describes the resources you want to create, their properties, and any dependencies between them.
 
