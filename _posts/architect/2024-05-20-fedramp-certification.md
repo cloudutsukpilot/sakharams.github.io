@@ -2,7 +2,7 @@
 layout: post
 title: FedRAMP Certification
 categories: [architect, security, fedramp]
-tags: [Security, PCI, FedRAMP]
+tags: [Architect, Security, FedRAMP]
 ---
 
 

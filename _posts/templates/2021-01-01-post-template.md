@@ -166,6 +166,8 @@ $$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
 
 ## Images
 
+![Segmentation of AI,ML,DL & RPA](/assets/img/artificialintelligence/AI-ML-DL-and-RPA.png)
+
 ### Default (with caption)
 
 ![Desktop View](/assets/img/templates//mockup.png){: width="972" height="589" }

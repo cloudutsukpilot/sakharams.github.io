@@ -19,3 +19,7 @@ https://github.com/Azure/aks-baseline-automation#deploy-sample-applications-usin
 
 Use a split-brain DNS configuration to host a web app in Azure
 https://learn.microsoft.com/en-us/azure/architecture/example-scenario/networking/split-brain-dns
+
+
+Networking Topology
+https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke?tabs=cli

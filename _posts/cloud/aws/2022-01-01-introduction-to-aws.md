@@ -9,6 +9,10 @@ Amazon Web Services (AWS) is a cloud computing platform that offers a wide range
 
 AWS provides a comprehensive suite of services, including compute, storage, databases, networking, machine learning, analytics, and more. These services are designed to be highly scalable, reliable, and secure, allowing you to focus on building your applications without worrying about the underlying infrastructure.
 
+
+![AWS Services CheatSheet](/assets/img/cloud/aws/aws-services-cheatsheet.gif)
+
+
 Some of the key services offered by AWS include:
 
 1. Amazon EC2 (Elastic Compute Cloud): This service provides virtual servers in the cloud, allowing you to quickly scale your compute capacity based on demand.
