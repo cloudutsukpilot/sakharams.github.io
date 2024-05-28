@@ -8,5 +8,7 @@ tasks:
       - git add .
       - git commit -m "{{.CLI_ARGS}}"
       - git push
-      - git push remote origin https://gitlab.com/sakharamgit/cloudutsuk.git
+      - git push -u origin gitlab
+
+# git remote add origin https://git@gitlab.com:sakharamgit/cloudutsuk.git
       
