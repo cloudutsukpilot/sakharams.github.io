@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Microsoft Azure Virtual Private Network Connections
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Python - Building Blocks of Python
-categories: [python]
+categories: [programming, python]
 tags: [Python]
 ---
 

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Python - No module named
-categories: [python]
+categories: [programming, python]
 tags: [Python]
 ---
 

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Microsoft Azure  - User Defined Routes
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 

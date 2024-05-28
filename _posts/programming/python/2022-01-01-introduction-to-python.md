@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Introduction to Python
-categories: [python]
+categories: [programming, python]
 tags: [Python]
 ---
 

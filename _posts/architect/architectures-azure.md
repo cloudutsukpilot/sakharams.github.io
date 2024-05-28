@@ -23,3 +23,7 @@ https://learn.microsoft.com/en-us/azure/architecture/example-scenario/networking
 
 Networking Topology
 https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke?tabs=cli
+
+
+DevSecOps on Azure Kubernetes Service (AKS)
+https://learn.microsoft.com/en-in/azure/architecture/guide/devsecops/devsecops-on-aks

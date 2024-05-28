@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Microsoft Azure Front Door
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 

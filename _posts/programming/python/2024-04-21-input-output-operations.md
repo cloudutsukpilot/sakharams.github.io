@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Python - Input & Output Operations
-categories: [python]
+categories: [programming, python]
 tags: [Python]
 ---
 

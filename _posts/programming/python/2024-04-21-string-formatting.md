@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Python - String Formatting
-categories: [python]
+categories: [programming, python]
 tags: [Python]
 ---
 

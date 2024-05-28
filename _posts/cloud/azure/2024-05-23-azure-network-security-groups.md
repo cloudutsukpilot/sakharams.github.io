@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Azure - Network Security Groups (NSG)
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 

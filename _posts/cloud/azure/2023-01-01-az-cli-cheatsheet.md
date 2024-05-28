@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Az CLI Commands - CheatSheet
-categories: [cloud, azure, az cli]
+categories: [azure, az cli]
 tags: [Cloud, Azure, Az Cli, Cheatsheet]
 ---
 

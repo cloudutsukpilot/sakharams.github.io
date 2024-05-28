@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Azure - Application Security Groups (ASG)
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 

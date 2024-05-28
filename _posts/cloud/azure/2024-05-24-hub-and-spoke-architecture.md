@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Microsoft Azure - Hub and Spoke Architecture
-categories: [cloud, azure]
+categories: [azure]
 tags: [Cloud, Azure]
 ---
 
