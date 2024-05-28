@@ -8,4 +8,5 @@ tasks:
       - git add .
       - git commit -m "{{.CLI_ARGS}}"
       - git push
+      - git push remote https://gitlab.com/sakharamgit/cloudutsuk.git
       

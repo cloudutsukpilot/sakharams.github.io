@@ -27,3 +27,7 @@ https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub
 
 DevSecOps on Azure Kubernetes Service (AKS)
 https://learn.microsoft.com/en-in/azure/architecture/guide/devsecops/devsecops-on-aks
+
+
+Deploy a Python (Django or Flask) web app with PostgreSQL in Azure
+https://learn.microsoft.com/en-us/azure/app-service/tutorial-python-postgresql-app?tabs=flask%2Cwindows&pivots=azure-portal
