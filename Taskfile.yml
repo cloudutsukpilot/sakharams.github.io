@@ -3,6 +3,8 @@ version: '3'
 tasks:
   gp:
     description: git push with changes
+    # git remote add gitlab git@gitlab.com:sakharamgit/cloudutsuk.git
+    # git remote add github git@github.com:SakharamS/sakharams.github.io.git
     cmds:
       - git status
       - git add .
@@ -10,5 +12,4 @@ tasks:
       - git push github 
       - git push gitlab
 
-# git remote add origin https://git@gitlab.com:sakharamgit/cloudutsuk.git
       

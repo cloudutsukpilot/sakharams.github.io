@@ -31,3 +31,7 @@ https://learn.microsoft.com/en-in/azure/architecture/guide/devsecops/devsecops-o
 
 Deploy a Python (Django or Flask) web app with PostgreSQL in Azure
 https://learn.microsoft.com/en-us/azure/app-service/tutorial-python-postgresql-app?tabs=flask%2Cwindows&pivots=azure-portal
+
+
+Banking App Python
+https://abujji.visualstudio.com/banking-app-python
