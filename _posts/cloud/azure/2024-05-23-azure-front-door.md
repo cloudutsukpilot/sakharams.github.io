@@ -6,7 +6,6 @@ tags: [Cloud, Azure]
 ---
 
 ## Introduction
-
 - Azure Front Door is a global, scalable, and secure entry point for fast delivery of your web applications. 
 - It offers features such as global load balancing, enhanced performance, and comprehensive security for your web applications.
 

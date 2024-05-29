@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Blueprints
+## Introduction
 - Azure Blueprints are a governance tool in Microsoft Azure that allows you to define a repeatable set of Azure resources, policies, and configurations to deploy and manage an environment consistently. 
 - They help you ensure compliance and standardization across your organization by enabling you to package key artifacts and deploy them together as a single unit. 
 

@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-# Introduction to Network Security Groups
+# Introduction
 - Network Security Groups (NSGs) in Azure are used to control network traffic to and from Azure resources within an Azure Virtual Network (VNet). 
 - They contain security rules that allow or deny inbound and outbound traffic based on various criteria. 
 

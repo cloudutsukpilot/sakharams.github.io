@@ -5,7 +5,7 @@ categories: [azure, kql]
 tags: [Cloud, Azure, KQL]
 ---
 
-## Introduction to KQL
+## Introduction
 - KQL, or Kusto Query Language, is a powerful query language used in Azure to perform read-only requests for processing and retrieving data from the Azure Data Explorer service. 
 - KQL is widely used in Azure Monitor, Log Analytics, and other Azure services to analyze and explore large volumes of data efficiently. 
 
@@ -35,6 +35,14 @@ tags: [Cloud, Azure, KQL]
     | project Column1, Column2
     ```
     - This query selects and returns only Column1 and Column2 from the table.
+
+4. `Get Table Schema`
+
+    ```
+    TableName
+    | getschema
+    ```
+    - This query returns the table schema.
 
 ### `Aggregation and Summarization`
 

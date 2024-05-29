@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Firewall
+## Introduction
 - Azure Firewall is a managed, cloud-based network security service provided by Microsoft Azure. 
 - It offers comprehensive, centralized network and application-level protection to safeguard your Azure Virtual Network resources. 
 

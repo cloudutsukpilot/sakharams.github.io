@@ -5,9 +5,7 @@ categories: [cloud, azure]
 tags: [Cloud, Azure]
 ---
 
-
-
-### Introduction to Microsoft Azure
+### Introduction
 - Microsoft Azure is a cloud computing platform and service provided by Microsoft. It offers a wide range of cloud services that enable organizations to build, deploy, and manage applications and services through Microsoft-managed data centers.
 
 ![Azure Services CheatSheet](/assets/img/cloud/azure/azure-services-cheatsheet.gif)

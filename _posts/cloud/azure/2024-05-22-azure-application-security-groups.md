@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-# Introduction to Application Security Groups
+# Introduction
 - Application Security Groups (ASGs) in Azure provide a way to manage and group network security rules in a more flexible and scalable manner. 
 - They allow you to define and enforce security policies based on the role and function of the application rather than individual IP addresses. 
 

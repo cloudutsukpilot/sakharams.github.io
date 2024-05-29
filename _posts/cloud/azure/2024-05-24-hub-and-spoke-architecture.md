@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Hub and Spoke Architecture
+## Introduction
 - Hub-Spoke architecture in Azure is a networking design pattern that provides a centralized hub (central network) with interconnected spokes (individual networks) to facilitate communication and data exchange between different network segments. 
 - This architecture is commonly used for organizing and managing network resources in a scalable and efficient manner. 
 

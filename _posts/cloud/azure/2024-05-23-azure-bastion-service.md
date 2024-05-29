@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Bastion Service
+## Introduction
 - Azure Bastion is a fully managed service that provides secure and seamless RDP (Remote Desktop Protocol) and SSH (Secure Shell) connectivity to virtual machines (VMs) directly through the Azure portal. 
 - It eliminates the need for exposing VMs to the public internet, thereby enhancing security. 
 

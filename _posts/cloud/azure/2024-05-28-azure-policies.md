@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Policies
+## Introduction
 - Azure Policies are a governance tool within Microsoft Azure that allow you to create, assign, and manage policies to enforce rules and ensure compliance across your Azure resources. 
 - Azure Policies help you to manage and maintain the security, compliance, and operational standards of your Azure environment by providing control over your resources' configurations and deployments. 
 

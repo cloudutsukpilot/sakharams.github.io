@@ -5,8 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Container Registry
-
+## Introduction
 - Azure Container Registry (ACR) is a managed, private Docker registry service provided by Microsoft Azure. 
 - It enables you to store and manage container images and artifacts in a private registry, securely and at scale. 
 - ACR is integrated with Azure services and provides a variety of features that simplify the development, deployment, and management of containerized applications.

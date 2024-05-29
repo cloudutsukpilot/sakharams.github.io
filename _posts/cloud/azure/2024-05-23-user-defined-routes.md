@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to UDRs
+## Introduction
 - User Defined Routes (UDRs) in Azure are custom routing rules that allow you to control the traffic flow within your Azure Virtual Network. 
 - They enable you to override the default system routes provided by Azure, giving you the flexibility to direct network traffic according to specific needs. 
 

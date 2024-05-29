@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Monitor
+## Introduction
 - Azure Monitor is a comprehensive monitoring service provided by Microsoft Azure that offers a suite of tools and features to help you collect, analyze, and act on telemetry data from your cloud and on-premises environments. 
 - Below are the key components and functionalities of Azure Monitor:
 

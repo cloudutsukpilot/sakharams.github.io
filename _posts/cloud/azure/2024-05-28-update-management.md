@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Update Management
+## Introduction
 - Azure Update Management is a feature in Microsoft Azure that enables you to manage updates for your Windows and Linux virtual machines (VMs) in Azure, on-premises environments, or in other cloud environments. 
 - This feature allows you to assess the status of available updates, schedule installation of required updates, and review deployment results to ensure compliance.
 

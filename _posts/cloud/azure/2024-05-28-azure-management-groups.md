@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Management Groups
+## Introduction
 - Azure Management Groups are a feature in Microsoft Azure that allow you to efficiently manage access, policy, and compliance across multiple Azure subscriptions. 
 - They provide a hierarchical structure for organizing your Azure resources, making it easier to apply governance at scale. 
 

@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Container Instance
+## Introduction
 - Azure Container Instances (ACI) is a service provided by Microsoft Azure that allows you to run Docker containers directly on the Azure cloud without the need to provision and manage underlying virtual machines or orchestrate complex container infrastructure. 
 - ACI is designed to simplify the deployment and management of containerized applications by offering a quick and easy way to run containers in a serverless environment.
 

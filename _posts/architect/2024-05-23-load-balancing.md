@@ -2,10 +2,10 @@
 layout: post
 title: Cloud Load Balancers
 categories: [architect]
-tags: [Archiect]
+tags: [Architect]
 ---
 
-
+## Introduction to Load Balancers
 - Efficient load balancing is vital for optimizing the performance and availability of your applications in the cloud.
 - However, managing load balancers can be overwhelming, given the various types and configuration options available.
 - In today's multi-cloud landscape, mastering load balancing is essential to ensure seamless user experiences and maximize resource utilization, especially when orchestrating applications across multiple cloud providers. 

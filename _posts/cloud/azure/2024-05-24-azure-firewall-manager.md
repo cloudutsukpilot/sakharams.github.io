@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Azure Firewall Manager
+## Introduction
 - Azure Firewall Manager is a centralized security management service in Azure that enables you to manage and monitor multiple Azure Firewall instances across different Azure regions and subscriptions from a single location. 
 - It provides a unified view and streamlined management capabilities for deploying, configuring, and monitoring Azure Firewall policies across your entire Azure environment. 
 

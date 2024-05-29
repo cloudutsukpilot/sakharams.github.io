@@ -6,7 +6,6 @@ tags: [Cloud, Azure]
 ---
 
 ## Introduction
-
 - A powerful service that provides layer 7 load balancing, SSL termination, and web application firewall capabilities.
 - Azure Application Gateway is a scalable and highly available web traffic load balancer that enables you to manage and optimize the delivery of your web applications. 
 - It acts as an entry point for your web traffic and distributes it across multiple backend servers, ensuring high availability and performance.

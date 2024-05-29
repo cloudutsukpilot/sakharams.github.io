@@ -2,12 +2,10 @@
 layout: post
 title: Firewalls
 categories: [architect]
-tags: [Archiect]
+tags: [Architect]
 ---
 
-![Firewalls](/assets/img/architect/software-architecture-styles.jpg)
-
-
+## Introduction to Firewall
 - A firewall is a network security system that controls and filters network traffic, acting as a watchman between a private network and the public Internet.
 
 - They come in two broad categories:

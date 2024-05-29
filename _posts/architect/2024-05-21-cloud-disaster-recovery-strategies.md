@@ -2,7 +2,7 @@
 layout: post
 title: Cloud Disaster Recovery Strategies
 categories: [architect, recovery]
-tags: [Archiect, Disaster Recovery(DR)]
+tags: [Architect, Disaster Recovery(DR)]
 ---
 
 ![Cloud Disaster Recovery Strategies](/assets/img/architect/cloud-disaster-recovery-strategies.webp)

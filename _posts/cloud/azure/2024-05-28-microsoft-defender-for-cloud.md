@@ -5,7 +5,7 @@ categories: [azure]
 tags: [Cloud, Azure]
 ---
 
-## Introduction to Microsoft Defender
+## Introduction
 - Microsoft Defender for Cloud, formerly known as Azure Security Center and Azure Defender, is a comprehensive security management and threat protection service provided by Microsoft Azure. 
 - It offers unified security management and advanced threat protection across your hybrid cloud workloads.
 
