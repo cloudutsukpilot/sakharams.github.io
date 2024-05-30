@@ -11,7 +11,11 @@ tags: [Architect]
 - In today's multi-cloud landscape, mastering load balancing is essential to ensure seamless user experiences and maximize resource utilization, especially when orchestrating applications across multiple cloud providers. 
 - Having the right knowledge is key to overcoming these challenges and achieving consistent, reliable application delivery.
 
+### Use Cases of Load Balancer
 
+![Load Balancer Use Cases](/assets/img/architect/load-balancer-use-cases.jpeg)
+
+### Load Balancers in CSP's
 ![Load Balancing](/assets/img/architect/cloud-loadbalancer-cheatsheet.webp)
 
 - In selecting the appropriate load balancer type, it's essential to consider factors such as 

@@ -11,7 +11,7 @@ tags: [Cloud, Azure, KQL]
 
 - Below are some common examples and usage scenarios of KQL:
 
-### Basic Query Structure
+### **Basic Query Structure**
 
 1. `Retrieving All Records from a Table`
 
@@ -28,11 +28,21 @@ tags: [Cloud, Azure, KQL]
     ```
     - This query retrieves records from the table where the Timestamp is later than January 1, 2023.
 
+    ```
+    TableName 
+    | where ColumnName contains "Error"
+    ```
+    ```
+    TableName 
+    | search "Error"
+    ```
+    - This query retrieves records from the table where the "Error" word is present
+
 3. `Selecting Specific Columns`
 
     ```
     TableName
-    | project Column1, Column2
+    | project Column1, Column2, CustomerColum=["internalKeyName"]
     ```
     - This query selects and returns only Column1 and Column2 from the table.
 
@@ -44,7 +54,7 @@ tags: [Cloud, Azure, KQL]
     ```
     - This query returns the table schema.
 
-### `Aggregation and Summarization`
+### **Aggregation and Summarization**
 
 1. `Counting Records`
 
@@ -70,7 +80,7 @@ tags: [Cloud, Azure, KQL]
     ```
     - This query calculates the average of NumericColumn values, grouped by CategoryColumn.
 
-### Time-Based Analysis
+### **Time-Based Analysis**
 
 1. `Time Series Analysis`
 
@@ -88,7 +98,7 @@ tags: [Cloud, Azure, KQL]
     ```
     - This query calculates the difference in minutes between EndTime and StartTime for each record.
 
-### Joining and Combining Data
+### **Joining and Combining Data**
 
 1. `Joining Tables`
 
@@ -106,6 +116,14 @@ tags: [Cloud, Azure, KQL]
     ```
     - This query combines records from Table1 and Table2.
 
+3. `Creating a New Column`
+
+    ```
+    AzureActivity
+    | extend request=todynamic(HTTPReqeust)
+    | project request9["clientIpAddress"]
+    ```
+    - This query returns the client IP address from the HTTPRequest column
 
 ### Advanced Scenarios
 
@@ -125,6 +143,15 @@ tags: [Cloud, Azure, KQL]
     | evaluate anomaly_detection(AvgValue, 2, 'linefit')
     ```
 - This query detects anomalies in the AvgValue over time, using a 2-sigma threshold and a line fit model.
+
+3. `Parsing Data from Column Text`
+
+    ```
+    AzureDiagnostics
+    | parse msg_s with Protocol 'request from ' SourceIP ':' * 'to' DestinationIP ':' *
+    | extend 1_protocol=Protocol, 1_sourceip=SourceIP,1_destination=DestinationIP
+    | project 1_protocol, 1_sourceip,1_destination
+    ```
 
 
 ### Real-World Examples
