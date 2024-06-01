@@ -5,8 +5,28 @@ categories: [architect, devsecops]
 tags: [DevOps, DevSecOps, Architect]
 ---
 
+## Introduction
 
-## Different Stages in DevSecOps and corresponding Tools:
+
+### DevSecOps Tools
+
+| Stages                                          | Tools                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| IDE Plugins                                     | DevSkim, JFrog Eclipse, Snyk                                         |
+| Pre-Commit Hooks                                | git-hound, git-secrets, repo-supervisor                              |
+| Secrets Management Tools                        | Amazon Web Services(AWS), Microsoft, Google                          |
+| Static Application Security Testing (SAST)      | Checkmarx, ECG, DerScanner                                           |
+| Source Composition Analysis (SCA)               | GitHub, BlackDuck, Synx                                              |
+| Dynamic Application Security Testing (DAST)     | Rapid1, Contrast Security, Acunetix, SonarCube                       | 
+| Interactive Application Security Testing (IAST) | Contrast Security, Synopsis, VeraCode                                |
+| Secure infrastructure as code                   | Cliar, Dockscan, Anchore, tfsec, kube-sec                            |
+| Compliance as code                              | KitchenCI, ServerSPEC, CHEF INSPEC                                   |
+| Runtime application self-protection (RASP)      | Signal Sciences, Trend Micro, Imperva                                |
+| Web Application Firewall (WAF)                  | Azure WAF, AWS WAF, GCP WAF, Cloudflare, Imperva and Wallarm         |
+| Vulnerability management                        | Hacker, Archery, Qualys, Microsoft Defender                          |
+
+
+### Different Stages in DevSecOps and corresponding Tools:
 
 1. `IDE Plugins`
 - IDE extensions that can work like spellcheck and help to avoid basic mistakes at the earliest stage of coding.

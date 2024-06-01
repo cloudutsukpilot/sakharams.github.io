@@ -9,6 +9,8 @@ tags: [Communication, API]
 
 - API security involves implementing measures to protect your APIs from threats and attacks. Here are some common security implementations for APIs:
 
+![API Security](/assets/img/communication/api-security.webp)
+
 1. `Authentication`: 
 - This verifies the identity of the users interacting with your API. Common methods include API keys, OAuth, or JWT (JSON Web Tokens).
 

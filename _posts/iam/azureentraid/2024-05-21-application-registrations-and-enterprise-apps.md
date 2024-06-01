@@ -88,3 +88,18 @@ Enterprise Apps: Heavily involves SSO configuration and conditional access polic
 8. Privileged Role Administrator: Manages role assignments in Azure AD, including roles related to enterprise applications.
 9. Security Reader: Can view security-related features, such as reports and alerts, but cannot make changes.
 10. Conditional Access Administrator: Can manage conditional access policies.
+
+
+### Application Object vs Service Principal vs Managed Identity
+
+1. `Application Object`: 
+- Defines the application's identity and access needs globally in Azure AD.
+- Assigned to non-Azure Resources 
+
+2. `Managed Identity`: 
+- Automatically managed identity for Azure resources, eliminating the need to manage credentials.
+- Assigned to Azure Resources
+
+3. `Service Principal`: 
+- An instance of an Application Object in a tenant, used to grant the application access to resources.
+- Both Application Object and Managed Identity indirectly create a SPN which is used to assign permissions.

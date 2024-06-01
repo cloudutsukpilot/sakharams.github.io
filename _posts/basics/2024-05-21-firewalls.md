@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Firewalls
-categories: [architect]
-tags: [Architect]
+categories: [basics]
+tags: [Basics]
 ---
 
 ## Introduction to Firewall

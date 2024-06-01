@@ -81,3 +81,15 @@ Azure Notification Hubs is a push notification service that helps you send perso
 - It provides a comprehensive set of tools and frameworks to support the entire machine learning lifecycle.
 
 
+### Azure Logic Apps vs Azure Web Apps vs Azure Functions
+
+| Feature                 | Azure Logic Apps                                | Azure Web Apps                                     | Azure Functions                                      |
+|-------------------------|-------------------------------------------------|---------------------------------------------------|------------------------------------------------------|
+| **Primary Purpose**     | Automating workflows and integrating services   | Building, deploying, and scaling web applications | Running event-driven code                            |
+| **State Management**    | Stateful                                        | Stateful                                          | Stateless                                             |
+| **Scaling**             | Managed by Azure, designed for high scalability | Automatic and manual scaling                      | Automatically scales based on events                  |
+| **Development Effort**  | Low-code/No-code with visual designer           | Traditional development                           | Code-based with minimal infrastructure management     |
+| **Languages Supported** | N/A (Workflow orchestration)                    | .NET, Java, PHP, Node.js, Python, etc.            | C#, JavaScript, Python, Java, etc.                    |
+| **Event Handling**      | Yes, with triggers and actions                  | No                                                | Yes, with various event triggers                      |
+| **Integration**         | Extensive built-in connectors                   | Via APIs and SDKs                                 | Native integration with Azure services                |
+| **Use Cases**           | Business process automation, data integration   | Enterprise web applications, APIs                 | Background processing, microservices, real-time data processing |

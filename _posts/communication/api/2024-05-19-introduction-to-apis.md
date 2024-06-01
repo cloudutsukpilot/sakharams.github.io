@@ -26,6 +26,9 @@ tags: [Communication, API]
     + DELETE.
 
 - They are stateless: Each REST request is self-contained. That’s great for scalability but nearly all web applications depend on external state storage to keep track of state that is too large or too complex to fit into request headers.
+
+![Rest API Cheatsheet](/assets/img/communication/rest-api-cheatsheet.webp)
+
 - They use workarounds to track state: Just as with web browsing, cookies and tokens provide a way to identify individual clients and authenticate them with a specific session.
 - Responses are cacheable: Both clients and server-side components can cache responses, in part because they are stateless.
 - Responses are synchronous: Following HTTP’s request-response pattern makes it harder to build REST APIs that rely on long-running connections.
