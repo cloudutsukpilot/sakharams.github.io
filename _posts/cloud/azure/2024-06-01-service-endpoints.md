@@ -47,5 +47,6 @@ tags: [Cloud, Azure]
 4. `Compliance`: Meeting regulatory requirements that mandate secure connections to cloud services without internet exposure.
 
 ### Service Endpoint vs Private Endpoint
-- Service Endpoints provide secure access over Azure network while still allowing public internet accessibility, suitable for general secure connectivity. 
-- Private Endpoints offer complete isolation from the public internet, ideal for scenarios requiring the highest level of security and privacy.
+- For the highest level of security and network isolation, Private Endpoints are preferred. 
+- They ensure that your storage account is accessible only via a private IP address within your VNet, providing enhanced security and compliance. 
+- For simpler configurations and cost-effectiveness, Service Endpoints can be used, providing good performance and keeping traffic within the Azure backbone while still allowing access via the public endpoint of the service.

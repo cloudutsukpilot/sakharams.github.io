@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Azure - Blob Storage
-categories: [cloud, azure]
-tags: [Cloud, Azure]
+categories: [cloud, azure, storage]
+tags: [Cloud, Azure, Storage]
 ---
 
 ## Introduction

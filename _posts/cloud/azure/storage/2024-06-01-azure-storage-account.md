@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Azure - Storage Account
-categories: [cloud, azure]
-tags: [Cloud, Azure]
+categories: [cloud, azure, storage]
+tags: [Cloud, Azure, Storage]
 ---
 
 ## Introduction
@@ -53,6 +53,19 @@ tags: [Cloud, Azure]
 - Supports both system-assigned and user-assigned managed identities.
 
 
+
+### Supported Authentication Types
+
+| Storage Type          | Shared Key | Shared Access <br> Signature (SAS) | Microsoft Entra ID | On-premises <br> Active Directory <br> Domain Services | Anonymous Public <br> Read Access |
+|-----------------------|------------|-------------------------------|--------------------|----------------------------------------------|------------------------------|
+| Azure Blobs           | Supported  | Supported                     | Supported          | Not supported                                | Supported                    |
+| Azure Files (SMB)     | Supported  | Not supported                 | Supported (with Microsoft <br> Entra Domain Services <br> or Microsoft Entra Kerberos) | Supported (credentials must <br> be synced to Microsoft <br> Entra ID) | Not supported |
+| Azure Files (REST)    | Supported  | Supported                     | Supported          | Not supported                                | Not supported                |
+| Azure Queues          | Supported  | Supported                     | Supported          | Not supported                                | Not supported                |
+| Azure Tables          | Supported  | Supported                     | Supported          | Not supported                                | Not supported                |
+
+
+### Storage Account Access Key vs Shared Access Signatures
 | Feature                     | Storage Account Access Key                               | Shared Access Signatures (SAS)                          |
 |-----------------------------|----------------------------------------------------------|---------------------------------------------------------|
 | **Access Level**            | Full access to all resources in the storage account      | Granular access to specific resources and operations     |

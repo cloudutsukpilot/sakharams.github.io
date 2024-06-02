@@ -5,7 +5,7 @@ categories: [cybersecurity, cloudsecurity]
 tags: [CyberSecurity, Cloud Security]
 ---
 
-## Security Measures to Secure the Storage Account
+## Security Measures
 
 1. **Network Security**:
 - `Virtual Network (VNet) Integration`: Use VNet service endpoints or private endpoints to restrict access to storage resources from specific VNets.
