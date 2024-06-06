@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Microsoft Azure Virtual Private Network Connections
+title: Azure - Virtual Private Network (VPN) Connections
 categories: [cloud, azure, networking]
 tags: [Cloud, Azure, Networking]
 ---

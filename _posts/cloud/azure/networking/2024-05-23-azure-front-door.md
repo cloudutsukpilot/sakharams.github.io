@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Microsoft Azure Front Door
+title: Azure - Front Door
 categories: [cloud, azure, networking]
 tags: [Cloud, Azure, Networking]
 ---

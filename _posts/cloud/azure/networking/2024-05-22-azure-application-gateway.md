@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Microsoft Azure Application Gateway
+title: Azure - Application Gateway
 categories: [cloud, azure, networking]
 tags: [Cloud, Azure, Networking]
 ---

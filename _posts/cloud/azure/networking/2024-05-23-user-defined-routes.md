@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Microsoft Azure  - User Defined Routes
+title: Azure - User Defined Routes
 categories: [cloud, azure, networking]
 tags: [Cloud, Azure, Networking]
 ---

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Microsoft Azure Virtual Networks
+title: Azure - Virtual Networks
 categories: [cloud, azure, networking]
 tags: [Cloud, Azure, Networking]
 ---

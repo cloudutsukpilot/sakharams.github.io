@@ -2,7 +2,7 @@
 layout: post
 title: Azure - SQL Database
 categories: [cloud, azure, database]
-tags: [Cloud, Azure, Database]
+tags: [Cloud, Azure, Databases]
 ---
 
 ## Introduction
