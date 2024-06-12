@@ -1,7 +1,7 @@
 ---
 layout: post
 title: E-Commerce Platform - Azure
-categories: [projects]
+categories: [projects, e-commerce]
 tags: [Projects, E-Commerce]
 ---
 ## Problem Statement: E-Commerce Platform on Azure

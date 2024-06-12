@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Email Journaling - Azure
+title: Email Journaling
 categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
 ---

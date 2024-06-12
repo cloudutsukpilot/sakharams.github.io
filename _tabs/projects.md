@@ -11,25 +11,18 @@ order: 9
 
 
 ###  1.  E-Commerce Platform on Cloud
-- [Problem Statement and Solution Design](/posts/projects/e-commerce-platform-cloud)
-- `Azure`
-    + [Solution Design](/posts/projects/e-commerce-platform-azure)
-    + [Implementation and Demo](/posts/projects/e-commerce-platform-azure-demo)
-- `AWS`
-    + [Solution Design](/posts/projects/e-commerce-platform-aws)
-    + [Implementation and Demo](/posts/projects/e-commerce-platform-aws-demo)
-- `GCP`
-    + [Solution Design](/posts/projects/e-commerce-platform-gcp)
-    + [Implementation and Demo](/posts/projects/e-commerce-platform-gcp-demo)
+- [Problem Statement and Solution Design](/posts/projects/e-commerce/e-commerce-platform-cloud)
+
+| Category | Azure | AWS | GCP | 
+| -------- | ----- | --- | --- | 
+| Solution Design | [Link](/posts/projects/e-commerce/e-commerce-platform-azure) | [Link](/posts/projects/e-commerce/e-commerce-platform-aws) | [Link](/posts/projects/e-commerce/e-commerce-platform-gcp) | 
+| Implementation/Demo | [Link](/posts/projects/e-commerce/e-commerce-platform-azure-demo) | [Link](/posts/projects/e-commerce/e-commerce-platform-aws-demo) | [Link](/posts/projects/e-commerce/e-commerce-platform-gcp-demo) | 
+
 
 ### 2.  Email Journaling Solution on Cloud
-- [Problem Statement and Solution Design](/posts/projects/email-journaling-cloud)
-- `Azure`
-    + [Solution Design](/posts/projects/email-journaling-azure)
-    + [Implementation and Demo](/posts/projects/email-journaling-azure-demo)
-- `AWS`
-    + [Solution Design](/posts/projects/email-journaling-aws)
-    + [Implementation and Demo](/posts/projects/email-journaling-aws-demo)
-- `GCP`
-    + [Solution Design](/posts/projects/email-journaling-gcp)
-    + [Implementation and Demo](/posts/projects/email-journaling-gcp-demo)
+- [Problem Statement and Solution Design](/posts/projects/email journaling/email-journaling-cloud)
+
+| Category | Azure | AWS | GCP | 
+| -------- | ----- | --- | --- | 
+| Solution Design | [Link](/posts/projects/email journaling/email-journaling-azure) | [Link](/posts/projects/email journaling/email-journaling-aws) | [Link](/posts/projects/email journaling/email-journaling-gcp) | 
+| Implementation/Demo | [Link](/posts/projects/email journaling/email-journaling-azure-demo)| [Link](/posts/projects/email journaling/email-journaling-aws-demo) | [Link](/posts/projects/email journaling/email-journaling-gcp-demo) | 

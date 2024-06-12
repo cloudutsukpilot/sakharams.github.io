@@ -1,7 +1,7 @@
 ---
 layout: post
-title: E-Commerce Platform on Cloud
-categories: [projects]
+title: E-Commerce Platform - Cloud
+categories: [projects, e-commerce]
 tags: [Projects, E-Commerce]
 ---
 ## Problem Statement: E-Commerce Platform on Cloud
