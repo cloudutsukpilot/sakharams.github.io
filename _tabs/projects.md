@@ -6,8 +6,8 @@ order: 9
 ---
 
 ## Projects with Demo's
-1. [E-Commerce Platform on Cloud](#1-e-commerce-platform-on-cloud)
-2. [Email Journaling Solution on Cloud](#2-email-journaling-solution-on-cloud)
+1. [E-Commerce Platform on Cloud](#1--e-commerce-platform-on-cloud)
+2. [Email Journaling Solution on Cloud](#2--email-journaling-solution-on-cloud)
 
 
 ###  1.  E-Commerce Platform on Cloud

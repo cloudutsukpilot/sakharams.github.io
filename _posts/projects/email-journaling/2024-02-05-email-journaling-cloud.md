@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Email Journaling on Cloud
-categories: [projects]
+categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
 ---
 
