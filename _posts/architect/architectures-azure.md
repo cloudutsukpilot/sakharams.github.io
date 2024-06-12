@@ -35,3 +35,6 @@ https://learn.microsoft.com/en-us/azure/app-service/tutorial-python-postgresql-a
 
 Banking App Python
 https://abujji.visualstudio.com/banking-app-python
+
+Secure Hybrid Network
+https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/dmz/secure-vnet-dmz?tabs=portal

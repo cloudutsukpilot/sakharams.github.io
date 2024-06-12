@@ -59,3 +59,20 @@ management experience.
 
 3. `Security Orchestration`:
 - Orchestrate security policies and rules across diverse Azure environments to ensure consistent security posture and compliance.
+
+
+### Azure Firewall Manager Policy Components
+1. `Parent Policies`:
+- These are top-level policies that define security rules and configurations inherited by multiple child policies or firewalls, enabling centralized management and consistent enforcement across environments.
+
+2. `Rule Collections`:
+- Logical groupings of rules within Azure Firewall policies, organized into application rule collections, network rule collections, and DNAT rule collections, each serving different purposes in traffic filtering and management.
+
+3. `DNAT Rules (Destination Network Address Translation)`:
+- Rules that map incoming traffic from a public IP address and port to a private IP address and port within the virtual network, facilitating access to internal resources from external sources.
+
+4. `Network Rules`:
+- Rules that control traffic based on IP addresses, port numbers, and protocols, used primarily for controlling network-level access between resources within the virtual network or to/from the internet.
+
+5. `Application Rules`:
+- Rules that filter outbound traffic based on fully qualified domain names (FQDNs) and protocol, allowing granular control over web and application traffic to ensure secure and compliant access to internet resources.

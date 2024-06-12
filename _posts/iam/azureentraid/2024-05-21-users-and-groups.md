@@ -7,6 +7,19 @@ tags: [Identity and Access Management(IAM), Entra ID]
 
 ## Introduction
 
+### Users:
+- Individual accounts representing real persons or applications/services.
+- Types of Users:
+    + `Internal member`: These users are most likely full-time employees in your organization.
+    + `Internal guest`: These users have an account in your tenant, but have guest-level privileges. It's possible they were created within your tenant prior to the availability of B2B collaboration.
+    + `External member`: These users authenticate using an external account, but have member access to your tenant. These types of users are common in multitenant organizations.
+    + `External guest`: These users are true guests of your tenant who authenticate using an external method and who have guest-level privileges.
+- Authentication Methods:
+    
+    | Internal Member | Microsoft Entra Tenant | 
+    | Internal Guests | Microsoft Entra Tenant | 
+    | External Member | Their Home Microsoft Entra Tenant and they authenticate using Federated Sign-in with our Microsoft Tenant | 
+    | Exnternal Guest |  Microsoft Entra Tenant | 
 
 ### Groups
 - Collections of user accounts, which simplify management and access control.
@@ -15,10 +28,6 @@ tags: [Identity and Access Management(IAM), Entra ID]
     + `Microsoft 365 groups`: Collaborative groups with shared resources like email, files
 - Groups allow assigning permissions, applying policies, and managing resources collectively.
 
-### Users:
-- Individual accounts representing real persons or applications/services.
-- Types: Internal users (employees), guest users (external collaborators).
-- Can be added, removed, or managed within the Azure AD tenant.
 
 ### User(Member) v/s Guest User
 

@@ -10,6 +10,9 @@ tags: [Identity and Access Management(IAM), Entra ID]
 - It leverages machine learning and behavioral analytics to identify suspicious activities and provide actionable insights.
 
 
+![Entra ID Identity Protectino](/assets/img/iam/azureentraid/microsoft-entra-identity-protection.png)
+
+
 ### Key Features of Entra ID Identity Protection
 
 1. `Risk Detection`

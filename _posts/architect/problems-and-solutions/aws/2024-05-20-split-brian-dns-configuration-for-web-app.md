@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Architectures - Use a split-brain DNS configuration to host a web app in AWS
-categories: [architect, cloud, aws]
-tags: [Architect, Cloud, Amazon Web Services(AWS)]
+categories: [cloud, aws]
+tags: [Cloud, Projects, Amazon Web Services(AWS)]
 ---
 
 

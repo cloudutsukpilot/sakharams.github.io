@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Architectures - Use a split-brain DNS configuration to host a web app in Azure
-categories: [architect, cloud, azure]
-tags: [Architect, Cloud, Azure]
+categories: [cloud, azure]
+tags: [Projects, Cloud, Azure]
 ---
 
 

@@ -70,3 +70,20 @@ tags: [Cloud, Azure]
 | | Establish connectivity between spokes and the hub using virtual network peering, VPN, or ExpressRoute. |
 | `Routing and Security` | Configure routing using User Defined Routes (UDRs) or Azure Route Tables to direct traffic between the hub and spokes.
 | | Implement network security policies using Network Security Groups (NSGs) and Azure Firewall to control traffic flow and enforce security rules.
+
+
+### Hub Spoke Architecture using Virtual WAN
+
+![Hub Spoke Using VWAN](/assets/img/cloud/azure/networking/hub-spoke-using-virtual-wan.png)
+
+1. `Hub (VWAN)`: 
+- The VWAN hub serves as the central point of connectivity, handling all routing and traffic management between the spokes.
+
+2. `Spokes (VNets, On-Premises Network, Branch Offices, Remote Users)`: 
+- Each spoke is connected to the hub. This setup ensures that:
+    + Traffic between spokes is routed through the hub.
+    + Centralized security policies and controls can be applied at the hub.
+    + Simplified management of network connections and routing.
+
+
+

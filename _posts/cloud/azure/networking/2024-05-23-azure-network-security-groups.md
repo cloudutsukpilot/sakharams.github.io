@@ -61,10 +61,39 @@ tags: [Cloud, Azure, Networking]
 
 ### Multiple NSG's Association
 - When you have Network Security Groups (NSGs) associated with both a subnet and a Network Interface Card (NIC) in Azure, the rules from both NSGs are applied, and the most restrictive rule takes precedence. 
-- Rule Application Order
+- Rule Application Order - Inbound
 1. Subnet NSG:
 - The NSG associated with the subnet applies its rules to all traffic entering and leaving any NICs within that subnet.
 2. NIC NSG:
 - The NSG associated with a specific NIC applies its rules only to the traffic for that particular NIC.
+- Rule Application Order - Outbound
+1. NIC NSG
+2. Subnet NSG
 
 
+### Application Security Groups (ASGs)
+- Application security groups enable you to configure network security as a natural extension of an application's structure, allowing you to group virtual machines and define network security policies based on those groups. 
+- You can reuse your security policy at scale without manual maintenance of explicit IP addresses. 
+
+![Application Security Groups](/assets/img/cloud/azure/networking/application-security-groups.png)
+
+- Rules:
+1. Allow-HTTP-Inbound-Internet
+
+| Priority | Source   | Source Ports | Destination | Destination Ports | Protocol | Access |
+|----------|----------|--------------|-------------|-------------------|----------|--------|
+| 100      | Internet | *            | AsgWeb      | 80                | TCP      | Allow  |
+
+2. Deny-Database-All
+
+| Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access |
+|----------|--------|--------------|-------------|-------------------|----------|--------|
+| 120      | *      | *            | AsgDb       | 1433              | Any      | Deny   |
+
+3. Allow-Database-BusinessLogic
+
+| Priority | Source   | Source Ports | Destination | Destination Ports | Protocol | Access |
+|----------|----------|--------------|-------------|-------------------|----------|--------|
+| 110      | AsgLogic | *            | AsgDb       | 1433              | TCP      | Allow  |
+
+- This rule allows traffic from the AsgLogic application security group to the AsgDb application security group.

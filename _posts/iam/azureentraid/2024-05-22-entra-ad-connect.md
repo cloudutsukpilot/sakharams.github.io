@@ -1,14 +1,15 @@
 ---
 layout: post
-title: Entra ID - Azure AD Connect
+title: Entra ID - Entra AD Connect
 categories: [iam, entraid]
 tags: [Identity and Access Management(IAM), Entra ID]
 ---
 
-## Azure AD Connect
-
+## Introduction
 - Azure AD Connect is a Microsoft service designed to synchronize on-premises directories, such as Active Directory, with Azure Active Directory (Azure AD). 
 - This synchronization allows organizations to provide a unified identity for users across their on-premises and cloud environments, ensuring consistent identity and access management.
+
+![Entra AD Connect](/assets/img/iam/azureentraid/microsoft-entra-connect.png)
 
 ### Key features and components of Azure AD Connect:
 
@@ -78,3 +79,19 @@ tags: [Identity and Access Management(IAM), Entra ID]
 | --------- | ----------- |
 | Azure AD Connect sync component | This is installed on the on-premise environment |
 | Azure AD Connect sync service | This service runs in Azure AD |
+
+### Microsoft Entra Cloud Sync 
+- Microsoft Entra Cloud Sync is a lightweight, cloud-based solution for synchronizing on-premises directories (such as Active Directory) with Microsoft Entra ID (formerly Azure AD). 
+- It is designed to provide seamless and automatic synchronization of user identities, groups, and other directory objects to the cloud.
+- Key Features:
+1. `Lightweight Agent`: Uses a lightweight agent installed on-premises to handle synchronization tasks.
+2. `Automatic Updates`: The agent is updated automatically by Microsoft, reducing administrative overhead.
+3. `Scalability`: Supports multiple agents for high availability and scalability.
+4. `Filtered Synchronization`: Allows for filtering which objects and attributes to synchronize.
+5. `Password Hash Synchronization`: Supports synchronizing password hashes, enabling users to use the same password for both on-premises and cloud services.
+6. `Simplified Management`: Managed through the Microsoft Entra ID portal, providing a simplified and centralized management interface.
+
+- Use Cases:
+1. Organizations with lightweight or decentralized IT environments.
+2. Scenarios where minimal infrastructure changes are desired.
+3. Companies needing to synchronize specific subsets of directory objects.

@@ -2,7 +2,7 @@
 layout: post
 title: AZ 500 - Azure Security Engineer Associate
 categories: [certification, azure]
-tags: [Certification, Azure]
+tags: [Certification]
 ---
 
 ## AZ-500 Certification Skills
@@ -622,6 +622,120 @@ Select only one answer.
     {: .prompt-tip}
 
 
+44. You have the following security policy deployed to an Azure subscription.
+```
+  policyRule: {
+    if: {
+      allOf: [
+        {
+          field: "type",
+          equals: "Microsoft.Storage/storageAccounts"
+        },
+        {
+          field: "Microsoft.Storage/storageAccounts/allowSharedKeyAccess",
+          equals: "true"
+        }
+      ]
+    },
+    then: {
+      effect: "Deny"
+    }
+  }
+```
+You successfully deploy a new storage account.
+Which statements is true?
+Select only one answer.
+  + [ ] Accessing the data by using SAS tokens is enabled.
+  + [ ] Accessing the data in the storage account is enabled for users that have the Storage Account Contributor role.
+  + [x] Usage of Microsoft Entra authentication is enforced.
+  + [ ] Usage of the storage account shared key is allowed.
+
+    > Enforcing Microsoft Entra authentication prevents using shared keys, and leaves only data plane RBAC as an authentication option.
+    {: .prompt-tip}
+
+45. You need to implement a key management solution that supports importing keys generated in an on-premises environment. The solution must ensure that the keys stay within a single Azure region.
+What should you do?
+Select only one answer.
+  + [ ]Apply the Keys should be the specified cryptographic type RSA or EC Azure policy.
+  + [ ]Disable the Allow trusted services option.
+  + [ ]Implement Azure Key Vault Firewall.
+  + [x]Implement Azure Key Vault Managed HSM.
+
+    > Key Vault Managed HSM supports importing keys generated in an on-premise HSM. Also, managed HSM does not store or process customer data outside the Azure region in which the customer deploys the HSM instance. On-premises-generated keys are still managed, after implementing Key Vault Firewall. Enforcing HSM-backed keys does not enforce them to be imported. Disabling the Allow trusted services option does not have a direct impact on key importing.
+    {: .prompt-tip}
+
+46. You need to enable encryption at rest by using customer-managed keys (CMKs).
+Which two services support CMKs? Each correct answer presents a complete solution.
+Select all answers that apply.
+  + [x] Azure Blob storage
+  + [ ] Azure Disk Storage
+  + [x] Azure Files
+  + [ ] Azure NetApp Files
+  + [ ] Log Analytics workspace
+
+47. You have a storage account that contains multiple containers, blobs, queues, and tables.
+You need to create a key to allow an application to access only data from a given table in the storage account.
+Which authentication method should you use for the application?
+Select only one answer.
+  + [ ] SAS
+  + [ ] shared
+  + [x] service SAS
+  + [ ] user delegation SAS
+    
+    > A SAS service is the only type of authentication that provides control at the table level. User delegation SAS is only available for Blob storage. SAS and shared allow access to the entire storage account.
+    {: .prompt-tip}
+
+48. You have an Azure Storage account.
+You plan to prevent the use of shared keys by using Azure Policy.
+Which two access methods will continue to work? Each correct answer presents a complete solution.
+Select all answers that apply.
+  + [ ] SAS account SAS
+  + [ ] service SAS
+  + [x] Storage Blob Data Reader role
+  + [x] user delegation
+
+    > The Storage Blob Data Reader role uses Microsoft Entra to authenticate. User delegation SAS is a method that uses Microsoft Entra to generate a SAS. Both methods work whether the shared keys are allowed or prevented. Service SAS and account SAS use shared keys to generate.
+    {: .prompt-tip}
+
+49. You need to provide public anonymous access to a file in an Azure Storage account. The solution must follow the principle of least privilege.
+Which two actions should you perform? Each correct answer presents part of the solution.
+Select all answers that apply.
+  + [x] For the container, set Public access level to Blob.
+  + [ ] For the container, set Public access level to Container.
+  + [ ] For the storage account, set Blob public access to Disabled.
+  + [x] For the storage account, set Blob public access to Enabled.
+
+    > Unless prevented by another setting, setting Public access level to Blob allows public access to the blob only. Setting Blob public access to Enabled is a prerequisite for setting the access level of container or blob. Setting Blob public access to Disabled prevents any public access and setting Public access level to Container also allows any current and future blobs in the container, which does not follow the principle of least privilege.
+    {: .prompt-tip}
+
+50. You have an Azure subscription that contains the following resources:
+<br> A virtual machine named VM1 that has a network interface named NIC1
+<br> A virtual network named VNet1 that has a subnet named Subnet1
+<br> A public IP address named PubIP1
+<br> A load balancer named LB1
+You create a network security group (NSG) named NSG1.
+To which two resources can you associate NSG1? Each correct answer presents a complete solution.
+Select all answers that apply.
+  + [ ] LB1
+  + [x] NIC1
+  + [ ] PubIP1
+  + [x] Subnet1
+  + [ ] VM1
+  + [ ] VNet1
+
+51. You need to allow only Microsoft Entra-authenticated principals to access an existing Azure SQL database.
+Which three actions should you perform? Each correct answer presents part of the solution.
+Select all answers that apply.
+  + [x] Add a Microsoft Entra administrator.
+  + [x] Assign your account the SQL Security Manager built-in role.
+  + [ ] Connect to the database by using Microsoft SQL Server Management Studio (SSMS).
+  + [x] Connect to the database by using the Azure portal.
+  + [ ] Select Support only Microsoft Entra authentication for this server.
+    
+    > Adding a Microsoft Entra administrator and assigning your account the SQL Security Manager built-in role are prerequisites for enabling Microsoft Entra-only authentication. A connection to the data plane of the logical server is not needed.
+    {: .prompt-tip}
+
+
 ### Manage Identity and Access
 
 1. Which feature of Microsoft Entra ID is primarily used to set up multi-factor authentication for enhanced security of user accounts?
@@ -934,6 +1048,9 @@ Select only one answer.
   + [ ] Privileged Role Administrator
   + [x] User Access Administrator
 
+    > User Access Administrator is the least privileged role that grants access to Microsoft.Authorization/roleDefinition/write. <br> Contributor does not have access to Microsoft.Authorization/roleDefinition/write. Privileged Role Administrator grants access to manage role assignments in Microsoft Entra, and all aspects of Microsoft Entra Privileged Identity Management (PIM). This is not an RBAC role.
+    {: .prompt-tip}
+
 43. You need to grant an application access to read connection strings stored in Azure Key Vault. The solution must follow the principle of least privilege.
 Which role assignment should you use?
 Select only one answer.
@@ -988,6 +1105,96 @@ Select only one answer.
 
     > Setting Admins and users in the guest inviter role can invite to Yes allows users to invite guests. Security defaults do not affect guest invitation privileges. The Guest user access is restricted to properties and memberships of their own directory objects setting does not affect guests’ permissions to invite guests. Setting Members can invite to Yes allows non-admin members of your directory to invite guests. Another setting can still override this one.
     {: .prompt-tip}
+
+48. You have an Azure key vault that is configured with Azure role-based access control permission model.
+You need to ensure that a user can read and write keys to the Key Vault. The solution must follow the principle of least privilege.
+Which role should you assign to the user?
+Select only one answer.
+  + [ ] Key Vault Certificates Officer
+  + [x] Key Vault Crypto Officer
+  + [ ] Key Vault Crypto Service Encryption User
+  + [ ] Key Vault Secrets Officer
+
+    > Key Vault Crypto Officer has all the permissions to the secrets in Key Vault. Key Vault Certificates Officer has all the permissions to certificates only, not keys. Key Vault Crypto Service Encryption User can only read keys. Key Vault Secrets Officer has all the permissions to secrets only.
+    {: .prompt-tip}
+
+49. You create an Azure role that contains the following permissions.
+```
+  "permissions": [
+    {
+      "actions": [
+        "Microsoft.Network/publicIPAddresses/read",
+        "Microsoft.Network/virtualNetworks/read",
+        "Microsoft.Network/loadBalancers/read",
+        "Microsoft.Network/networkInterfaces/read",
+        "Microsoft.Compute/virtualMachines/*/read",
+        "Microsoft.HybridCompute/machines/*/read"
+      ],
+      "notActions": [],
+      "dataActions": [
+        "Microsoft.Compute/virtualMachines/login/action"
+      ],
+      "notDataActions": []
+    }
+  ],
+```
+Which three actions can be performed by users that are assigned the role? Each correct answer presents a complete solution.
+Select all answers that apply.
+
+  + [x] Sign in as a regular user to a virtual machine in an Azure subscription.
+  + [ ] Sign in as a regular user to an Azure Arc-connected virtual machine.
+  + [ ] Sign in as an administrator to a virtual machine in an Azure subscription.
+  + [ ] Sign in as an administrator to an Azure Arc-connected virtual machine.
+  + [x] View the attributes of a virtual machine in an Azure subscription.
+  + [x] View the attributes of an Azure Arc-connected virtual machine.
+
+    > Microsoft.Compute/virtualMachines/*/read allows a user to view the attributes of a virtual machine in an Azure environment. <br> Microsoft.HybridCompute/Machines/*/read allows a user to view the attributes of a virtual machine in an Azure Arc subscription. <br> Microsoft.Compute/virtualMachines/login/action allows a user to sign in as a regular user to a virtual machine in an Azure subscription.
+    {: .prompt-tip}
+
+50. You are managing permission consent for Microsoft Entra app registration.
+Which component displays the publisher domain?
+Select only one answer.
+  + [ ] app name
+  + [ ] Microsoft 365 certification
+  + [ ] publisher information
+  + [x] publisher name and verification
+
+    > The publisher displays more app info as it becomes available, including the publisher name, publisher domain, date created, certification details, and reply URLs. Publisher information, Microsoft 365 certification, and app name do not display publisher domain information.
+    {: .prompt-tip}
+  
+51. You create an application named App1 in an Azure tenant.
+You need to host the application as a multitenant application for any users in Azure, while restricting non-Azure accounts.
+You need to allow administrators in other Azure tenants to add the application to their gallery.
+Which CLI command should you run?
+Select only one answer.
+  + [ ] az ad app create –display-name app1 –sign-in-audience AzureADandPersonalMicrosoftAccount
+  + [x] az ad app create –display-name app1--sign-in-audience AzureADMultipleOrgs
+  + [ ] az webapp auth-classic update -r rg1 -n app1 --action LoginWithAzureActiveDirectory
+  + [ ] az webapp auth openid-connect add -r rg1 -n app1 --provider-name p1
+
+    > The CLI commands requiring a web app do not create a gallery entry for the application
+    {: .prompt-tip}
+
+52. You create a Microsoft Entra app registration.
+You need to consent to the use of a given API in your app for all users.
+What should you add to your app registration?
+Select only one answer.
+  + [ ] a client application
+  + [x] a permission
+  + [ ] a scope
+  + [ ] an application ID URI
+
+    > A permission allows the application to use a given API. A scope is used to request consent to run a given function on an API. An application ID URI does not handle permissions.
+    {: .prompt-tip}
+
+53. You have a sneaking suspicion that there are users trying to sign in to resources which are inaccessible to them.
+You decide to create an Azure Log Analytics query to confirm your suspicions. The query will detect unsuccessful user sign-in attempts from the last few days.
+You want to make sure that the results only show users who had failed to sign-in more than five times.
+Which of the following should be included in your query?
+  + [ ] The EventID and CountIf() parameters.
+  + [ ] The ActivityID and CountIf() parameters.
+  + [x] The EventID and Count() parameters.
+  + [ ] The ActivityID and Count() parameters.
 
 ### Manage Security Operations
 1. When creating and managing sensitive data such as API keys and database connection strings in Azure, which service should you primarily use?
@@ -1533,3 +1740,43 @@ Select only one answer.
 
     > You can integrate a web app only to a dedicated subnet of a virtual network that does not have any connected resources. The subnet can have service endpoints, but subnet delegation should either not be configured or must be configured to the Microsoft.Web/serverFarms service
     {: .prompt-tip}
+
+54. You are designing a solution that must meet FIPS 140-2 Level 3 compliance in Azure.
+Where should the solution maintain encryption keys.
+Select only one answer.
+  + [x] a managed HSM
+  + [ ] a software-protected Azure key vault
+  + [ ] an Azure SQL Manage Instance database
+  + [ ] an HSM-protected Azure key vault
+
+    > A managed HSM is level 3-compliant. An HSM-protected key vault is level 2-compliant. A software-protected key vault is level 1-complaint. SQL is not FIPS 104-2 level 3 compliant.
+    {: .prompt-tip}
+
+55. You are configuring automatic key rotation for an encryption key stored in Azure Key Vault.
+You need to implement an alert to be triggered five days before the keys are rotated.
+What should you use?
+Select only one answer.
+  + [ ] an action group alert
+  + [ ] Application Insights
+  + [x] Azure Event Grid
+  + [ ] Microsoft Defender for Key Vault
+
+    > Using Event Grid triggers the Microsoft.KeyVault.CertificateNearExpiry event. Key Vault cannot be monitored by using Application Insights. Defender for Key Vault is used to alert for unusual and unplanned activities. Key Vault key expiration cannot be monitored by using action group alerts.
+    {: .prompt-tip}
+
+56. You have a Linux virtual machine in an on-premises datacenter that is used as a forwarder for Microsoft Sentinel by using CEF-formatted logs.
+The timestamp on events retrieved from the forwarder is the time the agent on the forwarder received the event, not the time the event occurred on the system it came from.
+You need to ensure that Microsoft Sentinel receives the time the event was generated.
+What should you do?
+Select only one answer.
+  + [ ] Run cef_gather_info.py on CEF forwarder.
+  + [ ] Run cef_gather_info.py on each system that sends events to the forwarder.
+  + [ ] Run TimeGenerated.py on each system that sends events to the forwarder.
+  + [x] Run TimeGenerated.py on the CEF forwarder.
+
+57. Your company uses Azure DevOps with branch policies configured.
+Which of the following is TRUE with regards to branch policies? (Choose all that apply.)
+  + [x] It enforces your team's change management standards.
+  + [ ] It controls who can read and update the code in a branch.
+  + [x] It enforces your team's code quality.
+  + [ ] It places a branch into a read-only state.

@@ -27,16 +27,16 @@ tags: [Cloud, Azure, Networking]
 3. `Custom IP Addressing`:
 - You can define your own private IP address space using public and private addresses.
 
-4. Subnets:
+4. `Subnets`:
 - VNets can be divided into subnets for organizational and security purposes.
 
-5. Network Security:
+5. `Network Security`:
 - You can use Network Security Groups (NSGs) to control inbound and outbound traffic at the subnet or NIC level.
 
-6. Integration with Azure Services:
+6. `Integration with Azure Services`:
 - Many Azure services can be deployed into a VNet, providing network security and connectivity.
 
-7. Service Endpoints and Private Link:
+7. `Service Endpoints and Private Link`:
 - Enables secure access to Azure services over a private IP within the VNet.
 
 ## Azure Subnets
