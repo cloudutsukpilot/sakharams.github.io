@@ -1,9 +1,9 @@
-<!-- ---
+---
 layout: post
 title: Email Journaling on Cloud
 categories: [projects]
 tags: [Projects, Email Journaling]
---- -->
+---
 
 ## Problem Statement: Email Journaling for Compliance and Security
 

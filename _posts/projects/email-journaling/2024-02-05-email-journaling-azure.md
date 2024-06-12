@@ -1,9 +1,9 @@
-<!-- ---
+---
 layout: post
 title: Email Journaling
 categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
---- -->
+---
 
 ## Problem Statement: Email Journaling with Postfix Server and Azure Storage
 
