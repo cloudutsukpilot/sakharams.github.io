@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Email Journaling
+title: Email Journaling - AWS
 categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
 ---

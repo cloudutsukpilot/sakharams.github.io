@@ -11,25 +11,25 @@ order: 9
 
 
 ###  1.  E-Commerce Platform on Cloud
-- [Problem Statement and Solution Design](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-cloud.md)
+- [Problem Statement and Solution Design](/posts/projects/e-commerce-platform-cloud)
 - `Azure`
-    + [Solution Design](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-azure.md)
-    + [Implementation and Demo](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-azure-demo.md)
+    + [Solution Design](/posts/projects/e-commerce-platform-azure)
+    + [Implementation and Demo](/posts/projects/e-commerce-platform-azure-demo)
 - `AWS`
-    + [Solution Design](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-aws.md)
-    + [Implementation and Demo](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-aws-demo.md)
+    + [Solution Design](/posts/projects/e-commerce-platform-aws)
+    + [Implementation and Demo](/posts/projects/e-commerce-platform-aws-demo)
 - `GCP`
-    + [Solution Design](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-gcp.md)
-    + [Implementation and Demo](../_posts/projects/e-commerce-platform/2024-01-03-e-commerce-platform-gcp-demo.md)
+    + [Solution Design](/posts/projects/e-commerce-platform-gcp)
+    + [Implementation and Demo](/posts/projects/e-commerce-platform-gcp-demo)
 
 ### 2.  Email Journaling Solution on Cloud
-- [Problem Statement and Solution Design](../_posts/projects/email-journaling/email-journaling-cloud.md)
+- [Problem Statement and Solution Design](/posts/projects/email-journaling-cloud)
 - `Azure`
-    + [Solution Design](../_posts/projects/email-journaling/email-journaling-azure.md)
-    + [Implementation and Demo](../_posts/projects/email-journaling/email-journaling-azure-demo.md)
+    + [Solution Design](/posts/projects/email-journaling-azure)
+    + [Implementation and Demo](/posts/projects/email-journaling-azure-demo)
 - `AWS`
-    + [Solution Design](../_posts/projects/email-journaling/email-journaling-aws.md)
-    + [Implementation and Demo](../_posts/projects/email-journaling/email-journaling-aws-demo.md)
+    + [Solution Design](/posts/projects/email-journaling-aws)
+    + [Implementation and Demo](/posts/projects/email-journaling-aws-demo)
 - `GCP`
-    + [Solution Design](../_posts/projects/email-journaling/email-journaling-gcp.md)
-    + [Implementation and Demo](../_posts/projects/email-journaling/email-journaling-gcp-demo.md)
+    + [Solution Design](/posts/projects/email-journaling-gcp)
+    + [Implementation and Demo](/posts/projects/email-journaling-gcp-demo)

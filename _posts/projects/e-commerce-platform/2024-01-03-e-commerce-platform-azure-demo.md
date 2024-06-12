@@ -1,6 +1,6 @@
 ---
 layout: post
-title: E-Commerce Platform - Azure
+title: E-Commerce Platform - Azure Demo
 categories: [projects]
 tags: [Projects, E-Commerce]
 ---

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Email Journaling
+title: Email Journaling - Azure Demo
 categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
 ---

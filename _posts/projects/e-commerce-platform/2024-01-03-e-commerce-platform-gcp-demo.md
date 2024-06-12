@@ -1,6 +1,6 @@
 ---
 layout: post
-title: E-Commerce Platform - GCP
+title: E-Commerce Platform - GCP Demo
 categories: [projects]
 tags: [Projects, E-Commerce]
 ---

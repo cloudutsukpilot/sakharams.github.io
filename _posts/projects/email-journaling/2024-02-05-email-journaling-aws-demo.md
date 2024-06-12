@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Email Journaling - GCP
+title: Email Journaling - AWS Demo
 categories: [projects, email journaling]
 tags: [Projects, Email Journaling]
 ---

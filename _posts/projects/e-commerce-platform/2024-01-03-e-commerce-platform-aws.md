@@ -1,6 +1,6 @@
 ---
 layout: post
-title: E-Commerce Platform on AWS
+title: E-Commerce Platform - AWS
 categories: [projects]
 tags: [Projects, E-Commerce]
 ---
