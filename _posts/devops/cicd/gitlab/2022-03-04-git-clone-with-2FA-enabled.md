@@ -22,6 +22,10 @@ git clone https://<gitlab-server-name>/<gitlab-repository>.git
 2. Once you press enter, you will be prompted for password
 4. Paste the Personal Access Token (PAT) that you created above and the repo should be cloned.
 
+OR
+
+1. Clone the repository using
+git clone https://oauth2:<your-token>@gitlab.com/<username>/<repository>.git
 
 
 
