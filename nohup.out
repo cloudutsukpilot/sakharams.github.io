@@ -1,0 +1,12 @@
+/Users/Sakharam.Shinde/.rvm/gems/ruby-3.3.0/gems/jekyll-4.3.3/lib/jekyll.rb:28: warning: csv was loaded from the standard library, but will no longer be part of the default gems since Ruby 3.4.0. Add csv to your Gemfile or gemspec. Also contact author of jekyll-4.3.3 to add csv into its gemspec.
+/Users/Sakharam.Shinde/.rvm/gems/ruby-3.3.0/gems/safe_yaml-1.0.5/lib/safe_yaml/transform.rb:1: warning: base64 was loaded from the standard library, but will no longer be part of the default gems since Ruby 3.4.0. Add base64 to your Gemfile or gemspec. Also contact author of safe_yaml-1.0.5 to add base64 into its gemspec.
+/Users/Sakharam.Shinde/.rvm/gems/ruby-3.3.0/gems/liquid-4.0.4/lib/liquid/standardfilters.rb:2: warning: bigdecimal was loaded from the standard library, but will no longer be part of the default gems since Ruby 3.4.0. Add bigdecimal to your Gemfile or gemspec. Also contact author of liquid-4.0.4 to add bigdecimal into its gemspec.
+Configuration file: /Users/Sakharam.Shinde/github/sakharams.github.io/_config.yml
+            Source: /Users/Sakharam.Shinde/github/sakharams.github.io
+       Destination: /Users/Sakharam.Shinde/github/sakharams.github.io/_site
+ Incremental build: disabled. Enable with --incremental
+      Generating... 
+                    done in 24.372 seconds.
+ Auto-regeneration: enabled for '/Users/Sakharam.Shinde/github/sakharams.github.io'
+    Server address: http://127.0.0.1:4000/
+  Server running... press ctrl-c to stop.
