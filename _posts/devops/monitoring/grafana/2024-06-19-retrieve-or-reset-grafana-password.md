@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Introduction to Grafana as a Monitoring Tool in DevOps
+title: Grafana - Retrive Admin Credentials
 categories: [devops, monitoring, grafana]
 tags: [DevOps, Monitoring, Grafana]
 ---

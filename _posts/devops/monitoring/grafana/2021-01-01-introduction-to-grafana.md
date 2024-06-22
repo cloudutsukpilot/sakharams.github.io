@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Introduction to Grafana as a Monitoring Tool in DevOps
+title: Introduction to Grafana
 categories: [devops, monitoring, grafana]
 tags: [DevOps, Monitoring, Grafana]
 ---
