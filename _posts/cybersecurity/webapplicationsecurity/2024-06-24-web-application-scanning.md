@@ -90,8 +90,6 @@ tags: [CyberSecurity, Web Application Security]
 | Output                  | Detailed reports on application vulnerabilities.                                    | Comprehensive security reports.                                                             |
 
 
-
-
 ### Types of Web Application Scanning
 - Web application scanning can be typically categorized into two types, which are:
 
@@ -112,3 +110,5 @@ tags: [CyberSecurity, Web Application Security]
     + *Purpose*: Detect vulnerabilities that can be exploited from outside the application.
     + *Benefits*: Identifies security flaws that appear when the application is live and running.
     + *Examples*: OWASP ZAP, Burp Suite, Netsparker, SQL Map, etc.
+
+### 
