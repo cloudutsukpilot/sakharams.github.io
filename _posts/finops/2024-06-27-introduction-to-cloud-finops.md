@@ -34,8 +34,8 @@ tags: [FinOps]
 5. **Governance**: 
 - Implement policies and controls to manage cloud usage and costs in a structured and compliant manner.
 
-### Key Practices in Cloud FinOps:
 
+### Key Practices in Cloud FinOps:
 1. **Budgeting and Forecasting**: 
 - Predicting cloud costs and creating budgets to manage spending.
 
@@ -62,15 +62,3 @@ tags: [FinOps]
 5. `Enhanced Visibility`: Provides detailed insights into cloud spending, enabling better decision-making and resource management.
 
 
-### Metrics
-- Unit Economics: Idea is to measure cloud spend againsta business metric (total revenue, shipments made, paid subscribers, customer orders completed, etc), which in practice is complete to achieve.
-
-### Phases of FinOps
-1. `Inform`
-- Get visibility and create shared accountability by showing teams what they are spending and why.
-
-2. `Optimize`
-- Empower the teams to identify and measure efficiency optimizations, then make goals and strategies based on those opportunities.
-
-3. `Operate`
-- Define and execute processes aligned with the goals of Technology, Finance and business.
