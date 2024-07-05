@@ -2,7 +2,7 @@
 layout: post
 title: Docker Desktop - MacOS - Platform Mismatch
 categories: [issues-fixes]
-tags: [Docker Desktop, MacOS]
+tags: [Fixies, Docker Desktop, MacOS]
 ---
 
 #### Problem:

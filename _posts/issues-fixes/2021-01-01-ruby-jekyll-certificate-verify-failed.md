@@ -2,7 +2,7 @@
 layout: post
 title: Ruby/Jeykll - Certificate Verify Failed
 categories: [issues-fixes]
-tags: [Website, Jekyll, Ruby, OpenSSL]
+tags: [Fixies, Jekyll, Ruby, OpenSSL]
 ---
 
 ## Error Messages:

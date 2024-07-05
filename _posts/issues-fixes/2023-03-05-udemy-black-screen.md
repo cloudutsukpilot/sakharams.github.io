@@ -2,7 +2,7 @@
 layout: post
 title: Udemy Black Screen
 categories: [issues-fixes]
-tags: [Udemy]
+tags: [Fixies, Udemy]
 ---
 
 #### Problem:

@@ -2,7 +2,7 @@
 layout: post
 title: Gem Install Jekyll - Timeout
 categories: [issues-fixes]
-tags: [Website, Jekyll, Ruby, OpenSSL]
+tags: [Fixies, Website, Jekyll, Ruby, OpenSSL]
 ---
 
 ## Command:
