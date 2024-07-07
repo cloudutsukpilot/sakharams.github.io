@@ -30,7 +30,7 @@ tags: [Certification]
 - Configure and manage security monitoring and automation solutions
 
 
-## AZ-500 Question and Answers
+### AZ-500 Question and Answers
 
 ### Secure Networking
 1. You want to secure the communication between users and your Azure App Service application. Which security protocol should be implemented to encrypt data in transit?
