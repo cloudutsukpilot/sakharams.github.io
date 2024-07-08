@@ -1,0 +1,73 @@
+---
+layout: post
+title: Introduction to Amazon Web Services(AWS)
+categories: [cloud, aws]
+tags: [Cloud, Amazon Web Services(AWS)]
+---
+
+## Introduction
+- Amazon Web Services (AWS) is a cloud computing platform that offers a wide range of services and tools to help businesses and individuals build and manage their applications and infrastructure in the cloud. 
+- With Amazon Web Services(AWS), you can easily provision resources, scale your applications, and pay only for what you use.
+- AWS provides a comprehensive suite of services, including compute, storage, databases, networking, machine learning, analytics, and more. 
+- These services are designed to be highly scalable, reliable, and secure, allowing you to focus on building your applications without worrying about the underlying infrastructure.
+
+
+![AWS Services CheatSheet](/assets/img/cloud/aws/aws-services-cheatsheet.gif)
+
+### Categorization:
+
+1. **Compute**
+    - AWS provides a range of compute services for various workloads:
+        + `Amazon EC2 (Elastic Compute Cloud)`: Offers resizable compute capacity in the cloud, allowing full control over the virtualized resources.
+        + `AWS Lambda`: Enables event-driven, serverless computing where you can run code without provisioning or managing servers.
+        + `Amazon ECS (Elastic Container Service) and Amazon EKS (Elastic Kubernetes Service)`: Offer container management services for running Docker containers and Kubernetes applications.
+
+2. **Storage**
+    - AWS offers scalable and durable storage solutions:
+        + `Amazon S3 (Simple Storage Service)`: Provides object storage with industry-leading scalability, data availability, security, and performance.
+        + `Amazon EBS (Elastic Block Store)`: Provides block-level storage volumes for use with EC2 instances.
+        + `Amazon EFS (Elastic File System)`: Provides scalable file storage for use with EC2 instances.
+        + `Amazon Glacier`: Offers secure, durable, and low-cost storage for data archiving and backup.
+
+3. **Database**
+    - AWS provides a range of database services for different use cases:
+        + `Amazon RDS (Relational Database Service)`: Offers managed relational databases including MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server.
+        + `Amazon DynamoDB`: A fully managed NoSQL database service for key-value and document data models.
+        + `Amazon Aurora`: A MySQL- and PostgreSQL-compatible relational database built for the cloud with high performance and availability.
+        + `Amazon Redshift`: A fully managed data warehouse service for big data analytics.
+
+4. **App Services**
+    - AWS offers services for deploying and managing applications:
+        + `AWS Elastic Beanstalk`: An easy-to-use service for deploying and scaling web applications and services.
+        + `AWS App Runner`: A fully managed service that makes it easy to quickly deploy containerized web applications and APIs.
+        + `Amazon API Gateway`: Enables developers to create, publish, maintain, monitor, and secure APIs.
+
+5. **Networking**
+    - AWS provides networking services for creating and managing network resources:
+        + `Amazon VPC (Virtual Private Cloud)`: Enables you to provision a logically isolated section of the AWS cloud where you can launch AWS resources.
+        + `AWS Direct Connect`: Provides a dedicated network connection from your premises to AWS.
+        + `Elastic Load Balancing (ELB)`: Distributes incoming application traffic across multiple targets.
+
+6. **Identity**
+    - AWS offers identity and access management services:
+        + `AWS IAM (Identity and Access Management)`: Provides fine-grained access control across all of AWS.
+        + `Amazon Cognito`: Offers user sign-up, sign-in, and access control for web and mobile apps.
+
+7. **Analytics**
+    - AWS provides analytics services for data processing and analysis:
+        + `Amazon Kinesis`: Allows you to collect, process, and analyze real-time, streaming data.
+        + `AWS Glue`: A fully managed ETL (extract, transform, and load) service.
+        + `Amazon EMR (Elastic MapReduce)`: Provides a managed Hadoop framework for processing vast amounts of data.
+
+8. **Security**
+    - AWS offers services for enhancing security and compliance:
+        + `AWS KMS (Key Management Service)`: Makes it easy to create and control encryption keys.
+        + `AWS WAF (Web Application Firewall)`: Helps protect your web applications from common web exploits.
+        + `AWS Shield`: Provides protection against DDoS attacks.
+
+9. **Monitoring**
+    - AWS offers monitoring services for managing and monitoring your applications:
+        + `Amazon CloudWatch`: Provides monitoring for AWS cloud resources and the applications you run on AWS.
+        + `AWS X-Ray`: Helps with analyzing and debugging production, distributed applications.
+
+

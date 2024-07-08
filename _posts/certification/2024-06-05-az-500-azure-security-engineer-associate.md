@@ -151,7 +151,7 @@ tags: [Certification]
   + [ ] Private DNS Zone
 
 20. You are tasked with securing access to an Azure SQL Managed Instance. Which of the following can be used to secure and limit access to the instance from the internet?
-  + [x] Virtual Network Service Endpoints
+  + [ ] Virtual Network Service Endpoints
   + [x] Azure Firewall
   + [x] Private Link services
   + [ ] Azure Front Door
@@ -208,12 +208,12 @@ Select all answers that apply.
 
 
 27. You have an Azure subscription that contains the following resources:
-Two virtual networks
-VNet1: Contains two subnets
-VNet2: Contains three subnets
-Virtual machines: Connected to all the subnets on VNet1 and VNet2
-A storage account named storage1
-You need to identify the minimal number of service endpoints that are required to meet the following requirements:
+<br> Two virtual networks
+<br> VNet1: Contains two subnets
+<br> VNet2: Contains three subnets
+<br> Virtual machines: Connected to all the subnets on VNet1 and VNet2
+<br> A storage account named storage1
+<br> You need to identify the minimal number of service endpoints that are required to meet the following requirements:
 <br> Virtual machines that are connected to the subnets of VNet1 must be able to access storage1 over the Azure backbone.
 <br> Virtual machines that are connected to the subnets of VNet2 must be able to access Microsoft Entra tenant over the Azure backbone.
 <br> How many service endpoints should you recommend?
@@ -263,7 +263,7 @@ Select only one answer.
   + [ ] Immutable storage
   + [x] Blob versioning
   + [ ] Customer-Managed Key (CMK)
-  + [x] Locally Redundant Storage (LRS)
+  + [ ] Locally Redundant Storage (LRS)
   + [x] Immutable Blobs
 
 7. Which of the following Azure services doesn't enable you to authenticate a database using Microsoft Entra ID?
@@ -392,9 +392,9 @@ Dynamic Data Masking
     <br> Allow a user named User1 to access the account from the Azure portal.
     <br> Block all other access to the account.
 <br> Which two actions should you perform? Each correct answer presents part of the solution. Select all answers that apply.
-  + [ ] Add the IP address of User1 to the allowed IP address range of the Azure Cosmos DB account.
+  + [x] Add the IP address of User1 to the allowed IP address range of the Azure Cosmos DB account.
   + [x] Add the web app’s outbound IP addresses to the allowed IP address range of the Azure Cosmos DB account.
-  + [x] Select Allow access from Azure Portal.
+  + [ ] Select Allow access from Azure Portal.
   + [ ] Sign in as User1 and select Add my current IP to the allowed IP address range.
 
 27. You have an Azure App Service web app named App1.
@@ -435,6 +435,7 @@ Select only one answer.
   + [ ] a storage account firewall
   + [ ] an Azure Front Door IP restriction rule
   + [ ] network conditions to Conditional Access
+  <br>
     > Configuring a SAS token that includes the signedIP field specifies an IP address or a range of IP addresses from which to accept requests. 
     > This configuration is required for specific IP and specific storage account. Eliminate the services which allow access to all IP's or to all files in storage accont.
     {: .prompt-tip}
@@ -608,14 +609,14 @@ VNet1 contains the following subnets:
 <br> Subnet1: Has a connected virtual machine
 <br> Subnet2: Has a Microsoft.Storage service endpoint
 <br> Subnet3: Has subnet delegation to the Microsoft.Web/serverFarms service
-<br> Subnet: Has no additional configurations
+<br> Subnet4: Has no additional configurations
 <br> You need to deploy an Azure SQL managed instance named managed1 to VNet1.
 To which subnets can you connect managed1?
 Select only one answer.
-  + [ ] Subnet4 only
+  + [x] Subnet4 only
   + [ ] Subnet3 and Subnet4 only
   + [ ] Subnet2 and Subnet4 only
-  + [x] Subnet2, Subnet3, and Subnet4 only
+  + [ ] Subnet2, Subnet3, and Subnet4 only
   + [ ] Subnet1, Subnet2, Subnet3, and Subnet4
 
     > You can deploy an SQL managed instance to a dedicated virtual network subnet that does not have any resource connected. The subnet can have a service endpoint or can be delegated for a different service. 
@@ -656,10 +657,10 @@ Select only one answer.
 45. You need to implement a key management solution that supports importing keys generated in an on-premises environment. The solution must ensure that the keys stay within a single Azure region.
 What should you do?
 Select only one answer.
-  + [ ]Apply the Keys should be the specified cryptographic type RSA or EC Azure policy.
-  + [ ]Disable the Allow trusted services option.
-  + [ ]Implement Azure Key Vault Firewall.
-  + [x]Implement Azure Key Vault Managed HSM.
+  + [ ] Apply the Keys should be the specified cryptographic type RSA or EC Azure policy.
+  + [ ] Disable the Allow trusted services option.
+  + [ ] Implement Azure Key Vault Firewall.
+  + [x] Implement Azure Key Vault Managed HSM(Hardware Security Module).
 
     > Key Vault Managed HSM supports importing keys generated in an on-premise HSM. Also, managed HSM does not store or process customer data outside the Azure region in which the customer deploys the HSM instance. On-premises-generated keys are still managed, after implementing Key Vault Firewall. Enforcing HSM-backed keys does not enforce them to be imported. Disabling the Allow trusted services option does not have a direct impact on key importing.
     {: .prompt-tip}
@@ -682,7 +683,7 @@ Select only one answer.
   + [x] service SAS
   + [ ] user delegation SAS
     
-    > A SAS service is the only type of authentication that provides control at the table level. User delegation SAS is only available for Blob storage. SAS and shared allow access to the entire storage account.
+    > A SAS service is the only type of authentication that provides control at the table level. <br> User delegation SAS is only available for Blob storage. <br> SAS and shared allow access to the entire storage account.
     {: .prompt-tip}
 
 48. You have an Azure Storage account.
@@ -694,7 +695,7 @@ Select all answers that apply.
   + [x] Storage Blob Data Reader role
   + [x] user delegation
 
-    > The Storage Blob Data Reader role uses Microsoft Entra to authenticate. User delegation SAS is a method that uses Microsoft Entra to generate a SAS. Both methods work whether the shared keys are allowed or prevented. Service SAS and account SAS use shared keys to generate.
+    > The Storage Blob Data Reader role uses Microsoft Entra to authenticate. <br> User delegation SAS is a method that uses Microsoft Entra to generate a SAS. <br> Both methods work whether the shared keys are allowed or prevented. <br> Service SAS and account SAS use shared keys to generate.
     {: .prompt-tip}
 
 49. You need to provide public anonymous access to a file in an Azure Storage account. The solution must follow the principle of least privilege.
@@ -713,8 +714,8 @@ Select all answers that apply.
 <br> A virtual network named VNet1 that has a subnet named Subnet1
 <br> A public IP address named PubIP1
 <br> A load balancer named LB1
-You create a network security group (NSG) named NSG1.
-To which two resources can you associate NSG1? Each correct answer presents a complete solution.
+<br> You create a network security group (NSG) named NSG1.
+<br> To which two resources can you associate NSG1? Each correct answer presents a complete solution.
 Select all answers that apply.
   + [ ] LB1
   + [x] NIC1
@@ -732,7 +733,7 @@ Select all answers that apply.
   + [x] Connect to the database by using the Azure portal.
   + [ ] Select Support only Microsoft Entra authentication for this server.
     
-    > Adding a Microsoft Entra administrator and assigning your account the SQL Security Manager built-in role are prerequisites for enabling Microsoft Entra-only authentication. A connection to the data plane of the logical server is not needed.
+    > Adding a Microsoft Entra administrator and assigning your account the SQL Security Manager built-in role are prerequisites for enabling Microsoft Entra-only authentication. <br> A connection to the data plane of the logical server is not needed.
     {: .prompt-tip}
 
 
@@ -851,7 +852,7 @@ Select all answers that apply.
   + [ ] Passwordless Authentication
   + [ ] Conditional Access
   + [ ] Multi-factor authentication (MFA)
-  + [ ] Single Sign-On
+  + [x] Single Sign-On
 
 19. Which of the following can be assigned roles in Azure?
   + [x] Service Principals
@@ -861,23 +862,23 @@ Select all answers that apply.
   + [ ] External users
 
 20. Which of the following tasks are associated with Microsoft Entra Privileged Identity Management (PIM)?
-  + [ ] Assigning time-limited role assignments
+  + [x] Assigning time-limited role assignments
   + [ ] Automatically providing access to all users
   + [x] Conducting access reviews for users and groups
   + [ ] Configuring password reset policies
   + [ ] Implementing role-based access control
 
 21. You are managing application registrations in Microsoft Entra ID. For a newly developed internal application, you need to ensure that only users within your organization can access the application. Which setting should you configure?
-  + [x] User assignment
+  + [ ] User assignment
   + [ ] Application properties
-  + [ ] Supported account types
+  + [x] Supported account types
   + [ ] Identity Provider Configuration
 
 22. Which of the following are primary functions of service principals in the context of Entra ID?
   + [x] Serve as an identity for applications to interact with Entra ID
   + [x] Grant OAuth permissions for external apps
   + [x] Assign permissions to specific resources within Azure
-  + [x] Generate personal access tokens for users
+  + [ ] Generate personal access tokens for users
 
 23. A security administrator is securing users in Microsoft Entra ID. Which of the following is NOT a recommended practice?
   + [ ] Enabling multi-factor authentication (MFA)
@@ -903,6 +904,9 @@ Select all answers that apply.
   + [x] Password Protection
   + [ ] Verified ID
 
+    > Password Protection helps enhance security by preventing users from choosing weak or easily guessable passwords.
+      {: .prompt-tip}
+
 27. Which of the following authentication methods are considered passwordless?
   + [x] Microsoft Authenticator app
   + [ ] Security Questions
@@ -926,7 +930,7 @@ Select all answers that apply.
   + [ ] Configure Azure role permissions for subscriptions
   + [ ] Implement Microsoft Entra Permissions Management
   + [x] Configure Microsoft Entra Privileged Identity Management (PIM)
-  + [x] Configure role management and access reviews in Microsoft Entra
+  + [ ] Configure role management and access reviews in Microsoft Entra
 
 31. You have a Microsoft Entra tenant that syncs with the on-premises Active Directory Domain Service (AD DS) domain and uses Microsoft Entra Domain Services.
 You have an application that runs on user devices by using the credentials of the signed-in user. The application accesses data in Azure Files by using REST calls.
