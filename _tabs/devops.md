@@ -527,7 +527,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="p-2">
             <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
-            href="/posts/devsecops/SonarQube/introduction-to-SonarQube"
+            href="/posts/devsecops/sonarqube/introduction-to-sonarqube"
             class="ml-1 mr-2"
             >SonarQube</a
             >
