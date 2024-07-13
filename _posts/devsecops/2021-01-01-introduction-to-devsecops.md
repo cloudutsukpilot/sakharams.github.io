@@ -29,7 +29,7 @@ tags: [DevSecOps]
 | Secrets Management Tools                        | Amazon Web Services(AWS), Microsoft, Google                          |
 | Static Application Security Testing (SAST)      | Checkmarx, ECG, DerScanner                                           |
 | Source Composition Analysis (SCA)               | GitHub, BlackDuck, Synx                                              |
-| Dynamic Application Security Testing (DAST)     | Rapid1, Contrast Security, Acunetix, SonarCube                       | 
+| Dynamic Application Security Testing (DAST)     | Rapid1, Contrast Security, Acunetix, SonarQube                       | 
 | Interactive Application Security Testing (IAST) | Contrast Security, Synopsis, VeraCode                                |
 | Secure infrastructure as code                   | Cliar, Dockscan, Anchore, tfsec, kube-sec                            |
 | Compliance as code                              | KitchenCI, ServerSPEC, CHEF INSPEC                                   |
