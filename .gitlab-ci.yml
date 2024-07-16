@@ -22,7 +22,7 @@ stages:
 # Jekyll will output the files to public directory
 # Docker image for the runner
 
-test:
+build_test_site:
   stage: test
   image:
     name: ruby:3.2
@@ -37,7 +37,7 @@ test:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
-testhtml:
+htmlproofer_for_test_site:
   stage: testhtml
   image:
     name: ruby:3.2
