@@ -1,6 +1,4 @@
 # Docker image for the runner
-image: ruby:3.2
-
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -9,16 +7,16 @@ cache:
   paths:
     - vendor/
 
+variables:
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task.
+
 stages:
   - test
   - testhtml
   - sonarcloud-check
   - deploy
  
-before_script:
-  - gem install bundler
-  - bundle install --path vendor
-
 # Defining the job to execute on the runner
 # For Gitlab pages, the job has a specific name called pages
 # Jekyll will output the files to public directory
@@ -26,6 +24,11 @@ before_script:
 
 test:
   stage: test
+  image:
+    name: ruby:3.2
+  before_script:
+    - gem install bundler
+    - bundle install --path vendor
   script:
     - bundle exec jekyll build -d test
   artifacts:
@@ -36,6 +39,11 @@ test:
 
 testhtml:
   stage: testhtml
+  image:
+    name: ruby:3.2
+  before_script:
+    - gem install bundler
+    - bundle install --path vendor
   dependencies:
     - test
   script:
@@ -45,10 +53,6 @@ testhtml:
       - testhtml
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-
-variables:
-  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
-  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task.
 
 sonarcloud-check:
   stage: sonarcloud-check
@@ -68,6 +72,11 @@ sonarcloud-check:
 
 pages:
   stage: deploy
+  image:
+    name: ruby:3.2
+  before_script:
+    - gem install bundler
+    - bundle install --path vendor
   script:
     - bundle exec jekyll build -d public
   artifacts:
