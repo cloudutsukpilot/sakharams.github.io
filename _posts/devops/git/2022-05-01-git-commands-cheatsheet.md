@@ -47,6 +47,10 @@ tags: [DevOps, Git, Git Commands, Cheatsheet]
 | `git config --global --remove-section user.email` | Remove the section user.email from the global Git configuration | 
 
 
+#### Git Push
+| `git push <target-remote>` | To push local changes to a specific remote repo | 
+| `git push <target-remote> <source-remote>/<branch>:<branch>` | To push code from source repo to target repo | 
+
 #### Cloning a Git Repository:
 - To pull contents from a repository(github) and upload to another(gitlab):
 
