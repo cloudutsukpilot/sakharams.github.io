@@ -33,6 +33,7 @@ tags: [DevOps, Git, Git Commands, Cheatsheet]
 
 
 #### Git Global Config
+
 | `git config --global --list` | List all settings in the global Git configuration | 
 | `git config --global user.name "Your Name"` | Set your name in the global Git configuration | 
 | `git config --global user.email "your.email@example.com"` | Set your email in the global Git configuration | 
@@ -48,6 +49,7 @@ tags: [DevOps, Git, Git Commands, Cheatsheet]
 
 
 #### Git Push
+
 | `git push <target-remote>` | To push local changes to a specific remote repo | 
 | `git push <target-remote> <source-remote>/<branch>:<branch>` | To push code from source repo to target repo | 
 

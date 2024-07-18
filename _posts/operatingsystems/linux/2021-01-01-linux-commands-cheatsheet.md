@@ -43,10 +43,12 @@ tags: [Operating Systems, Linux, Cheatsheet]
 
 | `lsblk` | To list the block devices | 
 | `iostat` | Report Central Processing Unit (CPU) statistics and input/output statistics for devices and partitions |
-| `hdparm -I /dev/sda` | Display information about disk data |
+| `hdparm -I /dev/sda` | Display information about disk hardware information |
 | `smartctl -a /dev/sda` | Display disk health |
 | `ncdu` | Disk usage analyzer with an ncurses interface |
 | `fdisk -l` | To list the different partitions |
+| `du -h --max-depth=1 \| sort -hr`  | To get the size of each folder in the current directory | 
+| `du -ah --max-depth=1` | To include hidden files in the size calculation | 
 
 #### Disk Space Utilization
 
