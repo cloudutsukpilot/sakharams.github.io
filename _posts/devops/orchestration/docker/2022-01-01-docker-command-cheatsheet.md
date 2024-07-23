@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Docker Commands Cheatsheet
-categories: [devops, orchestration, docker, cheatsheet]
-tags: [DevOps, Orchestration, Docker, Cheatsheet]
+title: Docker Commands CMDsheet
+categories: [devops, orchestration, docker, cmdsheet]
+tags: [DevOps, Orchestration, Docker, CMDsheet]
 ---
 
 

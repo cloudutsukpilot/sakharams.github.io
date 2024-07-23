@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Git Commands - CheatSheet
+title: Git Commands - CMDsheet
 categories: [devops, git, git commands]
-tags: [DevOps, Git, Git Commands, Cheatsheet]
+tags: [DevOps, Git, Git Commands, CMDsheet]
 ---
 
 

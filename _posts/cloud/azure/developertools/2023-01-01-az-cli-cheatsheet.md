@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Az CLI Commands - CheatSheet
+title: Az CLI Commands - CMDsheet
 categories: [cloud, azure, developertools, az cli]
-tags: [Cloud, Azure, Developer Tools, AzCLI, Cheatsheet]
+tags: [Cloud, Azure, Developer Tools, AzCLI, CMDsheet]
 ---
 
 # Shell

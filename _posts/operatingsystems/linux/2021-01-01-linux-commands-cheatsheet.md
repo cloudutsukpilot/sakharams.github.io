@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Linux Command Cheatsheet
+title: Linux Command CMDsheet
 categories: [operating systems, linux]
-tags: [Operating Systems, Linux, Cheatsheet]
+tags: [Operating Systems, Linux, CMDsheet]
 ---
 
 

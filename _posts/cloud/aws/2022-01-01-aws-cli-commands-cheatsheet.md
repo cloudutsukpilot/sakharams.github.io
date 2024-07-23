@@ -1,19 +1,19 @@
 ---
 layout: post
-title: AWS CLI Command CheatSheet
+title: AWS CLI Command CMDsheet
 categories: [cloud, aws]
-tags: [Cloud, Amazon Web Services(AWS), Cheatsheet]
+tags: [Cloud, Amazon Web Services(AWS), CMDsheet]
 ---
 
 ## Introduction
 
-In this blog post, we will explore some commonly used AWS CLI commands that can help you manage your AWS resources efficiently. Whether you are a beginner or an experienced AWS user, having a cheatsheet of AWS CLI commands can be handy.
+In this blog post, we will explore some commonly used AWS CLI commands that can help you manage your AWS resources efficiently. Whether you are a beginner or an experienced AWS user, having a cmdsheet of AWS CLI commands can be handy.
 
 ## Prerequisites
 
 Before we dive into the commands, make sure you have the AWS CLI installed and configured on your machine. You can follow the official AWS CLI documentation to get started.
 
-## AWS CLI Command CheatSheet
+## AWS CLI Command Cmdsheet
 
 Here are some frequently used AWS CLI commands:
 
@@ -35,6 +35,6 @@ Here are some frequently used AWS CLI commands:
 
 ## Conclusion
 
-In this blog post, we covered some commonly used AWS CLI commands that can help you manage your AWS resources efficiently. Having a cheatsheet of these commands can save you time and make your AWS management tasks easier. Make sure to refer to the official AWS CLI documentation for more details on each command.
+In this blog post, we covered some commonly used AWS CLI commands that can help you manage your AWS resources efficiently. Having a CMDsheet of these commands can save you time and make your AWS management tasks easier. Make sure to refer to the official AWS CLI documentation for more details on each command.
 
 Happy coding with AWS CLI!

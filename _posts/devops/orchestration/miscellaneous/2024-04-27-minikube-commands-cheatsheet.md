@@ -1,8 +1,8 @@
 ---
 layout: post
-title: Minikube Commands Cheatsheet
+title: Minikube CMDsheet
 categories: [devops, orchestration, miscellaneous]
-tags: [Minikube, Cheatsheet]
+tags: [Minikube, CMDsheet]
 ---
 
 
