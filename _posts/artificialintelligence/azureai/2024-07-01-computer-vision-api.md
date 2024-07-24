@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Computer Vision API
-categories: [ArtificialIntelligence, Azure]
-tags: [Artificial Intelligence(AI), Azure]
+categories: [ArtificialIntelligence, AzureAI]
+tags: [Artificial Intelligence(AI), AzureAI]
 ---
 
 ## Introduction 

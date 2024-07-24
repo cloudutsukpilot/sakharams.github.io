@@ -8,6 +8,7 @@ tags: [Operating Systems, Windows, CMDsheet]
 
 
 ### Process
+
 | `Get-Process` | To list the process | 
 | `wmic process list brief` | To list the running process | 
 | `wmic process list full` | To list the running processes with more details | 
@@ -16,4 +17,5 @@ tags: [Operating Systems, Windows, CMDsheet]
 
 
 ### Filtering
+
 | `tasklist | findstr notepad` | To filter the running process | 
