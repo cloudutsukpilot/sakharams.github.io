@@ -18,10 +18,11 @@ tags: [Artificial Intelligence(AI), GenAI]
 ![Generative AI Guide](/assets/img/artificialintelligence/generativeAI/generative-ai-guide.webp)
 
 
-| ` 1. Understanding the GenAI Terminologies` | 
-| :---------------------------------------------: |
+### 1. Understanding the GenAI Terminologies
+
 
 ![Generative AI Terminilogies](/assets/img/artificialintelligence/generativeAI/genai-terminologies.webp)
+
 
 - **Artificial Intelligence**
     + AI refers to the development of computer systems that can perform tasks that typically require human intelligence. 
