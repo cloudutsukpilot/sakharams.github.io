@@ -10,21 +10,22 @@ tags: [CyberSecurity, Cloud Security]
 - This helps ensure that VMs are not constantly exposed to potential threats by having ports open unnecessarily.
 
 - Here’s how Just-in-Time Access works in Azure:
+
 1. `Configuration`:
-- Administrators can configure JIT access for VMs in the Azure Security Center. 
-- They define the specific ports to be protected (e.g., RDP port 3389, SSH port 22), the maximum allowed time for access, and approved IP ranges.
+    - Administrators can configure JIT access for VMs in the Azure Security Center. 
+    - They define the specific ports to be protected (e.g., RDP port 3389, SSH port 22), the maximum allowed time for access, and approved IP ranges.
 
 2. `Access Request`:
-- When a user needs to access a protected VM, they request access through the Azure portal. 
-- The request specifies the VM, the required ports, and the duration of access.
+    - When a user needs to access a protected VM, they request access through the Azure portal. 
+    - The request specifies the VM, the required ports, and the duration of access.
 
 3. `Approval and Logging`:
-- The request can be automatically approved based on predefined policies or require manual approval from an administrator. 
-- All access requests and activities are logged for auditing and monitoring purposes.
+    - The request can be automatically approved based on predefined policies or require manual approval from an administrator. 
+    - All access requests and activities are logged for auditing and monitoring purposes.
 
 4. `Temporary Access`:
-- Once approved, Azure automatically configures the Network Security Group (NSG) to allow inbound traffic to the specified ports from the requester’s IP address for the defined period.
-- After the time period expires, the NSG rules revert to their default state, blocking access again.
+    - Once approved, Azure automatically configures the Network Security Group (NSG) to allow inbound traffic to the specified ports from the requester’s IP address for the defined period.
+    - After the time period expires, the NSG rules revert to their default state, blocking access again.
 
 ### Benefits of Just-in-Time Access
 - `Reduced Attack Surface`: By keeping ports closed except when needed, JIT access minimizes the exposure to potential attacks.

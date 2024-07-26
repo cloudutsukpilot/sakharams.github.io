@@ -6,7 +6,71 @@ tags: [CyberSecurity, Cloud Security, Examples]
 ---
 
 ## Introduction
-- The Azure Security Benchmark (ASB) provides a set of guidelines for securing Azure services.
+- Azure Policies are broadly categorised into below:
+   + Asset Management
+   + Backup and Recovery
+   + Data Proetection
+   + DevOps Security
+   + Endpoint Security
+   + Governance and Strategy
+   + Identiy Management
+   + Incident Response
+   + Logging and Threat Detection
+   + Network Security 
+   + Postsure and Vulnerability Management
+   + Privileged Access
+
+### Category Specific Examples
+- Below are few examples based on the categories:
+1. **Asset Management**
+- `Audit VMs that do not use managed disks`: Ensures all virtual machines are using managed disks.
+- `Allowed Resource Types`: Restricts the types of resources that can be deployed in the environment.
+
+2. **Backup and Recovery**
+- `Require Azure Backup on VMs`: Ensures that virtual machines have backup configured.
+- `Audit missing Azure Backup Recovery Services vaults`: Identifies VMs that do not have an associated Recovery Services vault for backup.
+
+3. **Data Protection**
+- `Require secure transfer for storage accounts`: Enforces secure transfer to ensure data is encrypted in transit.
+- `Audit unencrypted SQL databases`: Identifies SQL databases that do not have encryption enabled.
+
+4. **DevOps Security**
+- `Ensure that Azure DevOps projects have required policies`: Ensures that DevOps projects comply with specified security policies.
+- `Audit usage of deprecated Azure DevOps APIs`: Identifies usage of deprecated APIs within Azure DevOps projects.
+
+5. **Endpoint Security**
+- `Enforce Windows Defender antivirus protection on VMs`: Ensures that Windows Defender is enabled and running on all VMs.
+- `Require disk encryption on endpoint devices`: Ensures that all endpoint devices have disk encryption enabled.
+
+6. **Governance and Strategy**
+- `Enforce tag and its value on resources`: Requires a specific tag and value to be applied to resources for better management.
+- `Allowed locations`: Restricts the geographical locations where resources can be deployed.
+
+7. **Identity Management**
+- `Require multi-factor authentication (MFA) for all users`: Ensures that all users have MFA enabled.
+- `Audit usage of legacy authentication protocols`: Identifies accounts using outdated and less secure authentication methods.
+
+8. **Incident Response**
+- `Require diagnostic settings on resources`: Ensures that diagnostic logs are enabled and configured for resources.
+- `Ensure security alerts are enabled`: Ensures that security alerts are configured and active for critical resources.
+
+9. **Logging and Threat Detection**
+- `Deploy diagnostic settings for VMs to Log Analytics`: Automatically deploys diagnostic settings to VMs for centralized logging.
+- `Enable advanced threat protection on storage accounts`: Ensures that advanced threat protection is enabled on all storage accounts.
+
+10. **Network Security**
+- `Restrict public IP addresses on NICs`: Ensures that network interfaces do not have public IP addresses.
+- `Require NSG on subnets`: Ensures that network security groups are applied to all subnets for traffic filtering.
+
+11. **Posture and Vulnerability Management**
+- `Audit vulnerabilities in VMs`: Identifies VMs with known vulnerabilities based on installed software and configurations.
+- `Require VM extensions for security monitoring`: Ensures that security monitoring extensions are installed on VMs.
+
+12. **Privileged Access**
+- `Require Just-In-Time (JIT) access for VM management`: Ensures that VMs are configured for JIT access to limit the time window for administrative access.
+- `Audit privileged role assignments`: Regularly reviews and audits assignments of privileged roles to ensure appropriate access levels.
+
+### Examples based on Resources Types
 
 1. **Compute**
 

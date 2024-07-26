@@ -45,7 +45,7 @@ Custom Analytics: Allows users to create custom detection rules tailored to thei
 - `Cloud-Native Architecture`: Leverages the scalability and flexibility of the Azure cloud to handle large volumes of security data and dynamically scale resources based on demand.
 - `Cost-Effective`: Offers a consumption-based pricing model, reducing the costs associated with traditional SIEM solutions.
 
-### Use Cases:
+### Use Cases
 
 1. `Threat Detection and Response`: Continuously monitor and detect advanced threats across on-premises and cloud environments, and respond to incidents in real-time.
 2. `Security Monitoring and Alerting`: Collect and correlate security data from various sources to provide real-time monitoring and alerting of potential security incidents.
@@ -53,4 +53,22 @@ Custom Analytics: Allows users to create custom detection rules tailored to thei
 4. `Compliance and Reporting`: Support regulatory compliance by providing comprehensive logs, reports, and audit trails for security events and incidents.
 5. `Automated Security Operations`: Automate repetitive tasks and incident response processes using playbooks and automated workflows to improve efficiency and reduce human error.
 6. `Integration and Extensibility`: Integrate with a wide range of Microsoft and third-party security tools to create a cohesive security operations ecosystem.
+
+
+### Sentinel Implementation
+
+1. Sentinel Setup and PreReqs: [Start here Player One](https://learn.microsoft.com/en-us/azure/sentinel/prerequisites)
+2. Sentinel Permissions:  [What is your character/avatar and role](https://learn.microsoft.com/en-us/azure/sentinel/roles)
+3. Power UP/use AI+ML: [Enable User and Entity Behavior Analytics (UEBA)](https://learn.microsoft.com/en-us/azure/sentinel/enable-entity-behavior-analytics)
+4. Where Data: [What is your playing field (log analytics workspace)](https://learn.microsoft.com/en-us/azure/sentinel/design-your-workspace-architecture)
+5. Keep Data: [How long do you want to keep data](https://learn.microsoft.com/en-us/azure/sentinel/configure-data-retention-archive)
+6. How Data: [What data do you want and how will you connect to data that you want to ingest](https://learn.microsoft.com/en-us/azure/sentinel/prioritize-data-connectors#determine-which-connectors-you-need)
+7. Detect Threats in Data: [Automatically detect threats with Analytic Rules](https://learn.microsoft.com/en-us/azure/sentinel/detect-threats-built-in)
+8. See/Visualize Data: [Visualize data with workbooks](https://learn.microsoft.com/en-us/azure/sentinel/get-visibility)
+9. Alert on Data: [Visualize incidents](https://learn.microsoft.com/en-us/azure/sentinel/incident-investigation)
+10. Prevent/Threat Hunt in Data: [Be Proactive](https://learn.microsoft.com/en-us/azure/sentinel/hunting)
+11. Automate Responses: [SOAR to the highest with automation](https://learn.microsoft.com/en-us/azure/sentinel/automation)
+12. Deploy Solutions: [M2131](https://azuremarketplace.microsoft.com/en-US/marketplace/apps/azuresentinel.azure-sentinel-solution-maturitymodelforeventlogma?tab=Overview), [ZeroTrust](https://azuremarketplace.microsoft.com/en-US/marketplace/apps/azuresentinel.azure-sentinel-solution-zerotrust?tab=Overview), [CMMC2.0](https://azuremarketplace.microsoft.com/en-US/marketplace/apps/azuresentinel.azure-sentinel-solution-cmmcv2?tab=Overview), [NIST 800-53](https://azuremarketplace.microsoft.com/en-US/marketplace/apps/azuresentinel.azure-sentinel-solution-nistsp80053?tab=Overview)
+
+- For more in-depth information, please check out the [Sentinel Deployment planning guide](https://learn.microsoft.com/en-us/azure/sentinel/deploy-overview).
 

@@ -2,7 +2,7 @@
 layout: post
 title: Microsoft Defender for Cloud - Recommendations
 categories: [cloud, azure, defenderforcloud]
-tags: [Cloud, Azure, Defender for Cloud]
+tags: [Cloud, Azure, Defender for Cloud, Examples]
 ---
 
 ## Recommendations
