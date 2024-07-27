@@ -90,6 +90,5 @@ Cloud computing, while offering numerous benefits, also comes with its own set o
     - Control: 
         + Understand the regulatory requirements for your industry. 
         + Choose a cloud provider that meets these requirements and can provide necessary documentation.
-
-To mitigate these risks, it's important to have a robust security strategy in place, including encryption, access controls, regular audits, and a disaster recovery plan.
+        + To mitigate these risks, it's important to have a robust security strategy in place, including encryption, access controls, regular audits, and a disaster recovery plan.
 

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Azure Compute
+title: Azure - Compute
 categories: [cloud, azure, compute]
 tags: [Cloud, Azure, Compute]
 ---
@@ -9,6 +9,7 @@ tags: [Cloud, Azure, Compute]
 
 
 ### VM's vs App Services vs Functions
+
 | Virtual Machines | Azure App Service | Azure Functions | 
 | ---------------- | ----------------- | --------------- |
 | Infrastructure as a Service(IaaS) | Platform as a Service(PaaS) | Function as a Service(FaaS) | 

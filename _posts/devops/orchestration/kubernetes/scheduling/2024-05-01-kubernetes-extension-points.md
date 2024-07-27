@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes - Scheduling Plugins
+title: Kubernetes - Extension Points
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
 ---

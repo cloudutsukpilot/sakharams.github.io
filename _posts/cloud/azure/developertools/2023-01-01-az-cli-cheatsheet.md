@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Az CLI Commands - CMDsheet
-categories: [cloud, azure, developertools, az cli]
+categories: [cloud, azure, developer tools]
 tags: [Cloud, Azure, Developer Tools, AzCLI, CMDsheet]
 ---
 

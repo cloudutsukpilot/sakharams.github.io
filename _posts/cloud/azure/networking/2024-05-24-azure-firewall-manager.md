@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Microsoft Azure Firewall Manager
-categories: [azure]
-tags: [Cloud, Azure]
+categories: [cloud, azure, networking]
+tags: [Cloud, Azure, Networking]
 ---
 
 ## Introduction

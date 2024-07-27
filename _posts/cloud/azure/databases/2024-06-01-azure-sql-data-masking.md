@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Azure - SQL Data Masking
-categories: [cloud, azure, database]
+categories: [cloud, azure, databases]
 tags: [Cloud, Azure, Databases]
 ---
 

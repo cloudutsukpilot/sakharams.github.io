@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Azure - Kusto Query Language
-categories: [cloud, azure, developertools, kql]
+categories: [cloud, azure, developer tools]
 tags: [Cloud, Azure, Developer Tools, KQL, CMDsheet]
 ---
 

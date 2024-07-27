@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Microsoft Defender for Cloud
-categories: [cloud, azure, defenderforcloud]
-tags: [Cloud, Azure, Defender for Cloud]
+categories: [cloud, azure, security]
+tags: [Cloud, Azure, Security, Defender for Cloud]
 ---
 
 ## Introduction

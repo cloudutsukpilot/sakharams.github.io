@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Microsoft Sentinel
-categories: [cloud, azure, sentinel]
-tags: [Cloud, Azure, Sentinel]
+categories: [cloud, azure, security]
+tags: [Cloud, Azure, Security, Sentinel]
 ---
 
 ## Introduction

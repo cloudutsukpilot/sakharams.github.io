@@ -67,45 +67,40 @@ tags: [Architect, Security, FedRAMP]
 
 #### Below is an easy to review the summary of the most critical steps to compliance:
 
-- Continuous Monitoring
+1. **Continuous Monitoring**
     + Address every vulnerability found in your continuous monitoring program
     + Remediate the vulnerability. Establish a Deviation Request Process. Justify findings as “Vendor Dependency” and establish 30-day vendor contact timetable.
     + Align monthly monitoring scans and Plan of Action & Milestones (POA&M) to sync with your patch management program to report only real vulnerabilities not ones already scheduled for remediation.
 
-- Security Controls
+2. **Security Controls**
     + Review for commonly overlooked or insufficiently answered controls.
-        When reviewing the “Implementing Configuration Settings (CM-6)” make sure to identify all system components requiring configuration management, individuals responsible for configuration, how responsible part configures, any additional FedRAMP requirements included, and where you saved the documentation.
+        * When reviewing the “Implementing Configuration Settings (CM-6)” make sure to identify all system components requiring configuration management, individuals responsible for configuration, how responsible part configures, any additional FedRAMP requirements included, and where you saved the documentation.
 
     + Review for common missed or neglected FedRAMP or NIST requirements
-        Not identifying portals, lacking multi-factor authentication, non-segregation of customers, high vulnerabilities detected during testing, unclear authorization boundaries, incomplete or poorly defined policies and procedures are all examples of common documentation problems.
+        * Not identifying portals, lacking multi-factor authentication, non-segregation of customers, high vulnerabilities detected during testing, unclear authorization boundaries, incomplete or poorly defined policies and procedures are all examples of common documentation problems.
 
-- General Program
+3. **General Program**
     + Communicate with your FedRAMP Information System Security Officer (ISSO) or government liaison.
     + A Cloud Service Offering (CSO) must be approved and granted FedRAMP Provisional Authorization to Operate (P-ATO) or Agency ATO before leveraging security controls.
     + Use NIST SP 800-53 Revision 1 Contingency Planning Guide for Federal Information System Appendix B to create a Business Impact Analysis
     + If you are a moderate impact CSP and want to want to move into Law Enforcement, Emergency Services, Financial Systems, Health Systems, or any other high impact category, you should review the Categorization Change Form Template first.
 
-- Readiness Assessment Report (RAR)
+4. **Readiness Assessment Report (RAR)**
     + Always send an email notification to info@fedramp.gov when submitting a RAR or RAR update or authorization package to ensure review.
 
-- Security Assessment Plan (SAP) & Security Assessment Report (SAR)
+5. **Security Assessment Plan (SAP) & Security Assessment Report (SAR)**
     + If 3PAO validates/determines a finding a “False Positive” ensure that the JAB also approves those findings otherwise, they must be added to the Continuous Monitoring (ConMon) POA&M.
     + 3PAO vulnerability scanning includes reviewing tools for configurations, ensuring scans meeting FedRAMP requirements, overseeing and monitoring scans, describing and executing procedures.
     + Penetration testing tools must be in the SAP and match the Penetration Test Plan document.
     + Document False Positives or corrected findings with specific items of evidence such as screenshots or scan files, list by file name, and include with the SAR.
     + Assign unique Vulnerability Identifiers and ensure previously documented vulnerabilities are not assigned new identifiers.
 
-- System Security Plan (SSP)
+6. **System Security Plan (SSP)**
     + Security requirements for each control include a description of the solution, how it meets security control requirement, responsible parties, how often reviewed, who reviews, what triggers reviews, documentation of reviews, proof of review, any policies referenced as implementation reasons.
     + Review “Security Procedures” to include all steps for users, system operations personnel, or others. FedRAMP notes the following examples of procedures:
 
 
-
-FedRAMP Security Controls Baseline
-https://www.fedramp.gov/assets/resources/documents/FedRAMP_Security_Controls_Baseline.xlsx
-
-FedRAMP Initial Authorization Package Checklist
-https://www.fedramp.gov/assets/resources/templates/FedRAMP-Initial-Authorization-Package-Checklist.xlsx
-
-What is FedRAMP? Complete Guide to FedRAMP Authorization and Certification
-https://www.a-lign.com/articles/everything-you-need-to-know-about-fedramp
+### References:
+- [FedRAMP Security Controls Baseline](https://www.fedramp.gov/assets/resources/documents/FedRAMP_Security_Controls_Baseline.xlsx)
+- [FedRAMP Initial Authorization Package Checklist](https://www.fedramp.gov/assets/resources/templates/FedRAMP-Initial-Authorization-Package-Checklist.xlsx)
+- [What is FedRAMP? Complete Guide to FedRAMP Authorization and Certification](https://www.a-lign.com/articles/everything-you-need-to-know-about-fedramp)
