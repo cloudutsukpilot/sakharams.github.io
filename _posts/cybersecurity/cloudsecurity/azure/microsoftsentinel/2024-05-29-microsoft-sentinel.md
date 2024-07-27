@@ -8,7 +8,7 @@ tags: [Cloud, Azure, Security, Sentinel]
 ## Introduction
 - Microsoft Sentinel is a cloud-native Security Information and Event Management (SIEM) and Security Orchestration, Automation, and Response (SOAR) solution built on the Azure platform. 
 - It helps organizations to collect, analyze, and respond to security threats and incidents across their entire enterprise environment.
-- By leveraging artificial intelligence (AI) and machine learning (ML), Microsoft Sentinel enhances threat detection, investigation, and response capabilities.
+- By leveraging artificial Intelligence(AI) and machine learning (ML), Microsoft Sentinel enhances threat detection, investigation, and response capabilities.
 
 ### Key Features of Microsoft Sentinel
 1. **Data Collection**

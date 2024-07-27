@@ -48,7 +48,7 @@ order: 3
 
 To learn more about cloud computing and the services offered by Microsoft Azure, Amazon Web Services(AWS), and Google Cloud Platform(GCP), check out the following resources:
 
-1. [Microsoft Azure](/posts/cloud/azure/introduction-to-azure)
+1. [Microsoft Azure](/posts/cloud/azure/azure)
 2. [Amazon Web Services](/posts/cloud/aws/introduction-to-aws)
 3. [Google Cloud Platform](/posts/cloud/gcp/introduction-to-gcp)
 

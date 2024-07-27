@@ -7,7 +7,7 @@ tags: [Artificial Intelligence(AI)]
 
 ### Introduction:
 
-Artificial Intelligence (AI) is a rapidly evolving field that focuses on creating intelligent machines capable of performing tasks that typically require human intelligence. In recent years, AI has gained significant attention due to its potential to revolutionize various industries and improve our daily lives.
+Artificial Intelligence(AI) is a rapidly evolving field that focuses on creating intelligent machines capable of performing tasks that typically require human intelligence. In recent years, AI has gained significant attention due to its potential to revolutionize various industries and improve our daily lives.
 
 #### Types of AI:
 
@@ -31,7 +31,7 @@ There are different types of AI, each with its own characteristics, applications
 
 #### Machine Learning and Deep Learning
 
-Machine learning and deep learning are subfields of artificial intelligence (AI) that focus on enabling machines to learn from data and make predictions or decisions. 
+Machine learning and deep learning are subfields of artificial Intelligence(AI) that focus on enabling machines to learn from data and make predictions or decisions. 
 
 1. Machine learning
     - Involves the development of algorithms and models that can automatically learn patterns and relationships in data, without being explicitly programmed. 
@@ -54,7 +54,7 @@ Both machine learning and deep learning have revolutionized various industries b
 
 #### Applications of AI
 
-Artificial Intelligence (AI) has a wide range of applications across various industries. Some of the key areas where AI is being used include:
+Artificial Intelligence(AI) has a wide range of applications across various industries. Some of the key areas where AI is being used include:
 
 1. Healthcare: AI is being used to improve diagnostics, develop personalized treatment plans, and assist in drug discovery.
 2. Finance: AI is used for fraud detection, algorithmic trading, and risk assessment.
@@ -67,7 +67,7 @@ Artificial Intelligence (AI) has a wide range of applications across various ind
 
 ##### Ethical Considerations
 
-As artificial intelligence (AI) continues to advance, it is crucial to address the ethical implications associated with its development and use. Some key ethical considerations in AI include:
+As artificial Intelligence(AI) continues to advance, it is crucial to address the ethical implications associated with its development and use. Some key ethical considerations in AI include:
 
 1. Bias and Fairness: 
     - AI systems can inherit biases from the data they are trained on, leading to unfair outcomes and discrimination. 

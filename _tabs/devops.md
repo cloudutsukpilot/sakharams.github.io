@@ -40,7 +40,7 @@ Read More at [DevOps Introduction](/posts/devops/introduction-to-devops)
         <div class="d-flex flex-column w-50">
         <div class="p-2">
             <img alt="Microsoft Azure" src="/assets/img/icons/microsoft-azure-18.svg" />
-            <a href="/posts/cloud/azure/introduction-to-azure" class="ml-1 mr-2"
+            <a href="/posts/cloud/azure/azure" class="ml-1 mr-2"
             >Microsoft Azure</a
             >
         </div>
