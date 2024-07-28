@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Azure - Entra ID
+title: Microsoft - Entra ID
 categories: [iam, entraid]
 tags: [Identity and Access Management(IAM), Entra ID]
 ---

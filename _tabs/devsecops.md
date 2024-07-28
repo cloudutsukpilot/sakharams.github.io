@@ -9,7 +9,7 @@ order: 5
 
 - Development + Security + Operations
 
-More Details [here](/posts/devsecops/introduction-to-devsecops)
+More Details [here](/posts/devsecops/devsecops)
 
 ### DevSecOps Tools:
 <!-- DevSecOps Tools Start -->
@@ -20,7 +20,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
     >
     <span>
         <img alt="DevSecOps Tools" src="/assets/img/icons/coding-18.svg" />
-        <a href="../posts/devsecops/introduction-to-devsecops" class="ml-1 mr-2"
+        <a href="../posts/devsecops/devsecops" class="ml-1 mr-2"
         >DevSecOps Tools</a
         >
     </span>
@@ -40,7 +40,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="SonarQube" src="/assets/img/icons/sonarqube-18.svg" />
             <a
-            href="../posts/devsecops/sonarqube/introduction-to-sonarqube"
+            href="../posts/devsecops/sonarqube/sonarqube"
             class="ml-1 mr-2"
             >SonarQube</a
             >
@@ -48,7 +48,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="TFSec" src="/assets/img/icons/tfsec-18.svg" />
             <a
-            href="../posts/devsecops/tfsec/introduction-to-tfsec"
+            href="../posts/devsecops/tfsec/tfsec"
             class="ml-1 mr-2"
             >tfsec</a
             >
@@ -56,7 +56,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="CheckMarx" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/checkmarx/introduction-to-checkmarx"
+            href="../posts/devsecops/checkmarx/checkmarx"
             class="ml-1 mr-2"
             >checkmarx</a
             >
@@ -64,7 +64,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="BurpSuite" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/burpsuite/introduction-to-burpsuite"
+            href="../posts/devsecops/burpsuite/burpsuite"
             class="ml-1 mr-2"
             >Burp Suite/PortSwigger</a
             >
@@ -72,7 +72,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="AppScan" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/appscan/introduction-to-appscan"
+            href="../posts/devsecops/appscan/appscan"
             class="ml-1 mr-2"
             >App Scan</a
             >
@@ -82,7 +82,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="Snyk" src="/assets/img/icons/snyk-18.svg" />
             <a
-            href="../posts/devsecops/snyk/introduction-to-snyk"
+            href="../posts/devsecops/snyk/snyk"
             class="ml-1 mr-2"
             >Snyk</a
             >
@@ -90,7 +90,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="OWASPZap" src="/assets/img/icons/owaspzap-18.svg" />
             <a
-            href="../posts/devsecops/owaspzap/introduction-to-owaspzap"
+            href="../posts/devsecops/owaspzap/owaspzap"
             class="ml-1 mr-2"
             >OWASP SAP</a
             >
@@ -98,7 +98,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="Fortify" src="/assets/img/icons/fortify-18.svg" />
             <a
-            href="../posts/devsecops/fortify/introduction-to-fortify"
+            href="../posts/devsecops/fortify/fortify"
             class="ml-1 mr-2"
             >Fortify</a
             >
@@ -106,7 +106,7 @@ More Details [here](/posts/devsecops/introduction-to-devsecops)
         <div class="p-2">
             <img alt="Coverity" src="/assets/img/icons/folder-18.svg" />
             <a
-            href="../posts/devsecops/coverity/introduction-to-coverity"
+            href="../posts/devsecops/coverity/coverity"
             class="ml-1 mr-2"
             >Coverity</a
             >

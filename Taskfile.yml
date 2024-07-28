@@ -1,8 +1,13 @@
 version: '3'
 
 tasks:
+  update:
+    desc: Test and Push Changes
+    cmds:
+      - task: test-site
+      - task: gp
   gp:
-    description: git push with changes
+    desc: git push with changes
     # git remote add gitlab git@gitlab.com:sakharamgit/cloudutsuk.git
     # git remote add github git@github.com:SakharamS/sakharams.github.io.git
     cmds:
@@ -12,4 +17,8 @@ tasks:
       - git push github 
       - git push gitlab
 
+  test-site:
+    desc: test website
+    cmds:
+      - bundle exec htmlproofer _site/ --disable-external=true --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
       

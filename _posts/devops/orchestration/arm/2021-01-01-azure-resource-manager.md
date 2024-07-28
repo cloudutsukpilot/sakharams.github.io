@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Introduction to Azure Resource Manager(ARM)
-categories: [devops, orchestration, ARM]
-tags: [DevOps, Orchestration, ARM]
+categories: [devops, orchestration, arm]
+tags: [DevOps, Orchestration, Azue Resource Manager(ARM]
 ---
 
 Azure Resource Manager (ARM) is a powerful orchestration service provided by Microsoft Azure. It allows you to deploy, manage, and organize your Azure resources in a declarative manner. In this blog post, we will explore the key concepts and benefits of using ARM.
