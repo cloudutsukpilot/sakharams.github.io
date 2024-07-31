@@ -54,7 +54,7 @@ Quisque egestas convallis ipsum, ut sollicitudin risus tincidunt a. Maecenas int
   + Section
     * Paragraph
 
-### ToDo list
+### ToDo list / Checkbox
 
 - [ ] Job
   + [x] Step 1

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Key Knowledge Areas for a Cloud Architect
-categories: [architect, cloud, aws]
+categories: [architect, cloud]
 tags: [Cloud, Architect]
 ---
 
