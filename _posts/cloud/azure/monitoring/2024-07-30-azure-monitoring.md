@@ -12,7 +12,7 @@ tags: [Cloud, Azure, Monitoring]
 ### Features of Azure Monitor
 
 | Insight | Description |
-| :-----: | :---------: |
+| ----- | --------- |
 | `Application Insights` | Monitor your live web application on any platform by using this extensible Application Performance Management (APM) service that's available in Azure Monitor. |
 | `Container insights` | Check the performance of container workloads deployed to either Azure Container Instances or managed Kubernetes clusters hosted on Azure Kubernetes Service (AKS). | 
 | `Networks insights` | Obtain comprehensive information on the health and metrics for all your network resources. Use the advanced search capability to identify resource dependencies. | 

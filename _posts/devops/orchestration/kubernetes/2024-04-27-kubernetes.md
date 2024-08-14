@@ -11,39 +11,32 @@ Kubernetes is an open-source container orchestration platform that automates the
 
 Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform for automating the deployment, scaling, and management of containerized applications. It abstracts the underlying infrastructure and provides a consistent API for managing containers across different environments, such as on-premises data centers, public clouds, and hybrid clouds.
 
-
-### Kubernetes Objects
-
-| Namespaces | In Kubernetes, namespaces provides a mechanism for isolating groups of resources within a single cluster and are required when different teams or projects share a Kubernetes cluster. |
-| | Any number of namespaces are supported within a cluster, each logically separated from others but with the ability to communicate with each other. |
-| Labels & Selectors | Labels and Selectors are the standard method to group things together in Kubernetes. |
-| | We can filter the objects based on the criteria like class, kind, and functions. |
-| | Labels are the properties attached to each item/object. Selector helps us to filter the items/objects which have labels attached to them | 
-| Annotation | Kubernetes annotations are a type of metadata that you attach to your Kubernetes objects, such as ReplicaSets and Pods. |
-| | In particular, annotations are key-value maps. |
-| | Annotations let you organize your application into sets of attributes that correspond to how you think about that application. |
-
-
 ### Cluster Architecture
 
-| Nodes | Kubernetes runs your workload by placing containers into Pods to run on Nodes. |
-| | A node may be a virtual or physical machine, depending on the cluster. |
-| Controllers | In Kubernetes, controllers are control loops that watch the state of your cluster, then make or request changes where needed. |
-| | Each controller tries to move the current cluster state closer to the desired state |
-| Cloud Controller Manager | The cloud-controller-manager is a Kubernetes control plane component that embeds cloud-specific control logic. |
-| | The cloud controller manager lets you link your cluster into your cloud provider's API, and separates out the components that interact with that cloud platform from components that only interact with your cluster. |
-| Container Runtime Interface (CRI) | The Container Runtime Interface (CRI) is the main protocol for the communication between the kubelet and Container Runtime. |
-|  | You need a working container runtime on each Node in your cluster, so that the kubelet can launch Pods and their containers. |
-| Garbage Collection | Garbage collection is a collective term for the various mechanisms Kubernetes uses to clean up cluster resources. |
-| | This allows the clean up of resources like the following: |
-| | • Terminated pods
-| | • Completed Jobs
-| | • Objects without owner references
-| | • Unused containers and container images
-| | • Dynamically provisioned PersistentVolumes with a StorageClass reclaim policy of Delete
-| | • Stale or expired CertificateSigningRequests (CSRs)
-| | • Node Lease objects
-    
+![Kubernetes Cluster Architecture](/assets/img/devops/orchestration/kubernetes/kubernetes-cluster-architecture.svg)
+
+- `Nodes` 
+    + Kubernetes runs your workload by placing containers into Pods to run on Nodes.
+    + A node may be a virtual or physical machine, depending on the cluster.
+- `Controllers` 
+    + In Kubernetes, controllers are control loops that watch the state of your cluster, then make or request changes where needed.
+    + Each controller tries to move the current cluster state closer to the desired state.
+- `Cloud Controller Manager` 
+    + The cloud-controller-manager is a Kubernetes control plane component that embeds cloud-specific control logic.
+    + The cloud controller manager lets you link your cluster into your cloud provider's API, and separates out the components that interact with that cloud platform from components that only interact with your cluster.
+- `Container Runtime Interface (CRI)` 
+    + The Container Runtime Interface (CRI) is the main protocol for the communication between the kubelet and Container Runtime.
+    + You need a working container runtime on each Node in your cluster, so that the kubelet can launch Pods and their containers.
+- `Garbage Collection`
+    + Garbage collection is a collective term for the various mechanisms Kubernetes uses to clean up cluster resources.
+    + This allows the clean up of resources like the following:
+        * Terminated pods
+        * Completed Jobs
+        * Objects without owner references
+        * Unused containers and container images
+        * Dynamically provisioned PersistentVolumes with a StorageClass reclaim policy of Delete
+        * Stale or expired CertificateSigningRequests (CSRs)
+        * Node Lease objects
     
 ### Containers
 
@@ -57,6 +50,17 @@ Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform f
 | Container | Containers are the lowest level of microservice and has its own filesystem, share of CPU, memory, process space, and more. |
 | | These are placed inside of the pods and need external IP addresses to view any outside processes. |
 
+
+### Kubernetes Objects
+
+| Namespaces | In Kubernetes, namespaces provides a mechanism for isolating groups of resources within a single cluster and are required when different teams or projects share a Kubernetes cluster. |
+| | Any number of namespaces are supported within a cluster, each logically separated from others but with the ability to communicate with each other. |
+| Labels & Selectors | Labels and Selectors are the standard method to group things together in Kubernetes. |
+| | We can filter the objects based on the criteria like class, kind, and functions. |
+| | Labels are the properties attached to each item/object. Selector helps us to filter the items/objects which have labels attached to them | 
+| Annotation | Kubernetes annotations are a type of metadata that you attach to your Kubernetes objects, such as ReplicaSets and Pods. |
+| | In particular, annotations are key-value maps. |
+| | Annotations let you organize your application into sets of attributes that correspond to how you think about that application. |
 
 ### Workloads
 
