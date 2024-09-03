@@ -21,3 +21,9 @@ az ad app list --query "[].{Name:displayName, Created:createdDateTime}"
 az network public-ip list -g resourceGroupName --query "[?name=='publicIpResourceName'].ipAddress
 az network vnet list --query "[?name=='vnet1'].subnets[].addressPrefix"
 ```
+
+4. Az Login with a Service Principal
+```
+az account set --subscription "<subscription ID or name>"
+az login --service-principal -u <app-id> -p <password-or-cert> --tenant <tenant>
+```

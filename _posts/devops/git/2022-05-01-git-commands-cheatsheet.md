@@ -46,6 +46,7 @@ tags: [DevOps, Git, Git Commands, CMDsheet]
 | `git config --global --get-regexp user` | Get all settings in the global Git configuration that match the regular expression user |
 | `git config --global --rename-section user.email user.mail` |	Rename the section user.email to user.mail in the global Git configuration |
 | `git config --global --remove-section user.email` | Remove the section user.email from the global Git configuration | 
+| `git config --global pager.branch false` | To disable the displaying output using pager | 
 
 
 #### Git Push
