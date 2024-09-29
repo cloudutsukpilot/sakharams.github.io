@@ -47,7 +47,7 @@ htmlproofer_for_test_site:
   dependencies:
     - build_test_site
   script:
-    - bundle exec htmlproofer test/ --disable-external=true --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
+    - bundle exec htmlproofer test/ --disable-external --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
   artifacts:
     paths:
       - testhtml
