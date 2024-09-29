@@ -5,7 +5,7 @@ categories: [devops, cicd, azure devops]
 tags: [DevOps, CICD, Azure DevOps]
 ---
 
-## Introduction
+## Introduction 
 - Azure DevOps is a comprehensive suite of tools provided by Microsoft, aimed at streamlining the software development lifecycle. 
 - It is designed to support the entire process from code development, testing, and deployment to monitoring and feedback loops. 
 - Azure DevOps enables teams to implement Continuous Integration and Continuous Delivery (CI/CD) pipelines, making it easier to build, test, and release software in an efficient, automated manner.
