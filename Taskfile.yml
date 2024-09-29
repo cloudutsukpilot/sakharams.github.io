@@ -1,5 +1,8 @@
 version: '3'
 
+# Updating Chirpy Theme
+# https://www.richardn.ca/posts/UpdatingChirpy/
+
 tasks:
   update:
     desc: Test and Push Changes
@@ -22,3 +25,135 @@ tasks:
     cmds:
       - bundle exec htmlproofer _site/ --disable-external=true --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
       
+  install-jekyll:
+    desc: Install Jekyll
+    cmds:
+      - |
+        if command -v jekyll >/dev/null 2>&1; then
+          echo "Jekyll is already installed"
+          jekyll --version
+        else
+          sudo apt update
+          sudo apt install ruby-full
+          sudo apt-get install ruby-full build-essential zlib1g-dev
+          echo '# Install Ruby Gems to ~/gems' >> ~/.bashrc
+          echo 'export GEM_HOME="$HOME/gems"' >> ~/.bashrc
+          echo 'export PATH="$HOME/gems/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
+          bundle install
+          gem install jekyll bundler
+          jekyll --version
+          gem install jekyll-theme-chirpy 
+        fi
+
+  start-local:
+    desc: Start Local Website
+    cmds:
+      - bundle exec jekyll serve
+
+  create-service:
+    desc: "Create and configure the Jekyll service to start on boot"
+    cmds:
+      - |
+        echo "[Unit]
+        Description=Jekyll Server
+        After=network.target
+
+        [Service]
+        Type=simple
+        User=sakharamshinde
+        WorkingDirectory=/home/sakharamshinde/gitrepos/sakharams.github.io
+        ExecStart=/home/sakharamshinde/gems/bin/bundle exec jekyll serve --watch
+        Environment="PATH=/home/sakharamshinde/gems/bin:/usr/local/bin:/usr/bin:/bin"
+        StandardOutput=append:/var/log/jekyll-output.log
+        StandardError=append:/var/log/jekyll-error.log
+        Restart=on-failure
+
+        [Install]
+        WantedBy=multi-user.target" | sudo tee /etc/systemd/system/jekyll.service
+      - sudo chmod 644 /etc/systemd/system/jekyll.service
+      - sudo systemctl daemon-reload
+      - sudo systemctl enable jekyll.service
+      - sudo systemctl start jekyll.service
+      - sleep 5
+      - sudo systemctl status jekyll.service
+
+  delete-service:
+    desc: "Delete the Jekyll service"
+    cmds:
+      - |
+        if sudo systemctl is-active --quiet jekyll.service; then
+          sudo systemctl stop jekyll.service
+          sudo systemctl disable jekyll.service
+          sudo rm /etc/systemd/system/jekyll.service
+          sudo systemctl daemon-reload
+          echo "Jekyll service has been deleted."
+        else
+          echo "Jekyll service is not running."
+        fi
+      - if [ -f /var/log/jekyll-output.log ]; then sudo rm /var/log/jekyll-output.log; fi
+      - if [ -f /var/log/jekyll-error.log ]; then sudo rm /var/log/jekyll-error.log; fi
+
+  recreate-service:
+    desc: "Recreate the Jekyll service"
+    cmds:
+      - task: delete-service
+      - task: create-service
+  
+  setup-logrotate:
+    desc: "Setup logrotate for Jekyll logs"
+    cmds:
+      - echo "/var/log/jekyll.log {
+            hourly
+            rotate 24
+            compress
+            missingok
+            notifempty
+            create 644 sakharamshinde sakharamshinde
+            sharedscripts
+            postrotate
+                systemctl restart jekyll.service > /dev/null 2>&1 || true
+            endscript
+          }" | sudo tee /etc/logrotate.d/jekyll > /dev/null
+
+  add-alias:
+    desc: " Create Log file and Add alias to bashrc"
+    cmds:
+      # Step 1: Change the ownership of the Jekyll log file if not already owned by sakharamshinde
+      - |
+        if [ "$(stat -c %U /var/log/jekyll.log)" != "sakharamshinde" ]; then
+          sudo chown sakharamshinde /var/log/jekyll.log
+          echo "Changed ownership of /var/log/jekyll.log to sakharamshinde."
+        else
+          echo "Ownership of /var/log/jekyll.log is already assigned to sakharamshinde."
+        fi
+      
+      # Step 2: Add the alias to .bashrc if it doesn't already exist
+      - |
+        if ! grep -q "alias start-cloudutsuk" ~/.bashrc; then
+          echo "alias start-cloudutsuk='if pgrep -f \"jekyll serve\" > /dev/null; then echo \"Jekyll server is already running.\"; else cd /home/sakharamshinde/gitrepos/sakharams.github.io && /home/sakharamshinde/gems/bin/bundle exec jekyll serve --watch &> /home/sakharamshinde/jekyll.log & echo \"Jekyll server started.\"; fi'" >> ~/.bashrc
+          echo "Added alias start-cloudutsuk to .bashrc."
+        else
+          echo "Alias start-cloudutsuk already exists in .bashrc."
+        fi
+      - |
+        if ! grep -q "alias logs-cloudutsuk" ~/.bashrc; then
+          echo "alias logs-cloudutsuk='if [ -f /var/log/jekyll.log ]; then cat /var/log/jekyll.log; else echo \"Log file does not exist.\"; fi'" >> ~/.bashrc
+          echo "Added alias logs-cloudutsuk to .bashrc."
+        else
+          echo "Alias logs-cloudutsuk already exists in .bashrc."
+        fi
+      - |
+        if ! grep -q "alias clear-cloudutsuk-logs" ~/.bashrc; then
+          echo "alias clear-cloudutsuk-logs='if [ -f /var/log/jekyll.log ]; then echo "" > /var/log/jekyll.log; echo \"Log file contents cleared.\"; else echo \"Log file does not exist.\"; fi'" >> ~/.bashrc
+          echo "Added alias clear-cloudutsuk-logs to .bashrc."
+        else
+          echo "Alias clear-cloudutsuk-logs already exists in .bashrc."
+        fi
+      - |
+        if ! grep -q "alias stop-cloudutsuk" ~/.bashrc; then
+          echo "alias stop-cloudutsuk='pkill -f \"jekyll serve\" && echo \"Jekyll server stopped.\" || echo \"Jekyll server is not running.\"'" >> ~/.bashrc
+          echo "Added alias stop-cloudutsuk to .bashrc."
+        else
+          echo "Alias stop-cloudutsuk already exists in .bashrc."
+        fi
