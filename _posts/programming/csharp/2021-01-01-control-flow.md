@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Control Flow
-categories: [programming, csharp]
+categories: [Programming, csharp]
 tags: [Programming, CSharp]
 ---
 

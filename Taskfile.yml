@@ -157,3 +157,22 @@ tasks:
         else
           echo "Alias stop-cloudutsuk already exists in .bashrc."
         fi
+  
+  install-on-windows:
+    desc: Install on Windows
+    cmds:
+      - |
+        # https://jekyllrb.com/docs/installation/windows/
+      - |
+        gem install jekyll bundler
+        # To install the requirements for the Jekyll theme
+        bundle install
+      - | 
+        # Create a Windows Service
+        sc.exe create JekyllService binPath= '"C:\gitrepos\jekyllservice.bat"'
+        sc.exe config JekyllService start= auto
+        sc.exe start JekyllService
+
+
+
+

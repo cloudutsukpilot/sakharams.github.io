@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Introduction to Go
-categories: [programming, go]
+categories: [Programming, go]
 tags: [Go]
 ---
 

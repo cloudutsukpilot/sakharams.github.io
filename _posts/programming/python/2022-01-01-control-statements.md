@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Python - Control Statements
-categories: [programming, python]
+categories: [Programming, python]
 tags: [Python]
 ---
 

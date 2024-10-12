@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Introduction to CSharp
-categories: [programming, csharp]
+categories: [Programming, csharp]
 tags: [Programming, CSharp]
 ---
 

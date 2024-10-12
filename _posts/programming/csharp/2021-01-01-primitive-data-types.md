@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Primitive Data Types
-categories: [programming, csharp]
+categories: [Programming, csharp]
 tags: [Programming, CSharp]
 ---
 
