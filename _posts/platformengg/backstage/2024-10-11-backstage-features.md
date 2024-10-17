@@ -72,7 +72,6 @@ categories: [Platform Engineering, Backstage]
 - Collators define what can be found by defining, indexing, and collecting documents.
 - Currently, collators are available for the Catalog, TechDocs, and Stack Overflow. You can define your collators too.
 
-
 ### Adaptability Through Plugins
 
 - So far, all the features we’ve seen are implemented as plugins but are maintained by the Backstage team and considered core features of the framework.
