@@ -9,7 +9,7 @@ tasks:
     cmds:
       - task: test-site
       - task: gp
-  gp:
+  git-push:
     desc: git push with changes
     # git remote add gitlab git@gitlab.com:sakharamgit/cloudutsuk.git
     # git remote add github git@github.com:SakharamS/sakharams.github.io.git

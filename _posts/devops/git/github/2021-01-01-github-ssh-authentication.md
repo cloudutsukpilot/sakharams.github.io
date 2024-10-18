@@ -1,6 +1,6 @@
 ---
 layout: post
-title: GitHub Clone
+title: GitHub Clone using SSH
 categories: [devops, git, github]
 tags: [DevOps, Git, Github, SSH]
 ---
@@ -43,6 +43,7 @@ tags: [DevOps, Git, Github, SSH]
     git clone git@github.com:<profilename>/<reponame>.github.io.git
     ```
 
+6. If you have multiple organisations which use MFA for authentication, you can click on 'Configure SSO' next to the recently added SSH key and authorize it for all or specific organisations.
 
 <br />
 ### Switch from HTTPS to SSH Authentication
