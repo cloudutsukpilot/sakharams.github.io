@@ -23,7 +23,7 @@ tasks:
   test-site:
     desc: test website
     cmds:
-      - bundle exec htmlproofer _site/ --disable-external=true --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
+      - bundle exec htmlproofer _site/ --disable-external --ignore-urls "/^http://127.0.0.1/,/^http://0.0.0.0/,/^http://localhost/"
       
   install-jekyll:
     desc: Install Jekyll
