@@ -106,6 +106,3 @@ tags: [Basics, Certificates]
     + Use Certificate Transparency to detect and avoid mistakenly issued certificates
 
 - Following best practices for SSL deployment, maintenance, and monitoring will help prevent issues that lead to the error.
-
-
-### References Links:
