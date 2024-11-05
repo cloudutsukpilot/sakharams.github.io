@@ -333,7 +333,7 @@ Read More at [DevOps Introduction](/posts/devops/devops)
         <div class="p-2">
             <img alt="GitHub Actions" src="/assets/img/icons/githubactions-18.svg" />
             <a
-            href="/posts/devops/cicd/githubactions/github actions"
+            href="/posts/devops/cicd/github actions/github-actions"
             class="ml-1 mr-2"
             >GitHub Actions</a
             >
