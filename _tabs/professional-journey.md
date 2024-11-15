@@ -28,7 +28,7 @@ order: 11
     <!-- top-category -->
     <div id="a_0" class="card-header d-flex justify-content-between hide-border-bottom">
         <span class="ms-2 align-items-center" style="flex-grow: 1;">
-            <img alt="Notes" src="/assets/img/icons/coding-18.svg" />
+            <img alt="Notes" src="/assets/img/icons/miscellaneous/coding-18.svg" />
             <h2 class="mx-2" style="font-size: 1.2rem; display: inline;">Career Timeline</h2>
         </span>
     </div>
