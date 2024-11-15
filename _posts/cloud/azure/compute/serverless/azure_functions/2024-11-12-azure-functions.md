@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Azure Functions
-categories: [cloud, azure, compute, serverless]
-tags: [Cloud, Azure, Compute, Serverless]
+categories: [cloud, azure, compute, serverless, azure functions]
+tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
 ---
 
 ## Introduction
@@ -40,7 +40,7 @@ tags: [Cloud, Azure, Compute, Serverless]
 
 ### Azure Function Benefits
 1. `Simplified Programming Model`
-    - Easily run small pieces of code in clooud.
+    - Easily run small pieces of code in cloud.
     - Eliminate bolier plate code
 2. `Choice of Language`
     - Use it to run code in different programming languages

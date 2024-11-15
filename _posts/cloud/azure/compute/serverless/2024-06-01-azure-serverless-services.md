@@ -6,7 +6,19 @@ tags: [Cloud, Azure, Serverless]
 ---
 
 ##  Azure Serverless:
-- Below are the serverless services offered by Azure:
+- Azure Serverless refers to a cloud computing model offered by Microsoft Azure, where you can build and deploy applications without managing the underlying infrastructure. 
+- In a serverless environment, you focus solely on your code, and Azure automatically handles the provisioning, scaling, and management of servers and resources.
+
+### Key Aspects
+
+1. Event-Driven
+2. No Server Management
+3. Automatic Scaling
+4. Pay-as-you-go Pricing
+5. Stateless
+6. Focus on Business Logic
+
+### Azure Serverless Services
 
 | Category | Services | 
 | -------- | -------- |
@@ -20,12 +32,12 @@ tags: [Cloud, Azure, Serverless]
 | AI & ML | Azure Machine Learning, Azure Cognitivie Services |
 
 
-### Compute:
+### Compute
 1. `Azure Functions`
 - Azure Functions is a serverless compute service that allows you to run event-driven code without provisioning or managing infrastructure. 
 - It supports multiple programming languages and integrates seamlessly with other Azure services.
 
-### Integration:
+### Integration
 1. `Azure Logic Apps`
 - Azure Logic Apps is a cloud-based service that helps you automate and orchestrate tasks, business processes, and workflows. 
 - It provides a visual designer to create workflows using a wide range of connectors and triggers.
@@ -62,7 +74,7 @@ Azure Notification Hubs is a push notification service that helps you send perso
 - Azure Static Web Apps is a service that enables you to build and deploy modern web applications quickly. 
 - It integrates with GitHub to automatically build and deploy your app whenever you push changes to your repository.
 
-### Storage:
+### Storage
 1. `Azure Cosmos DB`
 - Azure Cosmos DB is a globally distributed, multi-model database service. 
 - It provides support for various data models, including document, key-value, graph, and columnar, and offers guaranteed low latency and high availability.
@@ -71,7 +83,7 @@ Azure Notification Hubs is a push notification service that helps you send perso
 - Azure Storage is a scalable and durable cloud storage service. 
 - It provides different storage options, such as Blob storage, File storage, Queue storage, and Table storage, to meet the needs of different types of applications.
 
-### AL & ML:
+### AL & ML
 1. `Azure Cognitive Services`
 - Azure Cognitive Services is a collection of AI services that enable you to build intelligent applications. 
 - It provides APIs for vision, speech, language, knowledge, and search, allowing you to add advanced capabilities to your applications with ease.
