@@ -16,10 +16,14 @@ tags: [DevOps, IAC, Terragrunt]
          Module ./aks has external dependency ../../entraid/resources/group
         Should Terragrunt apply the external dependency? (y/n)
         ```
-
+        
     - `Cause`:
-        + 
+        + The AKS module was dependent on other modules and terragrunt was requesting confirmation before running 'apply'.
+        + The command `terragrunt init` was executed using a pipeline was there no way to provide a confirmation in the runner.
+        
     - `Solution`:
+        + Added the '--terragrunt-non-interactive' parameter for the terragrunt command
+
 
 2. **Operating System Mismatch**
     - `Error`:
