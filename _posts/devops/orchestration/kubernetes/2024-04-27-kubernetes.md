@@ -5,26 +5,29 @@ categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
 ---
 
-Kubernetes is an open-source container orchestration platform that automates the deployment, scaling, and management of containerized applications. It was originally developed by Google and is now maintained by the Cloud Native Computing Foundation (CNCF).
+## Introduction
 
-## What is Kubernetes?
+- Kubernetes is an open-source container orchestration platform that automates the deployment, scaling, and management of containerized applications. 
+- It was originally developed by Google and is now maintained by the Cloud Native Computing Foundation (CNCF).
 
-Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform for automating the deployment, scaling, and management of containerized applications. It abstracts the underlying infrastructure and provides a consistent API for managing containers across different environments, such as on-premises data centers, public clouds, and hybrid clouds.
+### What is Kubernetes?
+
+- Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform for automating the deployment, scaling, and management of containerized applications. - It abstracts the underlying infrastructure and provides a consistent API for managing containers across different environments, such as on-premises data centers, public clouds, and hybrid clouds.
 
 ### Cluster Architecture
 
 ![Kubernetes Cluster Architecture](/assets/img/devops/orchestration/kubernetes/kubernetes-cluster-architecture.svg)
 
-- `Nodes` 
-    + Kubernetes runs your workload by placing containers into Pods to run on Nodes.
-    + A node may be a virtual or physical machine, depending on the cluster.
-- `Controllers` 
+- `Nodes`
+  - Kubernetes runs your workload by placing containers into Pods to run on Nodes.
+  - A node may be a virtual or physical machine, depending on the cluster.
+- `Controllers`
     + In Kubernetes, controllers are control loops that watch the state of your cluster, then make or request changes where needed.
     + Each controller tries to move the current cluster state closer to the desired state.
-- `Cloud Controller Manager` 
+- `Cloud Controller Manager`
     + The cloud-controller-manager is a Kubernetes control plane component that embeds cloud-specific control logic.
     + The cloud controller manager lets you link your cluster into your cloud provider's API, and separates out the components that interact with that cloud platform from components that only interact with your cluster.
-- `Container Runtime Interface (CRI)` 
+- `Container Runtime Interface (CRI)`
     + The Container Runtime Interface (CRI) is the main protocol for the communication between the kubelet and Container Runtime.
     + You need a working container runtime on each Node in your cluster, so that the kubelet can launch Pods and their containers.
 - `Garbage Collection`
