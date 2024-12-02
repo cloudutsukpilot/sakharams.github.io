@@ -8,16 +8,13 @@ order: 10
 
 My name is Sakharam Shinde and I am a Cloud, DevOps & Security Architect.
 
-
 As a *Cloud, DevOps & Security Architect*, I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. With 13 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. I am certified in various domains of Cloud, DevOps, and Security, which has significantly contributed to my development as an architect.
 
 You can reach out to me on [LinkedIn](https://www.linkedin.com/in/sakharamshinde/) or checkout my blog where I share my learnings and experiences.
 
-
 As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud, DevOps & Security.
 
-
-### Certifications:
+### Certifications
 
 <!-- Certifications Start -->
 <div class="container">

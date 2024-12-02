@@ -5,7 +5,7 @@ categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
 ---
 
-## Deployment YAML:
+## Deployment YAML
 
 - Kubernetes deployment Yaml contains the following main specifications.
 

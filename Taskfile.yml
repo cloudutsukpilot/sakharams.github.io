@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 # Updating Chirpy Theme
 # https://www.richardn.ca/posts/UpdatingChirpy/
@@ -17,14 +17,14 @@ tasks:
       - git status
       - git add .
       - git commit -m "{{.CLI_ARGS}}"
-      - git push github 
+      - git push github
       - git push gitlab
 
   test-site:
     desc: test website
     cmds:
       - bundle exec htmlproofer _site --disable-external --ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
-      
+
   install-jekyll:
     desc: Install Jekyll
     cmds:
@@ -49,7 +49,7 @@ tasks:
   start-local:
     desc: Start Local Website
     cmds:
-      - bundle exec jekyll serve
+      - bundle exec jekyll serve --livereload
 
   create-service:
     desc: "Create and configure the Jekyll service to start on boot"
@@ -99,22 +99,22 @@ tasks:
     cmds:
       - task: delete-service
       - task: create-service
-  
+
   setup-logrotate:
     desc: "Setup logrotate for Jekyll logs"
     cmds:
       - echo "/var/log/jekyll.log {
-            hourly
-            rotate 24
-            compress
-            missingok
-            notifempty
-            create 644 sakharamshinde sakharamshinde
-            sharedscripts
-            postrotate
-                systemctl restart jekyll.service > /dev/null 2>&1 || true
-            endscript
-          }" | sudo tee /etc/logrotate.d/jekyll > /dev/null
+        hourly
+        rotate 24
+        compress
+        missingok
+        notifempty
+        create 644 sakharamshinde sakharamshinde
+        sharedscripts
+        postrotate
+        systemctl restart jekyll.service > /dev/null 2>&1 || true
+        endscript
+        }" | sudo tee /etc/logrotate.d/jekyll > /dev/null
 
   add-alias:
     desc: " Create Log file and Add alias to bashrc"
@@ -127,7 +127,7 @@ tasks:
         else
           echo "Ownership of /var/log/jekyll.log is already assigned to sakharamshinde."
         fi
-      
+
       # Step 2: Add the alias to .bashrc if it doesn't already exist
       - |
         if ! grep -q "alias start-cloudutsuk" ~/.bashrc; then
@@ -157,7 +157,7 @@ tasks:
         else
           echo "Alias stop-cloudutsuk already exists in .bashrc."
         fi
-  
+
   install-on-windows:
     desc: Install on Windows
     cmds:
@@ -167,12 +167,8 @@ tasks:
         gem install jekyll bundler
         # To install the requirements for the Jekyll theme
         bundle install
-      - | 
+      - |
         # Create a Windows Service
         sc.exe create JekyllService binPath= '"C:\gitrepos\jekyllservice.bat"'
         sc.exe config JekyllService start= auto
         sc.exe start JekyllService
-
-
-
-

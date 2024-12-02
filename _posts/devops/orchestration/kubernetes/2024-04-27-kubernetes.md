@@ -12,7 +12,8 @@ tags: [DevOps, Orchestration, Kubernetes]
 
 ### What is Kubernetes?
 
-- Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform for automating the deployment, scaling, and management of containerized applications. - It abstracts the underlying infrastructure and provides a consistent API for managing containers across different environments, such as on-premises data centers, public clouds, and hybrid clouds.
+- Kubernetes, often referred to as K8s (pronounced "kates"), provides a platform for automating the deployment, scaling, and management of containerized applications.
+- It abstracts the underlying infrastructure and provides a consistent API for managing containers across different environments, such as on-premises data centers, public clouds, and hybrid clouds.
 
 ### Cluster Architecture
 
@@ -22,25 +23,25 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Kubernetes runs your workload by placing containers into Pods to run on Nodes.
   - A node may be a virtual or physical machine, depending on the cluster.
 - `Controllers`
-    + In Kubernetes, controllers are control loops that watch the state of your cluster, then make or request changes where needed.
-    + Each controller tries to move the current cluster state closer to the desired state.
+  - In Kubernetes, controllers are control loops that watch the state of your cluster, then make or request changes where needed.
+  - Each controller tries to move the current cluster state closer to the desired state.
 - `Cloud Controller Manager`
-    + The cloud-controller-manager is a Kubernetes control plane component that embeds cloud-specific control logic.
-    + The cloud controller manager lets you link your cluster into your cloud provider's API, and separates out the components that interact with that cloud platform from components that only interact with your cluster.
+  - The cloud-controller-manager is a Kubernetes control plane component that embeds cloud-specific control logic.
+  - The cloud controller manager lets you link your cluster into your cloud provider's API, and separates out the components that interact with that cloud platform from components that only interact with your cluster.
 - `Container Runtime Interface (CRI)`
-    + The Container Runtime Interface (CRI) is the main protocol for the communication between the kubelet and Container Runtime.
-    + You need a working container runtime on each Node in your cluster, so that the kubelet can launch Pods and their containers.
+  - The Container Runtime Interface (CRI) is the main protocol for the communication between the kubelet and Container Runtime.
+  - You need a working container runtime on each Node in your cluster, so that the kubelet can launch Pods and their containers.
 - `Garbage Collection`
-    + Garbage collection is a collective term for the various mechanisms Kubernetes uses to clean up cluster resources.
-    + This allows the clean up of resources like the following:
-        * Terminated pods
-        * Completed Jobs
-        * Objects without owner references
-        * Unused containers and container images
-        * Dynamically provisioned PersistentVolumes with a StorageClass reclaim policy of Delete
-        * Stale or expired CertificateSigningRequests (CSRs)
-        * Node Lease objects
-    
+  - Garbage collection is a collective term for the various mechanisms Kubernetes uses to clean up cluster resources.
+  - This allows the clean up of resources like the following:
+    - Terminated pods
+    - Completed Jobs
+    - Objects without owner references
+    - Unused containers and container images
+    - Dynamically provisioned PersistentVolumes with a StorageClass reclaim policy of Delete
+    - Stale or expired CertificateSigningRequests (CSRs)
+    - Node Lease objects
+
 ### Containers
 
 | Images | A container image represents binary data that encapsulates an application and all its software dependencies. |
@@ -52,7 +53,6 @@ tags: [DevOps, Orchestration, Kubernetes]
 | | The container runtime configuration is used to run a Pod's containers. |
 | Container | Containers are the lowest level of microservice and has its own filesystem, share of CPU, memory, process space, and more. |
 | | These are placed inside of the pods and need external IP addresses to view any outside processes. |
-
 
 ### Kubernetes Objects
 
@@ -88,7 +88,6 @@ tags: [DevOps, Orchestration, Kubernetes]
 | Stateless and Stateful | Stateless means that no past data nor state is stored or needs to be persistent when a new container is created. |
 | | Stateful application involve some databases and a process to read and/or write to it. |
 
-
 ### Services, Load Balancing and Networking
 
 | Services | Service is a method for exposing a network application that is running as one or more Pods in your cluster, thus allowing to serve traffic through a permanent address/URL. |
@@ -105,8 +104,7 @@ tags: [DevOps, Orchestration, Kubernetes]
 | Service Internal Traffic Policy | Service Internal Traffic Policy enables internal traffic restrictions to only route internal traffic to endpoints within the node the traffic originated from. |
 | | The "internal" traffic here refers to traffic originated from Pods in the current cluster. |
 | | This can help to reduce costs and improve performance. |
-    
-    
+
 ### Storage
 
 | Volumes | A Kubernetes volume is a directory containing data accessible to containers in a given pod. |
@@ -137,7 +135,7 @@ tags: [DevOps, Orchestration, Kubernetes]
 | CSI Volume Cloning | The CSI Volume Cloning feature adds support for specifying existing PVCs in the dataSource field to indicate a user would like to clone a Volume. |
 | Provisioners | A StorageClass object contains a provisioner that decides which volume plugin is used to provision PersistentVolumes. Admins must specify this field. |
 | | Kubernetes provides internal and external provisioners. |
-    
+
 ### Configuration
 
 | ConfigMaps | A ConfigMap is an API object used to store non-confidential data in key-value pairs. |
@@ -146,7 +144,7 @@ tags: [DevOps, Orchestration, Kubernetes]
 | Resource Management | When you specify a Pod, you can optionally specify how much of each resource a container needs and how much is the maximum limit (Requests and limits). |
 | | CPU, Memory |
 | Kubeconfig | kubeconfig files are used to organize information about clusters, users, namespaces, and authentication mechanisms. |
-    
+
 ### Security
 
 | 4C's of Cloud Native security | Cloud -> Cluster -> Container -> Code | 
@@ -162,8 +160,7 @@ tags: [DevOps, Orchestration, Kubernetes]
 | Liveliness Probe | The Liveness Probe serves as a diagnostic check to confirm if the container is alive. |
 | Readiness Probes | Readiness Probe ensures that the container is healthy to serve incoming traffic. |
 | | Failing liveness probe will restart the container, whereas failing readiness probe will stop our application from serving traffic. |
-    
-    
+
 ### Policies
 
 | Limit Ranges | Using Kubernetes resource quotas, administrators (also termed cluster operators) can restrict consumption and creation of cluster resources (such as CPU time, memory, and persistent storage) within a specified namespace. |
@@ -173,21 +170,20 @@ tags: [DevOps, Orchestration, Kubernetes]
 | | You can also reserve a number of allocatable PIDs for each node for use by the operating system and daemons (rather than by Pods). |
 | Node Resource Managers | In order to support latency-critical and high-throughput workloads, Kubernetes offers a suite of Resource Managers. |
 | | The managers aim to co-ordinate and optimise node's resources alignment for pods configured with a specific requirement for CPUs, devices, and memory (hugepages) resources. |
-    
+
 ### Scheduling, Pre-emption and Eviction
 
-| Kubernetes Scheduler |  | 
-| Assigning Pods to Nodes |  | 
-| Pod Overhead |  | 
-| Pod Topology Spread Constraints |  | 
-| Taints and Tolerations |  | 
-| Scheduling Framework |  | 
-| Dynamic Resource Allocation |  | 
-| Scheduler Performance Tuning |  | 
-| Resource Bin Packing for Extended Resources |  | 
-| Pod Scheduling Readiness |  | 
-| Descheduler |  | 
-
+| Kubernetes Scheduler |  |
+| Assigning Pods to Nodes |  |
+| Pod Overhead |  |
+| Pod Topology Spread Constraints |  |
+| Taints and Tolerations |  |
+| Scheduling Framework |  |
+| Dynamic Resource Allocation |  |
+| Scheduler Performance Tuning |  |
+| Resource Bin Packing for Extended Resources |  |
+| Pod Scheduling Readiness |  |
+| Descheduler |  |
 
 ### Cluster Administration
 
