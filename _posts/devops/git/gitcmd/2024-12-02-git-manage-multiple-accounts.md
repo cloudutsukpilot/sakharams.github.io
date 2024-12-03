@@ -25,7 +25,8 @@ tags: [DevOps, Git]
 
     ```sh
     git@github.com:apurvangiri/apurvangiri.github.io.git
-    git@github.com:cloudutsukpilot/developerportal.git
+    git@github.com:sakharams/developerportal.git
+    git@github.com:<org_name>/<repo-name>.git
     ```
 
     ```sh
@@ -36,8 +37,15 @@ tags: [DevOps, Git]
         IdentityFile ~/.ssh/apurvag/id_rsa
         IdentitiesOnly yes
 
-    # Configuration for cloudutsukpilot/developerportal
-    Host github-cloudutsuk
+    # Configuration for sakharams/developerportal
+    Host github-sakharams
+        HostName github.com
+        User git
+        IdentityFile ~/.ssh/sakharams/id_rsa
+        IdentitiesOnly yes
+
+    # Configuration for <org_name>/<repo_name>
+    Host github-<org_name>
         HostName github.com
         User git
         IdentityFile ~/.ssh/sakharams/id_rsa

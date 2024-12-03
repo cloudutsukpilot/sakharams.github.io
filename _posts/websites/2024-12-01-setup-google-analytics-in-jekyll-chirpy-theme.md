@@ -6,7 +6,7 @@ image: /assets/img/website/google-jekyll.webp
 alt: "Jekyll - Google Analytics" 
 ---
 
-## Introduction1
+## Introduction
 
 - This pages provides the steps to create a google analytics account to start collecting insights from website's traffic and user behaviour.
 - Below are the step by step instructions:
