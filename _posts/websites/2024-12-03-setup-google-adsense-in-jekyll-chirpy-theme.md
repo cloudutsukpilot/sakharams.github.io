@@ -21,7 +21,7 @@ alt: "Jekyll - Google AdSense"
 
 ### 3. Get AdSense Code
 
-- Login into [Google AdSense](http://www.google.com/adsense) account.
+- Login into [Google AdSense](https://www.google.com/adsense) account.
 - Click on `Ads` and then click on `Get Code` to get the AdSense code.
 
 ### 4. Paste AdSense Code in default.html
