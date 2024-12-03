@@ -31,8 +31,8 @@ alt: "Jekyll - Google AdSense"
 ```html
 ...
     <!-- AdSense Code -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3247366555534455"
-    crossorigin="anonymous"></script>
+    {% include adsense.html %} 
+    
   </body>
 </html>
 ```
