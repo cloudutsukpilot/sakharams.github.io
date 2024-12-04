@@ -47,10 +47,11 @@ layout: compress
             <div class="access">
               {% include_cached trending-tags.html lang=lang %}
               <!-- AdSense Side Panel -->
-              <div style="margin-bottom: 40px;">
-                {% include adsense_panel_sidebar.html %}
+              <div style="margin-bottom: 30px;">
+                {% include adsense_panel_sidebar_top.html %}
               </div>
               {% include_cached update-list.html lang=lang %}
+              {% include adsense_panel_sidebar_bottom.html %}
             </div>
 
           </aside>
