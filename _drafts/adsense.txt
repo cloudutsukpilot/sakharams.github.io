@@ -5,6 +5,6 @@
             id="panel-wrapper"
             class="col-xl-3 ps-2 text-muted"
           >
-            <div class="access">{% include adsense.html %}</div>
+            <div class="access">{% include adsense_center.html %}</div>
           </aside>
         </div>
