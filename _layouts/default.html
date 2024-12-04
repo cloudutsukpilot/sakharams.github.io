@@ -28,7 +28,9 @@ layout: compress
             {% if layout.refactor or layout.layout == 'default' %}
               {% include refactor-content.html content=content lang=lang %}
               <!-- AdSense Center Row -->
-              {% include adsense.html %}
+              <div style="margin-top: 20px;">
+                {% include adsense.html %}
+              </div>
             {% else %}
               {{ content }}
             {% endif %}
