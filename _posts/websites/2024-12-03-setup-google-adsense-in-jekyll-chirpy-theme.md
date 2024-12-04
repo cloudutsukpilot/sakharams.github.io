@@ -1,7 +1,7 @@
 ---
 title: Set Up Google AdSense in Your Jekyll Chirpy Site
 categories: [website, analytics]
-tags: [Website, Analytics, Web Development]
+tags: [Website, Analytics, Web Development, Google AdSense]
 image: /assets/img/website/google-jekyll.webp
 alt: "Jekyll - Google AdSense" 
 ---
@@ -24,15 +24,14 @@ alt: "Jekyll - Google AdSense"
 - Login into [Google AdSense](https://www.google.com/adsense) account.
 - Click on `Ads` and then click on `Get Code` to get the AdSense code.
 
-### 4. Paste AdSense Code in default.html
+### 4. Paste AdSense Code in _includes folder
 
-- Just before the end of <body> tag, paste the AdSense code.
+- Create a file under _includes folder (I named it adsense_center.html) and paste the Adsense code into the file. 
+- If you are `ad unit` in Google AdSense to have Ads displayed at specific location, you can create multiple files(max 3) with different names.
 
-```html
-...
-    <!-- AdSense Code -->
-    {% include adsense.html %} 
-    
-  </body>
-</html>
-```
+### 5. Update default.html template
+
+- Copy the _layouts/default.html from the [jekyll-theme-chirpy](https://github.com/cotes2020/jekyll-theme-chirpy/blob/master/_layouts/default.html) to your repository.
+- Based on your requirement, you can place the `include` statement and the file name to get the ads displayed at specific locations.
+- Please refer to the changes that I have made in my repository [Cloudutsuk.com Repo](https://github.com/cloudutsukpilot/sakharams.github.io/blob/main/_layouts/default.html).
+- Please note that the ads will start appearing after 30 minutes or more.

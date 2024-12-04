@@ -1,7 +1,7 @@
 ---
 title: Set Up Google Analytics in Your Jekyll Chirpy Site
 categories: [website, analytics]
-tags: [Website, Analytics, Web Development]
+tags: [Website, Analytics, Web Development, Google Analytics]
 image: /assets/img/website/google-jekyll.webp
 alt: "Jekyll - Google Analytics" 
 ---
