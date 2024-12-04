@@ -27,6 +27,8 @@ layout: compress
           <main aria-label="Main Content" class="col-12 col-lg-11 col-xl-9 px-md-4">
             {% if layout.refactor or layout.layout == 'default' %}
               {% include refactor-content.html content=content lang=lang %}
+              <!-- AdSense Center Row -->
+              {% include adsense.html %}
             {% else %}
               {{ content }}
             {% endif %}
@@ -34,22 +36,21 @@ layout: compress
 
           <!-- panel -->
           <aside aria-label="Panel" id="panel-wrapper" class="col-xl-3 ps-2 text-muted">
-            <div class="access">
-              {% include_cached update-list.html lang=lang %}
-              {% include_cached trending-tags.html lang=lang %}
-              <!-- AdSense Side Panel -->
-              {% include adsense_panel_sidebar.html %}
-            </div>
-
+            
             {% for _include in layout.panel_includes %}
               {% assign _include_path = _include | append: '.html' %}
               {% include {{ _include_path }} lang=lang %}
             {% endfor %}
+
+            <div class="access">
+              {% include_cached trending-tags.html lang=lang %}
+              <!-- AdSense Side Panel -->
+              {% include adsense_panel_sidebar.html %}
+              {% include_cached update-list.html lang=lang %}
+            </div>
+
           </aside>
         </div>
-
-        <!-- AdSense Center Row -->
-        {% include adsense.html %}
 
         <div class="row">
           <!-- tail -->
