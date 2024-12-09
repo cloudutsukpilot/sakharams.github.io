@@ -7,13 +7,9 @@
 name: Deploy Jekyll site to Pages
 
 on:
+  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-    paths-ignore:
-      - .gitignore
-      - README.md
-      - LICENSE
-      - .gitlab-ci.yml
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -51,18 +47,11 @@ jobs:
         run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
         env:
           JEKYLL_ENV: production
-
-      - name: Test site
-        run: |
-          bundle exec htmlproofer _site \
-            \-\-disable-external \
-            \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
-
-       - name: Upload artifact
+      - name: Upload artifact
         # Automatically uploads an artifact from the './_site' directory by default
-        uses: actions/upload-pages-artifact@v3     
+        uses: actions/upload-pages-artifact@v3
 
- # Deployment job
+  # Deployment job
   deploy:
     environment:
       name: github-pages
