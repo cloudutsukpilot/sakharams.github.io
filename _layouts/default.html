@@ -40,15 +40,17 @@ layout: compress
           <aside aria-label="Panel" id="panel-wrapper" class="col-xl-3 ps-2 mb-5 text-muted">
             <div class="access">
               {% include_cached trending-tags.html lang=lang %}
-              <!-- AdSense Side Panel -->
+              <!-- AdSense Side Panel
               <div style="margin-bottom: 30px; margin-top: 30px;">
                 {% include adsense_panel_sidebar_top.html %}
               </div>
+               -->
               {% include_cached update-list.html lang=lang %}
-              <!-- AdSense Side Panel -->
+              <!-- AdSense Side Panel 
               <div style="margin-bottom: 30px; margin-top: 30px;">
                 {% include adsense_panel_sidebar_bottom.html %}
               </div>
+              -->
             </div>
 
             {% for _include in layout.panel_includes %}
