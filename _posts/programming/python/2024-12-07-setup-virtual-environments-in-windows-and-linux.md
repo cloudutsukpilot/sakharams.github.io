@@ -31,7 +31,7 @@ tags: [Python]
     virtualenv virtualenv_name
     ```
 
-4. After this command, a folder named `virtualenv_name` will be created.  If you want to create a virtualenv for specific python version, type
+4. This will create a folder named `virtualenv_name` will be created.  If you want to create a virtualenv for specific python version, type
 
     ```sh
     $ virtualenv -p /usr/bin/python3 virtualenv_name
@@ -59,24 +59,24 @@ tags: [Python]
 
 1. If python is installed in your system, then pip comes in handy. So simple steps are: 1) Install virtualenv using
 
-    ```ps1
+    ```sh
     pip install virtualenv 
     ```
 
 2. Now in which ever directory you are, this line below will create a virtualenv there
 
-    ```ps1
+    ```sh
     python -m venv myenv
     ```
 
 3. To active the virtual environment in the same directory, type the below command
 
-    ```ps1
+    ```sh
     myenv\Scripts\activate
     ```
 
 4. To deactive the virtual environment, type
 
-    ```ps1
+    ```sh
     deactivate
     ```
