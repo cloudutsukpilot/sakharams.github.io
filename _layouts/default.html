@@ -46,9 +46,9 @@ layout: compress
                 {% include adsense_panel_sidebar_top.html %}
               </div>
               {% include_cached update-list.html lang=lang %}
-              <!-- AdSense Side Panel Bottom -->
-              <div id="sidebar-bottom" style="margin-bottom: 30px; margin-top: 30px;">
-                {% include adsense_panel_sidebar_bottom.html %}
+              <!-- AdSense Side Panel Center -->
+              <div id="sidebar-center" style="margin-bottom: 30px; margin-top: 30px;">
+                {% include adsense_panel_sidebar_center.html %}
               </div>
             </div>
 
@@ -56,6 +56,12 @@ layout: compress
               {% assign _include_path = _include | append: '.html' %}
               {% include {{ _include_path }} lang=lang %}
             {% endfor %}
+
+            <!-- AdSense Side Panel Bottom -->
+            <div id="sidebar-bottom" style="margin-bottom: 30px; margin-top: 30px;">
+              {% include adsense_panel_sidebar_bottom.html %}
+            </div>
+
           </aside>
         </div>
 
