@@ -40,15 +40,15 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
 
+      - name: Install Bundler
+        run: gem install bundler -v 2.5.21
+
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.1.6
           bundler-cache: true
 
-      - name: Install Bundler
-        run: gem install bundler -v 2.5.21
-      
       - name: Installed Versions
         run: |
           ruby --version
