@@ -52,7 +52,7 @@ jobs:
       - name: Install Gems
         run: |
           bundle _2.5.21_ install
-          bundle _2.5.23_ lock
+          bundle _2.5.21_ lock
       
       - name: Installed Versions
         run: |
