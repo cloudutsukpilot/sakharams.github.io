@@ -58,8 +58,7 @@ In this blog, we will explore the key principles of cloud-native architecture, i
 | Architect systems to scale horizontally as demand increases, ensuring that the application can handle growth efficiently. | Use serverless platforms (e.g., AWS Lambda, Azure Functions) to run code without managing servers, allowing for better scalability and cost efficiency. |
 | `DevOps and Continuous Delivery` | `Observability` |
 | Encourage collaboration between development and operations teams, and automate the process of integrating, testing, and deploying code frequently and reliably. | Monitor and trace applications using metrics, logs, and tracing tools to gain insights into system behavior and performance. |
-| `Infrastructure as Code (IaC)` | : Use code to define and manage infrastructure automatically using tools like Terraform, Ansible, or CloudFormation. | 
-
+| `Infrastructure as Code (IaC)` | : Use code to define and manage infrastructure automatically using tools like Terraform, Ansible, or CloudFormation. |
 
 ### Advantages of Cloud-Native Architecture
 
