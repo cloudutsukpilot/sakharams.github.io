@@ -14,3 +14,4 @@ end
 gem 'wdm', '>= 0.1.0' if Gem.win_platform?
 #gem "listen", "~> 3.2"
 
+gem "bundler", "~> 2.5.21"
