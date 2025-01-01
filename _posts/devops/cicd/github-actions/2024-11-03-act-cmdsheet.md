@@ -11,12 +11,13 @@ tags: [DevOps, CICD, Github Actions, CMDsheet]
 
 - Benefits
 
-  1. `Fast Feedback`
-    - Rather than having to commit/push every time you want to test out the changes you are making to your .github/workflows/ files (or for any changes to embedded GitHub actions), you can use act to run the actions locally. 
-    - The environment variables and filesystem are all configured to match what GitHub provides.
+1. `Fast Feedback`
 
-  2. `Local Task Runner` 
-    - With act, you can use the GitHub Actions defined in your .github/workflows/ to replace your Makefile!
+  - Rather than having to commit/push every time you want to test out the changes you are making to your .github/workflows/ files (or for any changes to embedded GitHub actions), you can use act to run the actions locally.
+  - The environment variables and filesystem are all configured to match what GitHub provides.
+
+2. `Local Task Runner`
+  - With act, you can use the GitHub Actions defined in your .github/workflows/ to replace your Makefile!
 
 - Reference Guide: <https://nektosact.com/introduction.html>
 

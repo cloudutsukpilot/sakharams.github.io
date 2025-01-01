@@ -13,8 +13,9 @@ tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
 ### Triggers and Bindings
 
 **Triggers:**
-- Triggers cause a function to run. 
-- A trigger defines how a function is invoked and a function must have exactly one trigger. 
+
+- Triggers cause a function to run.
+- A trigger defines how a function is invoked and a function must have exactly one trigger.
 - Triggers have associated data, which is often provided as the payload of the function.
 - Common Types:
     1. HTTP Trigger
@@ -23,7 +24,8 @@ tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
     4. Queue Trigger
 
 **Bindings:**
-- Binding to a function is a way of declaratively connecting another resource to the function; bindings may be connected as input bindings, output bindings, or both. 
+
+- Binding to a function is a way of declaratively connecting another resource to the function; bindings may be connected as input bindings, output bindings, or both.
 - Data from bindings is provided to the function as parameters.
 - Binding Types:
     1. Input Binding
@@ -31,14 +33,13 @@ tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
 
 ### Pricing Plans
 
-| Consumption | Premium Plan | App Service | 
+| Consumption | Premium Plan | App Service |
 | ----------- | ------------ | ----------- |
-| Billing: <br> a. Number of Executions <br> b. Executino Time <br> c. Memory Used <br> d. Free Quota per month <br> | Billing: <br> a. Number of Core Seconds <br> b. Memory Used <br> c. Pre-warmed instances <br> | Billing: <br> a. Pay for App Service resources <br> | 
-| Use Case: <br> a. Apps requires scaling <br> b. Intermittent traffic <br> | Use Case: <br> a. Apps that run continously <br> b. Apps require more time | Use Case: <br> a. Existing under-utilized VM's <br> b. Custom images to run functions | 
-
-
+| Billing: <br> a. Number of Executions <br> b. Executino Time <br> c. Memory Used <br> d. Free Quota per month <br> | Billing: <br> a. Number of Core Seconds <br> b. Memory Used <br> c. Pre-warmed instances <br> | Billing: <br> a. Pay for App Service resources <br> |
+| Use Case: <br> a. Apps requires scaling <br> b. Intermittent traffic <br> | Use Case: <br> a. Apps that run continously <br> b. Apps require more time | Use Case: <br> a. Existing under-utilized VM's <br> b. Custom images to run functions |
 
 ### Azure Function Benefits
+
 1. `Simplified Programming Model`
     - Easily run small pieces of code in cloud.
     - Eliminate bolier plate code
@@ -58,17 +59,18 @@ tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
     - Quickly creates prototypes at low cost
 
 ### Programming Language Support
-- Below are the supported lanaguages in Azure Functions:
-1. C#
-2. JavaScript
-3. F#
-4. Java
-5. Powershell
-6. Python
-7. TypeScript
 
+- Below are the supported lanaguages in Azure Functions:
+    1. C#
+    2. JavaScript
+    3. F#
+    4. Java
+    5. Powershell
+    6. Python
+    7. TypeScript
 
 ### Azure Function Authorization Levels
+
 1. `Anonymous`
     - No Key required.
     - Function can be called by anyone on the internet.
@@ -83,8 +85,8 @@ tags: [Cloud, Azure, Compute, Serverless, Azure Functions]
     - Provides admin level privileges.
     - Should not be shared or used in client applications.
 
-
 ### Use Cases
+
 1. `API creation`
     - Quick secure API creation with HTTP triggers.
 

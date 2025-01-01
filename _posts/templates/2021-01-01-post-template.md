@@ -101,6 +101,11 @@ Moon
 
 <http://127.0.0.1:4000>
 
+### HyperLinks
+
+- Same Tab: [Google](https://google.com)
+- New Tab: [Google](https://google.com){:target="_blank"}
+
 ## Footnote
 
 Click the hook will locate the footnote[^footnote], and here is another footnote[^fn-nth-2].
