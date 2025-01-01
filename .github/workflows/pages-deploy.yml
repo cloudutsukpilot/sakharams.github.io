@@ -43,13 +43,13 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.2
+          ruby-version: 3.1.6
           bundler-cache: true
       
-      - name: Ruby Version
+      - name: Installed Versions
         run: |
           ruby --version
-          bundler --version
+          bundle --version
 
 
       - name: Build site
