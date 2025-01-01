@@ -49,7 +49,7 @@ jobs:
       - name: Ruby Version
         run: |
           ruby --version
-          jekyll -version
+          bundler --version
 
 
       - name: Build site
