@@ -1,0 +1,28 @@
+---
+---
+
+{%- if jekyll.environment == 'production' -%}
+@use "main.bundle";
+{%- else -%}
+@use "main";
+{%- endif -%}
+
+.table-wrapper>table thead th,
+.table-wrapper>table tbody tr td {
+    padding: .4rem 1rem;
+    font-size: 95%;
+    white-space: normal
+}
+
+
+// @import 'main
+// {%- if jekyll.environment == 'production' -%}
+//   .bundle
+// {%- endif -%}
+// ';
+
+// %table-cell {
+//   padding: 0.4rem 1rem;
+//   font-size: 95%;
+//   white-space: normal;
+// }

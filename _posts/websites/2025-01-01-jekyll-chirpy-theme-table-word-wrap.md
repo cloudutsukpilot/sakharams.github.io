@@ -36,7 +36,7 @@ In this blog, we’ll walk you through how to enable word wrapping in tables and
 ```scss
 ---
 
-@use "main";
+@import "main";
 
 %table-cell {
     white-space: normal;
@@ -55,6 +55,8 @@ bundle exec jekyll serve
 - Final Output:
 
   ![Table Word Wrap](/assets/img/website/table-word-wrap.png)
+
+### Latest Solution
 
 ### Conclusion
 

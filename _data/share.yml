@@ -47,8 +47,5 @@ platforms:
   #
   # - type: Threads
   #   icon: "fa-brands fa-square-threads"
-<<<<<<< HEAD
   #   link: "https://www.threads.net/intent/post?text=TITLE%20URL"
-=======
-  #   link: "https://www.threads.net/intent/post?text=TITLE%20URL"
->>>>>>> v7.2.4
+  
