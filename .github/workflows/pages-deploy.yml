@@ -8,7 +8,10 @@ on:
       - .gitignore
       - README.md
       - LICENSE
+<<<<<<< HEAD
       - .gitlab-ci.yml
+=======
+>>>>>>> v7.2.4
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -43,7 +46,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.1.6
+          ruby-version: 3.3
           bundler-cache: true
 
       # - name: Install Bundler
@@ -58,7 +61,6 @@ jobs:
         run: |
           ruby --version
           bundle --version
-
 
       - name: Build site
         run: bundle exec jekyll b -d "_site${{ steps.pages.outputs.base_path }}"

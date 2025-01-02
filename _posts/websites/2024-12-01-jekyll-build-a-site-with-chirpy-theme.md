@@ -35,10 +35,10 @@ tags: [Website, Jekyll, Chirpy ]
     - For Unix-like systems, you can set up the environment natively for optimal performance, though you can also use Dev Containers as an alternative.
     - Steps:
 
-      a. Follow the [Jekyll installation guide](https://jekyllrb.com/docs/installation/) to install Jekyll and ensure Git is installed.
-      b. Clone your repository to your local machine.
-      c. If you forked the theme, install [Node.js](https://nodejs.org/) and run `bash tools/init.sh` in the root directory to initialize the repository.
-      d. Run command `bundle` in the root of your repository to install the dependencies.
+      - a. Follow the [Jekyll installation guide](https://jekyllrb.com/docs/installation/) to install Jekyll and ensure Git is installed.
+      - b. Clone your repository to your local machine.
+      - c. If you forked the theme, install [Node.js](https://nodejs.org/) and run `bash tools/init.sh` in the root directory to initialize the repository.
+      - d. Run command `bundle` in the root of your repository to install the dependencies.
 
 ### Usage
 
