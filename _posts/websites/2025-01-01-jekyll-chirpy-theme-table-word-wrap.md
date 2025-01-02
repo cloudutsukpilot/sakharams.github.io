@@ -17,7 +17,7 @@ In this blog, we’ll walk you through how to enable word wrapping in tables and
 
 - To fix this, we can modify the table cell styles to ensure that content within the table wraps instead of overflowing.
 
-### Solution: Enabling Word Wrap in Table Cells
+### Solution 1: Enabling Word Wrap in Table Cells
 
 - To solve this issue and enable word wrapping, you can override the default styles in the Chirpy theme by editing the `jekyll-theme-chirpy.scss` file in the `assets/css` directory.
 - Follow the steps below to implement this solution:
@@ -56,7 +56,27 @@ bundle exec jekyll serve
 
   ![Table Word Wrap](/assets/img/website/table-word-wrap.png)
 
-### Latest Solution
+### Solution 2: Enabling Word Wrap in Table Cells
+
+- As we are using @import in the above solution, we get a warning "Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0".
+- To fix these warning, I have used the below code in the jekyll-theme-chirpy.scss file and it is working without any warnings on jekyll-theme-chirpy version 7.2.4.
+
+```scss
+---
+
+{%- if jekyll.environment == 'production' -%}
+@use "main.bundle";
+{%- else -%}
+@use "main";
+{%- endif -%}
+
+.table-wrapper>table thead th,
+.table-wrapper>table tbody tr td {
+    padding: .4rem 1rem;
+    font-size: 95%;
+    white-space: normal
+}
+```
 
 ### Conclusion
 
