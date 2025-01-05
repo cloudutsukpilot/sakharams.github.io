@@ -3,6 +3,8 @@ layout: post
 title: Kubernetes - Container Runtimes
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
+image: /assets/img/devops/orchestration/kubernetes/kubernetes-posts.png
+description: Comparison of all the container runtimes supported by Kubernetes.
 ---
 
 ## Introduction
@@ -23,8 +25,7 @@ tags: [DevOps, Orchestration, Kubernetes]
 | **Podman**     | ✅ (via CRI-O) | High           | High        | Medium      | Growing      |
 | **LXC/LXD**    | Limited     | High           | High        | Low         | Niche        |
 
-
-1. **Containerd**
+### 1. **Containerd**
 
 - `Features`:
   - Native CRI support, eliminating the need for a CRI plugin.
@@ -39,7 +40,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Lacks a native CLI for standalone use (requires tools like ctr or crictl).
   - Limited use outside Kubernetes and Docker ecosystems.
 
-2. **CRI-O**
+### 2. **CRI-O**
 
 - `Features`:
   - Built explicitly for Kubernetes with native CRI support.
@@ -53,7 +54,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Limited tooling compared to other runtimes.
   - Relatively new, with fewer integrations outside Kubernetes.
 
-3. **Docker (via dockershim, now deprecated)**
+### 3. **Docker (via dockershim, now deprecated)**
 
 - `Features`:
   - Comprehensive ecosystem with built-in image management and CLI tools.
@@ -66,7 +67,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Heavier compared to other runtimes.
   - Dockershim has been removed from Kubernetes since v1.24, requiring migration to alternatives like Containerd.
 
-4. **gVisor**
+### 4. **gVisor**
 
 - `Features`:
   - Focuses on enhanced security by isolating workloads using user-space kernel emulation.
@@ -78,7 +79,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Performance overhead compared to traditional runtimes.
   - Limited use cases where high performance is critical.
 
-5. **Kata Containers**
+### 5. **Kata Containers**
 
 - `Features`:
   - Combines lightweight VMs with the agility of containers.
@@ -91,7 +92,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Higher resource consumption and slower startup times.
   - Complex setup compared to traditional runtimes.
 
-6. **Mirantis Container Runtime (formerly Docker Engine - Enterprise)**
+### 6. **Mirantis Container Runtime (formerly Docker Engine - Enterprise)**
 
 - `Features`:
   - Focuses on enterprise-grade features like FIPS compliance and enhanced security.
@@ -103,7 +104,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Proprietary and commercial product.
   - Heavier footprint compared to open-source alternatives.
 
-7. Podman
+### 7. Podman
 
 - `Features`:
   - Daemonless and rootless container runtime.
@@ -117,7 +118,7 @@ tags: [DevOps, Orchestration, Kubernetes]
   - Limited native support as a standalone runtime in Kubernetes (used alongside CRI-O).
   - Smaller ecosystem compared to Docker.
 
-8. LXC/LXD
+### 8. LXC/LXD
 
 - `Features`:
   - System container management (running full Linux distributions).

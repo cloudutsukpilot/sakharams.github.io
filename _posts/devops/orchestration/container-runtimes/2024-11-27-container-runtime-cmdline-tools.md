@@ -1,15 +1,17 @@
 ---
 layout: post
-title: Container Runtime Command Line Tools
+title: Container Runtime - Command Line Tools
 categories: [devops, orchestration, kubernetes]
-tags: [DevOps, Orchestration, ContainerR]
+tags: [DevOps, Orchestration, Containers]
+image: /assets/img/devops/containers/container-posts.webp
+description: Explore the different container runtime command line tools and their usage.
 ---
 
 ## Introduction
 
 - Below are some of the command line tools used to interact with different container runtimes:
 
-1. **ctr**
+### 1. ctr
 
 - `Description`:
   - A low-level CLI tool for managing containers in containerd.
@@ -26,7 +28,7 @@ tags: [DevOps, Orchestration, ContainerR]
 - `Common Use Cases`:
   - Debugging and low-level operations on containerd.
 
-2. **nerdctl**
+### 2. nerdctl
 
 - `Description`:
   - A Docker-compatible CLI for containerd.
@@ -45,7 +47,8 @@ tags: [DevOps, Orchestration, ContainerR]
 - `Common Use Cases`:
   - Replacement for Docker CLI in containerd-based environments.
 
-3. **crictl**
+### 3. crictl
+
 - `Description`:
   - A CLI tool specifically for interacting with Kubernetes Container Runtime Interface (CRI).
   - Supports runtimes like containerd, CRI-O, and others with CRI implementations.
@@ -63,7 +66,7 @@ tags: [DevOps, Orchestration, ContainerR]
 - `Common Use Cases`:
   - Debugging and inspecting runtime issues in Kubernetes clusters.
 
-4. **Docker CLI**
+### 4. Docker CLI
 
 - `Description`:
   - Comprehensive CLI for Docker containers.
@@ -75,7 +78,7 @@ tags: [DevOps, Orchestration, ContainerR]
   - Tightly coupled to Docker Engine.
   - Heavy compared to alternatives.
 
-5. **Podman**
+### 5. Podman
 
 - `Description`:
   - A daemonless, Docker-compatible container CLI.
@@ -87,7 +90,7 @@ tags: [DevOps, Orchestration, ContainerR]
   - Smaller ecosystem compared to Docker.
   - Some compatibility issues with Docker Compose.
 
-6. **Buildah**
+### 6. Buildah
 
 - `Description`:
   - A CLI for building OCI-compliant images without requiring a container runtime.
@@ -98,7 +101,7 @@ tags: [DevOps, Orchestration, ContainerR]
   - Not a general-purpose container CLI.
   - Steeper learning curve for Docker users.
 
-7. **LXC CLI (lxc)**
+### 7. LXC CLI (lxc)
 
 - `Description`:
   - CLI for managing LXC containers (system containers).
@@ -108,7 +111,7 @@ tags: [DevOps, Orchestration, ContainerR]
 - `Cons`:
   - Not suitable for microservices or application-level containerization.
 
-8. **runc**
+### 8. runc
 
 - `Description`:
   - A low-level CLI for managing OCI-compliant containers.
@@ -119,7 +122,7 @@ tags: [DevOps, Orchestration, ContainerR]
   - Requires extensive manual configuration.
   - Not user-friendly or feature-rich.
 
-9. **Singularity**
+### 9. Singularity
 
 - `Description`:
   - A CLI for managing containers in high-performance computing (HPC) environments.
