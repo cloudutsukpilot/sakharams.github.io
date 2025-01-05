@@ -1,10 +1,16 @@
 # frozen_string_literal: true
 
-source "https://rubygems.org"
+source "http://rubygems.org"
 
 gem "jekyll-theme-chirpy", "~> 7.2", ">= 7.2.4"
 
 gem "html-proofer", "~> 5.0", group: :test
+
+gem 'csv'
+gem 'base64'
+gem 'logger'
+gem 'fiddle'
+gem 'benchmark'
 
 platforms :mingw, :x64_mingw, :mswin, :jruby do
   gem "tzinfo", ">= 1", "< 3"
@@ -12,3 +18,5 @@ platforms :mingw, :x64_mingw, :mswin, :jruby do
 end
 
 gem "wdm", "~> 0.2.0", :platforms => [:mingw, :x64_mingw, :mswin]
+
+

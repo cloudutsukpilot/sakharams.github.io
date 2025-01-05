@@ -2,6 +2,8 @@
 title: Jekyll - Build a Site with Chirpy Theme
 categories: [website, jekyll, chirpy]
 tags: [Website, Jekyll, Chirpy ]
+image: /assets/img/website/chirpy-posts.jpg
+description: Learn how to build a personal blog/site using the Jekyll Chirpy theme.
 ---
 
 ## Introduction

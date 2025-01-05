@@ -2,6 +2,7 @@
 title: Jekyll - Build a Site
 categories: [website, jekyll]
 tags: [Website, Jekyll ]
+image: /assets/img/website/chirpy-posts.jpg
 ---
 
 ## Introduction

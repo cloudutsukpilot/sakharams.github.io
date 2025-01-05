@@ -3,6 +3,8 @@ layout: post
 title: Cloud Native Architecture Fundamentals
 categories: [Cloud Native]
 tags: [Cloud Native, Architecture]
+image: /assets/img/cloudnative/cloudnative-posts.png
+description: Explore the key pillars, terms, advantages, and practical use cases of Cloud Native Architecture
 ---
 
 ## Cloud Native Architecture Fundamentals
@@ -13,13 +15,35 @@ In this blog, we will explore the key principles of cloud-native architecture, i
 
 ### What is Cloud-Native Architecture?
 
-![Cloud Native Architecture](/assets/img/cloudnative/cloud-native-architecture-latest-stack.png)
-
 - Cloud-native is an approach to building and running applications that fully leverage the advantages of cloud computing.
 - It involves designing systems that are optimized for scalability, resilience, and continuous delivery.
 - The goal is to enhance the flexibility, agility, and overall efficiency of developing, deploying, and maintaining applications.
-- The Cloud Native Computing Foundation (CNCF) promotes the use of cloud-native technologies, as described in its charter. 
+- The Cloud Native Computing Foundation (CNCF) promotes the use of cloud-native technologies, as described in its charter.
 - These technologies include `containerization`, `microservices`, `serverless functions`, and `Kubernetes`, all of which help developers build systems that are resilient, scalable, and easily managed in the cloud.
+
+### Key Pillars of Cloud Native Architecture
+
+![Cloud Native Architecture](/assets/img/cloudnative/cloud-native-architecture-latest-stack.png)
+
+1. **Microservices Architecture**
+
+    - Microservices architecture involves breaking down the application into loosely coupled, independently deployable components, each focusing on a single responsibility.
+    - This design enables agility, scalability, and resilience as each microservice can be developed, scaled, and managed independently.
+
+2. **Containerisation**
+
+    - Containerisation involves encapsulating an application with its dependencies into a container, which can run uniformly across different environments.
+    - It facilitates isolation, consistency, and efficiency, making applications easier to build, deploy, and manage.
+
+3. **DevOps**
+
+    - DevOps is a collaborative approach that combines software development (Dev) and IT operations (Ops) to enhance the efficiency, reliability, and speed of software delivery.
+    - By fostering a culture of excellence, DevOps emphasizes automation, monitoring, and collaboration across development and operations teams.
+
+4. **Continuous Delivery (CD)**
+
+    - Continuous Delivery is a practice where code changes are automatically built, tested, and prepared for a release to production.
+    - CD accelerates the release cycle, enhances productivity, and reduces the risk, complexity, and downtime of application deployment.
 
 ### Key Terms: Principles and Practices
 

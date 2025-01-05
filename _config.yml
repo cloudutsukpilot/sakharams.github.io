@@ -232,3 +232,6 @@ jekyll-archives:
   permalinks:
     tag: /tags/:name/
     category: /categories/:name/
+
+# Index Page - Short Summary instead of first 50 words
+excerpt_separator: "<!-- more -->"

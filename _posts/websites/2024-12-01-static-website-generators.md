@@ -2,6 +2,8 @@
 title: Static Website Generators
 categories: [website, jekyll]
 tags: [Website, Jekyll ]
+image: /assets/img/website/chirpy-posts.jpg
+description: What are Static Site Generators? Review few examples and use cases for static sites.
 ---
 
 ## Introduction

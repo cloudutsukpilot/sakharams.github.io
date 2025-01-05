@@ -3,11 +3,14 @@ layout: post
 title: Cloud Native Architecture Principles
 categories: [Cloud Native]
 tags: [Cloud Native, Architecture]
+image: /assets/img/cloudnative/cloudnative-posts.png
 ---
 
 ## Principles of Cloud-Native Architecture
 
 Cloud-native architecture is based on several guiding principles that help organizations leverage the full potential of the cloud:
+
+![Cloud Native Practices](/assets/img/cloudnative/cloud-native-practices.webp)
 
 1. **Microservices**
 

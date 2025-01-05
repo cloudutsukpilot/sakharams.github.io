@@ -3,6 +3,7 @@ layout: post
 title: Push a Docker Image to DockerHub
 categories: [devops, orchestration, docker]
 tags: [DevOps, Orchestration, Docker]
+image: /assets/img/devops/docker/docker-posts.jpg
 ---
 
 Prerequisites:

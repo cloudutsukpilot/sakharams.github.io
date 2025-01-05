@@ -263,9 +263,7 @@ gantt
     5    : 0, 5
 ```
 
-
 ### Liquid
-
 
 {% raw %}
 ```liquid
@@ -274,3 +272,8 @@ gantt
 {% endif %}
 ```
 {% endraw %}
+
+### Refernces
+
+- [Writing a New Post](https://chirpy.cotes.page/posts/write-a-new-post/)
+- [Text and Typography](https://chirpy.cotes.page/posts/text-and-typography/)

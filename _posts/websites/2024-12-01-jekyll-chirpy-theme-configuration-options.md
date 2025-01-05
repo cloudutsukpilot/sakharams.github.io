@@ -2,6 +2,7 @@
 title: Jekyll Chirpy Theme - Configuration Options
 categories: [website, jekyll, chirpy]
 tags: [Website, Jekyll, Chirpy ]
+image: /assets/img/website/chirpy-posts.jpg
 ---
 
 ## Introduction

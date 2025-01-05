@@ -3,6 +3,8 @@ layout: post
 title: Git - Manage Multiple Accounts
 categories: [devops, git]
 tags: [DevOps, Git]
+image: /assets/img/devops/git/git-posts.png
+description: Learn how to manage multiple git accounts on the same host.
 ---
 
 

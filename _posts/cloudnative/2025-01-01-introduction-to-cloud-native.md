@@ -3,6 +3,7 @@ layout: post
 title: Introduction to Cloud Native
 categories: [Cloud Native]
 tags: [Cloud Native, Architecture]
+image: /assets/img/cloudnative/cloudnative-posts.png
 ---
 
 ## Cloud Native
@@ -18,7 +19,7 @@ tags: [Cloud Native, Architecture]
 1. `Scalable`: Designed to scale horizontally by adding more instances rather than vertically by upgrading hardware.
 2. `Resilient`: Built with fault tolerance in mind, ensuring high availability even during failures.
 3. `Dynamic`: Capable of adapting to varying workloads and environments.
-4. `Containerized`: Packaged in containers to ensure consistency across development, testing, and production. 
+4. `Containerized`: Packaged in containers to ensure consistency across development, testing, and production.
 
 Cloud-native applications are typically developed using microservices architectures and deployed in environments orchestrated by platforms like Kubernetes.
 
@@ -38,7 +39,7 @@ Cloud-native applications are typically developed using microservices architectu
 
 ### Relation with the Linux Foundation and CNCF
 
-- The Linux Foundation, a non-profit organization fostering open-source innovation, created the Cloud Native Computing Foundation (CNCF) in 2015. 
+- The Linux Foundation, a non-profit organization fostering open-source innovation, created the Cloud Native Computing Foundation (CNCF) in 2015.
 - CNCF serves as the steward for cloud-native technologies, hosting and governing many critical projects, including Kubernetes, Prometheus, and Envoy.
 
 - **CNCF’s Role**

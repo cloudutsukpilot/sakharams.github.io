@@ -3,6 +3,7 @@ layout: post
 title: Git Commands - CMDsheet
 categories: [devops, git, git commands]
 tags: [DevOps, Git, Git Commands, CMDsheet]
+image: /assets/img/devops/git/git-posts.png
 ---
 
 

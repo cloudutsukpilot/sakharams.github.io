@@ -2,8 +2,8 @@
 title: Set Up Google AdSense in Your Jekyll Chirpy Site
 categories: [website, analytics]
 tags: [Website, Analytics, Web Development, Google AdSense]
-image: /assets/img/website/google-jekyll.webp
-alt: "Jekyll - Google AdSense" 
+image: /assets/img/website/chirpy-google-adsense.png
+description: Configuration changes required to integrate Google AdSense into your Jekyll Site(Chirpy Theme)
 ---
 
 ## Introduction

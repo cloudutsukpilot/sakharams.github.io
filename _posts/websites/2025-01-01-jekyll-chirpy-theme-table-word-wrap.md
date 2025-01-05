@@ -2,6 +2,8 @@
 title: Jekyll Chirpy Theme - Word Wrap in Tables
 categories: [website, jekyll, chirpy]
 tags: [Website, Jekyll, Chirpy ]
+image: /assets/img/website/chirpy-posts.jpg
+description: Configuration changes required to enable word wrap in the .md tables.
 ---
 
 ## Enabling Word Wrap in Tables in Jekyll Chirpy Theme
@@ -58,8 +60,8 @@ bundle exec jekyll serve
 
 ### Solution 2: Enabling Word Wrap in Table Cells
 
-- As we are using @import in the above solution, we get a warning "Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0".
-- To fix these warning, I have used the below code in the jekyll-theme-chirpy.scss file and it is working without any warnings on jekyll-theme-chirpy version 7.2.4.
+- As we are using @import in the above solution, a warning "Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0" will be displayed after executing `jekyll serve`.
+- To fix this warning, I have used the below code in the `jekyll-theme-chirpy.scss` file and it is working without any warnings on jekyll-theme-chirpy version `7.2.4`.
 
 ```scss
 ---
