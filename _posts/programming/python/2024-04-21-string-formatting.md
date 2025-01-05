@@ -3,6 +3,7 @@ layout: post
 title: Python - String Formatting
 categories: [Programming, python]
 tags: [Python]
+image: /assets/img/programming/python/python-posts.png
 ---
 
 

@@ -3,6 +3,7 @@ layout: post
 title: Introduction to Python
 categories: [Programming, python]
 tags: [Python]
+image: /assets/img/programming/python/python-posts.png
 ---
 
 #### Variables

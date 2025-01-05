@@ -3,6 +3,7 @@ layout: post
 title: Python - Control Statements
 categories: [Programming, python]
 tags: [Python]
+image: /assets/img/programming/python/python-posts.png
 ---
 
 #### Control Statements:

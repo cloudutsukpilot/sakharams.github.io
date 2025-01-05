@@ -3,6 +3,8 @@ layout: post
 title: Python - Setup Virtual Environment in Windows and Linux
 categories: [Programming, python]
 tags: [Python]
+image: /assets/img/programming/python/python-posts.png
+description: Step-by-Step instructions on creating a python virtual environment in different operating systems.
 ---
 
 ## Introduction
