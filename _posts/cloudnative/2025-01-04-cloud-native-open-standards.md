@@ -2,7 +2,7 @@
 layout: post
 title: Cloud Native - Open Standards
 categories: [Cloud Native]
-tags: [Cloud Native, Architecture]
+tags: [Cloud Native]
 image: /assets/img/cloudnative/cloudnative-posts.png
 description: This blog explains Open Standards and key container-related specifications - OCI for image/container formats, CNI for networking, CRI for runtime interfaces, CSI for storage, and SMI for service mesh integration.
 ---

@@ -2,7 +2,7 @@
 layout: post
 title: Cloud Native - Auto Scaling
 categories: [Cloud Native]
-tags: [Cloud Native, Architecture]
+tags: [Cloud Native]
 image: /assets/img/cloudnative/cloudnative-posts.png
 ---
 

@@ -2,7 +2,7 @@
 layout: post
 title: Cloud Native Kubernetes Certifications
 categories: [Cloud Native]
-tags: [Cloud Native, Architecture]
+tags: [Cloud Native, Kubernetes]
 image: /assets/img/devops/orchestration/kubernetes/kubernetes-posts.png
 description: Explore all the Kubernetes certifications to become a Kubestronaut.
 ---
