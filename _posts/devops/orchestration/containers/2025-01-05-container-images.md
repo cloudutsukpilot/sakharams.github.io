@@ -4,7 +4,7 @@ title: Container Images
 categories: [devops, orchestration, containers]
 tags: [DevOps, Orchestration, Containers]
 image: /assets/img/devops/containers/container-posts.webp
-description: In this blog, we'll explore container images, their importance, and related concepts like registries, tags, layers, union filesystems, and more.
+description: Explore container images & their importance, related concepts like registries, tags, layers, union filesystems, and more.
 ---
 
 ## Demystifying Container Images: Understanding the Backbone of Containerization

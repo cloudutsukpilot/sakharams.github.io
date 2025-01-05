@@ -4,6 +4,7 @@ title: Docker Commands CMDsheet
 categories: [devops, orchestration, docker, cmdsheet]
 tags: [DevOps, Orchestration, Docker, CMDsheet]
 image: /assets/img/devops/docker/docker-posts.jpg
+description: Mostly used commands for docker operations.
 ---
 
 
