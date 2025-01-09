@@ -87,6 +87,27 @@ description: What are containers? Explore the evolution, benefits and use cases 
     - It uses `Linux namespaces` for process isolation and cgroups for resource management and limits.
     - Docker’s simplicity allowed developers to package applications and dependencies into lightweight, portable containers, ensuring consistency across environments.
 
+
+### Containers v/s Virtual Machines/HyperVisor
+
+![Container vs Virtual Machines](/assets/img/devops/containers/containers-vs-virtualmachines.png)
+
+| **Aspect**                  | **Container**                                           | **Hypervisor (VM)**                                      |
+|-----------------------------|---------------------------------------------------------|----------------------------------------------------------|
+| **Definition**               | A lightweight, portable unit of software that packages an application and its dependencies together. | A platform that allows multiple operating systems to run on a single physical machine. Each OS is isolated within its own virtual machine. |
+| **Isolation**                | Uses OS-level virtualization, sharing the same kernel but isolating processes. | Uses hardware-level virtualization, with each VM running its own OS kernel. |
+| **Resource Efficiency**      | More efficient as containers share the host OS kernel. Minimal overhead. | VMs are more resource-intensive due to running separate OS kernels for each VM. |
+| **Start-up Time**            | Fast start-up time, usually in seconds.               | Slower start-up time, as VMs need to boot an entire OS. |
+| **Performance**              | Typically better performance due to low overhead from shared kernel. | Performance overhead due to running separate operating systems for each VM. |
+| **Portability**              | Highly portable, as containers can run on any system with the same container runtime. | Less portable, as VMs require a hypervisor to run on the host system. |
+| **Use Cases**                | Ideal for microservices, stateless applications, CI/CD pipelines, and cloud-native apps. | Best for running legacy applications, multi-OS environments, or scenarios where OS-level isolation is needed. |
+| **Management Tools**         | Docker, Podman, containerd, nerdctl, Kubernetes.       | VMware, Hyper-V, KVM, VirtualBox.                        |
+| **Hardware Requirements**    | Uses less hardware resources compared to VMs.         | Requires more hardware resources for each VM since each VM runs a separate OS. |
+| **Security**                 | Shared kernel can lead to potential security risks; container isolation is weaker compared to VMs. | Stronger isolation with separate kernels for each VM, but more resource consumption. |
+| **Runtime**                  | Managed by container runtimes like Docker, containerd, and others. | Managed by hypervisors like KVM, VMware, Hyper-V.        |
+| **Operating System Support** | Can run on any OS with the appropriate container runtime installed. | Each VM runs its own complete OS, which can be different from the host OS. |
+| **Use of Host Resources**    | Containers share resources (CPU, memory, etc.) with the host. | Each VM consumes dedicated resources like CPU and memory for the entire guest OS. |
+
 ### Benefits of Containers
 
 - Containers offer several benefits that make them popular in the software industry:
