@@ -1,8 +1,8 @@
 ---
 layout: page
-title: Artificial Intelligence (AI)
+title: AI & ML
 icon: fas fa-cloud
-order: 6
+order: 7
 ---
 
 ### Introduction:
@@ -24,7 +24,7 @@ There are different types of AI, each with its own characteristics, applications
 
 3. Superintelligent AI 
     - Refers to AI systems that surpass human intelligence and have the ability to outperform humans in virtually every cognitive task. 
-    
+
 4. Hybrid AI systems 
     - Combine multiple AI techniques, such as machine learning, expert systems, and natural language processing, to achieve better performance and flexibility.
 

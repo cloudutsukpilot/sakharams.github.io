@@ -2,7 +2,7 @@
 layout: page
 title: DevOps
 icon: fas fa-cloud
-order: 4
+order: 5
 ---
 
 

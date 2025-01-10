@@ -2,17 +2,32 @@
 layout: page
 title: About Me
 icon: fas fa-info-circle
-order: 10
+order: 12
 ---
 
 
-My name is Sakharam Shinde and I am a Cloud, DevOps & Security Architect.
+I'm Sakharam Shinde, a `Cloud & DevSecOps Architect` with a passion for designing and implementing cutting-edge solutions to drive business success.
 
-As a *Cloud, DevOps & Security Architect*, I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. With 13 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. I am certified in various domains of Cloud, DevOps, and Security, which has significantly contributed to my development as an architect.
+📝 With 13 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. I am certified in various domains of Cloud, DevOps, and Security, which has significantly contributed to my development as an architect.
+
+### 💼 Day to day, I work with
+
+- **Kubernetes** - managing container orchestration and scaling applications seamlessly.
+-- **Docker** - building, shipping, and running containerized applications.
+- **Python** - developing scripts, automations, and backend services.
+- **GitHub Enterprise** - collaborating on code, managing repositories, and streamlining workflows.
+- **Monitoring** - tracking application performance and infrastructure health using tools like Prometheus and Grafana.
+- **Improving DevOps Performance Using DORA Metrics** - analyzing lead time, deployment frequency, and MTTR to optimize delivery.
+- **Developing Internal Portal Experience Using Backstage.io** - creating a centralized developer portal to enhance productivity and collaboration.
+- **Onboarding Networking Devices into IaC** - automating network infrastructure management with Infrastructure as Code practices.
+- **Terraform** - provisioning and managing cloud infrastructure efficiently with code.
+- **Learning Series for DevOps** - conducting training sessions to share best practices and build team expertise.
+- **DevSecOps** - integrating security checks into CI/CD pipelines to ensure secure and compliant deployments.
+- but mostly, I work with people on all of the above! 💖
 
 You can reach out to me on [LinkedIn](https://www.linkedin.com/in/sakharamshinde/) or checkout my blog where I share my learnings and experiences.
 
-As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud, DevOps & Security.
+🌱 As an open-source enthusiast , I am active on GitHub/GitLab and have hosted few of my projects providing step-by-step instructions to setup and deploy them to understand different tools used in Cloud, DevOps & Security.
 
 ### Certifications
 

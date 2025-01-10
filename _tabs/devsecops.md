@@ -2,7 +2,7 @@
 layout: page
 title: DevSecOps
 icon: fas fa-cloud
-order: 5
+order: 6
 ---
 
 ### What is DevSecOps?

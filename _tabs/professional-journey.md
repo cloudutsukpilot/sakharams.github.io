@@ -6,6 +6,7 @@ order: 11
 ---
 
 ### Table of Contents
+
 1. [Introduction](#introduction)
 2. [Career Timeline](#a_0)
 3. [Skills and Competencies](#skills-and-competencies)
@@ -17,6 +18,7 @@ order: 11
 9. Conclusion
 
 ### Introduction
+
 - As a *Cloud, DevOps & Security Architect*, I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. 
 - With ~13 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. 
 - I hold certifications across Cloud, DevOps, and Security domains, which have played a crucial role in my growth as an architect.
@@ -74,28 +76,27 @@ order: 11
 | `Datavail Infotech, Mumbai`  | Senior Database Administrator | Feb 2017 | Sep 2017 | 7 Months |
 | `Wipro, Navi Mumbai`             | Technical Consultant  | Oct 2011 | Feb 2017 | 5 Yrs. 4 Months |
 
-
 ### Skills and Competencies
 
 - **Technical Skills**
 
-| Category | Tools & Technlogies | 
+| Category | Tools & Technlogies |
 | -------- | ------------------- |
 | `Cloud` | AWS, Azure, GCP |
-| `Orchestration Tools` | Docker, Kubernetes, AKS, EKS, GKE, Git, Helm | 
-| `Security` | SonarQube, Qualys, Trivy, Microsoft Defender, Azure Sentinel, Falco | 
-| `CI/CD` | Azure DevOps, Jenkins, GitLab CI/CD, GitHub Actions, Argo CD, Jenkins | 
-| `Infrastructure as Code` | 	Terraform, ARM, AWS CloudFormation | 
+| `Orchestration Tools` | Docker, Kubernetes, AKS, EKS, GKE, Git, Helm |
+| `Security` | SonarQube, Qualys, Trivy, Microsoft Defender, Azure Sentinel, Falco |
+| `CI/CD` | Azure DevOps, Jenkins, GitLab CI/CD, GitHub Actions, Argo CD, Jenkins |
+| `Infrastructure as Code` | Terraform, ARM, AWS CloudFormation |
 | `Configuration Management` | Ansible, Puppet |
-| `Automation/Scripting` | PowerShell, Shell Scripting, Python | 
-| `Monitoring Tools` | Prometheus, Grafana, Datadog, Loki, Splunk, fluentd, Jaeger, OpenTelemetry, OpenMetrics | 
-| `Database` | Microsoft SQL Server, PostgreSQL | 
-| `Virtualization` | Hyper-V, VMWare, Docker | 
-| `Operating Systems` | Windows Server, Linux (Ubuntu, CentOS) | 
-| `ITSM Tools` | ServiceNow, JIRA | 
-| `IAM` | Active Directory/Entra ID, ADFS, DirSync, DNS, DHCP, SSO | 
-| `Mail & Calendar Services` | Exchange Server, Office 365, EAS | 
-| `AI Tools` | ChatGPT, GitHub Copilot, Azure AI Services | 
+| `Automation/Scripting` | PowerShell, Shell Scripting, Python |
+| `Monitoring Tools` | Prometheus, Grafana, Datadog, Loki, Splunk, fluentd, Jaeger, OpenTelemetry, OpenMetrics |
+| `Database` | Microsoft SQL Server, PostgreSQL |
+| `Virtualization` | Hyper-V, VMWare, Docker |
+| `Operating Systems` | Windows Server, Linux (Ubuntu, CentOS) |
+| `ITSM Tools` | ServiceNow, JIRA |
+| `IAM` | Active Directory/Entra ID, ADFS, DirSync, DNS, DHCP, SSO |
+| `Mail & Calendar Services` | Exchange Server, Office 365, EAS |
+| `AI Tools` | ChatGPT, GitHub Copilot, Azure AI Services |
 
 <br/>
 
@@ -188,7 +189,7 @@ order: 11
         src="/assets/img/certifications/GenAI-ML_Advanced.png"
         class="img-fluid"
         />
-    </div>    
+    </div>
     </div>
 </div>
 <!-- Certifications End -->
