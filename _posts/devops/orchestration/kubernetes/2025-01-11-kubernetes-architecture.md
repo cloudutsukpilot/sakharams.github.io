@@ -1,13 +1,13 @@
 ---
 layout: post
-title: Kubernetes - Architecture
+title: ☸️ Kubernetes - Architecture
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
 image: /assets/img/devops/orchestration/kubernetes/kubernetes-architecture.png
 description: What elements make Kubernetes the most comprehensive and powerful container orchestration platform?
 ---
 
-## Kubernetes Architecture
+## ☸️ Kubernetes Architecture
 
 Kubernetes (K8s) is an open-source platform designed to automate the deployment, scaling, and operation of application containers. Understanding the architecture of Kubernetes helps in comprehending how it orchestrates containerized workloads effectively.
 
