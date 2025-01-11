@@ -2,7 +2,7 @@
 layout: post
 title: Container Images
 categories: [devops, orchestration, containers]
-tags: [DevOps, Orchestration, Containers]
+tags: [DevOps, Containers]
 image: /assets/img/devops/containers/container-posts.webp
 description: Explore container images & their importance, related concepts like registries, tags, layers, union filesystems, and more.
 ---

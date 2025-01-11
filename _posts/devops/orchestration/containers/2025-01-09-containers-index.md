@@ -1,16 +1,16 @@
 ---
 layout: post
-title: Containers - Index
+title: Containers - Guide
 categories: [devops, orchestration, containers]
-tags: [DevOps, Orchestration, Containers, Index]
+tags: [DevOps, Containers, Guide]
 image: /assets/img/devops/containers/container-posts.webp
 description: Index of all articles related to Containers
 ---
 
-## Index
+## Containers Documentation Index
 
-- [Introduction to Containers](/_posts/devops/orchestration/containers/introduction-to-containers/)
-- [Container Runtimes](/_posts/devops/orchestration/containers/container-runtimes)
-- [Container Images](/_posts/devops/orchestration/containers/container-volumes)
-- [Container Volumes](/_posts/devops/orchestration/containers/container-images)
-- [Container Networking Services](/_posts/devops/orchestration/containers/container-networking-services)
+- [Introduction to Containers](/posts/devops/orchestration/containers/introduction-to-containers/)
+- [Container Runtimes](/posts/devops/orchestration/containers/container-runtimes)
+- [Container Images](/posts/devops/orchestration/containers/container-volumes)
+- [Container Volumes](/posts/devops/orchestration/containers/container-images)
+- [Container Networking Services](/posts/devops/orchestration/containers/container-networking-services)

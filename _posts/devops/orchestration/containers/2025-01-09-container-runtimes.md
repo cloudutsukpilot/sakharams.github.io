@@ -2,7 +2,7 @@
 layout: post
 title: Container Runtimes
 categories: [devops, orchestration, containers]
-tags: [DevOps, Orchestration, Containers]
+tags: [DevOps, Containers]
 image: /assets/img/devops/containers/container-posts.webp
 description: What are container runtimes? How do they compare with Hypervisor and its use cases?
 ---

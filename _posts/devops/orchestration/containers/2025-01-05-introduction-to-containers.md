@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Containers
 categories: [devops, orchestration, containers]
-tags: [DevOps, Orchestration, Containers]
+tags: [DevOps, Containers]
 image: /assets/img/devops/containers/container-posts.webp
 description: What are containers? Explore the evolution, benefits and use cases of containers.
 ---

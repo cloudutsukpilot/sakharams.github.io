@@ -28,7 +28,7 @@ image: /assets/img/website/chirpy-posts.jpg
 
 ### Themes
 
-- The Jekyll server uses a default theme called `minima` for generating the website. 
+- The Jekyll server uses a default theme called `minima` for generating the website.
 - You can find the location of the theme using the below command:
 
     ```sh
@@ -39,5 +39,3 @@ image: /assets/img/website/chirpy-posts.jpg
     > bundle show minima
     C:/Ruby31-x64/lib/ruby/gems/3.1.0/gems/minima-2.5.2
     ```
-
-- 

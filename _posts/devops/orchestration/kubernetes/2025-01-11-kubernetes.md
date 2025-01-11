@@ -3,6 +3,8 @@ layout: post
 title: Introduction to Kubernetes
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
+image: /assets/img/devops/orchestration/kubernetes/kubernetes-posts.png
+description: Why Kubernetes is the most popular container orchestration tool?
 ---
 
 ## Introduction

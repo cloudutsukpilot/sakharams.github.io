@@ -2,7 +2,7 @@
 layout: post
 title: Container Volumes
 categories: [devops, orchestration, containers]
-tags: [DevOps, Orchestration, Containers]
+tags: [DevOps, Containers]
 image: /assets/img/devops/containers/container-posts.webp
 description: In this blog, we'll explore container volumes and their types.
 ---
