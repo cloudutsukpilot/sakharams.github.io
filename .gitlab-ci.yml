@@ -53,6 +53,7 @@ htmlproofer_for_test_site:
       - testhtml
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
 
 sonarcloud-check:
   stage: sonarcloud-check

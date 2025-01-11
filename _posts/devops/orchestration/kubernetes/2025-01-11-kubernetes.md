@@ -19,7 +19,7 @@ description: Why Kubernetes is the most popular container orchestration tool?
 
 ### Cluster Architecture
 
-![Kubernetes Cluster Architecture](/assets/img/devops/orchestration/kubernetes/kubernetes-cluster-architecture.svg)
+![Kubernetes Cluster Architecture](/assets/img/devops/orchestration/kubernetes/kubernetes-architecture.svg)
 
 - `Nodes`
   - Kubernetes runs your workload by placing containers into Pods to run on Nodes.

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Kubernetes Commands CMDsheet
-categories: [devops, orchestration, kubernetes, cmdsheet]
+categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes, CMDsheet]
 ---
 
