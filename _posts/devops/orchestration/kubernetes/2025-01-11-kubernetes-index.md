@@ -24,7 +24,7 @@ description: Index Page for Kubernetes Articles
 
 ### Workloads
 
-- Pods
+- [Pods](/posts/devops/orchestration/kubernetes/kubernetes-pods)
 - ReplicaSets
 - Deployments
 - StatefulSets

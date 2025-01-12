@@ -3,6 +3,8 @@ layout: post
 title: Kubernetes Commands CMDsheet
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes, CMDsheet]
+image: /assets/img/devops/orchestration/kubernetes/kubectl-commands.png
+description: Kubectl Commands Quick Reference
 ---
 
 #### Cluster Management
@@ -144,12 +146,28 @@ tags: [DevOps, Orchestration, Kubernetes, CMDsheet]
 
 - In Kubectl you can specify optional flags with commands. Here are some of the most common and useful ones.
 
-| `-o` | Output format |  For example if you wanted to list all of the pods in ps output format with more information. kubectl get pods -o wide |
-| `-n` | Shorthand for --namespace |  For example, if you’d like to list all the Pods in a specific Namespace you would do this command: kubectl get pods -n=[namespace_name] |
-| `-f` | Filename, directory, or URL to files to use to create a resource. |  For example when creating a pod using data in a file named newpod.json. kubectl create -f ./newpod.json |
-| `-l` | Selector to filter on, supports ‘=’, ‘==’, and ‘!=’. | Example: |
-| `-h` | Help for kubectl | Example: kubectl get pods -h |
-| `--dry-run=client` | Used to preview the changes without applying |
+| **Parameter**         | **Description**                                                                                     | **Example**                                                                                   |
+|------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `-o`                  | Output format. Options include `wide`, `json`, `yaml`, etc.                                         | `kubectl get pods -o wide`                                                                    |
+| `-n`                  | Shorthand for `--namespace`. Specifies the namespace for the command.                               | `kubectl get pods -n [namespace_name]`                                                       |
+| `-f`                  | Filename, directory, or URL to files to create, delete, or update resources.                        | `kubectl apply -f ./newpod.yaml`                                                             |
+| `-l`                  | Selector to filter resources based on labels. Supports `=`, `==`, and `!=`.                         | `kubectl get pods -l app=nginx`                                                              |
+| `-h`                  | Help for the command. Displays usage instructions and options.                                      | `kubectl get pods -h`                                                                         |
+| `--dry-run=client`    | Preview the changes without applying them.                                                          | `kubectl apply -f ./deployment.yaml --dry-run=client`                                        |
+| `--all`               | Operate on all resources of a specific type in all namespaces.                                      | `kubectl delete pods --all`                                                                  |
+| `--context`           | Specify the Kubernetes context to use for the command.                                              | `kubectl get pods --context=my-cluster-context`                                              |
+| `--watch`             | Watch for changes to a resource and stream updates to the terminal.                                 | `kubectl get pods --watch`                                                                   |
+| `--field-selector`    | Filter resources based on specific fields.                                                          | `kubectl get pods --field-selector=status.phase=Running`                                     |
+| `--sort-by`           | Sort resources by a specific field.                                                                 | `kubectl get pods --sort-by=.metadata.name`                                                  |
+| `--force`             | Force the action, such as deleting a resource without graceful termination.                         | `kubectl delete pod mypod --force`                                                           |
+| `--kubeconfig`        | Specify a custom kubeconfig file to use for the command.                                            | `kubectl get pods --kubeconfig=/path/to/kubeconfig`                                          |
+| `--output=jsonpath`   | Customize the output by specifying a JSONPath expression.                                           | `kubectl get pods -o jsonpath='{.items[*].metadata.name}'`                                   |
+| `--timeout`           | Time to wait for a command to complete.                                                             | `kubectl wait --for=condition=ready pod mypod --timeout=30s`                                 |
+| `--all-namespaces`    | Operate on all namespaces for the command.                                                          | `kubectl get pods --all-namespaces`                                                          |
+| `--as`                | Impersonate a specific user for the command.                                                        | `kubectl get pods --as=admin`                                                                |
+| `--token`             | Specify a Bearer Token for authentication.                                                          | `kubectl get pods --token=abcdef123456`                                                      |
+| `--limit`             | Limit the number of resources returned.                                                             | `kubectl get pods --limit=5`                                                                 |
+
 
 ### Imperative Approach Commands
 

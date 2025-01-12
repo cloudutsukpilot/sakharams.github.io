@@ -14,7 +14,7 @@ description: What are container runtimes? How do they compare with Hypervisor an
 
 ### What are Container Engines?
 
-- A container engine is a higher-level software that manages containers. 
+- A container engine is a higher-level software that manages containers.
 - It provides the user interface, orchestration, and management capabilities for interacting with containers.
 - It often includes features like building, managing, and running containers, and sometimes even networking and storage management.
 - Example: `Docker Engine`
@@ -23,7 +23,7 @@ description: What are container runtimes? How do they compare with Hypervisor an
 
 - A container runtime is the underlying component responsible for actually running and managing containers on the host system.
 - It is responsible for the low-level tasks such as container lifecycle management (starting, stopping, and running containers), resource isolation (using namespaces and cgroups), and managing execution environments.
-- Container runtime acts as a middle layer between the host OS and container instances. 
+- Container runtime acts as a middle layer between the host OS and container instances.
 - Example: `containerd`, `CRI-O`, `runc`
 
 ### Responsibilities of Container Engine v/s Runtimes
@@ -40,7 +40,6 @@ description: What are container runtimes? How do they compare with Hypervisor an
 | **Storage**                | Manages container storage and volume management.    | Not responsible for storage, uses external systems integrated by the engine. |
 | **Orchestration**          | Orchestrates container deployment, scaling, and management (e.g., in Kubernetes or Docker Swarm). | Does not handle orchestration, relies on container engines or orchestration systems like Kubernetes. |
 | **Example**                | Docker Engine, Podman, Docker Compose                 | containerd, runc, CRI-O, Kata Containers                 |
-
 
 ### Container Runtimes Categories
 
@@ -80,7 +79,6 @@ description: What are container runtimes? How do they compare with Hypervisor an
 - Similar to Docker and Podman, CRI-O offers features such as container isolation, image management, and container lifecycle management.
 - However, CRI-O is specifically tailored for Kubernetes deployments and is optimized for use within the Kubernetes ecosystem.
 - It provides a minimal footprint, improved security, and compatibility with container images that adhere to the Open Container Initiative (OCI) standards.
-
 
 ### Low-Level Container Runtimes
 
@@ -126,16 +124,24 @@ description: What are container runtimes? How do they compare with Hypervisor an
 | Provide fast startup times                               | Suitable for scenarios where strict isolation is a priority  |
 | Suitable for most container workloads                    | Typically used in scenarios requiring strong isolation and security. |
 
-
 ### Uses Cases for Container Runtimes
 
 - Here are some of the widely used container runtimes and their associated use cases:
 
-| Docker | 	Containerd | CRI-O | rocket(rkt) | 
-| ------ | ----------- | ----- | ----------- | 
-| Development and testing environments	| Designed to be lightweight and focuses on executing containers reliably and efficiently | 	It is specifically designed to work with Kubernetes | Developed by CoreOS (now part of Red Hat) | 
-| Enables the deployment of individual microservices | It is the default container runtime in Kubernetes | Provides a runtime environment optimized for Kubernetes-specific use cases | rkt emphasizes strong security features, such as container signature verification and isolation mechanisms | 
-| Often used in CI/CD workflows | Can be used in container orchestration | | Security-focused deployments | 
-| Deploying applications across different cloud providers or hybrid environments | It aims to provide a minimal runtime | | | 
+| Docker | Containerd | CRI-O | rocket(rkt) |
+| ------ | ---------- | ----- | ----------- |
+| Development and testing environments | Designed to be lightweight and focuses on executing containers reliably and efficiently | It is specifically designed to work with Kubernetes | Developed by CoreOS (now part of Red Hat) | 
+| Enables the deployment of individual microservices | It is the default container runtime in Kubernetes | Provides a runtime environment optimized for Kubernetes-specific use cases | rkt emphasizes strong security features, such as container signature verification and isolation mechanisms |
+| Often used in CI/CD workflows | Can be used in container orchestration | | Security-focused deployments |
+| Deploying applications across different cloud providers or hybrid environments | It aims to provide a minimal runtime | | |
 
+### List of Tools and Container Runtimes
 
+| **Method**        | **Tool/Option**                     | **Description**                                                                                                    | **Example Command**                                                                                                           | **Container Runtime**            |
+|-------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------|
+| **1. Docker**      | `docker`                            | A platform for developing, shipping, and running containers. Uses `docker` CLI to build images and run containers.   | Build image: `docker build -t mywebsite .`<br>Run container: `docker run -d -p 8080:80 mywebsite`                               | Docker Engine                    |
+| **2. nerdctl**     | `nerdctl`                           | A tool for managing containers with `containerd`, mimics Docker's functionality but uses `containerd` as the runtime. | Build image: `nerdctl build -t mywebsite .`<br>Run container: `nerdctl run -d -p 8080:80 mywebsite`                           | containerd                       |
+| **3. Podman**      | `podman`                            | A container engine compatible with Docker, but rootless and daemonless, often used as an alternative to Docker.      | Build image: `podman build -t mywebsite .`<br>Run container: `podman run -d -p 8080:80 mywebsite`                             | Podman                           |
+| **4. Buildah**     | `buildah`                           | A tool for building OCI and Docker container images, often used with Podman but works independently of Docker.        | Build image: `buildah bud -t mywebsite .`<br>Run container: `podman run -d -p 8080:80 mywebsite`                             | Podman, Containerd               |
+| **5. Kubernetes**  | `kubectl`                           | Orchestrates containerized applications, can manage container images and run them as Pods in clusters.               | Deploy to Kubernetes: `kubectl run mywebsite --image=mywebsite:latest`<br>Expose service: `kubectl expose pod mywebsite --type=NodePort`  | containerd / Docker (Kubernetes runtime) |
+| **6. Docker Compose** | `docker-compose`                   | A tool for defining and running multi-container Docker applications. Often used for complex setups.                 | Build and run with Compose: `docker-compose up --build`                                                                       | Docker Engine                    |
