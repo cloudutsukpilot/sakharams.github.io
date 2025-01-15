@@ -52,6 +52,8 @@ Effective branching strategies are essential in software development to manage t
 
 6. **Trunk-Based Development**
 
+     ![Trunk Based Development](/assets/img/devops/git/trunk-based-development.jpg)
+
     - All developers commit to a single trunk (main) branch frequently. Short-lived branches for features are common but are merged daily or within a few hours.
     - Use Case:
       - Agile teams focusing on continuous integration.
