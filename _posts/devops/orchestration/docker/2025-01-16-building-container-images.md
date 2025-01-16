@@ -9,6 +9,12 @@ description:
 
 ## Building Container Images
 
+### Docker Commands
+
+- Below are the different command available to build an docker image:
+
+
+
 ### Nginx Source Code: Compile and Build into a Container Image
 
 - To start, we need to compile the Nginx source code and build it into a container image. Here are the steps:
