@@ -7,7 +7,7 @@ tags: [DevOps, Git, Github, SSH]
 
 ### Switch Repository from HTTPS to SSH
 
-1. Copoy the public from your laptop using the below command:
+1. Copy the public from your laptop using the below command:
 
     ```bash
     cat ~/.ssh/id_rsa.pub
@@ -26,8 +26,6 @@ tags: [DevOps, Git, Github, SSH]
     Enter same passphrase again:
     ```
 
-
-
 3. Once the key is generated, copy the content of the public key using the command provided in step 1. 
 
 4. Upload the key to your github profile:
@@ -43,12 +41,12 @@ tags: [DevOps, Git, Github, SSH]
     git clone git@github.com:<profilename>/<reponame>.github.io.git
     ```
 
-6. If you have multiple organisations which use MFA for authentication, you can click on 'Configure SSO' next to the recently added SSH key and authorize it for all or specific organisations.
+6. If you have multiple organizations which use MFA for authentication, you can click on 'Configure SSO' next to the recently added SSH key and authorize it for all or specific organizations.
 
-<br />
 ### Switch from HTTPS to SSH Authentication
 
 1. Confirm if the current authentication to your github repository is using HTTPS:
+
     ```bash
     $ git remote -v
     origin  https://github.com/<profilename>/<reponame>.github.git (fetch)
@@ -56,18 +54,23 @@ tags: [DevOps, Git, Github, SSH]
     ```
 
 2. Remove the existing remote origin whcih contains the https configuration:
+
     ```bash
     git remote rm origin
     ```
 
 3. Add the new remote origin wiht the new ssh configuration:
+
     ```bash
     git remote add origin git@github.com:<prfilename>/<reponame>.github.git
     ```
 
 4. Confirm if the git has changed to new ssh conighration:
+
     ```bash
     $ git remove -v
     origin  git@github.com:<profilename>/<reponame>.github.io.git (fetch)
     origin  git@github.com:<profilename>/<reponame>.github.io.git (push)
     ```
+
+**Note:**  If you are using GitHub enterprise, you might have to authorize the newly added SSH key in the GitHub portal for the respective organizations in your enterprise.

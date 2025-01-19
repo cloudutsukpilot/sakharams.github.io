@@ -62,3 +62,5 @@ description: Learn how to manage multiple git accounts on the same host.
     ```
 
 4. Executing the git pull/push commands will use the respective keys in order to authenticate the git servers.
+
+5. If you are using GitHub enterprise, you might have to authorize the newly added SSH key in the GitHub portal for the respective organizations in your enterprise.

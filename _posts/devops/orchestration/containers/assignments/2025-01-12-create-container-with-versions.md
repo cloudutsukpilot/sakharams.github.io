@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Containers - Image Versions
+title: 3. Create container with different image versions
 categories: [devops, orchestration, containers]
 tags: [Assignments]
 image: /assets/img/common/assignment.png

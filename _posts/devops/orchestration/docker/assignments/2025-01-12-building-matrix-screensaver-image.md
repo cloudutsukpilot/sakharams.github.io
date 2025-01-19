@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Docker - Building Container Images
+title: 1. Build a container using Docker for cmatrix screensaver
 categories: [devops, orchestration, docker]
 tags: [Assignments]
 image: /assets/img/common/assignment.png
