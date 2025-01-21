@@ -36,6 +36,10 @@ description: List of tools to install while setting up a new host/laptop.
     choco install terraform -y
     ```
 
+    ```sh
+    choco install postman -y
+    ```
+
 4. **Install Azure Tools**
 
     ```sh
