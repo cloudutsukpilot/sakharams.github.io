@@ -10,6 +10,8 @@ description: Mostly used commands for docker operations.
 
 #### Build Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker build` | Builds an image from a Dockerfile in the current directory |
 | `docker build <remote-url>` | Builds an image from a remote GIT repository |
 | `docker build -t imagename/tag` | Builds and tags an image for easier tracking |
@@ -35,13 +37,22 @@ description: Mostly used commands for docker operations.
 
 #### Copy Command
 
+| Command | Description |
+| ------- | ----------- |
 | docker cp <containerId>:/file/path/within/container /host/path/to/copy/files/to | Copy a file from container to localhost |
 | docker cp /host/path/to/copy/files/from <containerId>:/file/path/within/container | Copy a file from localhost to container |
 
+### Docker Image Commands
+
+| `docker images --filter "dangling=true"` | To list all the images without any tags |
+
 #### Clean Up Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker image prune` | Clears an unused image |
 | `docker image prune -a` | Clears all images that are not being used by containers |
+| `docker images --filter "dangling=true" -q \| xargs -r docker rmi` | To remove all the images without any tags |
 | `docker system prune` | Removes all stopped containers, all networks not used by containers, all dangling images, and all build cache |
 | `docker image rm image` | Removes an image |
 | `docker rm container` | Removes a running container |
@@ -53,6 +64,8 @@ description: Mostly used commands for docker operations.
 
 #### Container Interaction Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker start container` | Starts a new container |
 | `docker stop container` | Stops a container |
 | `docker pause container` | Pauses a container |
@@ -70,6 +83,8 @@ description: Mostly used commands for docker operations.
 
 #### Container Inspection Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker -ps -a` | Lists all containers |
 | `docker diff container` | Inspects changes to directories and files in the container filesystem |
 | `docker top container` | Shows all running processes in an existing container |
@@ -79,6 +94,8 @@ description: Mostly used commands for docker operations.
 
 #### Manage Images Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker image ls` | Lists images |
 | `docker image rm mysql` | Removes an image |
 | `docker tag image tag` | Tags an image |
@@ -87,6 +104,8 @@ description: Mostly used commands for docker operations.
 
 #### Registry Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker login` | Logs in to a registry |
 | `docker logout` | Logs out from a registry |
 | `docker pull mysql` | Pulls an image from a registry |
@@ -95,6 +114,8 @@ description: Mostly used commands for docker operations.
 
 #### Service Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker service ls` | Lists all services running in a swarm |
 | `docker stack services stackname` | Lists all running services |
 | `docker service ps servicename` | Lists the tasks of a service |
@@ -105,6 +126,8 @@ description: Mostly used commands for docker operations.
 
 #### Network Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker network create networkname` | Creates a new network |
 | `docker network rm networkname` | Removes a specified network |
 | `docker network ls` | Lists all networks |
@@ -114,6 +137,8 @@ description: Mostly used commands for docker operations.
 
 ### Docker Manifest Commands
 
+| Command | Description |
+| ------- | ----------- |
 | `docker manifest inspect` | Inspect the manifest or manifest list of an image |
 | `docker manifest create` | Create a manifest list by combining multiple image manifests for different platforms |
 | `docker manifest annotate` | Adds additional metadata (e.g., platform details) to a manifest list |

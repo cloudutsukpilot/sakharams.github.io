@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 1. Build a container using Docker for cmatrix screensaver
+title: 1. Build a container using Docker for cmatrix screensaver - Ubuntu
 categories: [devops, orchestration, docker]
 tags: [Assignments]
 image: /assets/img/common/assignment.png
@@ -19,7 +19,7 @@ description: Lab assignment for creating a container using containerd and docker
 1. Pull a base docker image 'alpine' - Ultrasmall and minimal image based on alpine linux (size: ~8MB)
 
 ```sh
-docker pull alpine
+docker pull ubuntu
 ```
 
 2. Verify if the images exists on your host
@@ -32,7 +32,7 @@ docker images
 
 ```sh
 cat <<EOF> ./Dockerfile
-FROM alpine
+FROM ubuntu
 
 LABEL org.opencontainers.image.authors="Sakharam Shinde"
 EOF
@@ -73,11 +73,11 @@ git clone https://github.com/abishekvashok/cmatrix.git
 8. Since git is not installed in the base image, we will install the git tool.
 
 ```sh
-apk update
+apt-get update
 ```
 
 ```sh
-apk add git
+apt-get install -y git
 ```
 
 - Clone the repo
@@ -107,7 +107,7 @@ autoreconf -i
 - Install autoconf
 
 ```sh
-apk add autoconf
+apt-get install -y autoconf
 ```
 
 - Prepare compilation, will fail, missing automake
@@ -119,7 +119,7 @@ autoreconf -i
 - Install automake
 
 ```sh
-apk add automake
+apt-get install -y automake
 ```
 
 - Prepare compilation, will succeed, confirm with echo $?
@@ -143,7 +143,7 @@ echo $?
 - Install compiler
 
 ```sh
-apk add alpine-sdk
+apt-get install -y alpine-sdk
 ```
 
 - Prepare configure, will fail, missing dependencies
@@ -155,7 +155,7 @@ apk add alpine-sdk
 - Install dependencies and create missing directories
 
 ```sh
-apk add ncurses-dev ncurses-static
+apt-get install -y ncurses-dev ncurses-static
 ```
 
 ```sh
@@ -194,23 +194,23 @@ FROM alpine
 
 LABEL org.opencontainers.image.authors="Sakharam Shinde"
 
-RUN apk update
+RUN apt-get update
 
-RUN apk add git 
+RUN apt-get install -y git 
 
 RUN git clone https://github.com/abishekvashok/cmatrix.git .
 
 RUN cd cmatrix
 
-RUN apk add autoconf
+RUN apt-get install -y autoconf
 
-RUN apk add automake
+RUN apt-get install -y automake
 
 RUN autoreconf -i
 
-RUN apk add alpine-sdk
+RUN apt-get install -y alpine-sdk
 
-RUN apk add ncurses-dev ncurses-static
+RUN apt-get install -y ncurses-dev ncurses-static
 
 RUN mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts
 
@@ -245,21 +245,21 @@ LABEL org.opencontainers.image.authors="Sakharam Shinde"
 
 WORKDIR /cmatrix
 
-RUN apk update
+RUN apt-get update
 
-RUN apk add git 
+RUN apt-get install -y git 
 
 RUN git clone https://github.com/abishekvashok/cmatrix.git .
 
-RUN apk add autoconf
+RUN apt-get install -y autoconf
 
-RUN apk add automake
+RUN apt-get install -y automake
 
 RUN autoreconf -i
 
-RUN apk add alpine-sdk
+RUN apt-get install -y alpine-sdk
 
-RUN apk add ncurses-dev ncurses-static
+RUN apt-get install -y ncurses-dev ncurses-static
 
 RUN mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts
 
@@ -304,8 +304,8 @@ LABEL org.opencontainers.image.authors="Sakharam Shinde"
 
 WORKDIR /cmatrix
 
-RUN apk update --no-cache && \
-    apk add git autoconf automake alpine-sdk ncurses-dev ncurses-static
+RUN apt-get update --no-cache && \
+    apt-get install -y git autoconf automake alpine-sdk ncurses-dev ncurses-static
     
 RUN git clone https://github.com/abishekvashok/cmatrix.git .
 
@@ -354,8 +354,8 @@ LABEL org.opencontainers.image.authors="Sakharam Shinde"
 
 WORKDIR /cmatrix
 
-RUN apk update --no-cache && \
-apk add git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
+RUN apt-get update --no-cache && \
+apt-get install -y git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
 git clone https://github.com/abishekvashok/cmatrix.git . && \
 autoreconf -i && \
 mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts && \
@@ -398,8 +398,8 @@ FROM alpine AS cmatrixbuilder
 
 WORKDIR /cmatrix
 
-RUN apk update --no-cache && \
-    apk add git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
+RUN apt-get update --no-cache && \
+    apt-get install -y git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
     git clone https://github.com/abishekvashok/cmatrix.git . && \
     autoreconf -i && \
     mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts && \
@@ -411,8 +411,8 @@ FROM alpine
 
 LABEL org.opencontainers.image.authors="Sakharam Shinde" \
 
-RUN apk update --no-cache && \
-    apk add ncurses-terminfo-base
+RUN apt-get update --no-cache && \
+    apt-get install -y ncurses-terminfo-base
 
 COPY --from=cmatrixbuilder /cmatrix/cmatrix /cmatrix
 
@@ -448,8 +448,8 @@ FROM alpine AS cmatrixbuilder
 
 WORKDIR /cmatrix
 
-RUN apk update --no-cache && \
-    apk add git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
+RUN apt-get update --no-cache && \
+    apt-get install -y git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
     git clone https://github.com/abishekvashok/cmatrix.git . && \
     autoreconf -i && \
     mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts && \
@@ -461,8 +461,8 @@ FROM alpine
 
 LABEL org.opencontainers.image.authors="Sakharam Shinde" \
 
-RUN apk update --no-cache && \
-    apk add ncurses-terminfo-base && \
+RUN apt-get update --no-cache && \
+    apt-get install -y ncurses-terminfo-base && \
     adduser -g "Sakharam" -s /usr/sbin/nologin -D -H sakharam
 
 COPY --from=cmatrixbuilder /cmatrix/cmatrix /cmatrix
@@ -493,8 +493,8 @@ FROM alpine AS cmatrixbuilder
 
 WORKDIR /cmatrix
 
-RUN apk update --no-cache && \
-    apk add git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
+RUN apt-get update --no-cache && \
+    apt-get install -y git autoconf automake alpine-sdk ncurses-dev ncurses-static && \
     git clone https://github.com/abishekvashok/cmatrix.git . && \
     autoreconf -i && \
     mkdir -p /usr/lib/kbd/consolefonts /usr/share/consolefonts && \
@@ -506,8 +506,8 @@ FROM alpine
 
 LABEL org.opencontainers.image.authors="Sakharam Shinde" \
 
-RUN apk update --no-cache && \
-    apk add ncurses-terminfo-base && \
+RUN apt-get update --no-cache && \
+    apt-get install -y ncurses-terminfo-base && \
     adduser -g "Sakharam" -s /usr/sbin/nologin -D -H sakharam
 
 COPY --from=cmatrixbuilder /cmatrix/cmatrix /cmatrix
