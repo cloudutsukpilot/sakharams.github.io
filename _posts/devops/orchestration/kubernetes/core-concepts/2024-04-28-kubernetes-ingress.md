@@ -3,9 +3,11 @@ layout: post
 title: Kubernetes - Ingress
 categories: [devops, orchestration, kubernetes]
 tags: [DevOps, Orchestration, Kubernetes]
+image: /assets/img/devops/orchestration/kubernetes/kubernetes-posts.png
+description: Ingress
 ---
 
-## Introduction:
+## Introduction
 
 - Ingress is an API object that manages external access to the services in a cluster. It provides HTTP and HTTPS routing to services based on the request host or path.
 
@@ -62,5 +64,3 @@ spec:
           servicePort: 8080
 
 ```
-
-

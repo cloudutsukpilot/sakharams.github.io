@@ -25,16 +25,16 @@ description: Index Page for Kubernetes Articles
 ### Workloads
 
 - [Pods](/posts/devops/orchestration/kubernetes/kubernetes-pods)
-- ReplicaSets
-- Deployments
-- StatefulSets
-- DaemonSets
+- [ReplicaSets](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets)
+- [Deployments](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets)
+- [StatefulSets](/posts/devops/orchestration/kubernetes/kubernetes-statefulesets)
+- [DaemonSets](/posts/devops/orchestration/kubernetes/kubernetes-daemonsets)
 
 ### Networking
 
-- Services
-- Ingress
-- Network Policies
+- [Services](/posts/devops/orchestration/kubernetes/kubernetes-services)
+- [Ingress](/posts/devops/orchestration/kubernetes/kubernetes-ingress)
+- [Network Policies](/posts/devops/orchestration/kubernetes/kubernetes-network-policies)
 - Cluster Networking
 
 ### Scheduling

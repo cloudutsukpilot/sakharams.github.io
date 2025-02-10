@@ -29,6 +29,7 @@ tags: [Minikube, CMDsheet]
 | `minikube profile list` |To list the profiles |
 |  `minikube start -p <profile_name>` |To run multiple cluster with profiles |
 | `minikube start -p profileX` |To switch between profiles |
+| `minikube delete -p <profile_name>` | To delete a minikube profile | 
 
 ### Nodes
 

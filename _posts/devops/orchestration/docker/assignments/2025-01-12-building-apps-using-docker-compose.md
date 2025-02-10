@@ -18,206 +18,206 @@ description: Lab assignment for creating a app using docker-compose.
 
 1. Create a docker-compose file to save the configuration of the app
 
-```sh
-cat <<EOF> docker-compose.yaml
-version: "3.9"
+    ```sh
+    cat <<EOF> docker-compose.yaml
+    version: "3.9"
 
-services:
-  backend:
-    image: backend-app:latest # Replace with your backend image
-    build:
-      context: ./backend
-      dockerfile: Dockerfile # Adjust if your Dockerfile has a different name
-    ports:
-      - "5000:5000" # Exposes the backend on port 5000
-    environment:
-      - DATABASE_URL=postgres://user:password@db:5432/appdb
-    depends_on:
-      - db # Ensures the database service starts before the backend
+    services:
+      backend:
+        image: backend-app:latest # Replace with your backend image
+        build:
+          context: ./backend
+          dockerfile: Dockerfile # Adjust if your Dockerfile has a different name
+        ports:
+          - "5000:5000" # Exposes the backend on port 5000
+        environment:
+          - DATABASE_URL=postgres://user:password@db:5432/appdb
+        depends_on:
+          - db # Ensures the database service starts before the backend
+        networks:
+          - app-network
+
+      frontend:
+        image: frontend-app:latest # Replace with your frontend image
+        build:
+          context: ./frontend
+          dockerfile: Dockerfile # Adjust if your Dockerfile has a different name
+        ports:
+          - "3000:3000" # Exposes the frontend on port 3000
+        environment:
+          - REACT_APP_API_URL=http://backend:5000 # URL of the backend service
+        depends_on:
+          - backend # Ensures the backend starts before the frontend
+        networks:
+          - app-network
+
+      db:
+        image: postgres:15 # Replace with your preferred database image/version
+        environment:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: appdb
+        volumes:
+          - db_data:/var/lib/postgresql/data
+        networks:
+          - app-network
+
     networks:
-      - app-network
+      app-network:
+        driver: bridge
 
-  frontend:
-    image: frontend-app:latest # Replace with your frontend image
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile # Adjust if your Dockerfile has a different name
-    ports:
-      - "3000:3000" # Exposes the frontend on port 3000
-    environment:
-      - REACT_APP_API_URL=http://backend:5000 # URL of the backend service
-    depends_on:
-      - backend # Ensures the backend starts before the frontend
-    networks:
-      - app-network
-
-  db:
-    image: postgres:15 # Replace with your preferred database image/version
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: appdb
     volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
-
-volumes:
-  db_data:
-EOF
-```
+      db_data:
+    EOF
+    ```
 
 2. Create Dockerfile for backend container:
 
-```sh
-cat <<EOF> ./backend/Dockerfile
-# Use the official Python image as the base
-FROM python:3.11-slim
+    ```sh
+    cat <<EOF> ./backend/Dockerfile
+    # Use the official Python image as the base
+    FROM python:3.11-slim
 
-# Set the working directory in the container
-WORKDIR /app
+    # Set the working directory in the container
+    WORKDIR /app
 
-# Copy the application code into the container
-COPY . .
+    # Copy the application code into the container
+    COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+    # Install Python dependencies
+    RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the backend's port
-EXPOSE 5000
+    # Expose the backend's port
+    EXPOSE 5000
 
-# Command to run the application
-CMD ["python", "app.py"]
-EOF
-```
+    # Command to run the application
+    CMD ["python", "app.py"]
+    EOF
+    ```
 
-```sh
-cat <<EOF> ./backend/requirements.txt
-Flask==2.2.5
-psycopg2-binary==2.9.6  # PostgreSQL driver
-EOF
-```
+    ```sh
+    cat <<EOF> ./backend/requirements.txt
+    Flask==2.2.5
+    psycopg2-binary==2.9.6  # PostgreSQL driver
+    EOF
+    ```
 
-```sh
-cat <<EOF> ./backend/app.py
-from flask import Flask, jsonify
+    ```sh
+    cat <<EOF> ./backend/app.py
+    from flask import Flask, jsonify
 
-app = Flask(__name__)
+    app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return jsonify({"message": "Welcome to the backend API!"})
+    @app.route("/")
+    def home():
+        return jsonify({"message": "Welcome to the backend API!"})
 
-@app.route("/data")
-def data():
-    return jsonify({"data": "This is some data from the backend!"})
+    @app.route("/data")
+    def data():
+        return jsonify({"data": "This is some data from the backend!"})
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-EOF
-```
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=5000)
+    EOF
+    ```
 
 3. Create a Dockerfile for frontend container.
 
-```sh
-cat <<EOF> ./frontend/Dockerfile
-# Use the official Node.js image as the base
-FROM node:18-alpine
+    ```sh
+    cat <<EOF> ./frontend/Dockerfile
+    # Use the official Node.js image as the base
+    FROM node:18-alpine
 
-# Set the working directory in the container
-WORKDIR /app
+    # Set the working directory in the container
+    WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+    # Copy package.json and package-lock.json
+    COPY package*.json ./
 
-# Install Node.js dependencies
-RUN npm install
+    # Install Node.js dependencies
+    RUN npm install
 
-# Copy the rest of the application code
-COPY . .
+    # Copy the rest of the application code
+    COPY . .
 
-# Build the React app
-RUN npm run build
+    # Build the React app
+    RUN npm run build
 
-# Serve the build using a lightweight server
-RUN npm install -g serve
+    # Serve the build using a lightweight server
+    RUN npm install -g serve
 
-# Expose the frontend's port
-EXPOSE 3000
+    # Expose the frontend's port
+    EXPOSE 3000
 
-# Command to start the frontend
-CMD ["serve", "-s", "build", "-l", "3000"]
-EOF
-```
+    # Command to start the frontend
+    CMD ["serve", "-s", "build", "-l", "3000"]
+    EOF
+    ```
 
-```sh
-cat <<EOF> ./frontend/package.json
-{
-  "name": "frontend-app",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "axios": "^1.5.0"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  }
-}
-EOF
-```
+    ```sh
+    cat <<EOF> ./frontend/package.json
+    {
+      "name": "frontend-app",
+      "version": "1.0.0",
+      "private": true,
+      "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-scripts": "5.0.1",
+        "axios": "^1.5.0"
+      },
+      "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+      }
+    }
+    EOF
+    ```
 
-```sh
-cat <<EOF> ./frontend/src/App.js
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+    ```sh
+    cat <<EOF> ./frontend/src/App.js
+    import React, { useEffect, useState } from "react";
+    import axios from "axios";
 
-function App() {
-  const [data, setData] = useState("");
+    function App() {
+      const [data, setData] = useState("");
 
-  useEffect(() => {
-    // Call the backend API
-    axios.get("http://backend:5000/data")
-      .then(response => setData(response.data.data))
-      .catch(error => console.error("Error fetching data:", error));
-  }, []);
+      useEffect(() => {
+        // Call the backend API
+        axios.get("http://backend:5000/data")
+          .then(response => setData(response.data.data))
+          .catch(error => console.error("Error fetching data:", error));
+      }, []);
 
-  return (
-    <div style={{ textAlign: "center", padding: "50px" }}>
-      <h1>Frontend React App</h1>
-      <p>Message from Backend: {data || "Loading..."}</p>
-    </div>
-  );
-}
+      return (
+        <div style={{ textAlign: "center", padding: "50px" }}>
+          <h1>Frontend React App</h1>
+          <p>Message from Backend: {data || "Loading..."}</p>
+        </div>
+      );
+    }
 
-export default App;
-EOF
-```
+    export default App;
+    EOF
+    ```
 
-```sh
-cat <<EOF> ./frontend/public/index.html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frontend App</title>
-</head>
-<body>
-  <div id="root"></div>
-</body>
-</html>
-EOF
-```
+    ```sh
+    cat <<EOF> ./frontend/public/index.html
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Frontend App</title>
+    </head>
+    <body>
+      <div id="root"></div>
+    </body>
+    </html>
+    EOF
+    ```
 
 4. Build a docker image using the Dockerfile (Same as base image with just additional label)
 
@@ -701,7 +701,7 @@ EOF
     EOF
     ```
 
-   - Build the image
+    - Build the image
 
     ```sh
     docker build -t sakharamshinde/cmatrixms .

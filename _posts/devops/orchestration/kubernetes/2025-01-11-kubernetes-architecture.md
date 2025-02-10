@@ -58,9 +58,9 @@ This blog will cover both high-level and low-level container runtimes, as well a
 
     - **Functions of a High-Level Container Runtime:**
       - `Container Orchestration`: Works with Kubernetes to schedule and manage containers across nodes.
-      -`Networking and Volume Management`: Manages networking between containers and persistent storage.
-      -`Interfacing with Container Images`: Pulls container images and runs them according to Kubernetes specifications.
-      -`Handling Health Checks`: Monitors the health of containers and restarts them if necessary.
+      - `Networking and Volume Management`: Manages networking between containers and persistent storage.
+      - `Interfacing with Container Images`: Pulls container images and runs them according to Kubernetes specifications.
+      - `Handling Health Checks`: Monitors the health of containers and restarts them if necessary.
     - **Examples**:
       - `containerd` is an example of a high-level container runtime used in Kubernetes.
 

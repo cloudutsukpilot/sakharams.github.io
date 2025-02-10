@@ -40,6 +40,10 @@ description: List of tools to install while setting up a new host/laptop.
     choco install postman -y
     ```
 
+    ```sh
+    choco install azure-kubelogin -y
+    ```
+
 4. **Install Azure Tools**
 
     ```sh
@@ -89,6 +93,10 @@ description: List of tools to install while setting up a new host/laptop.
 
     ```sh
     choco install grep -y
+    ```
+
+    ```sh
+    choco install base64 -y
     ```
 
 9. **OpenSSL**

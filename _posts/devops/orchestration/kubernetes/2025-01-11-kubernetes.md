@@ -117,7 +117,7 @@ description: Why Kubernetes is the most popular container orchestration tool?
 |  | Currently, the following types of volume sources can be projected: |
 | | a. Secret |
 | | b. downwardAPI |
-| | c. configMap | 
+| | c. configMap |
 | | d. serviceAccountToken | 
 | Ephemeral Volumes	| Ephemeral volumes follows pod's lifetime and get created and deleted along with the Pod. |
 | | Kubernetes supports several different kinds of ephemeral volumes for different purposes: |
@@ -149,12 +149,14 @@ description: Why Kubernetes is the most popular container orchestration tool?
 
 ### Security
 
-| 4C's of Cloud Native security | Cloud -> Cluster -> Container -> Code | 
+![4 C's of Cloud Native Security](/assets/img/devops/orchestration/kubernetes/security/4c's-of-cloud-native-security.webp)
+
+| 4C's of Cloud Native security | Cloud -> Cluster -> Container -> Code |
 | | https://kubernetes.io/docs/concepts/security/overview/ |
 | Role/ClusterRole | An RBAC Role or ClusterRole contains rules that represent a set of permissions. |
 | | Permissions are purely additive (there are no "deny" rules). |
 | | A Role always sets permissions within a particular namespace; when you create a Role, you have to specify the namespace it belongs in |
-| RoleBinding/ClusterRoleBinding | A RoleBinding grants permissions within a specific namespace whereas a ClusterRoleBinding grants that access cluster-wide. |
+| RoleBinding/ ClusterRoleBinding | A RoleBinding grants permissions within a specific namespace whereas a ClusterRoleBinding grants that access cluster-wide. |
 | | A RoleBinding may reference any Role in the same namespace. |
 | | Alternatively, a RoleBinding can reference a ClusterRole and bind that ClusterRole to the namespace of the RoleBinding. | 
 | Startup Probes | Both liveness & readiness probes are used to control the health of an application. |

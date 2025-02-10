@@ -13,7 +13,7 @@ description: Lab assignment for creating a init container in a pod using kubectl
 - kubectl
 
 ### Assignment
- 
+
 - Lets start by creating a pod which will have a init container which will echo a countdown from 120 to 0 every second.
 
 1️⃣ Create a K8 manifest yaml to deploy a pod with two containers.
