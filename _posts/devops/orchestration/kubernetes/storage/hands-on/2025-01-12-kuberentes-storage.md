@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - Storage
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding storage in Kubernetes
 ---

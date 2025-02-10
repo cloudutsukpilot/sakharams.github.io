@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - RBAC Service Accounts
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding RBAC for service accounts in Kubernetes
 ---

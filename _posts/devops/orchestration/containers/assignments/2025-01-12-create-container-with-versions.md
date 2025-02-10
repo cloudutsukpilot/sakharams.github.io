@@ -2,7 +2,7 @@
 layout: post
 title: 3. Create container with different image versions
 categories: [devops, orchestration, containers]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating a container using containerd and docker with different versions.
 ---

@@ -2,7 +2,7 @@
 layout: post
 title: Helm - Flappy Burd
 categories: [devops, orchestration, helm]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating a helm chart for flappy-bird
 ---

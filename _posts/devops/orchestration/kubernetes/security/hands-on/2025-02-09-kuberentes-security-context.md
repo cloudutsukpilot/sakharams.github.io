@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - Security Contexts
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding security contexts in Kubernetes
 ---

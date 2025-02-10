@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - Deployments and ReplicaSets
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating namespaces using kubectl
 ---

@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - Pod Disruption Budgets
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding PDB's in Kubernetes
 ---

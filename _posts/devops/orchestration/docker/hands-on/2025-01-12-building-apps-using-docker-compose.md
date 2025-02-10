@@ -2,7 +2,7 @@
 layout: post
 title: 1. Build Apps using Docker-Compose
 categories: [devops, orchestration, docker]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating a app using docker-compose.
 ---

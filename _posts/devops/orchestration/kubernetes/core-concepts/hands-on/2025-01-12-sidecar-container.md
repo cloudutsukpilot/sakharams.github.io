@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes - Sidecar Containers in a Pod
 categories: [devops, orchestration, kubernetes]
-tags: [Assignments]
+tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating a sidecar container in a pod using kubectl
 ---
