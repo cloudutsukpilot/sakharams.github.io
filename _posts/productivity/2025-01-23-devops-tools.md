@@ -1,7 +1,7 @@
 ---
 layout: post
 title: DevOps Tools
-categories: [ Productivity, DevOps ]
+categories: [ Productivity, DevOps Tools ]
 image: /assets/img/productivity/productivity-tools.avif
 description: List of tools to improve productivity for DevOps Engineers.
 ---

@@ -16,19 +16,19 @@ description: Lab assignment for creating a container using containerd and docker
 - Lets build a container using the github repository created for running a Matrix screensaver.
 - Languages: C
 
-1. Pull a base docker image 'alpine' - Ultrasmall and minimal image based on alpine linux (size: ~8MB)
+1️⃣ Pull a base docker image 'alpine' - Ultrasmall and minimal image based on alpine linux (size: ~8MB)
 
 ```sh
 docker pull ubuntu
 ```
 
-2. Verify if the images exists on your host
+2️⃣ Verify if the images exists on your host
 
 ```sh
 docker images
 ```
 
-3. Create a Dockerfile using the apline images
+3️⃣ Create a Dockerfile using the apline images
 
 ```sh
 cat <<EOF> ./Dockerfile
@@ -38,25 +38,25 @@ LABEL org.opencontainers.image.authors="Sakharam Shinde"
 EOF
 ```
 
-4. Build a docker image using the Dockerfile (Same as base image with just additional label)
+4️⃣ Build a docker image using the Dockerfile (Same as base image with just additional label)
 
 ```sh
 docker build -t sakharamshinde/cmatrix .
 ```
 
-5. Verify if the new images is created with the defined tag.
+5️⃣ Verify if the new images is created with the defined tag.
 
 ```sh
 docker images
 ```
 
-6. Create a container using the new image and ssh into the container
+6️⃣ Create a container using the new image and ssh into the container
 
 ```sh
 docker run --rm -it sakharamshinde/cmatrix sh
 ```
 
-7. Once we are into the shell of the container, execute below steps to get the cmatrix running inside the container.
+7️⃣ Once we are into the shell of the container, execute below steps to get the cmatrix running inside the container.
 
 - Verify the Hostname
 
@@ -70,7 +70,7 @@ hostname
 git clone https://github.com/abishekvashok/cmatrix.git
 ```
 
-8. Since git is not installed in the base image, we will install the git tool.
+8️⃣ Since git is not installed in the base image, we will install the git tool.
 
 ```sh
 apt-get update
@@ -96,7 +96,7 @@ cd cmatrix
 ls -l 
 ```
 
-9. Similarly, install the required packages required to build the cmatrix screensave
+9️⃣ Similarly, install the required packages required to build the cmatrix screensave
 
 - Prepare compilation, will fail, missing autoconf
 
@@ -186,7 +186,7 @@ ls -l ./cmatrix
 ./cmatrix
 ```
 
-10. Build a docker image for the cmatrix app using all the command used above.
+🔟 Build a docker image for the cmatrix app using all the command used above.
 
 ```sh
 cat <<EOF> ./Dockerfile

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Kubernetes - Init Containers in a Pod
-categories: [devops, orchestration, kubernetes]
+categories: [devops, orchestration, kubernetes, hands-on]
 tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for creating a init container in a pod using kubectl

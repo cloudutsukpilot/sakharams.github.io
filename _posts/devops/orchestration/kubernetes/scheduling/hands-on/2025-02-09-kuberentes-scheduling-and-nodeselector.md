@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Kubernetes - Scheduling and Node Selector
-categories: [devops, orchestration, kubernetes]
+categories: [devops, orchestration, kubernetes, hands-on]
 tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding scheduling in Kubernetes

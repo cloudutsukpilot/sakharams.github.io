@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Windows OS - Tools Setup
-categories: [ Productivity, Windows ]
+categories: [ Productivity, Windows Tools ]
 image: /assets/img/productivity/productivity-tools.avif
 description: List of tools to install while setting up a new host/laptop.
 ---

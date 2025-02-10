@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Kubernetes - RBAC
-categories: [devops, orchestration, kubernetes]
+categories: [devops, orchestration, kubernetes, hands-on]
 tags: [Hands-On]
 image: /assets/img/common/assignment.png
 description: Lab assignment for understanding RBAC in Kubernetes

@@ -24,18 +24,22 @@ description: Index Page for Kubernetes Articles
 
 ### Workloads
 
-- [Pods](/posts/devops/orchestration/kubernetes/kubernetes-pods)
-- [ReplicaSets](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets)
-- [Deployments](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets)
-- [StatefulSets](/posts/devops/orchestration/kubernetes/kubernetes-statefulesets)
-- [DaemonSets](/posts/devops/orchestration/kubernetes/kubernetes-daemonsets)
+| Blog | Hands-On |
+| ---- | -------- |
+| [Pods](/posts/devops/orchestration/kubernetes/kubernetes-pods) | * [Pods](/posts/devops/orchestration/kubernetes/hands-on/pods) * [Init-Container](/posts/devops/orchestration/kubernetes/hands-on/init-container) * [SideCar Container](/posts/devops/orchestration/kubernetes/hands-on/sidecar-container) |
+| [ReplicaSets](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/deployments-and-replicasets) |
+| [Deployments](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/deployments-and-replicasets) |
+| [StatefulSets](/posts/devops/orchestration/kubernetes/kubernetes-statefulesets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/statefulsets) |
+| [DaemonSets](/posts/devops/orchestration/kubernetes/kubernetes-daemonsets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/daemonsets) |
 
 ### Networking
 
-- [Services](/posts/devops/orchestration/kubernetes/kubernetes-services)
-- [Ingress](/posts/devops/orchestration/kubernetes/kubernetes-ingress)
-- [Network Policies](/posts/devops/orchestration/kubernetes/kubernetes-network-policies)
-- Cluster Networking
+| Blog | Hands-On |
+| ---- | -------- |
+| [Services](/posts/devops/orchestration/kubernetes/kubernetes-services) | [Hands-On] |
+| [Ingress](/posts/devops/orchestration/kubernetes/kubernetes-ingress) | [Hands-On] |
+| [Network Policies](/posts/devops/orchestration/kubernetes/kubernetes-network-policies) | [Hands-On] |
+| Cluster Networking | |
 
 ### Scheduling
 
