@@ -168,7 +168,6 @@ description: Kubectl Commands Quick Reference
 | `--token`             | Specify a Bearer Token for authentication.                                                          | `kubectl get pods --token=abcdef123456`                                                      |
 | `--limit`             | Limit the number of resources returned.                                                             | `kubectl get pods --limit=5`                                                                 |
 
-
 ### Imperative Approach Commands
 
 | `kubectl run my-first-pod --image stacksimplify/kubenginx:1.0.0` | To create a pod |

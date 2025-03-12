@@ -6,45 +6,46 @@ tags: [Cloud, Azure, Containers, Kubernetes, AKS]
 ---
 
 ## Introduction
-- Azure Kubernetes Service (AKS) offers several networking models, each suited to different use cases and performance needs. 
-- The primary networking options in AKS are Kubenet, Azure CNI, Azure CNI Overlay and Cilium CNI with Azure CNI.
+
+- Azure Kubernetes Service (AKS) offers several networking models, each suited to different use cases and performance needs.
+- The primary networking options in AKS are kubenet, Azure CNI, Azure CNI Overlay and Cilium CNI with Azure CNI.
 
 ### AKS Networking Basics
 
- - Kubernetes employs a virtual networking layer to manage access within and between your applications or their components:
-    + `Kubernetes Nodes and Virtual Network`
-        * Kubernetes nodes are connected to a virtual network.
-        * This setup enables pods to have both inbound and outbound connectivity.
-    + `Kube-proxy Component`
-        * kube-proxy runs on each node and is responsible for providing the necessary network features.
+- Kubernetes employs a virtual networking layer to manage access within and between your applications or their components:
+  - `Kubernetes Nodes and Virtual Network`
+    - Kubernetes nodes are connected to a virtual network.
+    - This setup enables pods to have both inbound and outbound connectivity.
+    - `Kube-proxy Component`
+      - kube-proxy runs on each node and is responsible for providing the necessary network features.
 
 - Kubernetes Functionalities:
-    + `Load Balancer`: You can use a load balancer to distribute network traffic evenly across various resources.
-    + `Ingress Controllers`: These facilitate Layer 7 routing, which is essential for directing application traffic.
-    + `Egress Traffic Control`: Kubernetes allows you to manage and control outbound traffic from cluster nodes.
-    + `Network Policies`: These policies enable security measures and filtering for network traffic in pods.
+  - `Load Balancer`: You can use a load balancer to distribute network traffic evenly across various resources.
+  - `Ingress Controllers`: These facilitate Layer 7 routing, which is essential for directing application traffic.
+  - `Egress Traffic Control`: Kubernetes allows you to manage and control outbound traffic from cluster nodes.
+  - `Network Policies`: These policies enable security measures and filtering for network traffic in pods.
 
 ## Networking Models
 
-1. `Overlay Network Model` 
+1. `Overlay Network Model`
     - Pods are given an IP address from a private, logically separate CIDR from the Azure virtual network subnet where AKS nodes are deployed. 
     - This model enables simpler, improved scalability when compared to the flat network model.
 
-2. `Flat Network Model`: 
+2. `Flat Network Model`
     - A flat network model in AKS assigns IP addresses to pods from a subnet from the same Azure virtual network as the AKS nodes. 
     - Any traffic leaving your clusters isn't SNAT'd, and the pod IP address is directly exposed to the destination. 
     - This model can be useful for scenarios like exposing pod IP addresses to external services.
 
 ### 1. Kubenet (Basic Networking)
 
-- Kubenet is the simpler, default network model in AKS. 
+- Kubenet is the simpler, default network model in AKS.
 - Each node gets an IP from the Azure VNet, while pods receive IPs from a separate NATed range.
 - Pros:
-    + Lower IP requirements, as only nodes get IPs from the VNet.
-    + Simplicity and cost-effectiveness.
+  - Lower IP requirements, as only nodes get IPs from the VNet.
+  - Simplicity and cost-effectiveness.
 - Cons:
-    + Reduced performance due to NAT.
-    + Limited network integration and advanced networking features.
+  - Reduced performance due to NAT.
+  - Limited network integration and advanced networking features.
 - `Use Case`: Ideal for smaller or dev clusters where IP conservation and simplicity are prioritized over performance.
 
 ### 2. Azure CNI (Advanced Networking)
