@@ -1405,54 +1405,101 @@ Solve this question on: ssh cka3962
 
 #### Answer - 8
 
-Update Kubernetes to controlplane version
-Search in the docs for kubeadm upgrade:
+- Update Kubernetes to controlplane version
+- Search in the docs for kubeadm upgrade:
 
-➜ ssh cka3962
+```sh
+ssh cka3962
+```
 
-➜ candidate@cka3962:~$ k get node
+```sh
+k get node
+```
+
+```output
 NAME      STATUS   ROLES           AGE    VERSION
 cka3962   Ready    control-plane   169m   v1.32.1
-The controlplane node seems to be running Kubernetes 1.32.1.
+```
 
-➜ candidate@cka3962:~$ ssh cka3962-node1
+- The controlplane node seems to be running Kubernetes 1.32.1.
 
-➜ candidate@cka3962-node1:~$ sudo -i
+```sh
+ssh cka3962-node1
+```
 
-➜ root@cka3962-node1:~# kubectl version
+```sh
+sudo -i
+```
+
+```sh
+kubectl version
+```
+
+```output
 Client Version: v1.31.5
 Kustomize Version: v5.4.2
 The connection to the server localhost:8080 was refused - did you specify the right host or port?
+```
 
-➜ root@cka3962-node1:~# kubelet --version
+```sh
+kubelet --version
+```
+
+```output
 Kubernetes v1.31.5
+```
 
-➜ root@cka3962-node1:~# kubeadm version
+```sh
+kubeadm version
+```
+
+```output
 kubeadm version: &version.Info{Major:"1", Minor:"32", GitVersion:"v1.32.1", GitCommit:"e9c9be4007d1664e68796af02b8978640d2c1b26", GitTreeState:"clean", BuildDate:"2025-01-15T14:39:14Z", GoVersion:"go1.23.4", Compiler:"gc", Platform:"linux/amd64"}
-Above we can see that kubeadm is already installed in the exact needed version, otherwise we would need to install it using apt install kubeadm=1.32.1-1.1.
+```
 
-With the correct kubeadm version we can continue:
+- Above we can see that kubeadm is already installed in the exact needed version, otherwise we would need to install it using apt install kubeadm=1.32.1-1.1.
+- With the correct kubeadm version we can continue:
 
-➜ root@cka3962-node1:~# kubeadm upgrade node
+```sh
+kubeadm upgrade node
+```
+
+```output
 couldn't create a Kubernetes client from file "/etc/kubernetes/kubelet.conf": failed to load admin kubeconfig: open /etc/kubernetes/kubelet.conf: no such file or directory
 To see the stack trace of this error execute with --v=5 or higher
-This is usually the proper command to upgrade a worker node. But as mentioned in the question description, this node is not yet part of the cluster. Hence there is nothing to update. We'll add the node to the cluster later using kubeadm join. For now we can continue with updating kubelet and kubectl:
+```
 
-➜ root@cka3962-node1:~# apt update
+- This is usually the proper command to upgrade a worker node. But as mentioned in the question description, this node is not yet part of the cluster. Hence there is nothing to update. We'll add the node to the cluster later using kubeadm join. For now we can continue with updating kubelet and kubectl:
+
+```sh
+apt update
+```
+
+```output
 Hit:1 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.32/deb  InRelease
 Hit:2 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
 2 packages can be upgraded. Run 'apt list --upgradable' to see them.
+```
 
-➜ root@cka3962-node1:~# apt show kubectl -a | grep 1.32
+```sh
+apt show kubectl -a | grep 1.32
+```
+
+```output
 Version: 1.32.1-1.1
 APT-Sources: https://pkgs.k8s.io/core:/stable:/v1.32/deb  Packages
 Version: 1.32.0-1.1
 APT-Sources: https://pkgs.k8s.io/core:/stable:/v1.32/deb  Packages
+```
 
-➜ root@cka3962-node1:~# apt install kubectl=1.32.1-1.1 kubelet=1.32.1-1.1
+```sh
+apt install kubectl=1.32.1-1.1 kubelet=1.32.1-1.1
+```
+
+```output
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -1475,14 +1522,27 @@ Unpacking kubelet (1.32.1-1.1) over (1.31.5-1.1) ...
 Setting up kubectl (1.32.1-1.1) ...
 Setting up kubelet (1.32.1-1.1) ...
 ...
+```
 
-➜ root@cka3962-node1:~# kubelet --version
+```sh
+kubelet --version
+```
+
+```output
 Kubernetes v1.32.1
-Now that we're up to date with kubeadm, kubectl and kubelet we can restart the kubelet:
+```
 
-➜ root@cka3962-node1:~# service kubelet restart
+- Now that we're up to date with kubeadm, kubectl and kubelet we can restart the kubelet:
 
-➜ root@cka3962-node1:~# service kubelet status
+```sh
+service kubelet restart
+```
+
+```sh
+service kubelet status
+```
+
+```output
 ● kubelet.service - kubelet: The Kubernetes Node Agent
      Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; preset: enabled)
     Drop-In: /usr/lib/systemd/system/kubelet.service.d
@@ -1492,32 +1552,51 @@ Now that we're up to date with kubeadm, kubectl and kubelet we can restart the k
     Process: 14013 ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_AR>
    Main PID: 14013 (code=exited, status=1/FAILURE)
         CPU: 86ms
-These errors occur because we still need to run kubeadm join to join the node into the cluster. Let's do this in the next step.
+```
 
- 
+- These errors occur because we still need to run kubeadm join to join the node into the cluster. Let's do this in the next step.
+- Add cka3962-node1 to cluster
+- First we log into the controlplane node and generate a new TLS bootstrap token, also printing out the join command:
 
-Add cka3962-node1 to cluster
-First we log into the controlplane node and generate a new TLS bootstrap token, also printing out the join command:
+```sh
+ssh cka3962
+```
 
-➜ ssh cka3962
+```sh
+sudo -i
+```
 
-➜ candidate@cka3962:~$ sudo -i
+```sh
+kubeadm token create --print-join-command
+```
 
-➜ root@cka3962:~# kubeadm token create --print-join-command
+```output
 kubeadm join 192.168.100.31:6443 --token pwq11h.uevwb20rt81e6whd --discovery-token-ca-cert-hash sha256:cb299d7b2025adf683779793a4a0a2051ac7611da668f188770259b0da68376c 
+```
 
-➜ root@cka3962:~# kubeadm token list
+```sh
+kubeadm token list
+```
+
+```output
 TOKEN                     TTL         EXPIRES   ...
 a3py1z.lq1aiephfk3k8o08   <forever>   <never>   ...
 oq905j.i1q45s76clmm3hkn   21h         2025-02-06T15:00:12Z   ...
 pwq11h.uevwb20rt81e6whd   23h         2025-02-06T17:52:45Z   ...
-We see the expiration of 23h for our token, we could adjust this by passing the ttl argument.
+```
 
-Next we connect again to cka3962-node1 and simply execute the join command from above:
+- We see the expiration of 23h for our token, we could adjust this by passing the ttl argument.
+- Next we connect again to cka3962-node1 and simply execute the join command from above:
 
-➜ root@cka3962:~# ssh cka3962-node1
+```sh
+ssh cka3962-node1
+```
 
-➜ root@cka3962-node1:~# kubeadm join 192.168.100.31:6443 --token pwq11h.uevwb20rt81e6whd --discovery-token-ca-cert-hash sha256:cb299d7b2025adf683779793a4a0a2051ac7611da668f188770259b0da68376c 
+```sh
+kubeadm join 192.168.100.31:6443 --token pwq11h.uevwb20rt81e6whd --discovery-token-ca-cert-hash sha256:cb299d7b2025adf683779793a4a0a2051ac7611da668f188770259b0da68376c 
+```
+
+```output
 [preflight] Running pre-flight checks
 [preflight] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
 [preflight] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.
@@ -1533,8 +1612,13 @@ This node has joined the cluster:
 * The Kubelet was informed of the new secure connection details.
 
 Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+```
 
-➜ root@cka3962-node1:~# service kubelet status
+```sh
+service kubelet status
+```
+
+```output
 ● kubelet.service - kubelet: The Kubernetes Node Agent
      Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; preset: enabled)
     Drop-In: /usr/lib/systemd/system/kubelet.service.d
@@ -1548,21 +1632,35 @@ Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
      CGroup: /system.slice/kubelet.service
              └─14204 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/ku>
 ...
-ℹ️ If you have troubles with kubeadm join you might need to run kubeadm reset before
+```
 
-Finally we check the node status:
+- ℹ️ If you have troubles with kubeadm join you might need to run kubeadm reset before
 
-➜ root@cka3962:~# k get node
+- Finally we check the node status:
+
+```sh
+k get node
+```
+
+```output
 NAME            STATUS      ROLES           AGE    VERSION
 cka3962         Ready       control-plane   173m   v1.32.1
 cka3962-node1   NotReady    <none>          20s    v1.32.1
-Give it a bit of time till the node is ready.
+```
 
-➜ root@cka3962:~# k get node
+- Give it a bit of time till the node is ready.
+
+```sh
+k get node
+```
+
+```output
 NAME            STATUS   ROLES           AGE    VERSION
 cka3962         Ready    control-plane   173m   v1.32.1
 cka3962-node1   Ready    <none>          29s    v1.32.1
-We see cka3962-node1 is now available and up to date.
+```
+
+- We see cka3962-node1 is now available and up to date.
 
 ### Question 9 | Contact K8s Api from inside Pod
 

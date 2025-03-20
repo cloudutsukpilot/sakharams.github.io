@@ -15,6 +15,15 @@ description: Troubleshooting Tips Per Topic
 
 1. Use `tail` and `grep` to follow the logs real time.
 2. Always make a copy of the any files before modifying.
+3. Set up the environment before starting the exam
+
+```sh
+alias k=kubectl                         # will already be pre-configured
+
+export do="--dry-run=client -o yaml"    # k create deploy nginx --image=nginx $do
+
+export now="--force --grace-period 0"   # k delete pod x $now
+```
 
 ### Apiserver Crash/Misconfiguration
 

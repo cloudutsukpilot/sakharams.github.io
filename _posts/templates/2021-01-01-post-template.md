@@ -106,6 +106,10 @@ Moon
 - Same Tab: [Google](https://google.com)
 - New Tab: [Google](https://google.com){:target="_blank"}
 
+### Reference Posts/Links within the blog
+
+[Microsoft Azure](/posts/cloud/azure/microsoft-azure)
+
 ## Footnote
 
 Click the hook will locate the footnote[^footnote], and here is another footnote[^fn-nth-2].
