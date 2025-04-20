@@ -29,7 +29,7 @@ description: Index Page for Kubernetes Articles
 | [Pods](/posts/devops/orchestration/kubernetes/kubernetes-pods) | * [Pods](/posts/devops/orchestration/kubernetes/hands-on/pods) * [Init-Container](/posts/devops/orchestration/kubernetes/hands-on/init-container) * [SideCar Container](/posts/devops/orchestration/kubernetes/hands-on/sidecar-container) |
 | [ReplicaSets](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/deployments-and-replicasets) |
 | [Deployments](/posts/devops/orchestration/kubernetes/kubernetes-deployments-and-replicasets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/deployments-and-replicasets) |
-| [StatefulSets](/posts/devops/orchestration/kubernetes/kubernetes-statefulesets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/statefulsets) |
+| [StatefulSets](/posts/devops/orchestration/kubernetes/kubernetes-statefulsets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/statefulsets) |
 | [DaemonSets](/posts/devops/orchestration/kubernetes/kubernetes-daemonsets) | [Hands-On](/posts/devops/orchestration/kubernetes/hands-on/daemonsets) |
 
 ### Networking
