@@ -2,7 +2,7 @@
 layout: post
 title: Dapr - Hello World
 categories: [microservices, dapr]
-tags: [Microservices, Dapr, CMDSheet]
+tags: [Microservices, Dapr, CMDsheet]
 image: /assets/img/microservics/dapr/dapr-posts.jpg
 description: Dapr - Hello World
 ---

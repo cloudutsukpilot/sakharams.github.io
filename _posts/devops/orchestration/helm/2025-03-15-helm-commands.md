@@ -166,6 +166,50 @@ release "my-release" uninstalled
 - System Changes:
   - All Kubernetes resources associated with my-release are deleted.
 
+
+  ### Upgrading a Helm Release with Reuse Values and Custom Values
+
+  - Command:
+
+  ```sh
+  helm upgrade my-release bitnami/nginx --reuse-values -f custom-values.yaml
+  ```
+
+  - Example Output:
+
+  ```output
+  Release "my-release" has been upgraded. Happy Helming!
+  ```
+
+  - System Changes:
+    - The deployment is upgraded while retaining the values from the previous release (`--reuse-values`).
+    - Additional custom values from the `custom-values.yaml` file are applied during the upgrade.
+
+  - Use Case:
+    - The `--reuse-values` flag is helpful when you want to preserve existing configurations while applying new changes.
+    - The `-f` flag allows you to specify additional customizations, making it easier to tailor upgrades without losing prior settings.
+
+### Upgrading a Helm Release with Atomic and Cleanup on Fail
+
+- Command:
+
+```sh
+helm upgrade my-release bitnami/nginx --atomic --cleanup-on-fail
+```
+
+- Example Output:
+
+```output
+Release "my-release" has been upgraded. Happy Helming!
+```
+
+- System Changes:
+  - The deployment is upgraded only if all resources are successfully updated.
+  - If the upgrade fails, all changes are rolled back automatically, ensuring no partial updates remain.
+
+- Use Case:
+  - This is particularly useful in production environments where partial upgrades can lead to inconsistent states. The `--atomic` flag ensures all-or-nothing upgrades, while `--cleanup-on-fail` removes any failed resources to maintain a clean state.
+
 ### Conclusion
 
 Helm provides a straightforward way to manage Kubernetes applications. By understanding these commands and their effects, you can efficiently deploy, upgrade, and maintain your applications. Use helm --help to explore additional options and fine-tune your Helm workflows.

@@ -52,11 +52,16 @@ jobs:
       #   run: |
       #     bundle _2.5.21_ install
       #     bundle _2.5.21_ lock
-      
+
       - name: Installed Versions
         run: |
           ruby --version
           bundle --version
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Build site
         run: bundle exec jekyll b -d "_site${{ steps.pages.outputs.base_path }}"

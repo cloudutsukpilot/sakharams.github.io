@@ -2,6 +2,9 @@
   // Prettier
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
+  "[helm]": {
+    "editor.formatOnSave": false
+  },
   // Shopify Liquid
   "files.associations": {
     "*.html": "liquid"
@@ -30,5 +33,9 @@
   "[css]": {
     "editor.defaultFormatter": "vscode.css-language-features"
   },
-  "WhiteSource Advise.Diff.BaseBranch": "main"
+  "WhiteSource Advise.Diff.BaseBranch": "main",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "sakharamgitlab",
+    "projectKey": "sakharamgit_cloudutsuk"
+  }
 }

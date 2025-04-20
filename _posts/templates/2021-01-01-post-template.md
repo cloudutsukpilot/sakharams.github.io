@@ -108,6 +108,7 @@ Moon
 
 ### Reference Posts/Links within the blog
 
+[Link Name](/posts/<the categories path defined in the layout section>/<name of the file>)
 [Microsoft Azure](/posts/cloud/azure/microsoft-azure)
 
 ## Footnote
