@@ -242,9 +242,6 @@ tags: [Cloud Migration, Architect]
     + User Guide
     + Forum
  
- 
- 
- 
 ### Migration Process:
  
 | Steps	| Resources	| Tools | 

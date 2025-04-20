@@ -108,7 +108,10 @@ Moon
 
 ### Reference Posts/Links within the blog
 
+{% raw %}
 [Link Name](/posts/<the categories path defined in the layout section>/<name of the file>)
+{% endraw %}
+
 [Microsoft Azure](/posts/cloud/azure/microsoft-azure)
 
 ## Footnote

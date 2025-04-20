@@ -22,14 +22,19 @@ In this blog post, we will explore a comprehensive list of Docker interview ques
 8. What is Docker Hub?
 9. How to inspect the architecture of an image built using docker? and how to pull an image with a particular architecture?
 To identify:
+
 {% raw %}
-```
+
+```sh
 docker pull ubuntu:latest
 docker image inspect --format '{{.Architecture}}' ubuntu:latest
 ```
-{% endraw %} 
+
+{% endraw %}
+
 To pull
-```
+
+```sh
 FROM --platform=linux/amd64 ubuntu:latest
 ```
 
