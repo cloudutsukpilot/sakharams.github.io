@@ -3,6 +3,8 @@ layout: post
 title: Conda - SSL CERTIFICATE_VERIFY_FAILED
 categories: [issues-fixes]
 tags: [Fixies, Conda, OpenSSL]
+image: /assets/img/issues-fixes/issues-fixes-posts.jpg
+description: Conda - SSL CERTIFICATE_VERIFY_FAILED
 ---
 
 ## Command

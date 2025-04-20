@@ -3,6 +3,8 @@ layout: post
 title: gcloud - SSL CERTIFICATE_VERIFY_FAILED
 categories: [issues-fixes]
 tags: [Fixies, gcloud, OpenSSL]
+image: /assets/img/issues-fixes/issues-fixes-posts.jpg
+description: gcloud - SSL CERTIFICATE_VERIFY_FAILED
 ---
 
 ## Command:

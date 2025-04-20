@@ -3,7 +3,7 @@ layout: post
 title: Dapr - CMDSheet
 categories: [microservices, dapr]
 tags: [Microservices, Dapr, CMDsheet]
-image: /assets/img/microservics/dapr/dapr-posts.jpg
+image: /assets/img/microservices/dapr/dapr-posts.jpg
 description: Commands Cheat Sheet
 ---
 

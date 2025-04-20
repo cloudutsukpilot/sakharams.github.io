@@ -3,6 +3,8 @@ layout: post
 title: Error while debugging Azure Functions Locally
 categories: [issues-fixes]
 tags: [Fixies, Azure, VSCode, Errors]
+image: /assets/img/issues-fixes/issues-fixes-posts.jpg
+description: Error while debugging Azure Functions Locally
 ---
 
 #### Problem:

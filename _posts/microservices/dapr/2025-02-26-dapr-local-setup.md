@@ -3,7 +3,7 @@ layout: post
 title: Dapr - Local Setup
 categories: [microservices, dapr]
 tags: [Microservices, Dapr]
-image: /assets/img/microservics/dapr/dapr-posts.jpg
+image: /assets/img/microservices/dapr/dapr-posts.jpg
 description: Setup Dapr locally on your machine.
 ---
 

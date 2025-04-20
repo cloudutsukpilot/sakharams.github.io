@@ -41,7 +41,7 @@ System Design can feel overwhelming especially when you're just starting out and
 - A client doesn’t magically know where a server is, it needs an address to locate and communicate with it.
 - On the internet, computers identify each other using IP addresses, which work like phone numbers for servers.
 
-![IP Address](/assets/img/architect/system-design/building-blocks/ip-address.png)
+![IP Address](/assets/img/architect/system-design/building-blocks/ip_address.png)
 
 - Every publicly deployed server has a unique IP address. When a client wants to interact with a service, it must send requests to the correct IP address.
 - But there’s a problem:

@@ -49,7 +49,8 @@ tasks:
   start-local:
     desc: Start Local Website
     cmds:
-      - JEKYLL_ENV=production bundle exec jekyll serve --livereload
+      - JEKYLL_ENV=production bundle exec jekyll serve
+      # --livereload
 
   create-service:
     desc: "Create and configure the Jekyll service to start on boot"

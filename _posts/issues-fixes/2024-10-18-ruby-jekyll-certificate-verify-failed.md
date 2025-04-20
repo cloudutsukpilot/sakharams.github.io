@@ -3,6 +3,8 @@ layout: post
 title: Ruby/Jeykll - Certificate Verify Failed
 categories: [issues-fixes]
 tags: [Fixies, Jekyll, Ruby, OpenSSL]
+image: /assets/img/issues-fixes/issues-fixes-posts.jpg
+description: Ruby/Jeykll - Certificate Verify Failed
 ---
 
 ## Error Messages

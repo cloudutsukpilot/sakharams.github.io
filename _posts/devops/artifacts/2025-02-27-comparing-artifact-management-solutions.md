@@ -13,7 +13,7 @@ Artifact repositories play a crucial role in modern software development, enabli
 
 ### **JFrog Artifactory**
 
-![JFrog Artifactory](/assets/img/devops/artifacts/jfrog/jfrog-posts.webp)
+![JFrog Artifactory](/assets/img/devops/artifacts/jfrog/jfrog-posts.jpg)
 
 - `Overview:`
 JFrog Artifactory is a universal binary repository manager that supports a wide range of package formats, including Docker, Maven, npm, and PyPI. It is widely used in enterprise DevOps workflows due to its powerful automation and CI/CD integration capabilities.
@@ -31,7 +31,7 @@ JFrog Artifactory is a universal binary repository manager that supports a wide 
 
 ### **Nexus Repository Manager**
 
-![Nexus Repository Manager](/assets/img/devops/artifacts/nexus-repository-manager-posts.png)
+![Nexus Repository Manager](/assets/img/devops/artifacts/nexus/nexus-repository-manager-posts.png)
 - `Overview:`
   - Developed by Sonatype, Nexus Repository Manager is an open-source and commercial repository solution that provides centralized storage and management for software artifacts. It supports multiple package formats and is widely used in enterprise DevOps pipelines.
 

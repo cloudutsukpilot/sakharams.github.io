@@ -14,7 +14,7 @@ description: Index Page for Helm
   - [Benefits of Using Helm](/posts/devops/orchestration/helm/helm/)
   - [Helm vs. Kustomize](/posts/devops/orchestration/helm/helm-vs-kustomize/)
   - [Helm Architecture](/posts/devops/orchestration/helm/helm-architecture/)
-  - [Helm Commands](/devops/orchestration/helm/helm-commands)
+  - [Helm Commands](/posts/devops/orchestration/helm/helm-commands)
 
 - [Helm Fundamentals](/posts/devops/orchestration/helm/helm-fundamentals/)
   - [ArtifactHub and Helm Repositories](/posts/devops/orchestration/helm/helm-fundamentals/)

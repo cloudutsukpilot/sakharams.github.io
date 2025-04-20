@@ -3,6 +3,8 @@ layout: post
 title: Git Clone - Unable to get local issue certificate
 categories: [issues-fixes]
 tags: [Fixies, Git, OpenSSL]
+image: /assets/img/issues-fixes/issues-fixes-posts.jpg
+description: Git Clone - Unable to get local issue certificate
 ---
 
 ## Error Messages:
