@@ -3,7 +3,21 @@ layout: post
 Title: Terraform Iterators
 categories: [devops, orchestration, terraform]
 tags: [DevOps, Orchestration, Terraform]
+image: /assets/img/devops/orchestration/terraform/terraform-posts.jpg
+description: Terraform Iterators
 ---
+
+## Comparing Itertors: for, for_each and count
+
+| Feature               | `for` |`for_each` | `count`  |
+|-----------------------|------ | --------- | -------- |
+| **Purpose**           | Used to transform and filter collections (lists, sets, maps).        | Iterates over each element in a map or set to create multiple resource instances.              | Creates a specified number of instances of a resource or module.                           |
+| **Use Case**          | Modifying collections, such as filtering a list of strings in a collection. | Creating resources with unique configurations based on the default value for each item.        | Creating a fixed number of similar resources without a unique resource configuration.       |
+| **Supported Collection Types** | Lists, Sets, Maps                                                  | Sets and Maps                                                                                  | Numeric expressions                                                                         |
+| **Accessing Elements** | Access to both element and their index (if needed).                  | Access to key-value pairs of resources `each.key` and `each.value`.                           | Access to index of the current resource using `count.index`.                               |
+| **Resource Creation** | Used for data manipulation, not direct resource creation.            | Enables dynamic resource creation with unique configurations derived from each item.           | Allows for simple replication with slight variations (e.g., naming) based on an index.     |
+
+
 
 1. Using for_each on a list of strings:
 

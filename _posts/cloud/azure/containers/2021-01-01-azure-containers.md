@@ -3,6 +3,8 @@ layout: post
 title: Azure - Containers
 categories: [cloud, azure, containers]
 tags: [Cloud, Azure, Containers]
+image: /assets/img/cloud/azure/containers/containers-posts.jpg
+description: Azure Containers Guide
 ---
 
 ## Introduction

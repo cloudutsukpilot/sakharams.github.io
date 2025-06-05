@@ -1,8 +1,10 @@
 ---
 layout: post
 title: AKS - Networking
-categories: [cloud, azure, containers]
-tags: [Cloud, Azure, Containers, Kubernetes, AKS]
+categories: [cloud, azure, containers, aks]
+tags: [Cloud, Azure, Kubernetes, AKS]
+image: /assets/img/cloud/azure/containers/aks/aks-posts.jpg
+description: AKS Networking
 ---
 
 ## Introduction
@@ -99,19 +101,12 @@ tags: [Cloud, Azure, Containers, Kubernetes, AKS]
 
 ### AKS Networking
 
-1. `Network Plugin`
-    - Determines how networking is handled in the cluster (Azure CNI in this case).
-        - `Azure CNI` provides advance networking capabilities and integrates with Azure Virtual Network (VNet). It allows Kubernetes pods to have IP addresses from the VNet.
-
-2. `Network Policy`
-    - Controls inter-pod communication (Azure Network Policies).
-        - `Azure` defines that Azure Network Policies will be used, which allows you to define rules to control traffic flow between pods in your AKS cluster.
-
-3. `Service CIDR`
-    - This CIDR block is used to allocate IP addresses for Kubernetes services such as LoadBalancers, ClusterIP services, and others.
-
-4. `DNS Service IP`:
-    - This IP address is used by the cluster to resolve DNS queries for services and pods.
-
-5. `Load Balancer SKU`:
-    - Specifies the type of Azure Load Balancer used for the cluster.
+| **Feature**         | **Description**                                                                                                                                       |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Network Plugin**   | Determines how networking is handled in the cluster (Azure CNI in this case).                                                                        |
+|                      | - **Azure CNI**: Provides advanced networking capabilities and integrates with Azure Virtual Network (VNet). It allows Kubernetes pods to have IP addresses from the VNet. |
+| **Network Policy**   | Controls inter-pod communication (Azure Network Policies).                                                                                          |
+|                      | - **Azure**: Defines that Azure Network Policies will be used, which allows you to define rules to control traffic flow between pods in your AKS cluster. |
+| **Service CIDR**     | This CIDR block is used to allocate IP addresses for Kubernetes services such as LoadBalancers, ClusterIP services, and others.                      |
+| **DNS Service IP**   | This IP address is used by the cluster to resolve DNS queries for services and pods.                                                                 |
+| **Load Balancer SKU**| Specifies the type of Azure Load Balancer used for the cluster.                                                                                      |

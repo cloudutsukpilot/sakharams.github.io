@@ -3,6 +3,8 @@ layout: post
 title: Terraform Complex Type Variables
 categories: [devops, orchestration, terraform]
 tags: [DevOps, Orchestration, Terraform]
+image: /assets/img/devops/orchestration/terraform/terraform-posts.jpg
+description: Terraform Complex Type Variables
 ---
 
 #### List

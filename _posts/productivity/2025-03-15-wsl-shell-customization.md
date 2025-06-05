@@ -116,6 +116,17 @@ fzf is a general-purpose command-line fuzzy finder that makes searching through 
 plugins=(git kubectl docker npm kube-ps1 ohmyzsh-full-autoupdate kube-ps1 azure fzf fzf-tab zsh-history-substring-search zsh-autosuggestions zsh-syntax-highlighting)
 ```
 
+### Auto-Complete
+
+1. Kubernetes
+
+```sh
+source <(kubectl completion zsh)
+```
+
+2. Azure CLI
+
+
 ### Conclusion
 
 If you’re looking to improve your command line experience, oh-my-zsh and fzf are fantastic tools that can significantly boost productivity. With enhanced history search, better tab completion, and autosuggestions, these tools make navigating the terminal a breeze.

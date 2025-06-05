@@ -3,6 +3,8 @@ layout: post
 title: Terraform Interview Questions
 categories: [devops, orchestration, terraform]
 tags: [DevOps, Orchestration, Terraform, Interview Questions]
+image: /assets/img/devops/orchestration/terraform/terraform-posts.jpg
+description: Terraform Interview Questions
 ---
 
 
