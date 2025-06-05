@@ -4,7 +4,7 @@ title: Create an AKS Cluster
 categories: [cloud, azure, containers, aks]
 tags: [Cloud, Azure, Kubernetes, AKS]
 image: /assets/img/cloud/azure/containers/aks/aks-posts.jpg
-`Description`: Explore the different parameters and their purpose to create an AKS cluster and typical use cases.
+Description`: Explore the different parameters and their purpose to create an AKS cluster and typical use cases.
 ---
 
 ## Introduction
