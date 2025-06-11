@@ -3,7 +3,7 @@ layout: post
 title: WSL Shell Customization
 categories: [ Productivity, WSL ]
 image: /assets/img/productivity/productivity-tools.avif
-description: Customizations for WSL Shell
+description: Customizations for WSL Shell 
 ---
 
 ## Supercharge Your Command Line with oh-my-zsh and plugins
