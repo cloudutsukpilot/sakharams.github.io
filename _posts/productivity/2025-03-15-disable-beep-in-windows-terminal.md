@@ -2,6 +2,7 @@
 layout: post
 title: Disable Beep in Windows Terminal
 categories: [ Productivity, WSL ]
+tags: [ Windows, Hacks ]
 image: /assets/img/productivity/productivity-tools.avif
 description: Disable Beep in Windows Terminal
 ---

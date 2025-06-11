@@ -2,6 +2,7 @@
 layout: post
 title: WSL Shell Customization
 categories: [ Productivity, WSL ]
+tags: [Productivity, WSL]
 image: /assets/img/productivity/productivity-tools.avif
 description: Customizations for WSL Shell 
 ---
