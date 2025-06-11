@@ -18,7 +18,7 @@ tags: [DevOps, CICD, Github Actions]
 - Your workflow contains one or more jobs which can run in sequential order or in parallel. 
 - Each job will run inside its own virtual machine runner, or inside a container, and has one or more steps that either run a script that you define or run an action, which is a reusable extension that can simplify your workflow.
 
-![Actions Overview](/assets/img/devops/cicd/githubactions/overview-actions-.webp)
+![Actions Overview](/assets/img/devops/cicd/githubactions/overview-actions.webp)
 
 1. **Workflow**
     - A workflow is a configurable automated process that will run one or more jobs. 
