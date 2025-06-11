@@ -45,6 +45,14 @@ description: List of tools to install while setting up a new host/laptop.
     choco install azure-kubelogin -y
     ```
 
+    ```sh
+    choco install kubectx -y
+    ```
+
+    ```sh
+    choco install dive -y
+    ```
+
 4. **Install Azure Tools**
 
     ```sh
@@ -112,7 +120,7 @@ description: List of tools to install while setting up a new host/laptop.
     choco install python --version=3.12.6 -y
     ```
 
-11. Install distro in WSL
+11. **Install distro in WSL**
 
     ```sh
     wsl.exe --install Ubuntu
@@ -127,4 +135,10 @@ description: List of tools to install while setting up a new host/laptop.
      gem install jekyll bundler
      # To install the requirements for the Jekyll theme
      bundle install
+    ```
+
+13. **Networking Tools**
+
+    ```sh
+    choco install gping -y
     ```
