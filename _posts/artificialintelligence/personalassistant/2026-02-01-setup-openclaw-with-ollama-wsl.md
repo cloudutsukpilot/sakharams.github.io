@@ -216,6 +216,8 @@ Or open your browser and go to: `http://127.0.0.1:18789/`
 
 On Windows, you can usually open the same URL in your Windows browser (WSL2 loopback forwarding).
 
+![Openclaw Dashboard](openclaw_homepage.png)
+
 This will show you:
 - Connected models (your Ollama models)
 - Configured channels
