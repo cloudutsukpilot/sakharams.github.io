@@ -25,25 +25,29 @@ tasks:
     cmds:
       - bundle exec htmlproofer _site --disable-external --ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
 
-  install-jekyll:
-    desc: Install Jekyll
+  setup-local:
+    desc: Setup local environment with Ruby, Bundler, Jekyll and dependencies
     cmds:
       - |
-        if command -v jekyll >/dev/null 2>&1; then
-          echo "Jekyll is already installed"
+        if command -v jekyll >/dev/null 2>&1 && command -v bundle >/dev/null 2>&1; then
+          echo "Jekyll and Bundler are already installed"
           jekyll --version
+          bundle --version
         else
+          echo "Installing Ruby, Bundler, and dependencies..."
           sudo apt update
-          sudo apt install ruby-full
-          sudo apt-get install ruby-full build-essential zlib1g-dev
+          sudo apt install -y ruby-full build-essential zlib1g-dev libffi-dev
+          sudo apt install -y ruby-bundler || gem install bundler
           echo '# Install Ruby Gems to ~/gems' >> ~/.bashrc
           echo 'export GEM_HOME="$HOME/gems"' >> ~/.bashrc
           echo 'export PATH="$HOME/gems/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
+          export GEM_HOME="$HOME/gems"
+          export PATH="$HOME/gems/bin:$PATH"
           bundle install
           gem install jekyll bundler
           jekyll --version
-          gem install jekyll-theme-chirpy 
+          bundle --version
+          gem install jekyll-theme-chirpy
         fi
 
   start-local:
@@ -63,9 +67,10 @@ tasks:
         [Service]
         Type=simple
         User=sakharamshinde
-        WorkingDirectory=/home/sakharamshinde/gitrepos/sakharams.github.io
-        ExecStart=/home/sakharamshinde/gems/bin/bundle exec jekyll serve --watch
+        WorkingDirectory=/mnt/c/gitrepos/sakharams.github.io
+        ExecStart=/usr/local/bin/bundle exec jekyll serve --host 0.0.0.0 --watch
         Environment="PATH=/home/sakharamshinde/gems/bin:/usr/local/bin:/usr/bin:/bin"
+        Environment=GEM_HOME=/home/sakharamshinde/gems
         StandardOutput=append:/var/log/jekyll-output.log
         StandardError=append:/var/log/jekyll-error.log
         Restart=on-failure

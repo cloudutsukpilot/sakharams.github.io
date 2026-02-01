@@ -2,6 +2,9 @@
 #
 # Run jekyll serve and then launch the site
 
+# Add local gem bin to PATH
+export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+
 prod=false
 command="bundle exec jekyll s -l"
 host="127.0.0.1"

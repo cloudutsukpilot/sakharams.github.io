@@ -8,6 +8,9 @@
 
 set -eu
 
+# Add local gem bin to PATH
+export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+
 SITE_DIR="_site"
 
 _config="_config.yml"
