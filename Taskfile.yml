@@ -17,7 +17,7 @@ tasks:
       - git status
       - git add .
       - git commit -m "{{.CLI_ARGS}}"
-      - git push github
+      - git push origin main
       # - git push gitlab
 
   test-site:
@@ -65,7 +65,7 @@ tasks:
         After=network.target
 
         [Service]
-        Type=simple
+        Type=simplef
         User=sakharamshinde
         WorkingDirectory=/mnt/c/gitrepos/sakharams.github.io
         ExecStart=/usr/local/bin/bundle exec jekyll serve --host 0.0.0.0 --watch
