@@ -8,7 +8,7 @@ image:
   alt: Agentic AI Architecture
 ---
 
-> *Having spent years designing and deploying systems — from classic ML pipelines to multi-model production workloads — the shift to Agentic AI is the most architecturally significant change that we are seeing in the market. It is not just about smarter models; it is about systems that think, plan, delegate, and act with minimal human intervention. This article is my attempt to distill the essence of Agentic AI from an architect's lens.*
+> *Having spent years designing and deploying systems — from classic 3 tier systems to multi-model production workloads — the shift to Agentic AI is the most architecturally significant change that we are seeing in the market. It is not just about smarter models; it is about systems that think, plan, delegate, and act with minimal human intervention. This article is my attempt to distill the essence of Agentic AI from an architect's lens.*
 
 ---
 
@@ -295,5 +295,3 @@ The models will keep improving. The architecture patterns you establish today wi
 Build thoughtfully. Monitor obsessively. Iterate continuously.
 
 ---
-
-*Written from the perspective of an Agentic AI Architect with hands-on experience designing multi-agent systems across cloud, enterprise, and research domains. The frameworks and tools referenced reflect the ecosystem as of May 2026.*
