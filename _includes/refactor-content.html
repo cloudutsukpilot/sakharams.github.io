@@ -322,9 +322,20 @@
 
 {% if _content contains 'mermaid-wrapper' %}
   <!--
-    The script below implements a simulated fullscreen viewer for Mermaid
-    diagrams (fixed-position overlay + CSS class toggle, instead of the native
-    Fullscreen API, which is unreliable in embedded/webview browser contexts).
+    The script below does two things:
+    1. Implements a simulated fullscreen viewer for Mermaid diagrams
+       (fixed-position overlay + CSS class toggle, instead of the native
+       Fullscreen API, which is unreliable in embedded/webview browser
+       contexts).
+    2. De-duplicates `pre.mermaid` elements. Chirpy's bundled JS
+       (assets/js/dist/post.min.js) can end up processing the same
+       `<pre><code class="language-mermaid">` block twice on a normal page
+       load (not just on theme toggle), producing two `<pre class="mermaid">`
+       siblings inside our wrapper and rendering the same diagram twice. Since
+       that logic lives in a minified upstream bundle we don't control, we
+       self-heal after the fact: a MutationObserver watches each
+       `.mermaid-wrapper` and removes any extra `pre.mermaid` siblings beyond
+       the first, keeping exactly one rendered diagram per wrapper.
 
     IMPORTANT: keep this script 100% free of `//` and `/* */` comments.
     - Jekyll's HTML compressor (compress_html, active in production builds)
@@ -340,6 +351,33 @@
   {% capture _mermaid_fullscreen_script %}
 <script>
 (function () {
+  function dedupeWrapper(wrapper) {
+    var pres = wrapper.querySelectorAll('pre.mermaid');
+    for (var i = 1; i < pres.length; i++) {
+      pres[i].parentNode.removeChild(pres[i]);
+    }
+  }
+
+  function dedupeAllWrappers() {
+    document.querySelectorAll('.mermaid-wrapper').forEach(dedupeWrapper);
+  }
+
+  function startDedupeObserver() {
+    dedupeAllWrappers();
+
+    var observer = new MutationObserver(function () {
+      dedupeAllWrappers();
+    });
+
+    document.querySelectorAll('.mermaid-wrapper').forEach(function (wrapper) {
+      observer.observe(wrapper, { childList: true });
+    });
+
+    setTimeout(dedupeAllWrappers, 500);
+    setTimeout(dedupeAllWrappers, 1500);
+    setTimeout(dedupeAllWrappers, 3000);
+  }
+
   function closestWrapper(el) {
     while (el && el !== document) {
       if (el.classList && el.classList.contains('mermaid-wrapper')) return el;
@@ -394,6 +432,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', startDedupeObserver);
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
