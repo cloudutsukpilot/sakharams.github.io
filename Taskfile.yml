@@ -26,35 +26,79 @@ tasks:
       - bundle exec htmlproofer _site --disable-external --ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
 
   setup-local:
-    desc: Setup local environment with Ruby, Bundler, Jekyll and dependencies
+    desc: Install Ruby, Bundler, native build deps, and project gems (bundle install) for local development
     cmds:
       - |
-        if command -v jekyll >/dev/null 2>&1 && command -v bundle >/dev/null 2>&1; then
-          echo "Jekyll and Bundler are already installed"
-          jekyll --version
-          bundle --version
+        if command -v ruby >/dev/null 2>&1 && command -v bundle >/dev/null 2>&1; then
+          echo "Ruby and Bundler are already installed:"
+          ruby -v
+          bundle -v
         else
-          echo "Installing Ruby, Bundler, and dependencies..."
+          echo "Installing Ruby, Bundler, and native extension build dependencies..."
           sudo apt update
           sudo apt install -y ruby-full build-essential zlib1g-dev libffi-dev
-          sudo apt install -y ruby-bundler || gem install bundler
-          echo '# Install Ruby Gems to ~/gems' >> ~/.bashrc
-          echo 'export GEM_HOME="$HOME/gems"' >> ~/.bashrc
-          echo 'export PATH="$HOME/gems/bin:$PATH"' >> ~/.bashrc
-          export GEM_HOME="$HOME/gems"
-          export PATH="$HOME/gems/bin:$PATH"
-          bundle install
-          gem install jekyll bundler
-          jekyll --version
-          bundle --version
-          gem install jekyll-theme-chirpy
+          gem install bundler
         fi
+      - |
+        # Install gems to a user-writable path so `bundle install` never needs sudo
+        GEM_USER_DIR="$HOME/.local/share/gem"
+        bundle config set --local path "$GEM_USER_DIR"
+        echo "Bundle install path set to $GEM_USER_DIR"
+      - |
+        RUBY_ABI_VERSION="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
+        GEM_BIN_DIR="$HOME/.local/share/gem/ruby/${RUBY_ABI_VERSION}/bin"
+        if ! grep -q "$GEM_BIN_DIR" ~/.bashrc 2>/dev/null; then
+          echo "export PATH=\"$GEM_BIN_DIR:\$PATH\"" >> ~/.bashrc
+          echo "Added $GEM_BIN_DIR to PATH in ~/.bashrc (run 'source ~/.bashrc' or restart your shell)."
+        fi
+      - bundle install
+      - echo "Setup complete. Run 'task start-local' to start the server."
 
   start-local:
-    desc: Start Local Website
+    desc: "Start Jekyll server in the background on a port and open it in the browser (override with: task start-local PORT=4001)"
+    vars:
+      PORT: '{{.PORT | default "4000"}}'
     cmds:
-      - JEKYLL_ENV=production bundle exec jekyll serve
-      # --livereload
+      - |
+        if pgrep -f "jekyll serve" > /dev/null; then
+          echo "Jekyll server is already running."
+        else
+          echo "Starting Jekyll server on port {{.PORT}} in the background..."
+          JEKYLL_ENV=production nohup bundle exec jekyll serve --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 &
+        fi
+      - |
+        URL="http://127.0.0.1:{{.PORT}}"
+        echo "Waiting for Jekyll server to become ready at $URL (initial build can take ~60s)..."
+        for i in $(seq 1 90); do
+          if curl -s -o /dev/null "$URL"; then
+            echo "Server is up."
+            break
+          fi
+          sleep 1
+        done
+      - |
+        URL="http://127.0.0.1:{{.PORT}}"
+        if command -v xdg-open >/dev/null 2>&1; then
+          xdg-open "$URL" >/dev/null 2>&1 &
+        elif command -v wslview >/dev/null 2>&1; then
+          wslview "$URL"
+        elif command -v open >/dev/null 2>&1; then
+          open "$URL"
+        else
+          echo "Open manually in your browser: $URL"
+        fi
+      - echo "Jekyll server running at http://127.0.0.1:{{.PORT}} (logs -> /tmp/jekyll-server.log). Stop with 'task stop-local'."
+
+  stop-local:
+    desc: Stop the background Jekyll server started by start-local
+    cmds:
+      - |
+        if pgrep -f "jekyll serve" > /dev/null; then
+          pkill -f "jekyll serve"
+          echo "Jekyll server stopped."
+        else
+          echo "Jekyll server is not running."
+        fi
 
   create-service:
     desc: "Create and configure the Jekyll service to start on boot"
@@ -123,46 +167,46 @@ tasks:
         }" | sudo tee /etc/logrotate.d/jekyll > /dev/null
 
   add-alias:
-    desc: " Create Log file and Add alias to bashrc"
+    desc: "Add start/stop/logs aliases for the Jekyll background server to ~/.zshrc (override port with: task add-alias PORT=4001)"
+    vars:
+      PORT: '{{.PORT | default "4000"}}'
     cmds:
-      # Step 1: Change the ownership of the Jekyll log file if not already owned by sakharamshinde
+      # start-cloudutsuk: launches the site in the background (same approach as `task start-local`),
+      # bound to this repo's absolute path at the time this task runs.
       - |
-        if [ "$(stat -c %U /var/log/jekyll.log)" != "sakharamshinde" ]; then
-          sudo chown sakharamshinde /var/log/jekyll.log
-          echo "Changed ownership of /var/log/jekyll.log to sakharamshinde."
+        REPO_DIR="$(pwd)"
+        ALIAS_LINE="alias start-cloudutsuk='if pgrep -f \"jekyll serve\" > /dev/null; then echo \"Jekyll server is already running.\"; else cd $REPO_DIR && JEKYLL_ENV=production nohup bundle exec jekyll serve --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 & echo \"Jekyll server started at http://127.0.0.1:{{.PORT}} (logs: /tmp/jekyll-server.log).\"; fi'"
+        if ! grep -qF "alias start-cloudutsuk" ~/.zshrc 2>/dev/null; then
+          echo "$ALIAS_LINE" >> ~/.zshrc
+          echo "Added alias start-cloudutsuk to ~/.zshrc."
         else
-          echo "Ownership of /var/log/jekyll.log is already assigned to sakharamshinde."
-        fi
-
-      # Step 2: Add the alias to .bashrc if it doesn't already exist
-      - |
-        if ! grep -q "alias start-cloudutsuk" ~/.bashrc; then
-          echo "alias start-cloudutsuk='if pgrep -f \"jekyll serve\" > /dev/null; then echo \"Jekyll server is already running.\"; else cd /home/sakharamshinde/gitrepos/sakharams.github.io && /home/sakharamshinde/gems/bin/bundle exec jekyll serve --watch &> /home/sakharamshinde/jekyll.log & echo \"Jekyll server started.\"; fi'" >> ~/.bashrc
-          echo "Added alias start-cloudutsuk to .bashrc."
-        else
-          echo "Alias start-cloudutsuk already exists in .bashrc."
+          echo "Alias start-cloudutsuk already exists in ~/.zshrc."
         fi
       - |
-        if ! grep -q "alias logs-cloudutsuk" ~/.bashrc; then
-          echo "alias logs-cloudutsuk='if [ -f /var/log/jekyll.log ]; then cat /var/log/jekyll.log; else echo \"Log file does not exist.\"; fi'" >> ~/.bashrc
-          echo "Added alias logs-cloudutsuk to .bashrc."
+        ALIAS_LINE="alias logs-cloudutsuk='if [ -f /tmp/jekyll-server.log ]; then tail -f /tmp/jekyll-server.log; else echo \"Log file does not exist.\"; fi'"
+        if ! grep -qF "alias logs-cloudutsuk" ~/.zshrc 2>/dev/null; then
+          echo "$ALIAS_LINE" >> ~/.zshrc
+          echo "Added alias logs-cloudutsuk to ~/.zshrc."
         else
-          echo "Alias logs-cloudutsuk already exists in .bashrc."
+          echo "Alias logs-cloudutsuk already exists in ~/.zshrc."
         fi
       - |
-        if ! grep -q "alias clear-cloudutsuk-logs" ~/.bashrc; then
-          echo "alias clear-cloudutsuk-logs='if [ -f /var/log/jekyll.log ]; then echo "" > /var/log/jekyll.log; echo \"Log file contents cleared.\"; else echo \"Log file does not exist.\"; fi'" >> ~/.bashrc
-          echo "Added alias clear-cloudutsuk-logs to .bashrc."
+        ALIAS_LINE="alias clear-cloudutsuk-logs='if [ -f /tmp/jekyll-server.log ]; then : > /tmp/jekyll-server.log; echo \"Log file contents cleared.\"; else echo \"Log file does not exist.\"; fi'"
+        if ! grep -qF "alias clear-cloudutsuk-logs" ~/.zshrc 2>/dev/null; then
+          echo "$ALIAS_LINE" >> ~/.zshrc
+          echo "Added alias clear-cloudutsuk-logs to ~/.zshrc."
         else
-          echo "Alias clear-cloudutsuk-logs already exists in .bashrc."
+          echo "Alias clear-cloudutsuk-logs already exists in ~/.zshrc."
         fi
       - |
-        if ! grep -q "alias stop-cloudutsuk" ~/.bashrc; then
-          echo "alias stop-cloudutsuk='pkill -f \"jekyll serve\" && echo \"Jekyll server stopped.\" || echo \"Jekyll server is not running.\"'" >> ~/.bashrc
-          echo "Added alias stop-cloudutsuk to .bashrc."
+        ALIAS_LINE="alias stop-cloudutsuk='pkill -f \"jekyll serve\" && echo \"Jekyll server stopped.\" || echo \"Jekyll server is not running.\"'"
+        if ! grep -qF "alias stop-cloudutsuk" ~/.zshrc 2>/dev/null; then
+          echo "$ALIAS_LINE" >> ~/.zshrc
+          echo "Added alias stop-cloudutsuk to ~/.zshrc."
         else
-          echo "Alias stop-cloudutsuk already exists in .bashrc."
+          echo "Alias stop-cloudutsuk already exists in ~/.zshrc."
         fi
+      - 'echo "Run source ~/.zshrc or restart your shell, then use: start-cloudutsuk, logs-cloudutsuk, stop-cloudutsuk, clear-cloudutsuk-logs"'
 
   install-on-windows:
     desc: Install on Windows

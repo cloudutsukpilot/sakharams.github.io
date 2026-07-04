@@ -14,6 +14,108 @@
     white-space: normal
 }
 
+// Prevent wide Mermaid diagrams from being scaled down to fit the article
+// column (which shrinks all node/edge text to unreadable sizes). Render at
+// natural size and let the reader scroll horizontally instead.
+pre.mermaid {
+    overflow-x: auto;
+
+    svg {
+        max-width: none !important;
+        width: auto !important;
+        height: auto !important;
+    }
+}
+
+// Fullscreen viewer for Mermaid diagrams. The `.mermaid-wrapper` element and
+// `.mermaid-fullscreen-btn` button are injected server-side by our override of
+// `_includes/refactor-content.html` (see that file for details). This keeps
+// diagrams readable without requiring every diagram to be redesigned narrower.
+//
+// Intentionally does NOT use the native Fullscreen API (`Element.requestFullscreen`).
+// That API is unreliable in embedded/webview browser contexts (VS Code Simple
+// Browser, in-app browsers, some mobile browsers) where it can silently no-op
+// or be blocked by iframe permissions policy. Instead we simulate fullscreen
+// with a fixed-position overlay toggled via a plain CSS class, which works
+// consistently everywhere.
+.mermaid-wrapper {
+    position: relative;
+
+    .mermaid-fullscreen-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        z-index: 10;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: none;
+        border-radius: 0.375rem;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        cursor: pointer;
+        opacity: 0.55;
+        transition: opacity 0.15s ease-in-out;
+
+        &:hover,
+        &:focus-visible {
+            opacity: 1;
+        }
+    }
+
+    &.is-fullscreen {
+        position: fixed;
+        inset: 0;
+        z-index: 1090;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+        padding: 2rem;
+        margin: 0;
+        background: var(--main-bg);
+        overflow: auto;
+
+        // `pre.mermaid` is a flex item here. Without an explicit size, a flex
+        // item that also sets `overflow` to non-visible (see the base
+        // `pre.mermaid` rule above) gets an automatic minimum size of 0 per
+        // the flexbox spec, which combined with an `auto`-sized SVG inside it
+        // creates a circular sizing dependency that collapses everything to
+        // 0x0. Giving both explicit, non-`auto` dimensions breaks that cycle.
+        pre.mermaid {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            width: 100%;
+            height: 100%;
+
+            svg {
+                width: 90vw !important;
+                height: 85vh !important;
+                max-width: 90vw !important;
+                max-height: 85vh !important;
+            }
+        }
+
+        .mermaid-fullscreen-btn {
+            top: 1rem;
+            right: 1rem;
+        }
+    }
+}
+
+// Prevent the underlying page from scrolling while a diagram overlay is open.
+body.mermaid-fullscreen-open {
+    overflow: hidden;
+}
+
+
+
+
 
 // @import 'main
 // {%- if jekyll.environment == 'production' -%}

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Certifiates - Unable to get local issue certificate
+title: Certificates - Unable to get local issue certificate
 categories: [basics, certificates]
 tags: [Basics, Certificates]
 ---

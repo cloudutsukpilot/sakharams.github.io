@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Tmux - Copy Paste Configuration
-categories: [Linux]
+categories: [operating systems, linux]
 tags: [Linux, Tools]
 ---
 
