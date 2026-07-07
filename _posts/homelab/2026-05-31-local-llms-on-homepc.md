@@ -3,7 +3,6 @@ layout: post
 title: Setting Up Local LLMs on My Home PC — What Actually Works for Coding
 categories: [homelab]
 tags: [HomeLab, Local LLMs]
-pin: true
 image: /assets/img/homelab/homelab-posts.png
 description: Local LLMs for Coding
 ---
