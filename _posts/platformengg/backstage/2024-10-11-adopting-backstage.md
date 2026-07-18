@@ -2,7 +2,7 @@
 layout: post
 title: Backstage.io - Adoption
 categories: [Platform Engineering, Backstage]
-categories: [Platform Engineering, Backstage]
+tags: [Platform Engineering, Backstage]
 ---
 
 ## Introduction

@@ -2,7 +2,7 @@
 layout: post
 title: Backstage.io - Features
 categories: [PlatformEngg, Backstage]
-categories: [Platform Engineering, Backstage]
+tags: [Platform Engineering, Backstage]
 ---
 
 ## Introduction

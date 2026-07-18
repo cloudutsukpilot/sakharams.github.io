@@ -2,7 +2,7 @@
 layout: post
 title: Backstage.io - A Developer Portal Framework
 categories: [PlatformEngg, Backstage]
-categories: [Platform Engineering, Backstage]
+tags: [Platform Engineering, Backstage]
 ---
 
 ## Introduction

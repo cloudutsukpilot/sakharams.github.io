@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Backstage.io - Local Setup
-categories: [PlatformEngg, Backstage]
-categories: [Platform Engineering, Backstage]
+categories: [ Platform Engineering, Backstage ]
+tags: [Platform Engineering, Backstage]
 ---
 
 ## Introduction
