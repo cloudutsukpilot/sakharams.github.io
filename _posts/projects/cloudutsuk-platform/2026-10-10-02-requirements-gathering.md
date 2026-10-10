@@ -48,6 +48,7 @@ memory. Those tensions shaped the non-functional requirements more than any feat
 | F15 | A commit to a platform repo builds an image locally and Argo CD deploys it |
 | F16 | Architecture decisions are recorded as ADRs and published on the blog |
 | F17 | Planned faults can be injected into any cluster from one open-source chaos tool (LitmusChaos, run from the `core` cluster), with experiments kept in git and each run scored by probes |
+| F18 | The add-ons every cluster needs are placed by one policy per add-on (Karmada), by cluster label, so a new cluster gets them without any per-cluster change |
 
 ## Non-functional requirements
 {: #non-functional-requirements }
@@ -109,6 +110,8 @@ proposed fix waiting for my approval.
   probe result and resilience score are recorded, and the fault shows in Grafana next to its effect.
 - **F17:** Given an experiment that targets a node, or a workload without the chaos annotation, when it's
   started, it doesn't run.
+- **F18:** Given a new lab cluster registered with the `lab` role, when it joins, the monitoring pack and
+  the other shared add-ons are running on it without a change to `homelab-gitops`.
 
 ## Business rules
 {: #business-rules }

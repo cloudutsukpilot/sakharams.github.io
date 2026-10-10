@@ -178,14 +178,31 @@ nodes:
           detail: 'Pulls resources and cost from Azure, AWS, GCP and the DGX into `platform-db.inventory`, every 6
             hours or on Sync now. Uses read-only identities: Azure Reader + Cost Management Reader; AWS ReadOnly +
             `ce:Get*`; GCP Viewer + BigQuery Data Viewer.'
-        - id: argocd
-          label: Argo CD
-          sub: hub
+        - id: gitops-area
+          label: GitOps
+          sub: Argo CD + Karmada
           icon: git
           color: orange
-          detail: One instance that deploys to every cluster from `homelab-gitops`. An ApplicationSet installs the
-            monitoring pack (OTel collectors, kube-state-metrics, ServiceMonitor discovery) on every cluster, labs
-            included.
+          detail: 'How every cluster gets its desired state: Argo CD syncs `homelab-gitops`, and (from phase 1a) Karmada
+            places the shared add-ons on clusters by label.'
+          children:
+          - id: argocd
+            label: Argo CD
+            sub: hub
+            icon: git
+            color: orange
+            detail: One instance that deploys to every cluster from `homelab-gitops`. An ApplicationSet installs the
+              monitoring pack (OTel collectors, kube-state-metrics, ServiceMonitor discovery) on every cluster, labs
+              included.
+          - id: karmada
+            label: Karmada
+            sub: multi-cluster placement
+            icon: cluster
+            color: sky
+            detail: 'Planned for phase 1a (ADR 0037, proposed). Argo CD syncs the shared add-ons once to Karmada''s API
+              server; propagation policies place them on clusters by label (`cloudutsuk.com/role`) and override policies
+              set per-cluster values. Members join in pull mode, so Karmada holds no cluster credentials. If the trial
+              fails, Argo CD ApplicationSets keep this job.'
         - id: sre
           label: SRE agent
           sub: human in the loop
@@ -260,24 +277,31 @@ nodes:
           icon: function
           detail: Clones the repos with a read-only token and re-embeds only changed files, every 6 hours or on Re-index
             now. Only pushed work is indexed.
-        - id: redis
-          label: Redis
-          sub: semantic cache
-          icon: bolt
-          detail: 'Semantic cache entries keyed by the index version (RedisVL `SemanticCache`). Rebuildable: it''s
-            a cache.'
-        - id: qdrant
-          label: Qdrant
-          sub: vectors
+        - id: rag-stores
+          label: Stores
+          sub: cache, vectors, state
           icon: database
-          detail: Chunks of posts, lab cards and repos with embeddings. Each point carries `source`, `repo`, `lab`,
-            `cloud`, `path` and `commit`, so chat can filter and ingest can delete removed files.
-        - id: ai-db
-          label: ai-db
-          sub: Postgres
-          icon: databases/postgresql-18.svg
-          detail: 'Schemas `rag` (ingest state, chat history) and `phoenix` (traces, evals). Partly rebuildable: `rag`
-            rebuilds from git; chat history and evals are backed up.'
+          color: violet
+          detail: 'The RAG service''s stores: the Redis semantic cache, Qdrant vectors and the `ai-db` Postgres.'
+          children:
+          - id: redis
+            label: Redis
+            sub: semantic cache
+            icon: bolt
+            detail: 'Semantic cache entries keyed by the index version (RedisVL `SemanticCache`). Rebuildable: it''s
+              a cache.'
+          - id: qdrant
+            label: Qdrant
+            sub: vectors
+            icon: database
+            detail: Chunks of posts, lab cards and repos with embeddings. Each point carries `source`, `repo`, `lab`,
+              `cloud`, `path` and `commit`, so chat can filter and ingest can delete removed files.
+          - id: ai-db
+            label: ai-db
+            sub: Postgres
+            icon: databases/postgresql-18.svg
+            detail: 'Schemas `rag` (ingest state, chat history) and `phoenix` (traces, evals). Partly rebuildable: `rag`
+              rebuilds from git; chat history and evals are backed up.'
       - id: serving
         label: Model serving
         sub: LiteLLM + vLLM
@@ -383,6 +407,13 @@ nodes:
         sub: monitoring pack
         icon: chart
         detail: Installed by Argo CD's ApplicationSet; sends traces, metrics and logs to the mon cluster.
+      - id: lab-karmada
+        label: Karmada agent
+        sub: pull mode
+        icon: cluster
+        detail: 'Registered by the lab runner when the lab is deployed (and removed on destroy). Dials out to Karmada''s
+          API server, applies the add-ons placed on this cluster (monitoring pack, External Secrets, ExternalDNS,
+          cert-manager, chaos agent) and reports their status back.'
       - id: lab-chaos
         label: Chaos agent
         sub: Litmus infrastructure
@@ -524,6 +555,10 @@ edges:
   - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
   - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
   - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's cache."}
+  - {id: argo_karmada, view: cicd, from: argocd, to: karmada, proto: HTTPS, port: 5443, label: shared add-ons, detail: "Karmada's API server, registered in Argo CD as one more cluster.", why: "Used when a shared add-on changes in homelab-gitops: Argo CD syncs it once to Karmada instead of once per cluster."}
+  - {id: run_karmada, view: cicd, oneway: true, from: runner, to: karmada, kind: control, label: register, why: "Used when a lab is deployed or destroyed: the runner registers the new cluster with Karmada (role lab) or removes it."}
+  - {id: kagent_karmada, view: cicd, from: lab-karmada, to: karmada, proto: HTTPS, port: 5443, label: pull, detail: "Pull mode: the agent's own client certificate; Karmada never connects in.", why: "Always on: the agent watches Karmada for add-ons placed on its cluster and reports their status back."}
+  - {id: kagent_apply, view: cicd, oneway: true, from: lab-karmada, to: lab-otel, kind: control, label: apply add-ons, why: "Used when an add-on is placed on this cluster: the agent applies it locally, here the monitoring pack's collector."}
   - {id: you_chaos, view: chaos, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", detail: "Internal only: reached from the home LAN, not through Cloudflare.", why: "Used when you start, schedule or review a chaos experiment in ChaosCenter."}
   - {id: cc_db, view: chaos, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB."}
   - {id: chaos_agent, view: chaos, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key from OpenBao.", why: "Always on while a cluster is a chaos target: the agent dials out to ChaosCenter for experiments and reports their results."}
@@ -644,6 +679,37 @@ scenarios:
         path: [you_graf, ~you_graf]
         result: done
         outcome: "Dashboard loaded"
+
+  - id: karmada
+    title: Join a new cluster
+    summary: "Planned (phase 1a): Karmada places the shared add-ons on a new lab cluster by label."
+    steps:
+      - title: Register the cluster
+        action: "Lab runner → Karmada: register the new lab cluster (role lab)"
+        text: "Right after make up, the lab runner registers the cluster with Karmada in pull mode and labels it with its role."
+        edges: [run_karmada]
+      - title: The agent asks for work
+        action: "Karmada agent ↔ Karmada: which add-ons are placed here? (HTTPS 5443)"
+        text: "The lab's karmada-agent dials out to Karmada's API server (default port 5443); propagation policies match the lab label."
+        path: [kagent_karmada, ~kagent_karmada]
+      - title: Apply the add-ons
+        action: "Karmada agent → lab cluster: apply the monitoring pack and other add-ons"
+        text: "The agent applies the add-ons locally, with overrides such as the cluster's name and its OpenBao mount."
+        edges: [kagent_apply]
+      - title: Telemetry starts
+        action: "Lab collector → mon: traces, metrics, logs (OTLP 4317)"
+        text: "The monitoring pack's collector starts streaming to mon, with no change to the lab's own code."
+        edges: [labs_mon]
+      - title: Report status
+        action: "Karmada agent ↔ Karmada: add-ons applied and healthy"
+        text: "The agent reports each add-on's status, which Karmada aggregates across every cluster."
+        path: [kagent_karmada, ~kagent_karmada]
+      - title: One health in Argo CD
+        action: "Argo CD ↔ Karmada: shared add-ons Synced and Healthy (HTTPS 5443)"
+        text: "Argo CD reads the aggregated status from Karmada, so one app shows the add-ons' health on every cluster."
+        path: [argo_karmada, ~argo_karmada]
+        result: success
+        outcome: "Add-ons running on the new lab"
 
   - id: chaos
     title: Run a chaos experiment

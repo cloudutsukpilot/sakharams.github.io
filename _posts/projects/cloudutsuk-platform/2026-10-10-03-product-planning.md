@@ -33,6 +33,7 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 |---|---|---|---|
 | 0. Foundation | This playbook, animated diagrams (design gate), ADRs 0001–0035, 3 new repos, `core` cluster (Keycloak, OpenBao, PowerDNS, Zot registry), `mon`, `platform` and `ai` clusters, External Secrets everywhere, internal DNS and TLS, GPU spike, DNS on Cloudflare, tunnel + Access, boot unit, heartbeat, backup bucket | none | In progress |
 | 1. GitOps + CI/CD | Central Argo CD, `homelab-gitops` app-of-apps, ARC runners, BuildKit, the Zot registry in `core`, reusable build workflow with security gates (Gitleaks, Semgrep, Trivy, Checkov, Hadolint, SBOM, Cosign), Kyverno, PostSync smoke tests | 0 | Not started |
+| 1a. Multi-cluster management | Karmada trial, then the Karmada control plane in `platform` (installed by Argo CD), pull-mode agents on every cluster, the shared add-ons moved from ApplicationSets to Karmada propagation and override policies, lab runner registers and removes labs | 1 | Not started |
 | 3a. Quality baseline | Playwright journeys, Schemathesis on every service, nightly OWASP ZAP, Locust load scenarios, Performance and Security dashboards, first performance baseline | 3 | Not started |
 | 2. Central monitoring | `mon` with LGTM and Alertmanager; host exporters (node, GPU, Docker, blackbox); a monitoring pack on every cluster (OTel collectors, kube-state-metrics, ServiceMonitors); ready-made dashboards and mixin alerts; labs moved onto it | 1 | Not started |
 | 2a. Chaos engineering | Open-source LitmusChaos: ChaosCenter and its MongoDB in `core`, chaos agents on target clusters by an ApplicationSet (labs first), the experiment library in `homelab-gitops`, a Chaos dashboard in Grafana, first game day | 1, 2 | Not started |
@@ -79,6 +80,7 @@ Each phase ends with the same exit steps:
 |---|---|
 | M0 Design approved | The three animated diagrams are approved; `nvidia-smi` works in a test pod (or the plain-container fallback is accepted); cloudutsuk.com still serves after the DNS move |
 | M1 Commit to deploy | A commit to a hello-world service ends with an Argo CD app Synced and Healthy on the new SHA |
+| M1a One placement | A new cluster labelled `lab` gets the shared add-ons from Karmada with no other change; Argo CD shows them Healthy through Karmada; removing the cluster removes them. If the trial fails, the ApplicationSets stay and this milestone is dropped |
 | M2 One Grafana | A lab's signals appear in `mon` without changing the lab; killing a pod fires an alert |
 | M2a Chaos | A pod-delete experiment from ChaosCenter in `core` runs on a lab, its probe passes, and the fault and its alert show side by side in Grafana; no experiment can target a node |
 | M3 MVP | Deploy and Destroy from the portal create and delete a cluster and register it in Argo CD |
@@ -100,6 +102,7 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Foundation | `infra-local`, `infra-github` | Create repos; k3d clusters via `k3d_config_cluster`; GPU spike |
 | GitOps + CI/CD | `homelab-gitops` | App-of-apps; ARC runner scale set; image tag write-back |
 | Monitoring | `homelab-gitops` | LGTM values; ApplicationSet for lab collectors; Watchdog heartbeat |
+| Multi-cluster management | `homelab-gitops`, `homelab-services` | Karmada trial; control plane values; propagation and override policies per add-on; lab runner `register` and `unregister` |
 | Chaos engineering | `homelab-gitops` | ChaosCenter Helm values in `core`; agent ApplicationSet; experiment library with probes; game-day runbook |
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
 | Inventory + cost | `homelab-services` | Azure collector; AWS collector; GCP billing export; DGX power estimate |
@@ -150,6 +153,7 @@ and my evenings.
 | Memory exhaustion | Medium | Monitoring or the portal starves | Budget table, limits, PriorityClasses, lab admission control |
 | A chaos experiment hits the whole DGX (node stress on k3d, a fault in `core`) | Low | Every cluster, and the desktop, at once | Pod-level faults only; annotation check; `core` only in a planned game day; ChaosCenter LAN-only and admins only |
 | ChaosCenter adds memory and a MongoDB to `core` | Medium | `core` is less small and stable (ADR 0025) | Measure it in the spike; if it doesn't fit, ChaosCenter moves to `mon` and only the agents stay |
+| Karmada duplicates what Argo CD already does and costs ~2.5 GB | Medium | Two tools to learn and debug for the same fan-out | Narrow role (shared add-ons only); a trial with an exit check; ApplicationSets stay as the fallback; first to go if memory is tight |
 | Self-hosted runners abused | Low | Code execution on the DGX | Private repos only; ephemeral runners |
 | Prompt injection through logs reaches the agent | Medium | A bad change proposed | Read-only RBAC; approval for every change; fixes as PRs |
 | Scope creep | High | Nothing ships | MVP is phases 0–3; new ideas go to the backlog via change control |
@@ -178,6 +182,7 @@ There's one decider, so this stays light:
 - [x] GPU spike result written into ADR 0010
 - [ ] arm64 image check done for every planned chart, including LitmusChaos and its MongoDB
 - [ ] ADR 0036 (LitmusChaos in `core`) written in `homelab-gitops` and synced
+- [ ] ADR 0037 (Karmada) written in `homelab-gitops`, and accepted or dropped after the phase 1a trial
 - [ ] This post and the project card status updated at the end of every phase
 
 {% include project-nav.html %}

@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Technical Architecture"
 date: 2026-10-10 00:05:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Architecture]
-description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD and monitoring, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
+description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD with Karmada, monitoring, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
 project: cloudutsuk-platform
 project_step: 5
 mermaid: true
@@ -55,6 +55,8 @@ play to follow a packet through it:
 | Inventory | platform (CronJob, 6 h + Sync now) | Pulls resources and cost from Azure, AWS, GCP and the DGX into Postgres |
 | Lab runner | DGX host (systemd), called from platform | Runs a lab's `make up` / `make down`, registers the cluster with Argo CD |
 | Argo CD | platform | One instance that deploys to every cluster from `homelab-gitops` |
+| Karmada control plane | platform | Places the shared add-ons (monitoring pack, External Secrets, ExternalDNS, cert-manager, chaos agent) on clusters by label, with per-cluster overrides (phase 1a, proposed) |
+| Karmada agent | every member cluster, including labs | Pull mode: dials out to Karmada, applies the add-ons placed on its cluster and reports their status |
 | RAG API, rag-ingest | `ai` cluster | Chat retrieval with a semantic cache; scheduled indexing of the blog and repos |
 | Qdrant, Redis | `ai` cluster | Vectors and the semantic cache |
 | Postgres | platform | Relational state: Backstage, inventory and cost, lab jobs |
@@ -86,6 +88,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | Local Kubernetes | k3d | Already used by every lab. Clusters are cheap to create and destroy |
 | Cluster lifecycle | Terragrunt units from [Y-IaC](/tags/y-iac/): `docker_network` and `k3d_config_cluster`, which renders k3d's own config file and runs the k3d CLI | The long-lived clusters get the same plan/apply workflow as the cloud infrastructure, and `plan` shows the exact k3d config. The older provider-based unit crashed whenever `update.k3s.io` was down and couldn't set host aliases (ADR 0006) |
 | GitOps | Argo CD | Its UI and Backstage plugin suit a portal-centric setup better than Flux |
+| Multi-cluster placement | **Karmada** (CNCF), alongside Argo CD | Argo CD ApplicationSets already fan add-ons out, and they stay the fallback. Karmada adds placement by cluster label, per-cluster overrides and one API across every cluster, without changing a single manifest. Open Cluster Management and Rancher Fleet were the alternatives; Fleet would replace Argo CD, which this platform keeps |
 | CI | GitHub Actions self-hosted runners (ARC) + BuildKit | The repos are already on GitHub, and self-hosted minutes are free |
 | Observability | OpenTelemetry Collector + Grafana LGTM | The same stack the [OpenTelemetry lab](/tags/opentelemetry-lab/) already teaches |
 | LLM serving | vLLM | OpenAI-compatible API, continuous batching, runs on the GB10 GPU |
@@ -431,6 +434,7 @@ isn't published through the tunnel at all. It's reached only from the home LAN a
 | Alertmanager → SRE agent, collectors → mon | OAuth2 client credentials, which both support natively |
 | SRE agent and lab runner → a cluster's Kubernetes API | 15-minute ServiceAccount tokens from OpenBao's Kubernetes secrets engine, read-only for the agent |
 | Argo CD → every cluster | One ServiceAccount token per cluster, refreshed from OpenBao |
+| Karmada agents → Karmada API server | Each agent's own client certificate from pull-mode registration; Karmada holds no member-cluster credentials |
 | Every cluster → OpenBao | Per-cluster Kubernetes auth (below) |
 
 Every cross-cluster call is HTTPS on a `*.home.cloudutsuk.com` certificate, and NetworkPolicies
@@ -521,7 +525,66 @@ A commit flows:
 3. Argo CD syncs it.
 
 Argo CD is a single hub instance. Lab clusters are registered when the lab runner creates them, and an
-ApplicationSet installs the OTel collector on every one.
+ApplicationSet installs the OTel collector on every one. From phase 1a, if the Karmada trial passes, that
+fan-out moves to Karmada (below) and the lab runner also registers each new lab with it.
+
+### Multi-cluster management with Karmada
+{: #multi-cluster-management }
+
+The platform starts with four long-lived clusters and adds one per lab, and most of what each cluster
+runs is the same: the monitoring pack, External Secrets, ExternalDNS, cert-manager and, from phase 2a,
+the chaos agent. **Karmada** (a CNCF project) manages that shared layer. It's a Kubernetes-style
+control plane for many clusters: you apply ordinary manifests to *its* API server, and policies decide
+which member clusters get them.
+
+**How it fits with Argo CD.** Argo CD stays the GitOps engine and keeps deploying each cluster's own
+apps directly. For the shared add-ons, Argo CD syncs them once, to Karmada's API server, as if it were one
+more cluster:
+
+| Karmada object | What it does here |
+|---|---|
+| `PropagationPolicy` | Places each add-on on clusters by label, for example every cluster with `cloudutsuk.com/role` in `core`, `platform`, `mon`, `ai`, `lab` |
+| `OverridePolicy` | Per-cluster values: the OTel `cluster` attribute, each cluster's OpenBao auth mount, the ExternalDNS domain (`<cluster>.home.cloudutsuk.com`) |
+| `Cluster` | One per member, labelled with its role; the lab runner adds a lab's on deploy and removes it on destroy |
+| Status aggregation | Each add-on's status comes back from every cluster, so Argo CD shows one health for "monitoring pack everywhere" |
+
+**Placement.** The control plane (API server, etcd, controller manager, scheduler, webhook) runs in
+`platform` next to Argo CD, installed by Argo CD. It isn't needed at boot, so it doesn't belong in `core`.
+Members join in **pull mode**: a `karmada-agent` in each cluster dials out to the Karmada API server and
+applies what's placed on it, so Karmada holds no cluster credentials. That's the same outbound pattern as
+the chaos agents.
+
+**What I'm deliberately not using.** Karmada can split a Deployment's replicas across clusters, fail
+over between them and autoscale across them. On one DGX those add nothing: every cluster shares the same
+machine, so failing over from one to another doesn't survive the failures that matter (ADR 0015). They
+become worth turning on when a second machine joins.
+
+```yaml
+# Sketch: the monitoring pack on every cluster, with each cluster's name as an override
+apiVersion: policy.karmada.io/v1alpha1
+kind: ClusterPropagationPolicy
+metadata:
+  name: monitoring-pack
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: otel-agent
+      namespace: monitoring
+  placement:
+    clusterAffinity:
+      labelSelector:
+        matchExpressions:
+          - key: cloudutsuk.com/role
+            operator: In
+            values: [core, platform, mon, ai, lab]
+```
+
+> **TODO:** The Karmada trial (phase 1a) has to show four things before ADR 0037 is accepted: arm64
+> images for every component, Argo CD reporting health correctly through Karmada's API server, a lab
+> joining and leaving in pull mode within the lab runner's deploy time, and the memory it really uses. If
+> any fails, the ApplicationSets stay and Karmada is dropped.
+{: .prompt-warning }
 
 ### Internal DNS and bootstrap order
 
@@ -629,6 +692,7 @@ overridden with `--cluster-cidr` and `--service-cidr` when each cluster is creat
 | → Kubernetes API | HTTPS 6443 on the load balancer, never published to the LAN | k3s's own CA; short-lived tokens |
 | Collectors → mon | OTLP gRPC 4317 | TLS, plus OAuth2 client credentials |
 | Pods → internal DNS | DNS 53 to CoreDNS, forwarded to PowerDNS at `172.30.0.1:53` | Plain DNS, on the bridge only |
+| Karmada agents → Karmada API server | HTTPS 5443 (Karmada's default) on the `platform` load balancer, outbound from each member | Karmada's own CA; per-agent client certificates |
 | Chaos agents → ChaosCenter | HTTPS 443 to `chaos.core.home.cloudutsuk.com`, outbound from each target cluster | Let's Encrypt certificate; each agent has its own infrastructure ID and access key from OpenBao |
 | Clusters → registry | HTTPS 443 to `registry.core.home.cloudutsuk.com`, which resolves to the gateway address through a k3d host alias on every node | Let's Encrypt certificate. Anonymous pulls of mirrored public images; our images need the `zot-pull` secret |
 | cert-manager → Let's Encrypt | HTTPS 443, DNS-01 TXT records through the Cloudflare API | ACME |
@@ -659,6 +723,7 @@ on the same chip and the same memory. So the budget is the main design constrain
 | `ai` cluster: RAG API, rag-ingest, Qdrant, Redis, Phoenix | ~4–6 GB | ~5 GB |
 | core cluster (Keycloak, OpenBao, PowerDNS, Zot, ESO, ExternalDNS, LitmusChaos ChaosCenter + MongoDB) | ~4–5.5 GB | ~4.5 GB |
 | Litmus chaos agents (one per target cluster, from phase 2a) | ~0.2–0.4 GB each | ~1 GB |
+| Karmada control plane in platform (API server, etcd, controllers), plus one agent per cluster (from phase 1a) | ~1.5–2.5 GB, agents ~0.1 GB each | ~2.5 GB |
 | mon cluster | ~6–8 GB | ~7 GB |
 | platform cluster (portal, Postgres, inventory, Argo CD, CI, SRE agent) | ~7–9 GB | ~8 GB |
 | CI runners + BuildKit (in bursts) | ~4–8 GB | ~5 GB |
@@ -668,9 +733,10 @@ on the same chip and the same memory. So the budget is the main design constrain
 
 **Measured on 2026-10-11:** with the DGX in use as a desktop and no platform running yet, about 81 GB
 of the 121 GB was free. The top of every range needs about 97 GB, so the plan works to the mid-range
-column instead: about 77 GB for the platform (75 GB before LitmusChaos was added), which leaves
-25–35 GB for the desktop and some headroom. The Litmus figures are estimates until the phase 2a spike
-measures them. The chat model starts with a smaller memory slice and only
+column instead: about 80 GB for the platform (75 GB before LitmusChaos and Karmada were added), which
+leaves 25–35 GB for the desktop and less headroom than before. The Litmus and Karmada figures are
+estimates until their trials measure them; if the total gets too tight, Karmada is the first to go,
+because Argo CD ApplicationSets already do its job. The chat model starts with a smaller memory slice and only
 grows if measurements in Phase 5 leave room. The lab runner's admission control checks the memory
 actually free at deploy time (ADR 0017), not a fixed number, so a busy desktop day means fewer labs at
 once rather than an out-of-memory model.
@@ -853,7 +919,8 @@ post, generated from the repo. One is still *proposed*: 0020 waits for the first
 
 LitmusChaos in `core` is recorded as **ADR 0036** (proposed until the phase 2a spike). It replaces the
 "Chaos Mesh in a lab cluster later" line in ADR 0031. It joins the log below once it's merged in
-`homelab-gitops` and synced.
+`homelab-gitops` and synced. Karmada for multi-cluster placement is **ADR 0037**, also proposed until
+its phase 1a trial. It adds to ADR 0007 rather than replacing it: Argo CD stays the single GitOps hub.
 
 {% include project-adr-log.html project="cloudutsuk-platform" %}
 
@@ -871,6 +938,8 @@ LitmusChaos in `core` is recorded as **ADR 0036** (proposed until the phase 2a s
 - [ ] ADR 0036 (LitmusChaos in `core`) merged in `homelab-gitops` and synced to the blog
 - [ ] Litmus spike done: arm64 images, k3s containerd socket, Keycloak sign-in through Dex, measured memory
 - [ ] The first chaos experiments pass on a lab, then on `platform`, with results in Grafana
+- [ ] ADR 0037 (Karmada) merged in `homelab-gitops` and synced to the blog
+- [ ] Karmada trial done: arm64 images, Argo CD health through Karmada, a lab joining and leaving in pull mode, measured memory
 - [ ] This post updated with what was actually built at the end of each phase
 
 {% include project-nav.html %}
