@@ -49,6 +49,7 @@ memory. Those tensions shaped the non-functional requirements more than any feat
 | F16 | Architecture decisions are recorded as ADRs and published on the blog |
 | F17 | Planned faults can be injected into any cluster from one open-source chaos tool (LitmusChaos, run from the `core` cluster), with experiments kept in git and each run scored by probes |
 | F18 | The add-ons every cluster needs are placed by one policy per add-on (Karmada), by cluster label, so a new cluster gets them without any per-cluster change |
+| F19 | Every k3d cluster reports what it costs on the DGX, by namespace and pod (OpenCost), and that cost appears in the portal next to the cloud costs, per cluster and per lab |
 
 ## Non-functional requirements
 {: #non-functional-requirements }
@@ -112,6 +113,9 @@ proposed fix waiting for my approval.
   started, it doesn't run.
 - **F18:** Given a new lab cluster registered with the `lab` role, when it joins, the monitoring pack and
   the other shared add-ons are running on it without a change to `homelab-gitops`.
+- **F19:** Given a lab that ran for a day, when the daily cost sync runs, the portal shows that lab's DGX
+  cost from OpenCost next to its cloud cost, and the DGX costs of all clusters add up to the DGX's own
+  hourly cost for that day.
 
 ## Business rules
 {: #business-rules }

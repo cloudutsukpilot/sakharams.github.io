@@ -38,7 +38,7 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 | 2. Central monitoring | `mon` with LGTM and Alertmanager; host exporters (node, GPU, Docker, blackbox); a monitoring pack on every cluster (OTel collectors, kube-state-metrics, ServiceMonitors); ready-made dashboards and mixin alerts; labs moved onto it | 1 | Not started |
 | 2a. Chaos engineering | Open-source LitmusChaos: ChaosCenter and its MongoDB in `core`, chaos agents on target clusters by an ApplicationSet (labs first), the experiment library in `homelab-gitops`, a Chaos dashboard in Grafana, first game day | 1, 2 | Not started |
 | 3. Portal + labs | Backstage custom image through CI, SSO, Labs plugin, lab runner, `deploy:` blocks, Dashboard tab on the blog | 1, 2 | Not started |
-| 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, Inventory & Cost plugin, budget alerts | 3 | Not started |
+| 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, OpenCost on every k3d cluster with custom DGX prices, Inventory & Cost plugin, budget alerts | 2, 3 | Not started |
 | 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | Not started |
 | 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 | Not started |
 
@@ -84,7 +84,7 @@ Each phase ends with the same exit steps:
 | M2 One Grafana | A lab's signals appear in `mon` without changing the lab; killing a pod fires an alert |
 | M2a Chaos | A pod-delete experiment from ChaosCenter in `core` runs on a lab, its probe passes, and the fault and its alert show side by side in Grafana; no experiment can target a node |
 | M3 MVP | Deploy and Destroy from the portal create and delete a cluster and register it in Argo CD |
-| M4 Cost | Portal cost matches each provider's console within a day; a `lab`-tagged resource rolls up under its lab |
+| M4 Cost | Portal cost matches each provider's console within a day; a `lab`-tagged resource rolls up under its lab; every k3d cluster's OpenCost reports, and a lab's DGX cost and cloud cost show together |
 | M5 Chat | A new post is cited after "Re-index now"; the same question again hits the cache |
 | M6 Agent | An injected lab fault produces an RCA in Slack that cites the right doc; evals pass |
 
@@ -105,7 +105,7 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Multi-cluster management | `homelab-gitops`, `homelab-services` | Karmada trial; control plane values; propagation and override policies per add-on; lab runner `register` and `unregister` |
 | Chaos engineering | `homelab-gitops` | ChaosCenter Helm values in `core`; agent ApplicationSet; experiment library with probes; game-day runbook |
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
-| Inventory + cost | `homelab-services` | Azure collector; AWS collector; GCP billing export; DGX power estimate |
+| Inventory + cost | `homelab-services`, `homelab-gitops` | Azure collector; AWS collector; GCP billing export; DGX power estimate; OpenCost in the monitoring pack with custom DGX prices; daily OpenCost allocation into `COST_DAILY` |
 | RAG + chat | `homelab-services` | Incremental ingest; semantic cache; Chat plugin with citations |
 | Alert agent | `sre-agent` | Alertmanager webhook; RAG tool; eval cases from lab experiments |
 | Playbook | this blog | Area posts per phase; ADR sync; diagrams |
@@ -139,7 +139,7 @@ The real constraint isn't money. It's memory on the DGX (see
 and my evenings.
 
 > **TODO:** What's the electricity tariff per kWh? It's needed for the DGX's own line in the cost
-> dashboard.
+> dashboard, and for OpenCost's custom prices on every k3d cluster.
 {: .prompt-warning }
 
 ## Risk and dependency management
@@ -182,6 +182,7 @@ There's one decider, so this stays light:
 - [x] GPU spike result written into ADR 0010
 - [ ] arm64 image check done for every planned chart, including LitmusChaos and its MongoDB
 - [ ] ADR 0036 (LitmusChaos in `core`) written in `homelab-gitops` and synced
+- [ ] ADR 0038 (OpenCost on every k3d cluster) written in `homelab-gitops` and synced
 - [ ] ADR 0037 (Karmada) written in `homelab-gitops`, and accepted or dropped after the phase 1a trial
 - [ ] This post and the project card status updated at the end of every phase
 

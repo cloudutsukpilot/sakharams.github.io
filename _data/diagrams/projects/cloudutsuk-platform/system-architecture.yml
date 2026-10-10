@@ -407,6 +407,15 @@ nodes:
         sub: monitoring pack
         icon: chart
         detail: Installed by Argo CD's ApplicationSet; sends traces, metrics and logs to the mon cluster.
+      - id: lab-opencost
+        label: OpenCost
+        sub: cost allocation
+        icon: chart
+        color: amber
+        detail: 'Runs on every k3d cluster with the monitoring pack (shown here for a lab). Prices CPU, memory and GPU
+          requests with custom DGX prices (electricity plus the machine spread over its life), reading usage from
+          Mimir over PromQL. API and exporter only, no UI; the inventory reads its daily allocation for the
+          portal (phase 4, ADR 0038 proposed).'
       - id: lab-karmada
         label: Karmada agent
         sub: pull mode
@@ -555,6 +564,9 @@ edges:
   - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
   - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
   - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's cache."}
+  - {id: inv_oc, from: inventory, to: lab-opencost, proto: HTTPS, port: 443, label: daily allocation, detail: "OAuth2 client credentials from Keycloak (ADR 0029).", why: "Once a day: the inventory reads each cluster's cost by namespace from OpenCost and stores it as the DGX's line in the cost view."}
+  - {id: oc_mimir, view: observability, from: lab-opencost, to: mimir, proto: HTTPS, port: 443, label: PromQL, detail: "Filtered by the cluster's own label; no Prometheus runs in the cluster.", why: "Whenever OpenCost computes an allocation: it reads that cluster's CPU, memory and pod metrics from Mimir."}
+  - {id: oc_metrics, view: observability, main: true, from: lab-opencost, to: lab-otel, kind: telemetry, label: cost metrics, why: "Always on: OpenCost's cost metrics are scraped by the monitoring pack, so Grafana shows cost per cluster and lab."}
   - {id: argo_karmada, view: cicd, from: argocd, to: karmada, proto: HTTPS, port: 5443, label: shared add-ons, detail: "Karmada's API server, registered in Argo CD as one more cluster.", why: "Used when a shared add-on changes in homelab-gitops: Argo CD syncs it once to Karmada instead of once per cluster."}
   - {id: run_karmada, view: cicd, oneway: true, from: runner, to: karmada, kind: control, label: register, why: "Used when a lab is deployed or destroyed: the runner registers the new cluster with Karmada (role lab) or removes it."}
   - {id: kagent_karmada, view: cicd, from: lab-karmada, to: karmada, proto: HTTPS, port: 5443, label: pull, detail: "Pull mode: the agent's own client certificate; Karmada never connects in.", why: "Always on: the agent watches Karmada for add-ons placed on its cluster and reports their status back."}
@@ -679,6 +691,33 @@ scenarios:
         path: [you_graf, ~you_graf]
         result: done
         outcome: "Dashboard loaded"
+
+  - id: dgx-cost
+    title: Price a lab on the DGX
+    summary: "Planned (phase 4): OpenCost on each k3d cluster splits the DGX's cost by cluster, namespace and lab."
+    steps:
+      - title: Daily cost sync
+        action: "Inventory → OpenCost: allocation for yesterday, by namespace (HTTPS 443)"
+        text: "Once a day the inventory asks each cluster's OpenCost for yesterday's cost by namespace, with a Keycloak token."
+        path: [inv_oc]
+      - title: Read the usage
+        action: "OpenCost ↔ Mimir: this cluster's CPU, memory and pod metrics (PromQL)"
+        text: "OpenCost reads only its own cluster's series from Mimir and prices them with the DGX's custom per-hour prices."
+        path: [oc_mimir, ~oc_mimir]
+      - title: Allocation returns
+        action: "OpenCost → inventory: cost per namespace and pod"
+        text: "The allocation comes back; GPU-hours go to the pods that requested the GPU."
+        path: [~inv_oc]
+      - title: Store it with the cloud costs
+        action: "Inventory → platform-db: DGX rows in COST_DAILY (PostgreSQL 5432)"
+        text: "The rows are stored under the dgx provider, next to Azure, AWS and GCP, so a lab's local and cloud cost roll up together."
+        path: [inv_pg, ~inv_pg]
+      - title: See the lab's cost
+        action: "Inventory plugin ↔ inventory: cost per lab, DGX included"
+        text: "The portal's cost view shows each lab's DGX cost beside its cloud cost."
+        path: [bs_inv, ~bs_inv]
+        result: success
+        outcome: "Lab cost includes the DGX"
 
   - id: karmada
     title: Join a new cluster

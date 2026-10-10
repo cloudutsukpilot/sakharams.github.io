@@ -20,7 +20,7 @@ facts:
 - label: Type
   value: Self-hosted internal developer platform
 - label: Stack
-  value: Backstage, k3d, Argo CD, Karmada, OpenBao, Grafana LGTM, OpenTelemetry, LitmusChaos, vLLM, LiteLLM, Qdrant
+  value: Backstage, k3d, Argo CD, Karmada, OpenBao, Grafana LGTM, OpenTelemetry, OpenCost, LitmusChaos, vLLM, LiteLLM, Qdrant
 - label: Hosting
   value: NVIDIA DGX Spark at home, Cloudflare Tunnel + Access ($0 hosting)
 - label: Delivery
@@ -63,6 +63,9 @@ brief: |
 
   Author's request (2026-10-10): "can you review karmada and add it to the plan which can be used to
   manage the multiple cluster that we are going to create"
+
+  Author's request (2026-10-10): "can you update the plan to add opencost to every k3d cluster ?
+  https://opencost.io/"
 
   Decisions taken while planning (same session):
   - Portal: extend the existing Backstage app (self-service-portal); it needs a custom image.

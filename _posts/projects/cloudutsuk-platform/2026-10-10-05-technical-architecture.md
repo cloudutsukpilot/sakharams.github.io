@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Technical Architecture"
 date: 2026-10-10 00:05:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Architecture]
-description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD with Karmada, monitoring, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
+description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD with Karmada, monitoring, OpenCost, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
 project: cloudutsuk-platform
 project_step: 5
 mermaid: true
@@ -66,6 +66,7 @@ play to follow a packet through it:
 | SRE agent | platform | Alert-triggered diagnosis with human approval before any change |
 | mon cluster | its own k3d cluster | OpenTelemetry gateway, Grafana LGTM, Alertmanager; ready-made dashboards for the fleet, Kubernetes, data stores, AI serving and the platform |
 | Monitoring pack | every cluster, including labs | OTel collectors, kube-state-metrics and ServiceMonitor discovery, installed by one ApplicationSet |
+| OpenCost | every k3d cluster, with the monitoring pack | Prices what each cluster, namespace and pod uses with the DGX's own hourly cost; the inventory reads it for the DGX's line in the cost view (phase 4) |
 | Keycloak | `core` cluster | The one identity provider: brokers Google and Entra ID, issues tokens to people and services |
 | OpenBao | `core` cluster | The one secret manager; External Secrets in every cluster pulls from it; issues short-lived Kubernetes tokens |
 | Zot | `core` cluster | The container registry: our signed images, plus a cache of every upstream image the clusters pull |
@@ -90,6 +91,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | GitOps | Argo CD | Its UI and Backstage plugin suit a portal-centric setup better than Flux |
 | Multi-cluster placement | **Karmada** (CNCF), alongside Argo CD | Argo CD ApplicationSets already fan add-ons out, and they stay the fallback. Karmada adds placement by cluster label, per-cluster overrides and one API across every cluster, without changing a single manifest. Open Cluster Management and Rancher Fleet were the alternatives; Fleet would replace Argo CD, which this platform keeps |
 | CI | GitHub Actions self-hosted runners (ARC) + BuildKit | The repos are already on GitHub, and self-hosted minutes are free |
+| Kubernetes cost allocation | **OpenCost** (CNCF, Apache 2.0) on every k3d cluster | The open-source standard for "what does this namespace cost". Kubecost adds a UI and savings reports on top, but its free tier is limited and it's more to run. The cloud bills stay with the inventory's own collectors, so OpenCost only prices the DGX |
 | Observability | OpenTelemetry Collector + Grafana LGTM | The same stack the [OpenTelemetry lab](/tags/opentelemetry-lab/) already teaches |
 | LLM serving | vLLM | OpenAI-compatible API, continuous batching, runs on the GB10 GPU |
 | Model gateway | LiteLLM proxy | One endpoint for all callers, so adding a model, a second machine or a hosted fallback doesn't touch the services |
@@ -532,8 +534,8 @@ fan-out moves to Karmada (below) and the lab runner also registers each new lab 
 {: #multi-cluster-management }
 
 The platform starts with four long-lived clusters and adds one per lab, and most of what each cluster
-runs is the same: the monitoring pack, External Secrets, ExternalDNS, cert-manager and, from phase 2a,
-the chaos agent. **Karmada** (a CNCF project) manages that shared layer. It's a Kubernetes-style
+runs is the same: the monitoring pack, OpenCost, External Secrets, ExternalDNS, cert-manager and, from
+phase 2a, the chaos agent. **Karmada** (a CNCF project) manages that shared layer. It's a Kubernetes-style
 control plane for many clusters: you apply ordinary manifests to *its* API server, and policies decide
 which member clusters get them.
 
@@ -584,6 +586,50 @@ spec:
 > images for every component, Argo CD reporting health correctly through Karmada's API server, a lab
 > joining and leaving in pull mode within the lab runner's deploy time, and the memory it really uses. If
 > any fails, the ApplicationSets stay and Karmada is dropped.
+{: .prompt-warning }
+
+### Cost of the local clusters with OpenCost
+{: #local-cluster-cost }
+
+The cloud bills tell the inventory what Azure, AWS and GCP cost, but the DGX sends no bill. Its cost
+is electricity plus the machine itself, and the question that matters is *which* cluster, lab or
+namespace is using it. **OpenCost**, the open-source CNCF project for Kubernetes cost allocation, answers
+that. It runs on **every k3d cluster** as part of the monitoring pack, placed like the other shared
+add-ons, so a new lab is priced from its first minute.
+
+How it fits on this platform:
+
+- **No new metrics pipeline.** OpenCost needs Prometheus-style CPU, memory and pod metrics, and the
+  monitoring pack already ships them to Mimir in `mon` with their Prometheus names (ADR 0026). Each
+  cluster's OpenCost queries Mimir over PromQL, filtered by its own `cluster` label, instead of running
+  its own Prometheus.
+- **The DGX's own prices.** There's no cloud price list for a desk, so OpenCost runs with **custom
+  pricing**: a cost per CPU core-hour, per GB of RAM per hour and per GPU-hour, derived from the DGX's
+  hourly cost. That hourly cost is the electricity tariff times its measured power draw, plus the
+  machine's price spread over its expected life.
+- **One source of truth for cost.** The inventory service reads OpenCost's allocation API once a day,
+  per cluster and namespace, and writes the result into `COST_DAILY` under the `dgx` provider. So the
+  portal shows the DGX next to Azure, AWS and GCP, and a lab's local and cloud cost roll up together.
+  OpenCost itself keeps no history: Mimir holds about 15 days, and the daily rows in `platform-db` keep
+  the rest. Its own cloud-cost feature stays off, because the inventory already reads the cloud bills.
+- **Dashboards.** OpenCost exports its own metrics (cost per node, allocation per container), which the
+  monitoring pack scrapes into Mimir, so Grafana gets a Cost dashboard per cluster and lab.
+- **UI off.** Each cluster runs only the OpenCost API and exporter. People see cost in the portal and
+  Grafana, not in a dozen separate UIs.
+
+The one-host catch is the GPU. On the GB10, GPU memory is system memory and isn't charged to any
+container, and models share the GPU by time-slicing. OpenCost can only allocate the GPU by
+`nvidia.com/gpu` requests, so the GPU-hour goes to whichever vLLM pods requested it, not by real use.
+That's good enough to show what the `ai` cluster costs; it isn't a per-request cost.
+
+> **TODO:** The custom prices need two numbers that aren't recorded yet: the electricity tariff per kWh
+> (already an open TODO in [Product Planning](/posts/projects/cloudutsuk-platform/03-product-planning/#budget-and-resource-planning))
+> and the DGX's purchase price and the years to spread it over. Until then OpenCost shows usage shares
+> with placeholder prices.
+{: .prompt-warning }
+
+> **TODO:** Mimir is multi-tenant. Confirm in phase 4 how each OpenCost authenticates to Mimir's query
+> API and that its cluster-label setting picks out only its own cluster's series.
 {: .prompt-warning }
 
 ### Internal DNS and bootstrap order
@@ -692,6 +738,8 @@ overridden with `--cluster-cidr` and `--service-cidr` when each cluster is creat
 | → Kubernetes API | HTTPS 6443 on the load balancer, never published to the LAN | k3s's own CA; short-lived tokens |
 | Collectors → mon | OTLP gRPC 4317 | TLS, plus OAuth2 client credentials |
 | Pods → internal DNS | DNS 53 to CoreDNS, forwarded to PowerDNS at `172.30.0.1:53` | Plain DNS, on the bridge only |
+| OpenCost → Mimir | PromQL over HTTPS 443 to `mimir.mon.home.cloudutsuk.com`, from every cluster | Let's Encrypt certificate, plus OAuth2 client credentials like the collectors |
+| Inventory → OpenCost | HTTPS 443 to each cluster's OpenCost API, once a day | `*.<cluster>.home.cloudutsuk.com`, plus a JWT (ADR 0029) |
 | Karmada agents → Karmada API server | HTTPS 5443 (Karmada's default) on the `platform` load balancer, outbound from each member | Karmada's own CA; per-agent client certificates |
 | Chaos agents → ChaosCenter | HTTPS 443 to `chaos.core.home.cloudutsuk.com`, outbound from each target cluster | Let's Encrypt certificate; each agent has its own infrastructure ID and access key from OpenBao |
 | Clusters → registry | HTTPS 443 to `registry.core.home.cloudutsuk.com`, which resolves to the gateway address through a k3d host alias on every node | Let's Encrypt certificate. Anonymous pulls of mirrored public images; our images need the `zot-pull` secret |
@@ -724,6 +772,7 @@ on the same chip and the same memory. So the budget is the main design constrain
 | core cluster (Keycloak, OpenBao, PowerDNS, Zot, ESO, ExternalDNS, LitmusChaos ChaosCenter + MongoDB) | ~4–5.5 GB | ~4.5 GB |
 | Litmus chaos agents (one per target cluster, from phase 2a) | ~0.2–0.4 GB each | ~1 GB |
 | Karmada control plane in platform (API server, etcd, controllers), plus one agent per cluster (from phase 1a) | ~1.5–2.5 GB, agents ~0.1 GB each | ~2.5 GB |
+| OpenCost, one per k3d cluster (API and exporter, no UI; from phase 4) | ~0.1–0.2 GB each | ~1 GB |
 | mon cluster | ~6–8 GB | ~7 GB |
 | platform cluster (portal, Postgres, inventory, Argo CD, CI, SRE agent) | ~7–9 GB | ~8 GB |
 | CI runners + BuildKit (in bursts) | ~4–8 GB | ~5 GB |
@@ -733,9 +782,9 @@ on the same chip and the same memory. So the budget is the main design constrain
 
 **Measured on 2026-10-11:** with the DGX in use as a desktop and no platform running yet, about 81 GB
 of the 121 GB was free. The top of every range needs about 97 GB, so the plan works to the mid-range
-column instead: about 80 GB for the platform (75 GB before LitmusChaos and Karmada were added), which
-leaves 25–35 GB for the desktop and less headroom than before. The Litmus and Karmada figures are
-estimates until their trials measure them; if the total gets too tight, Karmada is the first to go,
+column instead: about 81 GB for the platform (75 GB before LitmusChaos, Karmada and OpenCost were
+added), which leaves 25–35 GB for the desktop and less headroom than before. The Litmus, Karmada and
+OpenCost figures are estimates until they're measured on the DGX; if the total gets too tight, Karmada is the first to go,
 because Argo CD ApplicationSets already do its job. The chat model starts with a smaller memory slice and only
 grows if measurements in Phase 5 leave room. The lab runner's admission control checks the memory
 actually free at deploy time (ADR 0017), not a fixed number, so a busy desktop day means fewer labs at
@@ -921,6 +970,7 @@ LitmusChaos in `core` is recorded as **ADR 0036** (proposed until the phase 2a s
 "Chaos Mesh in a lab cluster later" line in ADR 0031. It joins the log below once it's merged in
 `homelab-gitops` and synced. Karmada for multi-cluster placement is **ADR 0037**, also proposed until
 its phase 1a trial. It adds to ADR 0007 rather than replacing it: Argo CD stays the single GitOps hub.
+OpenCost on every k3d cluster for the DGX's cost is **ADR 0038**, proposed until phase 4.
 
 {% include project-adr-log.html project="cloudutsuk-platform" %}
 
@@ -939,6 +989,8 @@ its phase 1a trial. It adds to ADR 0007 rather than replacing it: Argo CD stays 
 - [ ] Litmus spike done: arm64 images, k3s containerd socket, Keycloak sign-in through Dex, measured memory
 - [ ] The first chaos experiments pass on a lab, then on `platform`, with results in Grafana
 - [ ] ADR 0037 (Karmada) merged in `homelab-gitops` and synced to the blog
+- [ ] ADR 0038 (OpenCost on every k3d cluster) merged in `homelab-gitops` and synced to the blog
+- [ ] OpenCost running on every cluster with custom DGX prices, and the DGX's daily cost in the portal per cluster and lab
 - [ ] Karmada trial done: arm64 images, Argo CD health through Karmada, a lab joining and leaving in pull mode, measured memory
 - [ ] This post updated with what was actually built at the end of each phase
 
