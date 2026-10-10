@@ -47,6 +47,7 @@ memory. Those tensions shaped the non-functional requirements more than any feat
 | F14 | Any change the agent proposes needs my approval and goes through GitOps |
 | F15 | A commit to a platform repo builds an image locally and Argo CD deploys it |
 | F16 | Architecture decisions are recorded as ADRs and published on the blog |
+| F17 | Planned faults can be injected into any cluster from one open-source chaos tool (LitmusChaos, run from the `core` cluster), with experiments kept in git and each run scored by probes |
 
 ## Non-functional requirements
 {: #non-functional-requirements }
@@ -104,6 +105,10 @@ proposed fix waiting for my approval.
 - **F13:** Given an injected fault from a lab experiment, an RCA citing the right lab doc is posted within
   5 minutes.
 - **F14:** No change is made to any cluster without an approval record.
+- **F17:** Given a pod-delete experiment from `homelab-gitops`, when it runs on a lab from ChaosCenter, its
+  probe result and resilience score are recorded, and the fault shows in Grafana next to its effect.
+- **F17:** Given an experiment that targets a node, or a workload without the chaos annotation, when it's
+  started, it doesn't run.
 
 ## Business rules
 {: #business-rules }
@@ -114,6 +119,8 @@ proposed fix waiting for my approval.
 - The agent never writes to a cluster directly. Fixes become PRs to `homelab-gitops`.
 - `_posts/private/` and `.env*` files are never indexed.
 - Self-hosted CI runners only serve private repos.
+- Chaos experiments are pod-level only and start on lab clusters. The `core` cluster is a target only in a
+  planned game day, and ChaosCenter is never published to the internet.
 
 ## Reporting and analytics requirements
 {: #reporting-and-analytics-requirements }

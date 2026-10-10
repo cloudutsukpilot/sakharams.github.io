@@ -35,10 +35,11 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 | 1. GitOps + CI/CD | Central Argo CD, `homelab-gitops` app-of-apps, ARC runners, BuildKit, the Zot registry in `core`, reusable build workflow with security gates (Gitleaks, Semgrep, Trivy, Checkov, Hadolint, SBOM, Cosign), Kyverno, PostSync smoke tests | 0 | Not started |
 | 3a. Quality baseline | Playwright journeys, Schemathesis on every service, nightly OWASP ZAP, Locust load scenarios, Performance and Security dashboards, first performance baseline | 3 | Not started |
 | 2. Central monitoring | `mon` with LGTM and Alertmanager; host exporters (node, GPU, Docker, blackbox); a monitoring pack on every cluster (OTel collectors, kube-state-metrics, ServiceMonitors); ready-made dashboards and mixin alerts; labs moved onto it | 1 | Not started |
+| 2a. Chaos engineering | Open-source LitmusChaos: ChaosCenter and its MongoDB in `core`, chaos agents on target clusters by an ApplicationSet (labs first), the experiment library in `homelab-gitops`, a Chaos dashboard in Grafana, first game day | 1, 2 | Not started |
 | 3. Portal + labs | Backstage custom image through CI, SSO, Labs plugin, lab runner, `deploy:` blocks, Dashboard tab on the blog | 1, 2 | Not started |
 | 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, Inventory & Cost plugin, budget alerts | 3 | Not started |
 | 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | Not started |
-| 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments | 2, 5 | Not started |
+| 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 | Not started |
 
 **Phase 0 progress:**
 - [x] Playbook areas 1, 2, 3 and 5 written, with the system, network and commit-to-deploy diagrams and the data model (2026-10-10)
@@ -79,6 +80,7 @@ Each phase ends with the same exit steps:
 | M0 Design approved | The three animated diagrams are approved; `nvidia-smi` works in a test pod (or the plain-container fallback is accepted); cloudutsuk.com still serves after the DNS move |
 | M1 Commit to deploy | A commit to a hello-world service ends with an Argo CD app Synced and Healthy on the new SHA |
 | M2 One Grafana | A lab's signals appear in `mon` without changing the lab; killing a pod fires an alert |
+| M2a Chaos | A pod-delete experiment from ChaosCenter in `core` runs on a lab, its probe passes, and the fault and its alert show side by side in Grafana; no experiment can target a node |
 | M3 MVP | Deploy and Destroy from the portal create and delete a cluster and register it in Argo CD |
 | M4 Cost | Portal cost matches each provider's console within a day; a `lab`-tagged resource rolls up under its lab |
 | M5 Chat | A new post is cited after "Re-index now"; the same question again hits the cache |
@@ -98,6 +100,7 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Foundation | `infra-local`, `infra-github` | Create repos; k3d clusters via `k3d_config_cluster`; GPU spike |
 | GitOps + CI/CD | `homelab-gitops` | App-of-apps; ARC runner scale set; image tag write-back |
 | Monitoring | `homelab-gitops` | LGTM values; ApplicationSet for lab collectors; Watchdog heartbeat |
+| Chaos engineering | `homelab-gitops` | ChaosCenter Helm values in `core`; agent ApplicationSet; experiment library with probes; game-day runbook |
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
 | Inventory + cost | `homelab-services` | Azure collector; AWS collector; GCP billing export; DGX power estimate |
 | RAG + chat | `homelab-services` | Incremental ingest; semantic cache; Chat plugin with citations |
@@ -145,6 +148,8 @@ and my evenings.
 | Some images have no arm64 build | Medium | Delays | Check every chart's images in phase 0; build our own where needed |
 | DNS move breaks the blog | Low | The blog goes offline | DNS-only records for GitHub Pages; check `curl -I` before and after |
 | Memory exhaustion | Medium | Monitoring or the portal starves | Budget table, limits, PriorityClasses, lab admission control |
+| A chaos experiment hits the whole DGX (node stress on k3d, a fault in `core`) | Low | Every cluster, and the desktop, at once | Pod-level faults only; annotation check; `core` only in a planned game day; ChaosCenter LAN-only and admins only |
+| ChaosCenter adds memory and a MongoDB to `core` | Medium | `core` is less small and stable (ADR 0025) | Measure it in the spike; if it doesn't fit, ChaosCenter moves to `mon` and only the agents stay |
 | Self-hosted runners abused | Low | Code execution on the DGX | Private repos only; ephemeral runners |
 | Prompt injection through logs reaches the agent | Medium | A bad change proposed | Read-only RBAC; approval for every change; fixes as PRs |
 | Scope creep | High | Nothing ships | MVP is phases 0–3; new ideas go to the backlog via change control |
@@ -171,7 +176,8 @@ There's one decider, so this stays light:
 - [ ] Electricity tariff recorded
 - [ ] Epics created as GitHub issues in each repo
 - [x] GPU spike result written into ADR 0010
-- [ ] arm64 image check done for every planned chart
+- [ ] arm64 image check done for every planned chart, including LitmusChaos and its MongoDB
+- [ ] ADR 0036 (LitmusChaos in `core`) written in `homelab-gitops` and synced
 - [ ] This post and the project card status updated at the end of every phase
 
 {% include project-nav.html %}

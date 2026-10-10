@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Technical Architecture"
 date: 2026-10-10 00:05:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Architecture]
-description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD and monitoring, a local LLM with RAG, and the ADRs behind each choice."
+description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD and monitoring, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
 project: cloudutsuk-platform
 project_step: 5
 mermaid: true
@@ -36,14 +36,15 @@ There are six zones:
 - the **edge** (Cloudflare, plus the sources the platform reads)
 - a long-lived **platform cluster** with the portal and its data stores
 - a long-lived **monitoring cluster**
-- a **`core` cluster** that boots first and holds identity (Keycloak), secrets (OpenBao) and internal DNS (PowerDNS)
+- a **`core` cluster** that boots first and holds identity (Keycloak), secrets (OpenBao), internal DNS
+  (PowerDNS) and the chaos control plane (LitmusChaos)
 - an **`ai` cluster** that serves the models on the GPU
 - any number of disposable **lab clusters**, one per lab
 All of them are k3d clusters on one Docker network called `homelab`, so they reach each other by name.
 The diagram below opens one layer deep. Use the level buttons or click a cluster to open it, drag and
 zoom like a map, and hover an arrow for its protocol and why it exists. The tabs at the top add the
-networking, observability, security and CI/CD connections. Pick a use case on the left and press play to
-follow a packet through it:
+networking, observability, security, CI/CD and chaos connections. Pick a use case on the left and press
+play to follow a packet through it:
 
 {% include diagram.html id="projects/cloudutsuk-platform/system-architecture" %}
 
@@ -67,6 +68,8 @@ follow a packet through it:
 | OpenBao | `core` cluster | The one secret manager; External Secrets in every cluster pulls from it; issues short-lived Kubernetes tokens |
 | Zot | `core` cluster | The container registry: our signed images, plus a cache of every upstream image the clusters pull |
 | PowerDNS | `core` cluster | Internal zone `home.cloudutsuk.com`, fed by ExternalDNS in every cluster |
+| LitmusChaos ChaosCenter + MongoDB | `core` cluster | The chaos control plane: the experiment library (synced from `homelab-gitops`), schedules, results and resilience scores (phase 2a) |
+| Litmus chaos agent | each target cluster, labs first | Dials out to ChaosCenter, runs experiments through the chaos operator, exports their metrics to the monitoring pack |
 | Lab clusters | one k3d cluster per lab | The lab's app plus an OTel collector installed by Argo CD |
 
 Two more diagrams are planned for this playbook. *Commit to deploy* goes in the CI/CD post and *RAG chat*
@@ -94,6 +97,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | Testing | pytest + Testcontainers, Schemathesis, Playwright, **Locust**, Argo CD PostSync smoke tests | Locust scripts load in Python like the services, scales with workers, and its thresholds can fail a run. Schemathesis turns each OpenAPI spec into hundreds of API tests for free |
 | Security scanning | Gitleaks, Semgrep + Bandit, Trivy (deps, IaC, images, licences), Checkov + Conftest, Hadolint, Syft, OWASP ZAP, Trivy Operator | All free and self-hosted. GitHub's own code scanning needs a paid licence on private repos |
 | Supply chain | Cosign signatures, SBOM attestations, Kyverno admission | Only signed images from our own registry can run, in every cluster |
+| Chaos engineering | **LitmusChaos** (open source, CNCF), ChaosCenter in the `core` cluster | Chaos Mesh was the earlier note in ADR 0031 and is lighter, but Litmus adds a control plane for every cluster, a hub of ready-made experiments, probes that score each run, and experiments kept in git. Hosted tools such as Gremlin cost money and reach in from outside |
 | Container registry | **Zot** in the `core` cluster | Harbor is the usual pick, but its official images are amd64 only and the DGX is arm64. Zot is a single multi-arch binary with access control, OIDC, a pull-through mirror, built-in CVE scanning and the OCI referrers API for signatures |
 
 > **GPU test, done 2026-10-11.** vLLM runs *inside* the `ai` k3d cluster: a k3s image with NVIDIA's
@@ -146,6 +150,7 @@ ownership in the diagram below honest, and it's why there are no foreign keys ac
 | Qdrant | ai | Chunks of posts, lab cards and repos, with embeddings | Yes: re-ingest from git |
 | Redis | ai | Semantic cache entries keyed by the index version | Yes: it's a cache |
 | Zot | core | Container images, signatures, SBOMs | Yes: rebuild from git (mirror refills itself) |
+| MongoDB `chaos-db` | core | ChaosCenter's experiment runs, results and resilience scores | Partly: experiment definitions rebuild from git; run history is an accepted loss |
 | mon (Mimir, Loki, Tempo) | mon | Metrics, logs and traces for about 15 days | Accepted loss |
 
 The logical data model is drawn below as four views, one per owning service. Solid lines are real
@@ -408,6 +413,15 @@ There are still two gates for people, so one misconfiguration isn't enough to ex
 A direct Google login, limited to my own address, stays on Cloudflare Access as a **break-glass**
 route. If `core` is down, I can still get in to fix it.
 
+**ChaosCenter is the exception to the public hostnames.** A tool that can delete pods across the fleet
+isn't published through the tunnel at all. It's reached only from the home LAN at
+`chaos.core.home.cloudutsuk.com`, and only `platform-admins` may run experiments.
+
+> **TODO:** Can ChaosCenter sign in through Keycloak? Litmus's single sign-on goes through Dex, so the
+> phase 2a spike checks Dex with Keycloak as its OIDC upstream. If it doesn't work, ChaosCenter keeps
+> local accounts, with the admin password in OpenBao and the LAN-only rule above.
+{: .prompt-warning }
+
 **Services authenticate to each other with short-lived credentials**, never shared passwords:
 
 | Call | How |
@@ -615,6 +629,7 @@ overridden with `--cluster-cidr` and `--service-cidr` when each cluster is creat
 | → Kubernetes API | HTTPS 6443 on the load balancer, never published to the LAN | k3s's own CA; short-lived tokens |
 | Collectors → mon | OTLP gRPC 4317 | TLS, plus OAuth2 client credentials |
 | Pods → internal DNS | DNS 53 to CoreDNS, forwarded to PowerDNS at `172.30.0.1:53` | Plain DNS, on the bridge only |
+| Chaos agents → ChaosCenter | HTTPS 443 to `chaos.core.home.cloudutsuk.com`, outbound from each target cluster | Let's Encrypt certificate; each agent has its own infrastructure ID and access key from OpenBao |
 | Clusters → registry | HTTPS 443 to `registry.core.home.cloudutsuk.com`, which resolves to the gateway address through a k3d host alias on every node | Let's Encrypt certificate. Anonymous pulls of mirrored public images; our images need the `zot-pull` secret |
 | cert-manager → Let's Encrypt | HTTPS 443, DNS-01 TXT records through the Cloudflare API | ACME |
 | Egress (cloud APIs, GitHub, model downloads) | HTTPS 443 through the router's NAT | Provider certificates |
@@ -642,7 +657,8 @@ on the same chip and the same memory. So the budget is the main design constrain
 | `ai` cluster: vLLM chat model (~20–30B MoE, FP8/MXFP4) | ~35–40 GB | ~30 GB to start |
 | `ai` cluster: vLLM embeddings + model gateway | ~3–5 GB | ~4 GB |
 | `ai` cluster: RAG API, rag-ingest, Qdrant, Redis, Phoenix | ~4–6 GB | ~5 GB |
-| core cluster (Keycloak, OpenBao, PowerDNS, Zot, ESO, ExternalDNS) | ~3–4 GB | ~3.5 GB |
+| core cluster (Keycloak, OpenBao, PowerDNS, Zot, ESO, ExternalDNS, LitmusChaos ChaosCenter + MongoDB) | ~4–5.5 GB | ~4.5 GB |
+| Litmus chaos agents (one per target cluster, from phase 2a) | ~0.2–0.4 GB each | ~1 GB |
 | mon cluster | ~6–8 GB | ~7 GB |
 | platform cluster (portal, Postgres, inventory, Argo CD, CI, SRE agent) | ~7–9 GB | ~8 GB |
 | CI runners + BuildKit (in bursts) | ~4–8 GB | ~5 GB |
@@ -652,8 +668,9 @@ on the same chip and the same memory. So the budget is the main design constrain
 
 **Measured on 2026-10-11:** with the DGX in use as a desktop and no platform running yet, about 81 GB
 of the 121 GB was free. The top of every range needs about 97 GB, so the plan works to the mid-range
-column instead: about 75 GB for the platform, which leaves 25–35 GB for the desktop and some
-headroom. The chat model starts with a smaller memory slice and only
+column instead: about 77 GB for the platform (75 GB before LitmusChaos was added), which leaves
+25–35 GB for the desktop and some headroom. The Litmus figures are estimates until the phase 2a spike
+measures them. The chat model starts with a smaller memory slice and only
 grows if measurements in Phase 5 leave room. The lab runner's admission control checks the memory
 actually free at deploy time (ADR 0017), not a fixed number, so a busy desktop day means fewer labs at
 once rather than an out-of-memory model.
@@ -723,6 +740,106 @@ One host can't be highly available, so I'm optimising for recovery and for knowi
 - **Backups.** Only Postgres and the secrets: a nightly encrypted `pg_dump` to the Cloudflare R2 free
   tier. Everything else rebuilds from git. Targets are **RTO 1 hour, RPO 24 hours**, tested once a
   quarter by rebuilding on an empty Docker.
+- **Chaos experiments.** The claims above (two `cloudflared` replicas, degradation, retries) are only
+  true once they've been broken on purpose. LitmusChaos does that, below.
+
+### Chaos engineering with LitmusChaos
+{: #chaos-engineering }
+
+**LitmusChaos**, the open-source CNCF project (Apache 2.0), is the platform's chaos tool. It arrives in
+phase 2a, once `mon` can show what a fault does. Its control plane, **ChaosCenter** (web UI, GraphQL
+server, auth server and a small MongoDB), runs in the **`core` cluster**:
+
+- **It survives the thing it breaks.** `core` boots first and doesn't depend on `platform`, `mon` or
+  `ai`, so an experiment that takes down a target never takes the chaos tool with it. That's the same
+  reason identity and secrets live there (ADR 0025).
+- **Hub and spoke, like Argo CD.** Each target cluster gets a **chaos agent**: a subscriber, the chaos
+  operator and the chaos exporter, installed by an Argo CD ApplicationSet. The agent dials **out** to
+  ChaosCenter over HTTPS 443, so nothing connects into a lab.
+- **Experiments as code.** Each experiment is a reviewed file in `homelab-gitops`, and ChaosCenter's
+  GitOps sync keeps its library equal to git. A one-off run from the UI is fine for exploring, but
+  anything scheduled goes through a PR.
+
+Running chaos on one shared machine needs stricter rules than in a real cloud, because every k3d node
+is a container on the same DGX, drawing on the same memory as the GPU:
+
+| Guardrail | Rule |
+|---|---|
+| Targets | Lab clusters first. `platform`, `mon` and `ai` only from phase 2a's exit, one cluster at a time. `core` only in a planned game day, with the break-glass login ready |
+| Fault types | Pod-level only: pod-delete, container-kill, pod network latency and loss, pod CPU and memory hog inside the pod's own limits. **No node-level stress or node drain**: on k3d a "node" is the whole DGX |
+| Blast radius | One namespace per experiment; Litmus's annotation check, so only workloads labelled as chaos targets can be hit |
+| Who | Only `platform-admins`; ChaosCenter is LAN-only, never on the tunnel |
+| Memory | A running experiment counts against lab admission control (ADR 0017), like a temporary lab |
+| Abort | Stop the experiment in ChaosCenter, or set the ChaosEngine's `engineState: stop` |
+
+Every experiment carries **probes** (an HTTP check, a Prometheus query, a Kubernetes check), and
+ChaosCenter turns their results into a pass or fail and a **resilience score**. The chaos exporter's
+metrics go through the monitoring pack to `mon`, so a Grafana dashboard shows each fault next to its
+effect. The faults also feed phase 6: a run that trips an alert is exactly the "injected lab fault"
+that milestone M6 grades the SRE agent on.
+
+A sketch of a first experiment, killing the portal's pod while a probe checks the portal still
+answers (Backstage's health endpoint on its default port, 7007):
+
+```yaml
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: backstage-pod-delete
+  namespace: backstage          # sketch: set to the portal's namespace
+spec:
+  engineState: active
+  annotationCheck: "true"
+  appinfo:
+    appns: backstage
+    applabel: app=backstage
+    appkind: deployment
+  chaosServiceAccount: pod-delete-sa
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: CHAOS_INTERVAL
+              value: "20"
+        probe:
+          - name: portal-still-answers
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://backstage.backstage.svc:7007/healthcheck
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+            runProperties:
+              probeTimeout: 5s
+              interval: 5s
+              retry: 1
+```
+
+The first experiments, each matched to a claim this post makes:
+
+| Experiment | Target | Claim it tests |
+|---|---|---|
+| pod-delete on `cloudflared` | platform | Two replicas mean one crash doesn't cut off remote access |
+| pod-delete on Backstage | platform | The portal recovers on its own; the PostSync smoke test passes again |
+| pod network loss to vLLM | ai | Chat falls back to search results when the model is down |
+| pod-delete on the inventory | platform | The portal shows the last data with a "stale since" badge |
+| pod network latency to OpenBao | core (game day) | External Secrets retries until OpenBao answers |
+| pod-delete on a lab's app | lab | The alert fires, and the SRE agent's RCA cites the right lab doc (M6) |
+
+> **TODO:** Check the Litmus images and its MongoDB on arm64 in the phase 2a spike, like every other
+> chart (see the arm64 risk in Product Planning). If its MongoDB chart has no arm64 build, pick a
+> multi-arch MongoDB image and pin it in `homelab-gitops`.
+{: .prompt-warning }
+
+> **TODO:** k3s uses containerd at a non-default socket. Litmus's network and container faults need
+> the runtime set to `containerd` and the socket path set to k3s's (`/run/k3s/containerd/containerd.sock`);
+> confirm both on a k3d node in the spike.
+{: .prompt-warning }
 
 ## Architectural decision records
 {: #architectural-decision-records }
@@ -733,6 +850,10 @@ intact. The full text of every ADR (context, decision, the options that lost, co
 [Architecture Decision Records](/posts/projects/cloudutsuk-platform/architecture-decision-records/)
 post, generated from the repo. One is still *proposed*: 0020 waits for the first load-test baseline
 (the SLO targets). 0010 was accepted after the GPU test on 2026-10-11.
+
+LitmusChaos in `core` is recorded as **ADR 0036** (proposed until the phase 2a spike). It replaces the
+"Chaos Mesh in a lab cluster later" line in ADR 0031. It joins the log below once it's merged in
+`homelab-gitops` and synced.
 
 {% include project-adr-log.html project="cloudutsuk-platform" %}
 
@@ -747,6 +868,9 @@ post, generated from the repo. One is still *proposed*: 0020 waits for the first
 - [ ] Keycloak brokering Google and Entra, the tunnel and Access configured, and an email not on the allowlist is denied
 - [ ] A service call without a valid token is rejected
 - [ ] Backup and restore of Postgres tested once
+- [ ] ADR 0036 (LitmusChaos in `core`) merged in `homelab-gitops` and synced to the blog
+- [ ] Litmus spike done: arm64 images, k3s containerd socket, Keycloak sign-in through Dex, measured memory
+- [ ] The first chaos experiments pass on a lab, then on `platform`, with results in Grafana
 - [ ] This post updated with what was actually built at the end of each phase
 
 {% include project-nav.html %}

@@ -15,6 +15,7 @@ views:
   - {id: observability, label: Observability, icon: chart}
   - {id: security, label: Security, icon: lock}
   - {id: cicd, label: CI/CD, icon: rocket}
+  - {id: chaos, label: Chaos, icon: bolt}
 
 nodes:
   - id: you
@@ -58,7 +59,8 @@ nodes:
       sub: boots first
       icon: cluster
       color: slate
-      detail: Boots first and holds identity (Keycloak), secrets (OpenBao), the registry (Zot) and internal DNS (PowerDNS).
+      detail: Boots first and holds identity (Keycloak), secrets (OpenBao), the registry (Zot), internal DNS (PowerDNS)
+        and the chaos control plane (LitmusChaos ChaosCenter).
       children:
       - id: keycloak
         label: Keycloak
@@ -90,6 +92,28 @@ nodes:
         icon: databases/postgresql-18.svg
         detail: 'Keycloak''s realm, users'' links to Google/Entra, groups. **Not rebuildable**: backed up with OpenBao''s
           snapshot.'
+      - id: litmus
+        label: LitmusChaos
+        sub: chaos control plane
+        icon: bolt
+        color: rose
+        detail: 'Open-source LitmusChaos (CNCF, Apache 2.0), planned for phase 2a. ChaosCenter runs in `core` so it
+          stays up when the cluster under test is the one breaking. It is internal only (`chaos.core.home.cloudutsuk.com`),
+          never published through the tunnel.'
+        children:
+        - id: chaoscenter
+          label: ChaosCenter
+          sub: UI, GraphQL, auth
+          icon: bolt
+          detail: Schedules experiments, holds the ChaosHub of ready-made faults (pod-delete, network latency and loss,
+            CPU and memory hog in a pod), and turns probe results into a resilience score. Experiment definitions are
+            kept in `homelab-gitops`.
+        - id: chaos-db
+          label: chaos-db
+          sub: MongoDB
+          icon: database
+          detail: 'ChaosCenter''s own store: experiment runs, results and resilience scores. Definitions rebuild from git;
+            run history is an accepted loss (ADR 0016 backs up only Postgres and secrets).'
       - id: core-otel
         label: OTel collector
         sub: monitoring pack
@@ -359,6 +383,13 @@ nodes:
         sub: monitoring pack
         icon: chart
         detail: Installed by Argo CD's ApplicationSet; sends traces, metrics and logs to the mon cluster.
+      - id: lab-chaos
+        label: Chaos agent
+        sub: Litmus infrastructure
+        icon: bolt
+        detail: 'Litmus chaos infrastructure in a target cluster: a subscriber that dials out to ChaosCenter, the chaos
+          operator that runs each experiment, and the chaos exporter whose metrics the monitoring pack scrapes. Installed
+          by Argo CD on labs first; never node-level stress, because every k3d node shares the DGX''s memory with the GPU.'
     - id: cicd
       label: CI/CD
       sub: on the DGX
@@ -493,6 +524,13 @@ edges:
   - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
   - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
   - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's cache."}
+  - {id: you_chaos, view: chaos, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", detail: "Internal only: reached from the home LAN, not through Cloudflare.", why: "Used when you start, schedule or review a chaos experiment in ChaosCenter."}
+  - {id: cc_db, view: chaos, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB."}
+  - {id: chaos_agent, view: chaos, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key from OpenBao.", why: "Always on while a cluster is a chaos target: the agent dials out to ChaosCenter for experiments and reports their results."}
+  - {id: chaos_inject, view: chaos, oneway: true, from: lab-chaos, to: lab-app, kind: control, label: inject fault, why: "During an experiment: the chaos operator injects the fault (for example pod-delete) into the target app, within the blast radius set in git."}
+  - {id: chaos_metrics, view: [observability, chaos], main: true, from: lab-chaos, to: lab-otel, kind: telemetry, label: chaos exporter, why: "Always on: experiment state and resilience scores from the chaos exporter are scraped, so Grafana shows faults next to their effects."}
+  - {id: chaos_git, view: [cicd, chaos], from: chaoscenter, to: gitops, proto: HTTPS, port: 443, label: experiments as code, why: "Experiment definitions are reviewed in homelab-gitops; ChaosCenter's GitOps sync keeps its library equal to git."}
+  - {id: chaos_kc, view: [security, chaos], from: chaoscenter, to: keycloak, proto: OIDC, tls: true, dashed: true, detail: "Through Litmus's Dex integration with Keycloak as the upstream; checked in the phase 2a spike.", why: "Planned: you sign in to ChaosCenter with Keycloak like every other tool; only platform-admins may run experiments."}
   - {id: pull_labs, from: labs, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Lab clusters also pull through Zot, so labs keep working when an upstream registry is slow or rate-limited."}
 
 # Use cases: one activity each, one action per step (the reader picks one; auto-play runs them in turn).
@@ -606,6 +644,45 @@ scenarios:
         path: [you_graf, ~you_graf]
         result: done
         outcome: "Dashboard loaded"
+
+  - id: chaos
+    title: Run a chaos experiment
+    summary: "A planned fault in a lab, run from ChaosCenter in core, watched in Grafana and scored."
+    steps:
+      - title: Start the experiment
+        action: "Browser → ChaosCenter: run pod-delete on the lab (HTTPS 443)"
+        text: "From the home LAN you start an experiment from the library synced from homelab-gitops; ChaosCenter is never published to the internet."
+        path: [you_chaos]
+      - title: Record the run
+        action: "ChaosCenter ↔ chaos-db: store the new run (MongoDB 27017)"
+        text: "ChaosCenter records the run in its MongoDB (default port 27017) before any agent sees it."
+        path: [cc_db, ~cc_db]
+      - title: The agent picks it up
+        action: "Chaos agent ↔ ChaosCenter: fetch the experiment (HTTPS 443)"
+        text: "The lab's chaos agent dials out to ChaosCenter in core and gets the experiment; nothing connects into the lab."
+        path: [chaos_agent, ~chaos_agent]
+      - title: Inject the fault
+        action: "Chaos operator → lab app: delete a pod"
+        text: "The chaos operator injects the fault within the blast radius set in git, while its probes check the app keeps answering."
+        edges: [chaos_inject]
+      - title: Watch the effect
+        action: "Lab collector → mon: traces, metrics, logs during the fault (OTLP 4317)"
+        text: "The monitoring pack streams the lab's signals, and the chaos exporter's metrics, to mon as usual."
+        edges: [labs_mon]
+      - title: An alert fires
+        action: "Alertmanager → SRE agent: the injected fault as an alert"
+        text: "If the fault trips an alert, the SRE agent investigates it; these runs become its eval cases (milestone M6)."
+        edges: [mon_sre]
+      - title: Report the result
+        action: "Chaos agent ↔ ChaosCenter: probe results and verdict"
+        text: "The agent reports the probe results; ChaosCenter turns them into a pass or fail and a resilience score."
+        path: [chaos_agent, ~chaos_agent]
+      - title: Read the score
+        action: "ChaosCenter → browser: verdict and resilience score"
+        text: "You see the verdict and score next to the Grafana dashboards for the same time window."
+        path: [~you_chaos]
+        result: success
+        outcome: "Resilience score recorded"
 
   - id: chat
     title: Ask the chatbot
