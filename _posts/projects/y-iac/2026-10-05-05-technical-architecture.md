@@ -28,9 +28,10 @@ the platform consistent, and it's also why a bug in the shared path is a bug in 
 At the highest level there are two kinds of repository and one execution path. Y-IaC holds the modules,
 the CLI and the reusable workflows; each infra-* consumer holds only YAML. The same CLI runs on a laptop
 and on a GitHub Actions runner, and only the action (plan or apply) changes between review and
-deployment. Press play, or step through it:
+deployment. Open any part to see what's inside, pick a tab for credentials, logs, gates or delivery, or
+play one of the use cases:
 
-{% include flow-anim.html id="projects/y-iac/system-architecture" %}
+{% include diagram.html id="projects/y-iac/system-architecture" %}
 
 The components, and where they live in the repository:
 
