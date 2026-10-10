@@ -1,0 +1,84 @@
+# Animated CI pipeline for _posts/devops/build-tools/ruby/2026-10-01-bundler-rake-build.md
+# (include id: devops/build-tools/ruby/bundler-rake-ci-pipeline). The stages follow the generic build pipeline in
+# _data/flow_anims/devops/build-tools/generic-build-pipeline.yml; labels name the real tool.
+title: "CI pipeline with Bundler and Rake"
+accent: "#F97316"
+accent2: "#8B5CF6"
+viewbox: [1000, 500]
+modes:
+  - {id: pass, label: "Gate passes"}
+  - {id: fail, label: "Simulate a failing gate"}
+
+lanes:
+  - {label: "Build with Bundler and Rake", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Verify, package and publish", x: 8, y: 205, w: 984, h: 287}
+
+nodes:
+  - {id: A, label: "Source", sub: "Gemfile.lock", x: 100, y: 75, w: 150, h: 56, shape: terminal, icon: git}
+  - {id: B, label: "Install", sub: "bundle install", x: 300, y: 75, w: 150, h: 56, icon: package, icon_pos: corner}
+  - {id: C, label: "Lint + format", sub: "rubocop", x: 500, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: D, label: "Build assets", sub: "assets:precompile", x: 700, y: 75, w: 150, h: 56, icon: gear, icon_pos: corner}
+  - {id: E, label: "Test + coverage", sub: "rspec", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner}
+  - {id: F, label: "SAST", sub: "Brakeman", x: 130, y: 270, w: 150, h: 46, icon: shield}
+  - {id: G, label: "SCA", sub: "bundler-audit", x: 130, y: 340, w: 150, h: 46, icon: shield, icon_pos: corner}
+  - {id: H, label: "Secrets", sub: "Gitleaks", x: 130, y: 410, w: 150, h: 46, icon: key}
+  - {id: I, label: "Quality\ngate", x: 320, y: 340, w: 110, h: 84, shape: diamond}
+  - {id: X, label: "Fail the build", x: 320, y: 452, w: 140, h: 42, tone: fail, icon: cross, icon_pos: corner}
+  - {id: J, label: "Package", sub: "rake build", x: 492, y: 340, w: 146, h: 56, icon: package}
+  - {id: K, label: "SBOM + sign", sub: "Syft + cosign", x: 662, y: 340, w: 146, h: 56, icon: cert, icon_pos: corner}
+  - {id: L, label: "RubyGems", sub: "gem push", x: 830, y: 340, w: 140, h: 66, shape: cylinder, icon: bucket}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]]}
+  - {id: EG, from: E, to: G, points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]]}
+  - {id: EH, from: E, to: H, points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]]}
+  - {id: FI, from: F, to: I}
+  - {id: GI, from: G, to: I}
+  - {id: HI, from: H, to: I}
+  - {id: IX, from: I, to: X, points: [[320, 382], [320, 431]], label: "fail", label_at: [334, 410], tone: fail}
+  - {id: IJ, from: I, to: J, label: "pass", label_at: [396, 330]}
+  - {id: JK, from: J, to: K}
+  - {id: KL, from: K, to: L}
+
+steps:
+  - lights: [A]
+    title: "Source + Gemfile.lock"
+    text: "A commit triggers CI. Gemfile and Gemfile.lock pin every gem, and .ruby-version pins Ruby."
+  - edges: [AB]
+    title: "Install"
+    text: "With bundle config set deployment true, bundle install installs exactly Gemfile.lock and fails if it would change."
+  - edges: [BC]
+    title: "Lint and format"
+    text: "bundle exec rubocop checks style and common bugs (with rubocop-rails and rubocop-rspec); Standard is a zero-config alternative."
+  - edges: [CD]
+    title: "Build assets"
+    text: "For Rails apps, bin/rails assets:precompile builds the production assets; plain gems skip this stage."
+  - edges: [DE]
+    title: "Test and coverage"
+    text: "bundle exec rspec runs the specs, with SimpleCov loaded in spec_helper to measure coverage."
+  - edges: [EF, EG, EH]
+    title: "Security scans in parallel"
+    text: "Brakeman checks Rails code for vulnerabilities, bundle-audit check --update checks Gemfile.lock against known advisories, and Gitleaks scans for secrets."
+  - edges: [FI, GI, HI]
+    title: "Quality gate"
+    text: "RuboCop, the specs and both scanners are required checks; one failure stops the pipeline."
+  - edges: [IX]
+    when: fail
+    title: "Fail the build"
+    text: "A failed check stops the pipeline at the gate, so nothing is packaged, signed or published."
+  - edges: [IJ]
+    when: pass
+    title: "Build the gem"
+    text: "bundle exec rake build (Bundler's gem tasks) writes pkg/<name>-<version>.gem."
+  - edges: [JK]
+    when: pass
+    title: "SBOM and signing"
+    text: "Syft generates the SBOM, and Sigstore cosign signs the gem."
+  - edges: [KL]
+    when: pass
+    title: "Publish"
+    text: "gem push uploads the .gem to RubyGems.org or a private gem server."

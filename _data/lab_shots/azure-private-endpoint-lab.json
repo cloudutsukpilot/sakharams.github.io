@@ -1,0 +1,173 @@
+{
+  "baseline-http.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:00:32.514Z",
+    "verify": "ok",
+    "experiment": "baseline",
+    "repo_rev": "unknown"
+  },
+  "baseline-log.webp": {
+    "w": 1408,
+    "h": 410,
+    "animated": false,
+    "captured": "2026-10-10T10:00:32.514Z",
+    "verify": "ok",
+    "experiment": "baseline",
+    "repo_rev": "unknown"
+  },
+  "baseline-resolves.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:00:32.514Z",
+    "verify": "ok",
+    "experiment": "baseline",
+    "repo_rev": "unknown"
+  },
+  "openai-zone-dashboard.webp": {
+    "w": 1440,
+    "h": 1500,
+    "animated": false,
+    "captured": "2026-10-10T11:54:05.374Z",
+    "verify": "ok",
+    "experiment": "openai-zone",
+    "repo_rev": "unknown"
+  },
+  "openai-zone-http-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T11:54:05.374Z",
+    "verify": "ok",
+    "experiment": "openai-zone",
+    "repo_rev": "unknown"
+  },
+  "openai-zone-log.webp": {
+    "w": 1408,
+    "h": 410,
+    "animated": false,
+    "captured": "2026-10-10T11:54:05.374Z",
+    "verify": "ok",
+    "experiment": "openai-zone",
+    "repo_rev": "unknown"
+  },
+  "openai-zone-timeline.webp": {
+    "w": 1200,
+    "h": 188,
+    "animated": true,
+    "captured": "2026-10-10T11:54:05.374Z",
+    "verify": "ok",
+    "experiment": "openai-zone",
+    "repo_rev": "unknown"
+  },
+  "split-dns-http-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:50:56.811Z",
+    "verify": "ok",
+    "experiment": "split-dns",
+    "repo_rev": "unknown"
+  },
+  "split-dns-resolves-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:50:56.811Z",
+    "verify": "ok",
+    "experiment": "split-dns",
+    "repo_rev": "unknown"
+  },
+  "split-dns-resolves-before.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:50:56.811Z",
+    "verify": "ok",
+    "experiment": "split-dns",
+    "repo_rev": "unknown"
+  },
+  "split-dns-waterfall.webp": {
+    "w": 1018,
+    "h": 544,
+    "animated": false,
+    "captured": "2026-10-10T10:50:56.811Z",
+    "verify": "ok",
+    "experiment": "split-dns",
+    "repo_rev": "unknown"
+  },
+  "tunnel-up-still-public.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:49:39.957Z",
+    "verify": "ok",
+    "experiment": "tunnel-up",
+    "repo_rev": "unknown"
+  },
+  "tunnel-up-tunnel-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:49:39.957Z",
+    "verify": "ok",
+    "experiment": "tunnel-up",
+    "repo_rev": "unknown"
+  },
+  "tunnel-up-tunnel-before.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T10:49:39.957Z",
+    "verify": "ok",
+    "experiment": "tunnel-up",
+    "repo_rev": "unknown"
+  },
+  "vm-deallocate-log.webp": {
+    "w": 1408,
+    "h": 410,
+    "animated": false,
+    "captured": "2026-10-10T11:55:26.839Z",
+    "verify": "ok",
+    "experiment": "vm-deallocate",
+    "repo_rev": "unknown"
+  },
+  "vm-deallocate-resolves-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T11:55:26.839Z",
+    "verify": "ok",
+    "experiment": "vm-deallocate",
+    "repo_rev": "unknown"
+  },
+  "vm-deallocate-tunnel-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T11:55:26.839Z",
+    "verify": "ok",
+    "experiment": "vm-deallocate",
+    "repo_rev": "unknown"
+  },
+  "vm-start-timeline.webp": {
+    "w": 1200,
+    "h": 188,
+    "animated": true,
+    "captured": "2026-10-10T11:58:02.401Z",
+    "verify": "ok",
+    "experiment": "vm-start",
+    "repo_rev": "unknown"
+  },
+  "vm-start-tunnel-after.webp": {
+    "w": 464,
+    "h": 220,
+    "animated": false,
+    "captured": "2026-10-10T11:58:02.401Z",
+    "verify": "ok",
+    "experiment": "vm-start",
+    "repo_rev": "unknown"
+  }
+}

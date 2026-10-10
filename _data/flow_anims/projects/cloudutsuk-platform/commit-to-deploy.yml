@@ -1,0 +1,131 @@
+# Cloudutsuk Platform: commit to deploy, with every test and security gate (ADRs 0008, 0031-0033).
+# Belongs to the Technical Architecture post (_posts/projects/cloudutsuk-platform/2026-10-10-05-technical-architecture.md,
+# "Commit to deploy"); moves to the CI/CD and Release Management post when that area is written.
+# Made with the cloudutsuk-flow-anim skill. Fan-out/fan-in layout follows devops/build-tools/generic-build-pipeline.
+title: Cloudutsuk Platform commit to deploy with security gates
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 820]
+modes:
+  - {id: pass, label: "All gates pass"}
+  - {id: fail, label: "Simulate a failing scan"}
+lanes:
+  - {label: "Commit", x: 8, y: 8, w: 984, h: 122}
+  - {label: "PR gates and build (ARC runner on the DGX)", x: 8, y: 205, w: 984, h: 287}
+  - {label: "Deploy with GitOps", x: 8, y: 515, w: 984, h: 140}
+  - {label: "Nightly", x: 8, y: 678, w: 984, h: 130}
+nodes:
+  - {id: dev, label: "Commit", sub: "laptop", x: 100, y: 75, w: 150, h: 56, shape: terminal, icon: laptop, color: blue}
+  - {id: hk, label: "Pre-commit", sub: "Gitleaks, Hadolint", x: 300, y: 75, w: 150, h: 56, icon: key, icon_pos: corner, color: rose}
+  - {id: pr, label: "Pull request", sub: "private repo", x: 500, y: 75, w: 150, h: 56, icon: "devops/cicd/github-18.svg", icon_pos: corner, color: slate}
+  - {id: rn, label: "ARC runner", sub: "ephemeral pod", x: 700, y: 75, w: 150, h: 56, icon: container, icon_pos: corner, color: orange}
+  - {id: ts, label: "Tests", sub: "pytest, Jest", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner, color: violet}
+  - {id: F, label: "SAST", sub: "Semgrep, Bandit", x: 130, y: 270, w: 150, h: 46, icon: shield, icon_pos: corner, color: rose}
+  - {id: G, label: "SCA + IaC", sub: "Trivy, Checkov", x: 130, y: 340, w: 150, h: 46, icon: shield, icon_pos: corner, color: rose}
+  - {id: H, label: "Secrets", sub: "Gitleaks", x: 130, y: 410, w: 150, h: 46, icon: key, icon_pos: corner, color: rose}
+  - {id: I, label: "Quality\ngate", x: 320, y: 340, w: 110, h: 84, shape: diamond}
+  - {id: X, label: "PR blocked", x: 320, y: 452, w: 140, h: 42, tone: fail, icon: cross, icon_pos: corner}
+  - {id: J, label: "Build", sub: "BuildKit", x: 490, y: 340, w: 130, h: 56, icon: package, icon_pos: corner, color: orange}
+  - {id: K, label: "Image scan", sub: "Trivy, Syft SBOM", x: 665, y: 340, w: 140, h: 56, icon: shield, icon_pos: corner, color: rose}
+  - {id: L, label: "Zot", sub: "signed, scanned", x: 850, y: 340, w: 130, h: 66, shape: cylinder, icon: package, icon_pos: corner, color: amber}
+  - {id: N, label: "Tag commit", sub: "homelab-gitops", x: 110, y: 585, w: 150, h: 56, icon: git, icon_pos: corner, color: orange}
+  - {id: O, label: "Argo CD", sub: "sync", x: 310, y: 585, w: 130, h: 56, icon: git, icon_pos: corner, color: orange}
+  - {id: P, label: "Kyverno", sub: "verify signature", x: 500, y: 585, w: 140, h: 56, icon: shield, icon_pos: corner, color: rose}
+  - {id: Q, label: "Smoke test", sub: "PostSync hook", x: 700, y: 585, w: 140, h: 56, icon: check, icon_pos: corner, color: green}
+  - {id: R, label: "Healthy", sub: "rollback if not", x: 895, y: 585, w: 140, h: 56, shape: terminal, tone: ok}
+  - {id: clk, label: "Nightly", sub: "schedule", x: 110, y: 745, w: 150, h: 56, shape: terminal, icon: clock, color: slate}
+  - {id: suite, label: "Nightly suite", sub: "Playwright, ZAP, Locust", x: 430, y: 745, w: 230, h: 56, icon: rocket, icon_pos: corner, color: violet}
+  - {id: W, label: "Dashboards", sub: "Security, Perf", x: 800, y: 745, w: 150, h: 56, icon: chart, icon_pos: corner, color: green}
+edges:
+  - {id: dev_hk, from: dev, to: hk}
+  - {id: hk_pr, from: hk, to: pr}
+  - {id: pr_rn, from: pr, to: rn}
+  - {id: rn_ts, from: rn, to: ts}
+  - {id: EF, from: ts, to: F, points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]]}
+  - {id: EG, from: ts, to: G, points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]]}
+  - {id: EH, from: ts, to: H, points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]]}
+  - {id: FI, from: F, to: I}
+  - {id: GI, from: G, to: I}
+  - {id: HI, from: H, to: I}
+  - {id: IJ, from: I, to: J, tone: ok}
+  - {id: IX, from: I, to: X, tone: fail}
+  - {id: JK, from: J, to: K}
+  - {id: KL, from: K, to: L}
+  - {id: LN, from: L, to: N, points: [[850, 373], [850, 503], [110, 503], [110, 557]]}
+  - {id: N_O, from: N, to: O}
+  - {id: OP, from: O, to: P}
+  - {id: PQ, from: P, to: Q}
+  - {id: QR, from: Q, to: R}
+  - {id: Rclk, from: R, to: clk, points: [[895, 613], [895, 666], [110, 666], [110, 717]], dashed: true, label: "every night"}
+  - {id: clk_suite, from: clk, to: suite}
+  - {id: suite_W, from: suite, to: W, kind: telemetry}
+steps:
+  - title: Commit
+    text: "Work starts on a laptop or the DGX, in one of the private platform repos."
+    lights: [dev]
+  - title: Pre-commit hooks
+    text: "Gitleaks and Hadolint run before the commit is even created, so a leaked token never reaches GitHub."
+    edges: [dev_hk]
+  - title: Pull request
+    text: "The push opens a pull request on GitHub. Only private repos use the self-hosted runners."
+    edges: [hk_pr]
+  - title: A runner picks it up
+    text: "An ephemeral ARC runner pod on the DGX polls GitHub for the job (outbound only) and is destroyed after one job."
+    edges: [pr_rn]
+  - title: Tests first
+    text: "Unit tests (pytest, Jest), integration tests with Testcontainers, and Schemathesis API tests generated from each OpenAPI spec."
+    edges: [rn_ts]
+  - title: Security scans
+    text: "Semgrep and Bandit read the code, Trivy and Checkov check dependencies and IaC (plus Conftest with the OPA policies), and Gitleaks scans the history."
+    edges: [EF, EG, EH]
+  - title: Quality gate
+    text: "Any secret, a critical or high finding with a fix available, a high IaC misconfiguration or an OPA deny fails the gate."
+    edges: [FI, GI, HI]
+  - title: Build
+    when: pass
+    text: "BuildKit builds the image rootless inside the cluster, with layer caching between runs."
+    edges: [IJ]
+  - title: PR blocked
+    when: fail
+    text: "The check goes red with the finding in a PR comment. Nothing is built, so nothing can be deployed."
+    edges: [IX]
+  - title: Scan the image
+    when: pass
+    text: "Trivy scans the image itself (OS packages and licences) and Syft writes a CycloneDX SBOM."
+    edges: [JK]
+  - title: Sign and push
+    when: pass
+    text: "Cosign signs the image with a key held in OpenBao, attaches the SBOM, and pushes to Zot in core with a key read from OpenBao via GitHub OIDC."
+    edges: [KL]
+  - title: Tag commit
+    when: pass
+    text: "The new image digest is committed to homelab-gitops on GitHub. CI never gets a kubeconfig; git is the only way to change what runs."
+    edges: [LN]
+  - title: Argo CD syncs
+    when: pass
+    text: "Argo CD polls GitHub (outbound, every 3 minutes), sees the commit and applies it to the target k3d cluster; nodes pull the image from Zot."
+    edges: [N_O]
+  - title: Admission check
+    when: pass
+    text: "Kyverno admits the pod only if the image is signed, comes from our Zot registry, runs as non-root and has resource limits."
+    edges: [OP]
+  - title: Smoke test
+    when: pass
+    text: "A PostSync hook calls health endpoints, one login redirect, one RAG question and one gateway call."
+    edges: [PQ]
+  - title: Healthy
+    when: pass
+    text: "The app turns Healthy. A failed smoke test marks it Degraded instead, and Argo CD rolls back to the last good revision."
+    edges: [QR]
+  - title: Every night
+    when: pass
+    text: "Scheduled workflows test what is actually deployed, not just what was built."
+    edges: [Rclk]
+  - title: The nightly suite
+    when: pass
+    text: "Playwright user journeys, the full Schemathesis profile, an OWASP ZAP scan and a Locust load run, all against the internal ingress."
+    edges: [clk_suite]
+  - title: Results on dashboards
+    when: pass
+    text: "Locust, ZAP and Trivy Operator results land in Grafana's Performance and Security folders; a regression opens an issue."
+    edges: [suite_W]

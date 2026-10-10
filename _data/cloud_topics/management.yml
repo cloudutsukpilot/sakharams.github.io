@@ -1,0 +1,82 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-monitoring-management-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: metrics
+    title: Metrics, dashboards and alerting
+    aws:
+      - ref: Amazon CloudWatch
+        summary: Collects metrics from every AWS service, custom metrics via the CloudWatch agent or OpenTelemetry, dashboards, alarms (static, anomaly detection, composite) and actions such as autoscaling or SNS notifications. Amazon Managed Prometheus and Managed Grafana cover open-source stacks.
+    azure:
+      - ref: Azure Monitor
+        summary: Platform metrics for every Azure resource, metric and log alerts with action groups, workbooks and dashboards. Azure Monitor managed service for Prometheus and Azure Managed Grafana support Kubernetes and open-source tooling.
+    gcp:
+      - ref: Cloud Monitoring
+        summary: Metrics for Google Cloud services and custom metrics, dashboards, uptime checks, SLO monitoring and alerting policies. Google Cloud Managed Service for Prometheus stores Prometheus metrics at global scale with PromQL support.
+
+  - id: logs
+    title: Log management
+    aws:
+      - ref: Amazon CloudWatch
+        name: CloudWatch Logs
+        summary: Centralised log groups with retention settings, Logs Insights for interactive queries, metric filters, subscription filters to stream logs onward, and an Infrequent Access class for cheaper storage.
+    azure:
+      - ref: Log Analytics
+        summary: Workspaces that store logs from resources, VMs, containers and apps, queried with KQL. Analytics, Basic and Auxiliary table plans trade query capability for price; data collection rules control what's ingested.
+    gcp:
+      - ref: Cloud Logging
+        summary: Ingests logs from Google Cloud services automatically; log router sinks send them to buckets, BigQuery, Pub/Sub or Cloud Storage. Log Analytics lets you query logs with SQL.
+
+  - id: apm
+    title: Application performance monitoring and tracing
+    aws:
+      - ref: Amazon CloudWatch
+        name: CloudWatch Application Signals and X-Ray
+        summary: Application Signals gives service maps, SLOs and golden-signal dashboards from OpenTelemetry instrumentation; AWS X-Ray provides distributed tracing. CloudWatch RUM and Synthetics cover front-end and canary monitoring.
+    azure:
+      - ref: Application Insights
+        summary: APM built on Azure Monitor with the OpenTelemetry-based distro. Request, dependency and exception telemetry, application map, live metrics, availability tests and distributed tracing across services.
+    gcp:
+      - name: Cloud Trace and Cloud Profiler
+        icon: trace
+        summary: Cloud Trace collects distributed traces (OpenTelemetry-native) and latency reports; Cloud Profiler gives continuous low-overhead CPU and memory profiling in production.
+
+  - id: audit
+    title: Audit logs
+    aws:
+      - ref: AWS CloudTrail
+        summary: Records every API call across your AWS accounts. Event history covers 90 days for free; organisation trails deliver logs to S3, and CloudTrail Lake stores and queries events with SQL.
+    azure:
+      - ref: Azure Monitor
+        name: Azure Activity Log
+        summary: Subscription-level log of control-plane operations (who created, changed or deleted what), kept for 90 days. Send it to a Log Analytics workspace or storage with diagnostic settings for longer retention. Entra ID has separate sign-in and audit logs.
+    gcp:
+      - ref: Cloud Audit Logs
+        summary: Admin Activity logs (always on, free), Data Access logs (opt-in), System Event and Policy Denied logs for every project, folder and organisation. Route them to a central bucket with an aggregated sink.
+
+  - id: iac
+    title: Infrastructure as code
+    aws:
+      - ref: AWS CloudFormation
+        summary: Declarative templates in YAML or JSON, with stacks, change sets, drift detection and StackSets for multi-account deployment. The AWS CDK generates CloudFormation from TypeScript, Python, Java, Go or .NET.
+    azure:
+      - ref: Azure Resource Manager
+        summary: The deployment and management layer behind every Azure request. Author templates in Bicep (or ARM JSON), store them as template specs and manage lifecycle and locks with deployment stacks. What-if previews changes before you deploy.
+    gcp:
+      - ref: Infrastructure Manager
+        summary: Google's managed Terraform service that runs plan and apply in Google Cloud with state handled for you. It replaces Cloud Deployment Manager, whose support ended in 2026; Deployment Manager shuts down on 30 June 2027.
+
+  - id: ops
+    title: Operations and recommendations
+    aws:
+      - ref: AWS Systems Manager
+        summary: Patch Manager, Session Manager (shell access without SSH or bastions), Run Command, State Manager, Parameter Store and inventory for EC2 and hybrid servers.
+      - ref: AWS Trusted Advisor
+        summary: Best-practice checks across cost, security, fault tolerance, performance and service quotas. Full checks require Business support or higher.
+    azure:
+      - ref: Azure Automation
+        summary: Runbooks (PowerShell and Python) for scheduled operations, plus state configuration. Patching has moved to Azure Update Manager, which works for Azure and Arc-enabled servers.
+      - ref: Azure Advisor
+        summary: Free personalised recommendations for cost, security, reliability, operational excellence and performance, aligned with the Well-Architected Framework and with an Advisor score.
+    gcp:
+      - name: VM Manager and Active Assist
+        icon: vm-manager
+        summary: VM Manager handles OS patching, inventory and configuration for Compute Engine fleets. Active Assist (the Recommender) suggests right-sizing, idle resource clean-up, IAM tightening and committed-use purchases.

@@ -1,0 +1,90 @@
+# Animated flow diagram for _posts/labs/opentelemetry-lab/2026-10-08-01-overview.md
+# (include id: labs/opentelemetry-lab/architecture), reused in part 7.
+# The request path of one click on "Call /api/demo", then how each signal reaches Grafana.
+# Facts from ~/gitrepos/observability/otel-static-site-k3d at 8fbd1b1.
+title: OpenTelemetry End to End, request and signal paths
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 560]
+modes:
+  - { id: miss, label: "Cache miss" }
+  - { id: hit, label: "Show a cache hit instead" }
+
+lanes:
+  - { label: "Request path", x: 8, y: 8, w: 984, h: 236 }
+  - { label: "Telemetry path", x: 8, y: 256, w: 984, h: 296 }
+
+nodes:
+  - { id: BR, label: "Browser", sub: "otel.js", x: 90, y: 80, w: 140, h: 56, icon: browser }
+  - { id: TR, label: "Traefik", sub: "ingress", x: 280, y: 80, w: 150, h: 56, icon: balancer }
+  - { id: NG, label: "nginx", sub: "static files", x: 375, y: 190, w: 130, h: 56 }
+  - { id: API, label: "API", sub: "FastAPI", x: 470, y: 80, w: 150, h: 56, icon: api }
+  - { id: BK, label: "Backend", sub: "FastAPI", x: 660, y: 80, w: 150, h: 56, icon: server }
+  - { id: RD, label: "Redis", sub: "cache", x: 880, y: 62, w: 130, h: 62, shape: cylinder, icon: bolt }
+  - { id: SQ, label: "SQLite", sub: "records", x: 880, y: 178, w: 130, h: 62, shape: cylinder }
+  - { id: COL, label: "OTel Collector", sub: "DaemonSet", x: 470, y: 380, w: 170, h: 56, icon: chart }
+  - { id: EXP, label: "nginx exporter", sub: ":9113/metrics", x: 190, y: 360, w: 160, h: 50, icon: chart, icon_pos: corner }
+  - { id: LOG, label: "Pod log files", sub: "/var/log/pods", x: 190, y: 470, w: 160, h: 50, icon: chart, icon_pos: corner }
+  - { id: TE, label: "Tempo", sub: "traces", x: 720, y: 318, w: 130, h: 56, shape: cylinder, icon: chart }
+  - { id: LO, label: "Loki", sub: "logs", x: 720, y: 410, w: 130, h: 56, shape: cylinder, icon: "devops/monitoring/loki-18.svg" }
+  - { id: PR, label: "Prometheus", sub: "metrics", x: 720, y: 502, w: 130, h: 56, shape: cylinder, icon: "devops/monitoring/prometheus-18.svg", icon_pos: corner }
+  - { id: GR, label: "Grafana", sub: ":3002", x: 905, y: 410, w: 130, h: 56, shape: terminal, icon: "devops/monitoring/grafana-18.svg" }
+
+edges:
+  - { id: BR_TR, from: BR, to: TR }
+  - { id: TR_NG, from: TR, to: NG, points: [[330, 108], [330, 162]], label: "/", label_at: [342, 140] }
+  - { id: TR_API, from: TR, to: API, label: "/api" }
+  - { id: API_BK, from: API, to: BK }
+  - { id: BK_RD, from: BK, to: RD, label: "GET" }
+  - { id: BK_SQ, from: BK, to: SQ, points: [[700, 108], [700, 178], [815, 178]], label: "SELECT", label_at: [752, 168] }
+  # Every traced service pushes spans over OTLP; the stubs meet on a bus above the Collector.
+  - { id: BR_COL, from: BR, to: COL, points: [[90, 108], [90, 290], [470, 290], [470, 352]], dashed: true }
+  - { id: TR_COL, from: TR, to: COL, points: [[250, 108], [250, 290], [470, 290], [470, 352]], dashed: true }
+  - { id: NG_COL, from: NG, to: COL, points: [[375, 218], [375, 290], [470, 290], [470, 352]], dashed: true }
+  - { id: API_COL, from: API, to: COL, points: [[510, 108], [510, 290], [470, 290], [470, 352]], dashed: true }
+  - { id: BK_COL, from: BK, to: COL, points: [[620, 108], [620, 290], [470, 290], [470, 352]], dashed: true, label: "OTLP push", label_at: [560, 280] }
+  # The Collector pulls the other two signals.
+  - { id: COL_EXP, from: COL, to: EXP, points: [[385, 370], [270, 370]], label: "scrape 15s", label_at: [328, 356] }
+  - { id: COL_LOG, from: COL, to: LOG, points: [[385, 396], [330, 396], [330, 470], [270, 470]], label: "tail", label_at: [342, 440] }
+  - { id: COL_TE, from: COL, to: TE }
+  - { id: COL_LO, from: COL, to: LO }
+  - { id: COL_PR, from: COL, to: PR }
+  - { id: TE_GR, from: TE, to: GR }
+  - { id: LO_GR, from: LO, to: GR }
+  - { id: PR_GR, from: PR, to: GR }
+
+steps:
+  - lights: [BR]
+    title: A click starts a trace
+    text: "otel.js wraps the fetch to /api/demo in a span and adds a W3C traceparent header carrying the trace ID."
+  - edges: [BR_TR]
+    title: Traefik continues it
+    text: "The ingress reads traceparent and records a gateway span as a child, in the same trace."
+  - edges: [TR_NG]
+    title: Pages come from nginx
+    text: "Traefik routes / to nginx, which serves the static page. nginx traces and logs its own requests, separately."
+  - edges: [TR_API]
+    title: /api goes to FastAPI
+    text: "opentelemetry-instrument wraps the API, so the request becomes a server span with no tracing code in main.py."
+  - edges: [API_BK]
+    title: The API calls the backend
+    text: "The HTTPX client span injects traceparent again, so the backend's spans join the same trace."
+  - edges: [BK_RD]
+    title: Check Redis first
+    text: "The backend's Redis GET span is renamed GET (cache miss) or GET (cache hit) by a response hook."
+  - edges: [BK_SQ]
+    when: miss
+    title: SQLite on a miss
+    text: "On a miss the backend runs a manually created sqlite SELECT records span, then SETEX writes Redis for 60 s."
+  - edges: [BR_COL, TR_COL, NG_COL, API_COL, BK_COL]
+    title: Spans are pushed
+    text: "Every service exports spans over OTLP to the Collector. The browser's go through nginx at /v1/traces."
+  - edges: [COL_EXP, COL_LOG]
+    title: Metrics and logs are pulled
+    text: "The Collector scrapes the nginx exporter every 15 s and tails JSON log lines from the pod log files."
+  - edges: [COL_TE, COL_LO, COL_PR]
+    title: One pipeline per signal
+    text: "Traces go to Tempo, logs to Loki, metrics to Prometheus, all inside the grafana/otel-lgtm container."
+  - edges: [TE_GR, LO_GR, PR_GR]
+    title: One place to look
+    text: "Grafana queries all three. The shared trace ID is what lets you jump from a log line to its trace."

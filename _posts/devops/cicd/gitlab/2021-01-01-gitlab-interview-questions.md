@@ -1,8 +1,10 @@
 ---
-layouy: page
+layout: post
 title: GitLab Interview Questions
 categories: [devops, cicd, gitlab]
 tags: [DevOps, CICD, Gitlab, Interview Questions]
+interview_domain: devops
+interview_topic: GitLab
 ---
 
 1. What is repositoring mirroring and why do we need to use it?

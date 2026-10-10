@@ -124,10 +124,12 @@ inputs:
 
 Then in the job:
 
+{% raw %}
 ```yaml
 env:
   NUGET_CERT_REVOCATION_MODE: ${{ inputs.NUGET_CERT_REVOCATION_MODE }}
 ```
+{% endraw %}
 
 Callers on the sectigo runner set `NUGET_CERT_REVOCATION_MODE: offline`. Everyone else gets the safe default.
 

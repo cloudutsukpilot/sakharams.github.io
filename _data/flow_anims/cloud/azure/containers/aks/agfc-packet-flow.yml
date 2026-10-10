@@ -1,0 +1,71 @@
+# Animated flow diagram for
+# _posts/cloud/azure/containers/aks/2026-10-08-migrate-aks-nginx-ingress-to-application-gateway-for-containers.md
+# (include id: cloud/azure/containers/aks/agfc-packet-flow).
+# Browser to pod through Application Gateway for Containers (BYO, Gateway API).
+title: "Packet path: browser to pod through Application Gateway for Containers"
+accent: "#38BDF8"
+accent2: "#6366F1"
+viewbox: [1000, 545]
+modes:
+  - { id: offload, label: "TLS offload at AGfC" }
+  - { id: e2e, label: "End-to-end TLS (BackendTLSPolicy)" }
+
+lanes:
+  - { label: "Client and DNS", x: 8, y: 8, w: 984, h: 150 }
+  - { label: "Azure-managed data plane (outside the cluster)", x: 8, y: 200, w: 984, h: 150 }
+  - { label: "AKS cluster", x: 8, y: 392, w: 984, h: 145 }
+
+nodes:
+  - { id: B, label: "Browser", sub: "corp egress IP", x: 100, y: 95, shape: terminal, icon: browser, icon_pos: corner }
+  - { id: D, label: "Public DNS", sub: "CNAME to fzXX", x: 330, y: 95, shape: cylinder, w: 140, h: 62, icon: globe, icon_pos: corner }
+  - { id: F, label: "AGfC frontend", sub: "NSG allow-list", x: 100, y: 290, icon: browser, icon_pos: corner }
+  - { id: W, label: "TLS + WAF", sub: "Layer 7", x: 330, y: 290, icon: firewall }
+  - { id: R, label: "Route match", sub: "HTTPRoute", x: 560, y: 290 }
+  - { id: S, label: "Delegated\nsubnet", x: 790, y: 290, icon: router }
+  - { id: C, label: "ALB Controller", sub: "config only", x: 560, y: 470, icon: balancer, icon_pos: corner }
+  - { id: P, label: "App pod", sub: "pod IP", x: 790, y: 470, shape: terminal, icon: container }
+
+edges:
+  - { id: CR, from: C, to: R, exit: top, enter: bottom, dashed: true, label: "programs" }
+  - { id: BD, from: B, to: D, label: "lookup" }
+  - { id: DB, from: D, to: B, exit: top, enter: top, offset: 32, tone: ok, label: "public IP" }
+  - { id: BF, from: B, to: F, label: "HTTPS :443" }
+  - { id: FW, from: F, to: W }
+  - { id: WR, from: W, to: R }
+  - { id: RS, from: R, to: S }
+  - { id: SP, from: S, to: P }
+
+steps:
+  - lights: [C]
+    title: Control plane first
+    text: The ALB Controller runs in the cluster and watches Gateway, HTTPRoute and policy resources. It never carries user traffic.
+  - edges: [CR]
+    lights: [R, B]
+    title: Config pushed, user arrives
+    text: The routes are pushed to the AGfC resource that Terraform created. Now the user browses to https://orders.example.com.
+  - edges: [BD]
+    title: CNAME lookup
+    text: The hostname is a CNAME to the frontend's generated FQDN, such as b7x2k9qf3h.fz42.alb.azure.com.
+  - edges: [DB]
+    title: A public IP comes back
+    text: The FQDN resolves to a public IP that Azure owns. There is no private IP option, so you publish a CNAME, not an A record.
+  - edges: [BF]
+    title: To the frontend
+    text: The request leaves through corporate internet egress. The NSG on the association subnet only allows your egress IPs on 80 and 443.
+  - edges: [FW]
+    title: TLS and WAF at the edge
+    text: AGfC terminates TLS with the listener's cert-manager Secret, and the WAF policy inspects the decrypted request.
+  - edges: [WR]
+    title: Layer 7 routing
+    text: The Host, path, headers and query are matched against the HTTPRoute rules. Rewrites, redirects and timeouts are applied here.
+  - edges: [RS]
+    title: Into your VNet
+    text: The data plane forwards the request through its association with the delegated /24 subnet in the cluster's VNet.
+  - edges: [SP]
+    when: offload
+    title: Plain HTTP to the pod IP
+    text: AGfC proxies straight to a pod IP (Azure CNI or CNI Overlay). There's no NodePort, no kube-proxy and no ingress pod in between.
+  - edges: [SP]
+    when: e2e
+    title: Re-encrypted to the pod
+    text: A BackendTLSPolicy makes AGfC open a new TLS session to the pod and verify its certificate against your internal CA.

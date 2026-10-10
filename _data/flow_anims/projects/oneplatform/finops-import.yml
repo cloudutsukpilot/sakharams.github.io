@@ -1,0 +1,76 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-07-data-and-integration.md
+# (include id: projects/oneplatform/finops-import). The daily FOCUS cost import in the middleware
+# Functions app: manifests, gzip CSVs, batched COPY, tag materialization, full integrity check, then
+# either a view refresh or keeping the previous views. Source: the middleware FinOps feature doc.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: OnePlatform FinOps FOCUS import
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 360]
+modes:
+  - { id: pass, label: "Import passes the integrity check" }
+  - { id: fail, label: "Simulate a failed integrity check" }
+
+lanes:
+  - { label: "Import (daily timer, Azure Functions)", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Publish", x: 8, y: 205, w: 984, h: 145 }
+
+grid: { x0: 90, y0: 75, dx: 164, dy: 0, w: 136, h: 56 }
+nodes:
+  - { id: TIMER, label: "05:00 UTC", col: 0, row: 0, shape: terminal }
+  - { id: MAN, label: "Read\nmanifests", col: 1, row: 0 }
+  - { id: DL, label: "Download", sub: "gzip CSV", col: 2, row: 0, icon: file }
+  - { id: COPY, label: "Batch COPY", sub: "10k rows", col: 3, row: 0, icon: function, icon_pos: corner }
+  - { id: TAGS, label: "Materialize\ntags", col: 4, row: 0 }
+  - { id: INT, label: "Full\ncheck?", col: 5, row: 0, w: 130, h: 84, shape: diamond }
+  - { id: MV, label: "Refresh views", sub: "one transaction", x: 140, y: 290, w: 150 }
+  - { id: API, label: "Cost APIs", sub: "views only", x: 345, y: 290, w: 150 }
+  - { id: PAGE, label: "Entity page\ncost trend", x: 550, y: 290, w: 150, shape: terminal, tone: ok }
+  - { id: KEEP, label: "Keep previous\nviews", x: 760, y: 290, w: 150, tone: warn }
+
+edges:
+  - { id: E1, from: TIMER, to: MAN }
+  - { id: E2, from: MAN, to: DL }
+  - { id: E3, from: DL, to: COPY }
+  - { id: E4, from: COPY, to: TAGS }
+  - { id: E5, from: TAGS, to: INT }
+  - { id: PASS, from: INT, to: MV, points: [[910, 117], [910, 165], [35, 165], [35, 290], [65, 290]], label: "yes", label_at: [480, 155], tone: ok }
+  - { id: FAIL, from: INT, to: KEEP, points: [[910, 117], [910, 290], [835, 290]], label: "no", label_at: [935, 230], tone: fail }
+  - { id: E7, from: MV, to: API }
+  - { id: E8, from: API, to: PAGE }
+
+steps:
+  - lights: [TIMER]
+    title: Daily timer
+    text: The FinOps importer runs in the middleware Functions app every day at 05:00 UTC. Every log line carries one run ID.
+  - edges: [E1]
+    title: Read manifests
+    text: Azure cost exports in FOCUS format land in Blob Storage with a manifest.json declaring blobs, bytes and row counts.
+  - edges: [E2]
+    title: Download
+    text: Each CSV blob is downloaded and decompressed. Status is tracked per blob, so a rerun skips what is already complete.
+  - edges: [E3]
+    title: Batch COPY
+    text: Rows go into PostgreSQL in COPY batches of 10,000, and each blob's row count is checked before it commits.
+  - edges: [E4]
+    title: Materialize tags
+    text: Eligible tags are stored per charge. Application cost splits equally across mapped applications, with the rounding remainder kept.
+  - edges: [E5]
+    title: Full integrity check
+    text: Manifests, blob totals, per-manifest row counts and every tag record must match. Missing and extra rows cannot cancel out.
+  - edges: [PASS]
+    when: pass
+    title: Refresh the views
+    text: Current-month, historical and daily resource summaries refresh, each with its success log in the same transaction.
+  - edges: [E7]
+    when: pass
+    title: APIs read views only
+    text: Report endpoints never touch the raw cost table, so a request costs a few indexed lookups however much data is imported.
+  - edges: [E8]
+    when: pass
+    title: Cost on the entity page
+    text: A resource's catalog page shows its daily billed cost, including older ARM IDs Azure billed it under.
+  - edges: [FAIL]
+    when: fail
+    title: Publish nothing
+    text: Without full integrity the published views and their as-of time stay as they were. The next run repairs missing tags without downloading again.

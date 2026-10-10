@@ -1,0 +1,75 @@
+# Animated roadmap for _posts/architect/system-design/2026-10-07-system-design-fundamentals.md
+# (include id: architect/system-design/system-design-roadmap).
+# Four lanes, each read left to right; wrap connectors drop from the last node of a lane, run left
+# through the gap and enter the first node of the next lane.
+title: System design fundamentals roadmap
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 600]
+loop: true
+grid: { x0: 130, y0: 78, dx: 185, dy: 155, w: 140, h: 56 }
+
+lanes:
+  - { label: "Foundations (1-4)", x: 40, y: 8, w: 952, h: 120 }
+  - { label: "Data and scale (5-9)", x: 40, y: 163, w: 952, h: 120 }
+  - { label: "Distributed systems (10-14)", x: 40, y: 318, w: 952, h: 120 }
+  - { label: "Data platforms and operations (15-18)", x: 40, y: 473, w: 952, h: 120 }
+
+nodes:
+  - { id: A, label: "Core\nconcepts", col: 0, row: 0, shape: terminal }
+  - { id: B, label: "Networking", col: 1, row: 0 }
+  - { id: C, label: "Load\nbalancing", col: 2, row: 0, icon: balancer }
+  - { id: D, label: "APIs", col: 3, row: 0 }
+  - { id: E, label: "Communication\npatterns", col: 0, row: 1 }
+  - { id: F, label: "Caching", col: 1, row: 1 }
+  - { id: G, label: "Databases", col: 2, row: 1, shape: cylinder, icon: database }
+  - { id: H, label: "Database\nscaling", col: 3, row: 1, icon: database }
+  - { id: I, label: "Storage", col: 4, row: 1, shape: cylinder, icon: bucket }
+  - { id: J, label: "Architectural\npatterns", col: 0, row: 2 }
+  - { id: K, label: "Microservices\npatterns", col: 1, row: 2 }
+  - { id: L, label: "Distributed\nsystems", col: 2, row: 2 }
+  - { id: M, label: "Distributed\ntransactions", col: 3, row: 2 }
+  - { id: N, label: "Data structures\nfor scale", col: 4, row: 2 }
+  - { id: O, label: "Big data", col: 0, row: 3 }
+  - { id: P, label: "Deployment", col: 1, row: 3, icon: rocket }
+  - { id: Q, label: "Observability", col: 2, row: 3, icon: chart, icon_pos: corner }
+  - { id: R, label: "Security", col: 3, row: 3, shape: terminal, icon: shield }
+
+edges:
+  - { id: AB, from: A, to: B }
+  - { id: BC, from: B, to: C }
+  - { id: CD, from: C, to: D }
+  - { id: DE, from: D, to: E, points: [[685, 106], [685, 145], [22, 145], [22, 233], [60, 233]] }
+  - { id: EF, from: E, to: F }
+  - { id: FG, from: F, to: G }
+  - { id: GH, from: G, to: H }
+  - { id: HI, from: H, to: I }
+  - { id: IJ, from: I, to: J, points: [[870, 261], [870, 300], [22, 300], [22, 388], [60, 388]] }
+  - { id: JK, from: J, to: K }
+  - { id: KL, from: K, to: L }
+  - { id: LM, from: L, to: M }
+  - { id: MN, from: M, to: N }
+  - { id: "NO", from: N, to: O, points: [[870, 416], [870, 455], [22, 455], [22, 543], [60, 543]] }
+  - { id: OP, from: O, to: P }
+  - { id: PQ, from: P, to: Q }
+  - { id: QR, from: Q, to: R }
+
+steps:
+  - { lights: [A], title: "1. Core concepts", text: "Scalability, availability, latency, consistent hashing and CAP: the vocabulary every later decision is judged against." }
+  - { edges: [AB], title: "2. Networking", text: "TCP vs UDP, HTTP versions, DNS and proxies. When something breaks, you need to know which layer is lying." }
+  - { edges: [BC], title: "3. Load balancing", text: "L4 or L7, round robin or least connections, plus DNS and Anycast for spreading traffic across regions." }
+  - { edges: [CD], title: "4. APIs", text: "REST, GraphQL or gRPC, gateways, rate limits and idempotency keys. The contract you can't refactor quietly." }
+  - { edges: [DE], title: "5. Communication", text: "Polling, SSE, WebSockets, queues, pub/sub and CDC. How components talk decides how far a failure spreads." }
+  - { edges: [EF], title: "6. Caching", text: "Cache-aside, write-through, eviction and stampede protection. Lookup is easy; invalidation is the real design." }
+  - { edges: [FG], title: "7. Databases", text: "Pick by access pattern: relational, key-value, document, wide-column, graph, search or vector." }
+  - { edges: [GH], title: "8. Database scaling", text: "Indexes first, then denormalise, cache, replicate and finally shard. Each step costs more complexity." }
+  - { edges: [HI], title: "9. Storage", text: "Block, file and object storage, distributed file systems, and erasure coding for cheap durability." }
+  - { edges: [IJ], title: "10. Architecture", text: "Monolith, microservices, serverless, event-driven, CQRS and event sourcing. Start simple; split for teams." }
+  - { edges: [JK], title: "11. Microservices patterns", text: "Discovery, gateway, BFF, sidecar, circuit breaker, bulkhead and service mesh: standard answers to recurring problems." }
+  - { edges: [KL], title: "12. Distributed systems", text: "Unreliable networks, consensus, clock drift, fencing tokens and CRDTs. Single-machine intuition stops here." }
+  - { edges: [LM], title: "13. Distributed transactions", text: "2PC blocks; sagas with compensations plus the transactional outbox are the practical default." }
+  - { edges: [MN], title: "14. Data structures", text: "Bloom filters, HyperLogLog, Count-Min Sketch, geohash and Merkle trees trade a little accuracy for scale." }
+  - { edges: ["NO"], title: "15. Big data", text: "Batch vs stream, ETL vs ELT, lakes vs warehouses, and Kappa over Lambda when one code path is enough." }
+  - { edges: [OP], title: "16. Deployment", text: "Rolling, blue-green, canary, feature flags and expand-migrate-contract schema changes." }
+  - { edges: [PQ], title: "17. Observability", text: "Structured logs, RED/USE metrics, distributed traces, and SLOs with error budgets." }
+  - { edges: [QR], title: "18. Security", text: "TLS and mTLS, envelope encryption, managed secrets, least-privilege RBAC and SSO federation." }

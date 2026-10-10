@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/communication/api/2024-05-19-rest-api.md
+# (include id: communication/api/rest-request-lifecycle). One REST GET through an HTTP cache,
+# gateway, service and database, with a cache-hit mode.
+title: Lifecycle of a REST request
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 270]
+grid: {x0: 100, y0: 105, dx: 200, dy: 0, w: 150, h: 56}
+modes:
+  - {id: miss, label: "Cache miss"}
+  - {id: hit, label: "Simulate a cache hit"}
+
+nodes:
+  - {id: C, label: "Client", sub: "GET /orders/42", col: 0, row: 0, shape: terminal, icon: user, icon_pos: corner}
+  - {id: K, label: "Cached?", col: 1, row: 0, w: 110, h: 80, shape: diamond}
+  - {id: G, label: "API gateway", sub: "auth, rate limit", col: 2, row: 0, icon: balancer, icon_pos: corner}
+  - {id: S, label: "Orders service", sub: "route + handler", col: 3, row: 0, icon: server, icon_pos: corner}
+  - {id: D, label: "Database", col: 4, row: 0, h: 66, shape: cylinder, icon: database}
+
+edges:
+  - {id: CK, from: C, to: K}
+  - {id: KG, from: K, to: G, label: "miss"}
+  - {id: GS, from: G, to: S}
+  - {id: SD, from: S, to: D}
+  - {id: SC, from: S, to: C, offset: 75, tone: ok, label: "200 OK + JSON + ETag"}
+  - {id: KC, from: K, to: C, exit: top, enter: top, offset: 35, tone: ok, label: "fresh copy (or 304)"}
+
+steps:
+  - lights: [C]
+    title: Build the request
+    text: "The client names a resource by URL and an action by HTTP verb: GET /orders/42 with Accept: application/json and a bearer token."
+  - edges: [CK]
+    title: Ask the HTTP cache
+    text: A browser cache, CDN or reverse proxy checks Cache-Control and ETag. Caching is free in REST because GET is safe and the URL is the cache key.
+  - edges: [KC]
+    when: hit
+    title: Served from cache
+    text: The cached copy is still fresh (or the origin answers 304 Not Modified), so the request never reaches the service.
+  - edges: [KG]
+    when: miss
+    title: Gateway checks
+    text: Nothing cached, so the request reaches the API gateway, which validates the token, applies rate limits and logs the call.
+  - edges: [GS]
+    when: miss
+    title: Route to the resource
+    text: The path /orders/{id} maps to the Orders handler. The server keeps no session; everything it needs is in the request.
+  - edges: [SD]
+    when: miss
+    title: Load the resource
+    text: The handler reads order 42 from its store. The database schema stays private; clients only see the representation.
+  - edges: [SC]
+    when: miss
+    title: Return a representation
+    text: 200 OK with a JSON body, an ETag and Cache-Control, so the next identical GET can be answered by a cache.

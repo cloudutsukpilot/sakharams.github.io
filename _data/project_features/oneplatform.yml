@@ -1,0 +1,774 @@
+# Feature catalog for the OnePlatform project playbook (/tags/oneplatform/).
+# Rendered by _includes/project-features.html in
+# _posts/projects/oneplatform/2026-10-05-03-product-planning.md (#feature-catalog).
+#
+# Kept OUT of _data/projects/ on purpose: the Projects tab lists every file in that folder as a project.
+# Company, product, business-unit, host, vault, subscription and ticket names are deliberately left out
+# (public repo). Internal names were replaced with generic ones.
+#
+# Field meanings
+#   id          stable kebab-case key; use it as the anchor / file name of a future deep-dive post
+#   name        feature name as users see it (generic where the internal name was identifying)
+#   category    one of the `categories` keys below
+#   kind        Scaffolder template | Portal page | Plugin | Catalog ingestion | Backend job | Platform capability
+#   shipped     YYYY-MM of the first commit on main (from git history), not a confirmed production date
+#   status      Live = merged to main and in the release train; In progress = plan still open
+#   repos       portal = Backstage monorepo, middleware = .NET API/Functions solution
+#   docs        which planning docs exist in the source repo to draw on when expanding this feature
+#   summary     one sentence, what it does for the user
+#   lifecycle   EMPTY on purpose: fill these in when you write the feature's deep dive
+#               (requirements -> design -> implementation -> testing -> release -> benefits)
+#   post        URL of the deep-dive post once it exists
+
+categories:
+  foundation: Portal foundation
+  catalog: Software catalog and ownership
+  infra: Self-service Azure infrastructure
+  access: Developer access and licensing
+  insights: Engineering insights and reporting
+  operations: Operations and monitoring
+  identity: Identity, audit and compliance
+  finops: FinOps and cost
+  apps: Business workflows hosted in the portal
+  devex: Developer experience of the portal team
+
+features:
+  # --- Portal foundation -------------------------------------------------------------------------
+  - id: sso-entra
+    name: Single sign-on with Entra ID
+    category: foundation
+    kind: Platform capability
+    shipped: 2024-01
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Every user signs in with the corporate Entra ID account; a domain check and a standard-user group gate who gets in at all.
+  - id: rbac-roles
+    name: Role-based permission policy (13 roles)
+    category: foundation
+    kind: Platform capability
+    shipped: 2024-09
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: A custom permission policy maps Entra role groups to template and page permissions, scopes templates by environment and hard-blocks catalog and template mutation for everyone.
+  - id: role-navigation
+    name: Role-aware sidebar navigation
+    category: foundation
+    kind: Plugin
+    shipped: 2026-04
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Admins map roles to sidebar items in a database-backed admin page, so each role sees only the tools it can use.
+  - id: home-and-search
+    name: Home page, search, TechDocs, API docs and Tech Radar
+    category: foundation
+    kind: Portal page
+    shipped: 2024-01
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: The standard Backstage surfaces, customized with a tabbed home page and search across catalog and TechDocs.
+  - id: scaffolder-notifications
+    name: Scaffolder run notifications
+    category: foundation
+    kind: Plugin
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: In-app notifications (and Teams messages for failures) when a template run succeeds or fails, with the error and a link to the run.
+  - id: admin-broadcasts
+    name: Admin broadcast notifications
+    category: foundation
+    kind: Plugin
+    shipped: 2026-06
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Platform admins send targeted announcements to users or groups, with a sent-history tab.
+  - id: system-alerts
+    name: System-wide alerts banner
+    category: foundation
+    kind: Plugin
+    shipped: 2026-09
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Admin-managed, persistent alerts shown across the portal for outages, maintenance and change notices.
+  - id: dark-theme
+    name: Light and dark themes
+    category: foundation
+    kind: Platform capability
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Explicit light and dark theme variants, with every shared component and dashboard using semantic theme colours.
+  - id: auto-logout
+    name: Idle auto-logout
+    category: foundation
+    kind: Platform capability
+    shipped: 2024-08
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Sessions sign out after a long idle period, with a prompt a minute before.
+
+  # --- Software catalog and ownership ------------------------------------------------------------
+  - id: azure-resource-ingestion
+    name: Azure resources in the catalog
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2024-05
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: A custom entity provider ingests Azure resources (VMs, App Services, Functions, SQL and more) from every subscription as catalog Resource entities with ownership and environment annotations.
+  - id: per-subscription-ingestion
+    name: Per-subscription, staggered ingestion
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2026-06
+    status: Live
+    repos: [portal]
+    docs: [proposal, plan, implementation, architecture]
+    summary: Split the single ingestion task into one provider per subscription with staggered schedules, replacing one ~10,000-entity write with ~500-entity writes and isolating failures.
+  - id: org-ingestion
+    name: Users, groups and GitHub teams in the catalog
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2024-01
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Users and security groups come from Microsoft Graph and teams from three GitHub organizations, plus catalog-info.yaml discovery across those organizations.
+  - id: catalog-stitching
+    name: Catalog stitching (fragment overlays)
+    category: catalog
+    kind: Plugin
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Lets the portal team overlay owner, system, lifecycle and relation fields onto entities they don't own the source YAML for, stored as database fragments.
+  - id: catalog-bulk-edit
+    name: Bulk edit catalog entities
+    category: catalog
+    kind: Scaffolder template
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Select many entities and set ownership or metadata in one template run, written through the stitching overlay.
+  - id: github-login-sync
+    name: GitHub login and profile email sync
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation]
+    summary: Links each catalog user to their GitHub login (via SAML identities) and fills in profile email, so GitHub data can be attributed to people.
+  - id: relations-graph
+    name: Dependency relations from App Insights
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2026-08
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Discovers which services call which from Application Insights telemetry and publishes them as dependsOn relations, so the relations graph draws itself.
+  - id: entra-groups-as-teams
+    name: Entra groups as the visible team records
+    category: catalog
+    kind: Catalog ingestion
+    shipped: 2026-09
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Makes Entra groups the team entities people see, with same-name GitHub teams linked as data sources rather than duplicates.
+  - id: team-management
+    name: Manage my team
+    category: catalog
+    kind: Scaffolder template
+    shipped: 2025-07
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: Team leads add and remove members and assign portal roles for their own team.
+  - id: team-owner-management
+    name: Manage team owners
+    category: catalog
+    kind: Scaffolder template
+    shipped: 2026-09
+    status: Live
+    repos: [portal]
+    docs: [plan]
+    summary: Admins assign and change the owners of portal teams.
+
+  # --- Self-service Azure infrastructure ---------------------------------------------------------
+  - id: start-vm
+    name: Start Azure virtual machine
+    category: infra
+    kind: Scaffolder template
+    shipped: 2024-11
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Engineers start a stopped VM in dev, QA or performance-test subscriptions after a permission and power-state check.
+  - id: create-function-app
+    name: Create Azure Function App
+    category: infra
+    kind: Scaffolder template
+    shipped: 2024-12
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Validates name, prerequisites and permissions, then triggers a Terraform workflow that creates the Function App and its storage account.
+  - id: create-web-app
+    name: Create Azure Web App
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-01
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: The same validate-then-Terraform pattern for App Service web apps, development environments only.
+  - id: key-vault-access
+    name: Key Vault access (team-level)
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-03
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Request vault access for an Entra group; on approval an Azure role assignment is created at vault scope. Redesigned from per-secret, per-user grants.
+  - id: key-vault-secret
+    name: Add Key Vault secret
+    category: infra
+    kind: Scaffolder template
+    shipped: 2026-01
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Add a secret to a development vault with name validation, without needing write access in the Azure portal.
+  - id: app-config-access
+    name: App Configuration access
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-04
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Request read access to an Azure App Configuration store for a team, across non-production environments.
+  - id: app-insights-access
+    name: Application Insights access
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-06
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Grants a group access to an Application Insights resource in any environment.
+  - id: service-bus-queue
+    name: Add Service Bus queue
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-12
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Create a queue on an existing Service Bus namespace in non-production environments.
+  - id: start-test-environment
+    name: Start an on-demand test environment
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-05
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Starts the set of resources behind a line-of-business application's shared test environment in one request.
+  - id: view-service-status
+    name: View service status
+    category: infra
+    kind: Scaffolder template
+    shipped: 2025-09
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Shows whether the Windows services behind an application are running, without a server login.
+
+  # --- Developer access and licensing ------------------------------------------------------------
+  - id: create-github-repo
+    name: Create GitHub repository
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-03
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Creates a repository from a standard with team access, checking the team exists first.
+  - id: github-repo-access
+    name: GitHub repository access
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-05
+    status: Live
+    repos: [portal]
+    docs: [architecture, plan, implementation]
+    summary: Request access to a repository for yourself or a team, including additional access groups.
+  - id: github-license
+    name: GitHub license and org access
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-04
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Adds a user to the SSO group that grants a GitHub seat, then sends or resends the org invitation, per organization.
+  - id: copilot-license-request
+    name: Copilot license request with approvals
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-10
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Self-service Copilot request with tiered licenses, visible cost, and Finance / DevOps / cost-centre-owner approval routing with a chargeback audit trail.
+  - id: copilot-license-page
+    name: Copilot license self-service page
+    category: access
+    kind: Portal page
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: One page where requesters track live status and approvers review and decide, on top of the existing request service.
+  - id: copilot-budget
+    name: Copilot AI-credit budget management
+    category: access
+    kind: Portal page
+    shipped: 2026-08
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Managers see their reports' plan, usage and effective budget and reallocate AI credits to individuals.
+  - id: artifactory-access
+    name: Artifactory access
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-07
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Request access to the artifact registry; granted by adding the user or group to the Entra group behind its SSO.
+  - id: sonarqube-access
+    name: SonarQube access
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-10
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Request SonarQube access; granted through Entra group membership, like Artifactory.
+  - id: pr-reminders
+    name: Pull request reminders
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-11
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Teams configure scheduled email reminders for open pull requests awaiting review.
+  - id: run-github-workflow
+    name: Run a GitHub workflow
+    category: access
+    kind: Scaffolder template
+    shipped: 2025-09
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Trigger an allowed GitHub Actions workflow with inputs, without a GitHub seat.
+
+  # --- Engineering insights and reporting --------------------------------------------------------
+  - id: copilot-usage
+    name: Copilot metrics and usage
+    category: insights
+    kind: Portal page
+    shipped: 2025-10
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Copilot adoption and usage by organization, team and user, backfilled and stored for trends.
+  - id: copilot-ai-credits
+    name: Copilot AI credits used
+    category: insights
+    kind: Portal page
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation]
+    summary: Adds AI-credit consumption per user to the usage report from the enterprise billing API.
+  - id: copilot-legacy-api
+    name: Copilot metrics legacy API decommission
+    category: insights
+    kind: Platform capability
+    shipped: 2026-09
+    status: In progress
+    repos: [portal]
+    docs: [plan]
+    summary: Moves Copilot metrics off GitHub's retiring metrics API before it is switched off.
+  - id: github-insights-reports
+    name: GitHub Insights and license reports
+    category: insights
+    kind: Portal page
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan]
+    summary: A GitHub Insights page with Copilot license and GHAS active-committer reports.
+  - id: ghas-statistics
+    name: GitHub Advanced Security statistics
+    category: insights
+    kind: Portal page
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Code scanning, secret scanning and Dependabot alerts plus active committers, at enterprise, org and repo level.
+  - id: license-reporting
+    name: Visual Studio and Docker license reporting
+    category: insights
+    kind: Portal page
+    shipped: 2026-08
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Adds Visual Studio subscription and Docker Business seat data to the license reports, enriched from Entra ID.
+  - id: dora-metrics
+    name: DORA metrics
+    category: insights
+    kind: Plugin
+    shipped: 2026-04
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Deployment frequency, lead time, change failure rate and time to restore per service.
+  - id: scorecards
+    name: Scorecard framework and State of DevOps
+    category: insights
+    kind: Plugin
+    shipped: 2026-05
+    status: Live
+    repos: [portal, middleware]
+    docs: [architecture]
+    summary: Admin-defined scorecards for catalog entities with publish workflow and analytics, fed by a daily State of DevOps ingestion job.
+  - id: adoption-insights
+    name: Portal adoption insights
+    category: insights
+    kind: Portal page
+    shipped: 2026-04
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Who uses which portal features, from the portal's own Application Insights telemetry.
+  - id: sprint-predictability
+    name: Sprint predictability reporting
+    category: insights
+    kind: Backend job
+    shipped: 2026-08
+    status: Live
+    repos: [middleware]
+    docs: []
+    summary: A weekly job pulls sprint stories from Jira and stores them for predictability reporting.
+
+  # --- Operations and monitoring -----------------------------------------------------------------
+  - id: file-monitoring
+    name: Enterprise file monitoring
+    category: operations
+    kind: Plugin
+    shipped: 2025-02
+    status: Live
+    repos: [portal, middleware]
+    docs: [architecture]
+    summary: Dashboards and add/modify templates for expected-file monitoring rules, with audit history and Jira tickets when files are late or empty.
+  - id: file-monitoring-lookback
+    name: Seven-day look-back for file rules
+    category: operations
+    kind: Platform capability
+    shipped: 2026-06
+    status: Live
+    repos: [portal, middleware]
+    docs: [plan, design, implementation, architecture]
+    summary: A required look-back flag on every file rule, carried through create, modify, copy and view.
+  - id: jira-definition-cascade
+    name: Jira definition cascade in file rules
+    category: operations
+    kind: Platform capability
+    shipped: 2026-06
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation]
+    summary: Shared Jira fields entered once cascade to the second ticket definition, and values survive Back/Next in the form.
+  - id: sql-monitoring
+    name: Enterprise SQL job monitoring
+    category: operations
+    kind: Plugin
+    shipped: 2025-07
+    status: Live
+    repos: [portal, middleware]
+    docs: [plan, design, implementation, architecture]
+    summary: Rules and dashboards for scheduled SQL jobs, moved from table storage to middleware endpoints on PostgreSQL.
+  - id: sql-schedule-compliance
+    name: SQL schedule compliance
+    category: operations
+    kind: Platform capability
+    shipped: 2026-08
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Computes in a web worker whether each SQL job ran when its schedule said it should, over 60 days of audit data.
+  - id: sql-agent-dashboard
+    name: Cross-server SQL Agent job dashboard
+    category: operations
+    kind: Portal page
+    shipped: 2026-05
+    status: Live
+    repos: [portal, middleware]
+    docs: [plan, design, implementation, architecture]
+    summary: SQL Server Agent jobs across servers with owners, last runs and step drill-down, without SSMS access.
+  - id: dba-reports
+    name: DBA server, growth and index reports
+    category: operations
+    kind: Portal page
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan]
+    summary: Database server inventory, growth analysis and index maintenance runtime trends for the DBA team.
+  - id: close-locked-file
+    name: Close a locked file on a server
+    category: operations
+    kind: Scaffolder template
+    shipped: 2025-06
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Operations staff release a locked file on a file server through an Ansible playbook instead of a ticket.
+  - id: smoke-tests
+    name: Application smoke tests
+    category: operations
+    kind: Plugin
+    shipped: 2025-08
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: Operations trigger and watch GitHub-hosted smoke-test workflows for three business applications without GitHub seats.
+  - id: service-map
+    name: Service map monitoring dashboard
+    category: operations
+    kind: Portal page
+    shipped: 2025-06
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Distributed-trace map from Application Insights with grouped VMSS and Function nodes, guided triage and an exception timeline.
+  - id: phi-filtering
+    name: Backend PHI filtering
+    category: operations
+    kind: Platform capability
+    shipped: 2026-03
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Telemetry that may carry protected health data is redacted on the server for users outside the allowed location, so the browser never sees it.
+  - id: apim-dashboard
+    name: API Management gateway dashboard
+    category: operations
+    kind: Plugin
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, design, implementation, architecture]
+    summary: Capacity, traffic, URL drill-downs and raw logs for API Management, replacing a standalone Streamlit script.
+  - id: vm-reports
+    name: VM monitoring, compliance and short-lived server reports
+    category: operations
+    kind: Portal page
+    shipped: 2026-04
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Reports on VM monitoring coverage, compliance and servers that exist for too short a time to be tracked well.
+  - id: datadog
+    name: Datadog integration
+    category: operations
+    kind: Plugin
+    shipped: 2026-04
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Datadog monitor and dashboard data on entity pages through a backend proxy.
+
+  # --- Identity, audit and compliance ------------------------------------------------------------
+  - id: user-audit
+    name: Enterprise user access audit
+    category: identity
+    kind: Plugin
+    shipped: 2025-05
+    status: Live
+    repos: [portal, middleware]
+    docs: [architecture]
+    summary: "SOX/SOC user-access reviews: create and start audits, manager review pages, reminders, CSV import/export and Jira tickets for changes."
+  - id: user-termination
+    name: User termination automation
+    category: identity
+    kind: Scaffolder template
+    shipped: 2026-02
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: One request fans out access removal to every configured application, with an audit log per user and batch.
+  - id: inactivity-termination
+    name: 90-day inactivity termination
+    category: identity
+    kind: Backend job
+    shipped: 2026-05
+    status: Live
+    repos: [middleware]
+    docs: []
+    summary: A daily scan finds inactive accounts, sends escalating notices and can terminate at 90 days.
+  - id: user-access-management
+    name: Manage user access and permissions
+    category: identity
+    kind: Scaffolder template
+    shipped: 2025-10
+    status: Live
+    repos: [portal]
+    docs: [architecture]
+    summary: Admin onboarding of users into portal roles, licenses and resource-group access, with job-title-to-role mappings.
+  - id: entra-user-search
+    name: Entra user search
+    category: identity
+    kind: Portal page
+    shipped: 2024-09
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: Look up a user's groups and Azure role assignments in one place.
+  - id: jira-audit
+    name: Jira operation audit log
+    category: identity
+    kind: Backend job
+    shipped: 2026-03
+    status: Live
+    repos: [middleware]
+    docs: []
+    summary: Every Jira ticket the platform creates or updates is logged and queryable by date range.
+  - id: hitl-approvals
+    name: Human-in-the-loop approval inbox
+    category: identity
+    kind: Plugin
+    shipped: 2026-08
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation, architecture]
+    summary: A central reviewer inbox for approval gates in external Temporal workflows (first user, the SQL Blocking Agent), which sends the decision Signal back.
+
+  # --- FinOps and cost ---------------------------------------------------------------------------
+  - id: finops-import
+    name: FOCUS cost import
+    category: finops
+    kind: Backend job
+    shipped: 2025-08
+    status: Live
+    repos: [middleware]
+    docs: []
+    summary: A daily job imports Azure FOCUS cost exports from Blob Storage into PostgreSQL with materialized views and integrity checks.
+  - id: finops-reports
+    name: FinOps reports and cost analysis
+    category: finops
+    kind: Portal page
+    shipped: 2024-05
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: An Azure cost analysis page (the earliest portal page) and, later, FinOps reports over the imported FOCUS data.
+  - id: resource-cost-trend
+    name: Resource cost trend on entity pages
+    category: finops
+    kind: Portal page
+    shipped: 2026-09
+    status: Live
+    repos: [portal, middleware]
+    docs: [plan]
+    summary: Daily billed cost of a resource on its catalog page, including the older ARM IDs Azure billed it under.
+  - id: related-resource-cost
+    name: Related infrastructure cost view
+    category: finops
+    kind: Portal page
+    shipped: 2026-10
+    status: Live
+    repos: [portal, middleware]
+    docs: [plan]
+    summary: Cost of a component's related Azure resources together, from a batch cost API.
+
+  # --- Business workflows hosted in the portal ---------------------------------------------------
+  - id: routing-sheets
+    name: Intake routing sheets
+    category: apps
+    kind: Plugin
+    shipped: 2026-08
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: A role-aware intake workflow built as an externally published plugin, with a middleware endpoint for upstream systems to submit drafts.
+  - id: guideline-matrix-validation
+    name: Guideline matrix file validation
+    category: apps
+    kind: Backend job
+    shipped: 2026-02
+    status: Live
+    repos: [middleware]
+    docs: []
+    summary: An HTTP-triggered function validates SharePoint-hosted Excel matrices against schema and business rules for a data science team.
+
+  # --- Developer experience of the portal team ---------------------------------------------------
+  - id: local-keyvault-bootstrap
+    name: Local secrets from Key Vault
+    category: devex
+    kind: Platform capability
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation]
+    summary: Local dev fetches about 50 secrets from the dev vault with the developer's own az login instead of plaintext env files.
+  - id: frontend-migration
+    name: Migration to the new frontend system
+    category: devex
+    kind: Platform capability
+    shipped: 2026-05
+    status: Live
+    repos: [portal]
+    docs: [plan, implementation]
+    summary: Moved the app from legacy routes to Backstage's module-based frontend system, running hybrid during the move.
+  - id: pre-upgrade-compatibility
+    name: Backstage pre-upgrade compatibility run
+    category: devex
+    kind: Platform capability
+    shipped: 2026-07
+    status: Live
+    repos: [portal]
+    docs: []
+    summary: A workflow runs unit, integration, multi-version PostgreSQL, E2E and image checks before a Backstage upgrade is merged.
+  - id: ai-feature-workflow
+    name: AI-assisted plan-design-implement workflow
+    category: devex
+    kind: Platform capability
+    shipped: 2026-05
+    status: Live
+    repos: [portal, middleware]
+    docs: []
+    summary: Repository prompts produce PLAN, DESIGN, IMPLEMENTATION and ARCHITECTURE docs per feature and drive phased implementation with Jira updates.

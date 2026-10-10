@@ -1,0 +1,421 @@
+// Hands-on labs: experiment cards in posts (_includes/lab-experiment.html) and the experiment tiles
+// on the lab index (_includes/lab-index.html). The index and nav bar reuse the project playbook
+// styles (_sass/project-index.scss). The accent is the `labs` entry in
+// .claude/skills/cloudutsuk-image-common/brand.json. Theme variables keep light and dark mode working.
+
+.lab-index,
+.lab-nav,
+.lab-exp {
+  --lab-accent: #22d3ee;
+  --lab-accent2: #a3e635;
+  --lab-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --lab-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+}
+
+.lab-index {
+  --proj-accent: var(--lab-accent);
+}
+
+.lab-nav {
+  --proj-accent: var(--lab-accent);
+}
+
+.lab-cost-note {
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid #f59e0b;
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  font-size: 0.9rem;
+}
+
+// Signal chips: one colour per telemetry type, used in cards, tables and tiles.
+.lab-sig {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid currentcolor;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted-color);
+}
+
+.lab-sig-metrics { color: #f59e0b; }
+.lab-sig-logs { color: #10b981; }
+.lab-sig-traces { color: #3b82f6; }
+.lab-sig-profiles { color: #a855f7; }
+.lab-sig-events { color: #ef4444; }
+
+.lab-exp {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--lab-line);
+  border-top: 3px solid var(--lab-accent);
+  border-radius: 0.6rem;
+  background: var(--lab-card);
+
+  p {
+    margin-bottom: 0.5rem;
+  }
+}
+
+.lab-exp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.lab-exp-wait {
+  font-size: 0.8rem;
+  color: var(--text-muted-color);
+}
+
+.lab-exp-goal {
+  font-size: 1.02rem;
+}
+
+.lab-exp-step {
+  margin-top: 0.8rem;
+}
+
+.lab-exp-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--heading-color);
+
+  i {
+    color: var(--lab-accent);
+  }
+}
+
+.lab-exp-predict {
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--lab-accent2);
+  background: color-mix(in srgb, var(--lab-accent2) 8%, transparent);
+}
+
+.lab-exp-cmd {
+  margin: 0.3rem 0 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.4rem;
+  background: var(--highlight-bg-color, color-mix(in srgb, var(--heading-color) 6%, var(--main-bg)));
+  overflow-x: auto;
+  white-space: pre;
+
+  code {
+    font-size: 0.85rem;
+    background: none;
+    padding: 0;
+  }
+}
+
+table.lab-exp-look {
+  td code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  // Phones: one stacked block per signal instead of four squeezed columns.
+  @media (max-width: 767px) {
+    thead {
+      display: none;
+    }
+
+    tr,
+    td {
+      display: block;
+      width: 100%;
+    }
+
+    tr {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--lab-line);
+    }
+
+    td {
+      padding: 0.15rem 0.2rem !important;
+      border: 0 !important;
+
+      &[data-label="Query"]:empty {
+        display: none;
+      }
+
+      &[data-label="Where"]::before,
+      &[data-label="Query"]::before,
+      &[data-label="Expect"]::before {
+        content: attr(data-label) ": ";
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: var(--text-muted-color);
+      }
+    }
+  }
+}
+
+.lab-shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.lab-shot {
+  margin: 0;
+
+  &.is-wide {
+    grid-column: 1 / -1;
+  }
+
+  img,
+  a.img-link {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--lab-line);
+    border-radius: 0.4rem;
+  }
+
+  figcaption {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted-color);
+  }
+}
+
+.lab-shot-phase {
+  display: inline-block;
+  margin-right: 0.3rem;
+  padding: 0 0.45rem;
+  border-radius: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--lab-accent) 18%, transparent);
+  color: var(--heading-color);
+}
+
+.lab-shot-before .lab-shot-phase {
+  background: color-mix(in srgb, var(--heading-color) 10%, transparent);
+}
+
+.lab-shot-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 6rem;
+  padding: 0.8rem;
+  border: 2px dashed var(--lab-line, #8884);
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted-color);
+}
+
+// Experiment tiles on the lab index.
+.lab-exp-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.lab-exp-tile {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--lab-line);
+  border-radius: 0.6rem;
+  background: var(--lab-card);
+
+  > img {
+    width: 100%;
+    height: 10rem;
+    object-fit: cover;
+    object-position: top left;
+    border-bottom: 1px solid var(--lab-line);
+  }
+}
+
+.lab-exp-tile-blank {
+  display: grid;
+  height: 10rem;
+  place-items: center;
+  font-size: 2rem;
+  color: var(--lab-line);
+  border-bottom: 1px solid var(--lab-line);
+}
+
+.lab-exp-tile-body {
+  padding: 0.8rem 1rem 1rem;
+
+  .project-step {
+    margin-right: 0.4rem;
+  }
+
+  .lab-exp-meta {
+    margin: 0.5rem 0 0;
+  }
+}
+
+// Labs tab (_tabs/labs.md → _includes/labs-catalog.html): one tile per lab, grouped by category.
+.labs-catalog {
+  --lab-accent: #22d3ee;
+  --lab-accent2: #a3e635;
+  --lab-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --lab-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+}
+
+.lc-intro {
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
+}
+
+.lc-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--lab-line);
+  font-size: 0.9rem;
+
+  i {
+    color: var(--lab-accent);
+    margin-right: 0.15rem;
+  }
+}
+
+.lc-section {
+  margin-top: 2rem;
+}
+
+.lc-section-title {
+  font-size: 1.3rem;
+  margin-bottom: 0.25rem;
+
+  i {
+    color: var(--lab-accent);
+    margin-right: 0.35rem;
+  }
+}
+
+.lc-section-blurb {
+  color: var(--text-muted-color);
+  margin-bottom: 1rem;
+}
+
+.lc-empty {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--lab-line);
+  border-radius: 0.6rem;
+  color: var(--text-muted-color);
+  font-size: 0.9rem;
+}
+
+.lc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.lc-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--lab-line);
+  border-top: 3px solid var(--lab-accent);
+  border-radius: 0.6rem;
+  background: var(--lab-card);
+}
+
+.lc-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted-color);
+
+  i {
+    color: var(--lab-accent);
+  }
+}
+
+.lc-status {
+  padding: 0 0.5rem;
+  border: 1px solid var(--lab-accent2);
+  border-radius: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.lc-tile-title {
+  font-size: 1.15rem;
+  margin: 0.5rem 0 0.4rem;
+}
+
+.lc-tile-summary {
+  font-size: 0.92rem;
+  margin-bottom: 0.6rem;
+}
+
+.lc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.82rem;
+  color: var(--text-muted-color);
+
+  i {
+    color: var(--lab-accent);
+    margin-right: 0.2rem;
+  }
+}
+
+.lc-parts {
+  margin: 0 0 0.6rem;
+  padding-left: 1.3rem;
+  font-size: 0.92rem;
+
+  li {
+    margin: 0.1rem 0;
+  }
+
+  li::marker {
+    color: var(--lab-accent);
+    font-weight: 700;
+  }
+}
+
+.lc-pending {
+  color: var(--text-muted-color);
+}
+
+.lc-exps {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-bottom: 0.6rem;
+
+  span[aria-hidden] {
+    margin: 0 0.3rem;
+    color: var(--text-muted-color);
+  }
+}
+
+.lc-exps-label {
+  font-weight: 600;
+  margin-right: 0.3rem;
+}
+
+.lc-tile-foot {
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--lab-line);
+  text-align: right;
+  font-size: 0.9rem;
+}

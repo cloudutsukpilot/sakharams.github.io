@@ -1,0 +1,46 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-graphql.md
+# (include id: communication/api/graphql-query-resolution). One query fans out to three
+# resolvers backed by different sources and is shaped into one JSON response.
+title: How a GraphQL server resolves one query
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 340]
+nodes:
+  - {id: C, label: "Client", sub: "POST /graphql", x: 95, y: 160, w: 140, shape: terminal, icon: user, icon_pos: corner}
+  - {id: P, label: "Parse + validate", sub: "against schema", x: 275, y: 160, w: 160, icon: check, icon_pos: corner}
+  - {id: E, label: "Execute", sub: "resolver tree", x: 455, y: 160, w: 140}
+  - {id: U, label: "user resolver", sub: "Users REST API", x: 660, y: 70, w: 160, h: 50, icon: users, icon_pos: corner}
+  - {id: O, label: "orders resolver", sub: "Orders DB", x: 660, y: 160, w: 160, h: 50, icon: database, icon_pos: corner}
+  - {id: R, label: "reviews resolver", sub: "Reviews gRPC", x: 660, y: 250, w: 160, h: 50, icon: api, icon_pos: corner}
+  - {id: S, label: "Shape JSON", sub: "data + errors", x: 880, y: 160, w: 150}
+
+edges:
+  - {id: CP, from: C, to: P}
+  - {id: PE, from: P, to: E}
+  - {id: EU, from: E, to: U}
+  - {id: EO, from: E, to: O}
+  - {id: ER, from: E, to: R}
+  - {id: US, from: U, to: S}
+  - {id: OS, from: O, to: S}
+  - {id: RS, from: R, to: S}
+  - {id: SC, from: S, to: C, offset: 120, tone: ok, label: "200 OK  { data: { user: … } }"}
+
+steps:
+  - lights: [C]
+    title: Client writes a query
+    text: "The client asks for exactly the fields it needs: user(id: 7) { name orders(last: 3) { total } reviews { stars } }."
+  - edges: [CP]
+    title: One endpoint
+    text: Every operation is an HTTP POST to /graphql with the query and variables in a JSON body.
+  - edges: [PE]
+    title: Parse and validate
+    text: The query is parsed into an AST and checked against the typed schema. Unknown fields or wrong argument types are rejected before any data is touched.
+  - edges: [EU, EO, ER]
+    title: Resolvers fan out
+    text: Each field has a resolver. Independent fields run in parallel, and each resolver can call a different backend. DataLoader batches calls to avoid N+1 queries.
+  - edges: [US, OS, RS]
+    title: Results come back
+    text: The executor waits for every resolver. A failing resolver returns null for its field plus an entry in errors; the rest of the data still arrives.
+  - edges: [SC]
+    title: One shaped response
+    text: The JSON mirrors the shape of the query, with no extra fields and no second round trip.

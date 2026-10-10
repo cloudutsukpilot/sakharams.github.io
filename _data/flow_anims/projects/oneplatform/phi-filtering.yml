@@ -1,0 +1,63 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-06-security-and-privacy.md
+# (include id: projects/oneplatform/phi-filtering). Backend PHI filtering for Application Insights
+# telemetry: access check by the catalog user's usage-location annotation, full fetch, then either
+# complete data or server-side redaction. Source: the portal's PHI filtering README and diagrams.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: OnePlatform backend PHI filtering
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 300]
+modes:
+  - { id: allow, label: "User in an allowed location" }
+  - { id: deny, label: "Simulate a user outside the allowed location" }
+
+nodes:
+  - { id: USER, label: "Browser", x: 80, y: 100, w: 90, h: 70, shape: circle }
+  - { id: ROUTE, label: "Telemetry route", sub: "portal backend", x: 260, y: 100, icon: chart, icon_pos: corner }
+  - { id: CHECK, label: "PHI\naccess?", x: 470, y: 100, w: 120, h: 88, shape: diamond }
+  - { id: FILTER, label: "Redact fields", sub: "phi rules", x: 690, y: 100, icon: shield, icon_pos: corner }
+  - { id: OUT, label: "Response", x: 890, y: 100, w: 140, shape: terminal }
+  - { id: AI, label: "App Insights", x: 260, y: 245, w: 150, h: 60, shape: cylinder, icon: server, icon_pos: corner }
+  - { id: CAT, label: "Catalog user", sub: "usage location", x: 470, y: 245, w: 160, h: 60, shape: cylinder, icon: user }
+
+edges:
+  - { id: UR, from: USER, to: ROUTE }
+  - { id: RCHK, from: ROUTE, to: CHECK }
+  - { id: CHKCAT, from: CHECK, to: CAT, label: "lookup" }
+  - { id: RAI, from: ROUTE, to: AI, points: [[230, 128], [230, 215]], label: "KQL" }
+  - { id: AIR, from: AI, to: ROUTE, points: [[290, 215], [290, 128]] }
+  - { id: CHKOUT, from: CHECK, to: OUT, points: [[470, 56], [470, 28], [890, 28], [890, 72]], label: "allowed: complete data", tone: ok }
+  - { id: CHKFIL, from: CHECK, to: FILTER, label: "no", tone: fail }
+  - { id: FILOUT, from: FILTER, to: OUT }
+
+steps:
+  - lights: [USER]
+    title: A dashboard request
+    text: A user opens the service map. Its exceptions and dependencies can carry PHI inside SQL parameters.
+  - edges: [UR]
+    title: Backend route
+    text: The browser calls the portal backend's telemetry route. Nothing is filtered in the browser, because DevTools would show the raw response.
+  - edges: [RCHK]
+    title: Check access first
+    text: Before returning anything, the route asks whether this user may see PHI.
+  - edges: [CHKCAT]
+    title: Look up the user
+    text: The check reads the user's catalog entity and its directory usage-location annotation. In the allowed list means yes; any lookup failure means no.
+  - edges: [RAI]
+    title: Fetch everything
+    text: The route always runs the full KQL queries against Application Insights, so caching and correlation behave the same for everyone.
+  - edges: [AIR]
+    title: Raw telemetry
+    text: Complete exceptions, dependencies and traces come back to the backend, and stay there.
+  - edges: [CHKOUT]
+    when: allow
+    title: Complete data
+    text: An allowed user gets the full records, including exception messages and dependency data.
+  - edges: [CHKFIL]
+    when: deny
+    title: Apply the rules
+    text: Rules from one config file match records, for example SQL dependency exceptions, and replace message and data fields with [REDACTED].
+  - edges: [FILOUT]
+    when: deny
+    title: Sanitized response
+    text: Only the sanitized copy leaves the server. A user outside the allowed location never receives the PHI, not even in DevTools.

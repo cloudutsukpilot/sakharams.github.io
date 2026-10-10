@@ -1,0 +1,160 @@
+# Reference lab card: ~/gitrepos/observability/otel-static-site-k3d (nginx static site +
+# OpenTelemetry + Grafana LGTM on k3d). Copy the shape, not the content. Selectors, URLs and
+# timings were verified against the running lab (Grafana 13.2 in grafana/otel-lgtm 0.35.0) on
+# 2026-10-08 with capture.cjs, against commit bcaaca9 (button calls /ping.json). The lab has since
+# grown an API/backend behind the button, so re-check the steps before reusing them for it.
+# The exp-*/verify-* make targets are what the lab repo would add (scripts/signal.sh from the
+# k3d-lgtm template); the repo itself has only up/build/deploy/traffic/status/down.
+#
+# Lessons from that run, now in references/experiments.md:
+#  - "click the first trace" opened the page load's nginx trace: filter by service and row text.
+#  - a burst from the previous experiment showed in the next "before": capture.cooldown.
+#  - quote every prose value: an unquoted "Hint: ..." or "`svc: GET`" breaks the YAML.
+name: OpenTelemetry for a Static Site
+tag: OTel Static Site
+summary: "Serve a static page with nginx on k3d, add OpenTelemetry to the browser and the server, and
+  follow one click through traces, logs and metrics in Grafana LGTM."
+status: Built
+created: '2026-10-08'
+level: Beginner
+duration: about 60 minutes
+category: hands-on-labs
+clouds: [agnostic]
+repo:
+  path: ~/gitrepos/observability/otel-static-site-k3d
+platform:
+  runtime: k3d
+  observability: OpenTelemetry Collector + Grafana LGTM
+  cost: free-local
+facts:
+  - {label: Stack, value: "nginx 1.30 (otel module), OpenTelemetry JS, Collector Contrib"}
+endpoints:
+  site: http://localhost:8081
+  grafana: http://localhost:3002
+capture:
+  urls:
+    site: http://localhost:8081
+    grafana: http://localhost:3002
+  viewport: {width: 1440, height: 900}
+  color_scheme: dark
+  window: 15m
+  settle_ms: 3000
+  preflight: make status
+  cooldown: 30           # seconds between experiments, so one burst is not in the next "before"
+experiments:
+  - id: reload
+    title: Reload the page
+    goal: See a single page load turn into nginx requests, access-log lines and a browser documentLoad trace.
+    signals: [metrics, logs, traces]
+    action:
+      say: Open the site and reload it once.
+      browser:
+        url: site:/
+        steps: [{wait_for_text: "Loaded at"}]
+    predict: "How many requests does one reload cause? Hint: count the files the page needs."
+    wait: 30
+    verify: make verify-reload
+    look_for:
+      - signal: metrics
+        where: Dashboard › Requests in selected range
+        query: sum(increase(nginx_http_requests_total[$__range]))
+        expect: Rises by more than one after the next 15s scrape (HTML, otel.js, favicon).
+      - signal: logs
+        where: Dashboard › Request logs
+        query: '{service_name="state-site-nginx"} | json'
+        expect: New lines for `/`, `/otel.js` and `/favicon.ico`, each with a `trace_id`.
+      - signal: traces
+        where: Dashboard › Trace search results
+        query: '{ resource.service.name = "state-site-browser" }'
+        expect: A `documentLoad` trace from `state-site-browser`.
+    shots:
+      - name: requests-before
+        phase: before
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-5"]'
+        alt: Requests in selected range stat panel before the reload
+        caption: Request count before the reload.
+      - name: requests-after
+        phase: after
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-5"]'
+        alt: Requests in selected range stat panel after the reload
+        caption: The same panel one scrape later.
+      - name: logs
+        phase: after
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-3"]'
+        wide: true
+        alt: Request logs panel showing JSON access-log lines with trace IDs
+        caption: The access-log lines the reload produced, each carrying a trace_id.
+
+  - id: ping
+    title: Run a traced request
+    goal: Watch one click become a browser span with an nginx span as its child, joined by one trace ID.
+    signals: [traces, logs]
+    action:
+      say: Click **Fetch /ping.json** on the site.
+      browser:
+        url: site:/
+        steps: [{click: "#ping"}, {wait_for_text: "HTTP 200"}]
+    predict: How many spans will the trace have, and which service will own the root span?
+    wait: 20
+    verify: make verify-ping
+    look_for:
+      - signal: traces
+        where: Dashboard › Trace search results → click the trace ID
+        query: '{ resource.service.name = "state-site-browser" && name = "HTTP GET" }'
+        expect: "A `state-site-browser: GET` root span with a `state-site-nginx` child span."
+      - signal: logs
+        where: Dashboard › Request logs
+        expect: One `/ping.json` line whose `trace_id` matches the trace.
+    shots:
+      - name: traces
+        phase: after
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-browser"
+        selector: '[data-viz-panel-key="panel-4"]'
+        alt: Trace search results table listing recent traces by service
+        caption: Browser traces only; the newest is the GET the click made.
+      - name: waterfall
+        phase: after
+        # Filter to the browser service and open the newest GET trace: the first row alone may be
+        # the page load's nginx trace (caught in review on 2026-10-08).
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-browser"
+        steps:
+          - {click: '[data-viz-panel-key="panel-4"] [role="row"]:has-text("GET") a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 1440, height: 1300}
+        wide: true
+        alt: Tempo trace waterfall with a browser GET span and a child nginx span
+        caption: One trace, two services. The browser span is the parent; nginx continued its trace context.
+
+  - id: traffic
+    title: Send a burst of traffic
+    goal: See the request-rate graph climb and fall back as a burst of curl requests arrives.
+    signals: [metrics]
+    action:
+      say: Send 100 requests from the terminal.
+      run: make traffic
+    predict: Will the trace panel fill with browser traces too? (curl is not a browser.)
+    wait: 45
+    verify: make verify-traffic
+    look_for:
+      - signal: metrics
+        where: Dashboard › HTTP request rate
+        query: sum(rate(nginx_http_requests_total[5m]))
+        expect: The line steps up after the next scrape and decays over the 5-minute rate window.
+      - signal: traces
+        where: Dashboard › Trace search results
+        expect: Only `state-site-nginx` traces; curl runs no browser SDK.
+    shots:
+      - name: rate-live
+        phase: during
+        url: "grafana:/d/static-site-signals/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
+        timelapse: {seconds: 60, every: 5, reload: true}
+        wide: true
+        alt: Animated HTTP request rate graph rising during a burst of requests
+        caption: Request rate over a minute while the burst runs, one frame every 5 seconds.
+brief: |
+  Reference example for the cloudutsuk-learning-lab skill (not a published lab).

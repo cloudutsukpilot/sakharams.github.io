@@ -1,0 +1,84 @@
+# Project playbook card for /tags/cloudutsuk-platform/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+#
+# LIVING PLAYBOOK: this project is being built in phases (see 03-product-planning). After every
+# phase, update the posts with what was actually built (replace TODO callouts, add screenshots and
+# diagrams), scaffold the next areas with scaffold.py --areas <ids>, sync the ADR log, and move
+# `status` from Planning to In progress to Live. Tenant/subscription IDs, Cloudflare account and
+# tunnel IDs, email allowlists and private repo URLs are deliberately left out (public repo).
+name: Cloudutsuk Platform
+tag: Cloudutsuk Platform
+summary: 'A self-hosted control plane on an NVIDIA DGX Spark: one SSO-protected portal for every lab,
+  cloud resource and its cost, with central OpenTelemetry monitoring, local CI/CD and GitOps, a RAG chatbot
+  on a local LLM and an alert-driven SRE agent.'
+status: Planning
+created: '2026-10-10'
+category: platform-engineering
+clouds: [azure, aws, gcp]
+facts:
+- label: Type
+  value: Self-hosted internal developer platform
+- label: Stack
+  value: Backstage, k3d, Argo CD, OpenBao, Grafana LGTM, OpenTelemetry, vLLM, LiteLLM, Qdrant
+- label: Hosting
+  value: NVIDIA DGX Spark at home, Cloudflare Tunnel + Access ($0 hosting)
+- label: Delivery
+  value: GitHub Actions self-hosted runners, central Argo CD
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture (portal, labs, AI stack, alerts)", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/cloudutsuk-platform/system-architecture, format: animated}
+- {type: cicd, title: "Commit to deploy with security gates", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#commit-to-deploy, diagram: projects/cloudutsuk-platform/commit-to-deploy, format: animated}
+- {type: network, title: "Network layout (subnets, ports, TLS, DNS)", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#network-layout, diagram: projects/cloudutsuk-platform/network-architecture, format: animated}
+- {type: data-model, title: "Platform data model (ER) and ownership", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
+brief: |
+  Author's request (2026-10-10): "I am loving the way that labs are being generated for the blog
+  cloudutusk.com. I have a repo for the blog sakharams.github.io, I have shared module of terragrunt and
+  terraform with consumables repo starting with infra-* in the same folder. I need to create a dashboard
+  if possible within cloudutsuk.com which will have a user login associated with the google sso/entra id.
+  Once login, i should see a dashboard which would have details of the resources that I have created
+  locally on dgx, in any of the cloud providers, etc. The dashboard should also show the cost that is
+  being incurred for each of those resources. Please note that this website is hosted on github.io and is
+  a static website. If a dashboard is not possible there, we can have a separate repo with the code for
+  the dashboard running locally and show all these details. Along with all the resources, I also need a
+  lab section which shows the different labs that are added to the blog and a way to deploy or destroy
+  with one click. This app can run locally on a k3d cluster. I also need to setup a central k3d cluster
+  which will just be used for collecting and storing OTEL signals. The plan is to have multiple k3d
+  cluster running locally for different lab scenarios and then have a single cluster as a monitoring
+  platform to collect all the OTEL signals, have dashboards, setup alerts, etc. The dashboard will also
+  have a chatbot feature which I ask questions about my setup and it can answer based on the data from
+  all these repos. The data from all these repos needs to collected into a RAG system using vector
+  databases along with semantic caching which the chatbot can query and answer. The chatbot should be
+  able to use local model as we have a dgx spark and can use a model running on a k3d cluster served by
+  vLLM or similar technology. Once all these are done, I need to create a agent which gets invoked
+  whenever an alerts is triggered for any of the kubernetes cluster and perform the required
+  troubleshooting using the LLM as well as the knowledge from vector databases. Also, we keep on adding
+  new blogs/labs to the blog, the RAG pipeline should be running continuously on a schedule to pull data
+  and update the vector databases."
+
+  Decisions taken while planning (same session):
+  - Portal: extend the existing Backstage app (self-service-portal); it needs a custom image.
+  - Hosting: everything on the DGX Spark, $0. Public at portal.cloudutsuk.com via Cloudflare Tunnel +
+    Access; cloudutsuk.com DNS moves from GoDaddy to Cloudflare; the blog stays on GitHub Pages.
+  - Alert agent: extend the existing sre-agent (k8s subagents, HITL approvals, Slack).
+  - Inventory and cost scope for v1: Azure, AWS, GCP and the DGX itself (k3d/docker, power cost).
+  - Local CI/CD: GitHub Actions self-hosted runners (ARC) on the DGX, BuildKit, Zot registry in the core cluster (Harbor has no arm64 images), one
+    central Argo CD for all clusters (hub and spoke).
+  - Schedules: inventory and RAG ingest every 6 hours, with manual "Sync now" / "Re-index now".
+  - New repos (created through infra-github on 2026-10-11, private): infra-local, homelab-gitops, homelab-services.
+  - ADRs: MADR files in homelab-gitops/docs/adr, full text synced to the blog.
+  - Non-functional review: single host by design (optimise recovery, RTO 1 h / RPO 24 h), dead-man's
+    switch, backups of Postgres and secrets only, lab admission control and cloud-lab TTL, graceful
+    degradation, self-hosted runners only on private repos.
+  - RAG visualization: Arize Phoenix (self-hosted, OpenTelemetry/OpenInference traces), user's preference.
+  - AI scaling: model serving in its own `ai` k3d cluster behind a LiteLLM gateway (ADR 0022);
+    one GB10 can't scale out, so capacity grows by adding gateway backends (2nd box, hosted overflow).
+  - Secrets and DNS: a dedicated `core` k3d cluster (boots first) runs OpenBao and PowerDNS; External
+    Secrets in every cluster; internal zone home.cloudutsuk.com with ExternalDNS and Let's Encrypt (ADRs 0023-0025).
+  - Identity: Keycloak in `core` brokers Google/Entra for people, tools and kubectl; services use
+    client-credentials JWTs and short-lived Kubernetes tokens from OpenBao (ADRs 0028-0029).
+  - "Keep updating the posts in the project as we move forward."
+
+  Hardware: NVIDIA DGX Spark (GB10, 20 cores, ~121 GB unified memory, 3.7 TB disk).

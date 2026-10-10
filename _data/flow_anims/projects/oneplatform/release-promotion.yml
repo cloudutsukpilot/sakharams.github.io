@@ -1,0 +1,75 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-12-cicd-and-release-management.md
+# (include id: projects/oneplatform/release-promotion). The portal's path from pull request to
+# production: PR build, tests and Sonar; release workflow with a date-based tag; Argo CD deploys
+# development; promotion workflows copy the tag to staging and, after approval, production.
+# Source: the portal's build, release and promote workflows and the deployment process doc.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: OnePlatform release and promotion
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 380]
+
+lanes:
+  - { label: "Pull request and main", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Release and promote (GitOps)", x: 8, y: 205, w: 984, h: 167 }
+
+nodes:
+  - { id: PR, label: "Pull request", x: 100, y: 75, shape: terminal, icon: git, icon_pos: corner }
+  - { id: CI, label: "Build", sub: "backend + tsc", x: 300, y: 75, icon: gear, icon_pos: corner }
+  - { id: TEST, label: "Unit +\nintegration", x: 500, y: 75 }
+  - { id: SONAR, label: "SonarQube\ngate", x: 700, y: 75, icon: "devsecops/sonarqube-18.svg" }
+  - { id: MAIN, label: "Merge to\nmain", x: 900, y: 75, icon: git }
+
+  - { id: REL, label: "Release run", sub: "YYYY.MM.DD.N", x: 90, y: 290, w: 136, icon: rocket, icon_pos: corner }
+  - { id: IMG, label: "Image +\ndev values", x: 254, y: 290, w: 136, icon: container, icon_pos: corner }
+  - { id: ARGO, label: "Argo CD\ndeploys dev", x: 418, y: 290, w: 136, icon: rocket, icon_pos: corner }
+  - { id: STG, label: "Promote to\nstaging", x: 582, y: 290, w: 136, icon: rocket, icon_pos: corner }
+  - { id: APR, label: "Prod\napproval", x: 746, y: 290, w: 120, h: 88, shape: diamond }
+  - { id: PROD, label: "Production", x: 910, y: 290, w: 136, shape: terminal, tone: ok }
+
+edges:
+  - { id: E1, from: PR, to: CI }
+  - { id: E2, from: CI, to: TEST }
+  - { id: E3, from: TEST, to: SONAR }
+  - { id: E4, from: SONAR, to: MAIN }
+  - { id: WRAP, from: MAIN, to: REL, points: [[900, 103], [900, 165], [35, 165], [35, 290], [22, 290]] }
+  - { id: E6, from: REL, to: IMG }
+  - { id: E7, from: IMG, to: ARGO }
+  - { id: E8, from: ARGO, to: STG }
+  - { id: E9, from: STG, to: APR }
+  - { id: E10, from: APR, to: PROD, label: "yes" }
+
+steps:
+  - lights: [PR]
+    title: Pull request
+    text: Every change to the portal arrives as a PR from a short-lived branch named after its ticket.
+  - edges: [E1]
+    title: Build
+    text: CI installs through the private registry with OIDC, builds the backend and type-checks the whole workspace.
+  - edges: [E2]
+    title: Test lanes
+    text: The unit lane and the PostgreSQL-backed integration lane run as separate jobs.
+  - edges: [E3]
+    title: Quality gate
+    text: SonarQube analyses the code with coverage from the full Jest suite and posts the PR check.
+  - edges: [E4]
+    title: Merge
+    text: After code-owner review the PR merges to main. Main stays releasable.
+  - edges: [WRAP]
+    title: Release run
+    text: Someone runs the release workflow on a branch or commit. It generates a date-based tag such as 2026.08.12.123.
+  - edges: [E6]
+    title: Image and dev values
+    text: The image is built and pushed to the registry, a Git tag and prerelease are created, and the dev values in the charts repo get the new tag.
+  - edges: [E7]
+    title: Development deploys itself
+    text: Argo CD sees the values change and deploys development. A rerun is idempotent, so nothing is duplicated.
+  - edges: [E8]
+    title: Promote to staging
+    text: A promotion workflow reads the tag running in development and writes it into the staging values. No rebuild, the same image.
+  - edges: [E9]
+    title: Approval
+    text: Promotion to production runs in a GitHub environment that needs an approver.
+  - edges: [E10]
+    title: Production
+    text: The staging tag is copied into the production values, and release notes are generated for the release.

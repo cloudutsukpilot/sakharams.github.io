@@ -1,0 +1,58 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-database-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: relational
+    title: Managed relational databases
+    aws:
+      - ref: Amazon RDS
+        summary: Managed MySQL, PostgreSQL, MariaDB, SQL Server, Oracle and Db2. Automated backups, patching, Multi-AZ failover and read replicas. RDS Proxy pools connections for serverless and bursty clients.
+    azure:
+      - ref: Azure SQL Database
+        summary: Fully managed SQL Server engine as a single database or elastic pool, in provisioned or serverless compute (auto-pause when idle). Always on the latest engine, with built-in high availability and geo-replication.
+      - ref: SQL Managed Instance
+        summary: Near-100% compatibility with on-premises SQL Server, including SQL Agent, cross-database queries and CLR, inside your VNet. The usual lift-and-shift target for SQL Server estates.
+      - ref: Database for PostgreSQL
+        summary: Flexible Server runs community PostgreSQL with zone-redundant high availability, read replicas, extensions such as pgvector, and stop/start to save cost. Azure Database for MySQL Flexible Server is the MySQL equivalent.
+    gcp:
+      - ref: Cloud SQL
+        summary: Managed MySQL, PostgreSQL and SQL Server with regional high availability, read replicas, automated backups and point-in-time recovery. The Enterprise Plus edition adds a data cache and near-zero-downtime maintenance.
+
+  - id: distributed
+    title: Cloud-native and distributed relational
+    aws:
+      - ref: Amazon Aurora
+        summary: MySQL- and PostgreSQL-compatible engines on a distributed storage layer with six copies across three AZs. Up to 15 low-latency replicas, Global Database for cross-region reads and failover, and Aurora Serverless v2 for fine-grained autoscaling. Aurora DSQL adds active-active multi-region.
+    azure:
+      - ref: Azure SQL Database
+        name: Azure SQL Database Hyperscale
+        summary: The Hyperscale tier separates compute and log/page storage for databases up to 128 TB, fast backups and restores, and up to 30 named replicas. Cosmos DB for PostgreSQL (Citus) covers distributed PostgreSQL.
+    gcp:
+      - ref: Spanner
+        summary: Globally distributed relational database with strong consistency and up to 99.999% availability in multi-region configurations. Scales horizontally without sharding; supports GoogleSQL and a PostgreSQL interface.
+      - name: AlloyDB for PostgreSQL
+        summary: PostgreSQL-compatible database with a disaggregated storage layer and a columnar engine for fast analytical queries on transactional data. Google's answer to Aurora PostgreSQL.
+
+  - id: nosql
+    title: NoSQL databases
+    aws:
+      - ref: Amazon DynamoDB
+        summary: Serverless key-value and document database with single-digit-millisecond latency at any scale. On-demand or provisioned capacity, global tables for multi-region active-active, streams for change data capture, and DAX for microsecond caching.
+    azure:
+      - ref: Cosmos DB
+        summary: Globally distributed multi-model database with turnkey multi-region writes and five consistency levels. APIs for NoSQL, MongoDB (including vCore), Cassandra, Gremlin and Table. Serverless or provisioned throughput billed in request units.
+    gcp:
+      - ref: Firestore
+        summary: Serverless document database with real-time listeners, offline sync for mobile and web clients, and strong consistency. Firestore with MongoDB compatibility lets existing MongoDB drivers connect.
+      - ref: Bigtable
+        summary: Wide-column NoSQL database for very large, high-throughput workloads (time series, IoT, ad tech, ML features). HBase API compatible, with replication across clusters and regions.
+
+  - id: cache
+    title: In-memory caching
+    aws:
+      - ref: Amazon ElastiCache
+        summary: Managed Valkey, Redis OSS and Memcached, in node-based clusters or ElastiCache Serverless that scales automatically. Valkey is the lower-cost default for new clusters. Amazon MemoryDB offers a durable Redis-compatible primary database.
+    azure:
+      - ref: Azure Cache for Redis
+        summary: Microsoft is retiring Azure Cache for Redis (Basic/Standard/Premium by September 2028, Enterprise tiers by March 2027) in favour of **Azure Managed Redis**, built on Redis Enterprise. New deployments should use Azure Managed Redis.
+    gcp:
+      - ref: Memorystore
+        summary: Managed Valkey, Redis and Memcached. Memorystore for Valkey and Redis Cluster scale out with zero-downtime resharding and high availability across zones.

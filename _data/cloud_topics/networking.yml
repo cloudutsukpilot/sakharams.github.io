@@ -1,0 +1,83 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-networking-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: vnet
+    title: Virtual networks
+    aws:
+      - ref: Amazon VPC
+        summary: A regional private network with subnets pinned to Availability Zones, route tables, internet and NAT gateways, security groups (stateful, per instance) and network ACLs (stateless, per subnet). Connect VPCs with peering or AWS Transit Gateway.
+    azure:
+      - ref: Virtual Network
+        summary: A regional private network whose subnets span all zones in the region. Network security groups filter traffic; user-defined routes steer it through firewalls. VNet peering and Azure Virtual WAN connect many VNets, typically in a hub-and-spoke layout.
+    gcp:
+      - ref: Virtual Private Cloud (VPC)
+        summary: VPCs are global, and subnets are regional. One network can span every region with no peering, which simplifies multi-region designs. Firewall rules and policies apply by tag or service account; Shared VPC lets a host project serve many projects.
+
+  - id: dns
+    title: DNS
+    aws:
+      - ref: Amazon Route 53
+        summary: Authoritative DNS with a 100% availability SLA, private hosted zones for VPCs, domain registration, health checks and routing policies (weighted, latency, geolocation, failover). Route 53 Resolver handles hybrid DNS forwarding.
+    azure:
+      - ref: Azure DNS
+        summary: Public and private DNS zones hosted on Azure's anycast network, managed with ARM and RBAC. Azure DNS Private Resolver forwards between on-premises and Azure. Traffic Manager adds DNS-based global routing and failover.
+    gcp:
+      - ref: Cloud DNS
+        summary: Managed authoritative DNS with a 100% SLA, public and private zones, DNSSEC, forwarding and peering zones for hybrid setups, and routing policies (geolocation, weighted round robin, failover).
+
+  - id: lb
+    title: Load balancing
+    aws:
+      - ref: Elastic Load Balancing
+        summary: Application Load Balancer (HTTP/HTTPS with path and host routing), Network Load Balancer (TCP/UDP, millions of requests per second, static IPs) and Gateway Load Balancer (for inline security appliances). All regional; combine with Global Accelerator or CloudFront for global entry.
+    azure:
+      - ref: Load Balancer
+        summary: Layer 4 load balancing for TCP and UDP, internal or public, zone-redundant on the Standard SKU. A cross-region tier adds a global anycast front end.
+      - ref: Application Gateway
+        summary: Regional layer 7 load balancer with TLS termination, URL-based routing, autoscaling and an optional Web Application Firewall. Application Gateway for Containers is the newer Kubernetes-native option for AKS.
+    gcp:
+      - ref: Cloud Load Balancing
+        summary: A software-defined family on Google's front end. The global external Application Load Balancer gives one anycast IP for backends in many regions. Regional, internal, proxy and passthrough Network Load Balancers cover everything else.
+
+  - id: cdn
+    title: CDN and global edge
+    aws:
+      - ref: Amazon CloudFront
+        summary: CDN with hundreds of edge locations, origin shield, signed URLs and cookies, and edge compute through CloudFront Functions and Lambda@Edge. Integrates with AWS WAF and Shield, and data transfer from AWS origins to CloudFront is free.
+    azure:
+      - ref: Front Door
+        summary: Azure's global layer 7 entry point combining CDN, global load balancing, TLS and WAF (Premium adds Private Link origins and bot protection). It replaces Azure CDN from Microsoft (classic), which retires in September 2027.
+    gcp:
+      - ref: Cloud CDN
+        summary: Caching on Google's edge, enabled as a feature of the global external Application Load Balancer. Supports signed URLs, cache modes, and Cloud Storage or any HTTP backend as an origin. Media CDN covers large-scale video streaming.
+
+  - id: hybrid
+    title: Hybrid connectivity
+    aws:
+      - ref: AWS Direct Connect
+        summary: Dedicated private links (1 to 400 Gbps) from your data centre or colocation facility to AWS, or hosted connections through partners. Pair with Transit Gateway to reach many VPCs, and with a VPN for encryption or backup.
+      - ref: AWS Site-to-Site VPN
+        summary: Managed IPsec tunnels (two per connection for redundancy) over the internet to a virtual private gateway or Transit Gateway. Quick to set up, and the usual backup for Direct Connect.
+    azure:
+      - ref: ExpressRoute
+        summary: Private connections to Microsoft's network through a connectivity provider or ExpressRoute Direct (10/100 Gbps ports). Reaches Azure VNets and, with Microsoft peering, Microsoft 365. Global Reach links your on-premises sites through Microsoft's backbone.
+      - ref: VPN Gateway
+        summary: Site-to-site IPsec, point-to-site for remote users and VNet-to-VNet tunnels. Zone-redundant SKUs and active-active mode for resilience; commonly used as ExpressRoute failover.
+    gcp:
+      - ref: Cloud Interconnect
+        summary: Dedicated Interconnect (10 or 100 Gbps circuits in colocation facilities) or Partner Interconnect through a service provider. Cross-Cloud Interconnect links directly to AWS, Azure or Oracle.
+      - ref: Cloud VPN
+        summary: HA VPN provides two IPsec interfaces with a 99.99% SLA and dynamic BGP routing through Cloud Router. A common first step before Interconnect.
+
+  - id: private
+    title: Private access to managed services
+    aws:
+      - name: AWS PrivateLink
+        icon: privatelink
+        summary: Interface VPC endpoints give AWS services and third-party SaaS a private IP inside your VPC, so traffic never crosses the internet. Gateway endpoints for S3 and DynamoDB are free.
+    azure:
+      - ref: Private Link
+        summary: Private endpoints map a specific PaaS resource (a storage account, SQL database, Key Vault) to a private IP in your VNet, with private DNS zones to resolve it. Service endpoints are the lighter, older alternative.
+    gcp:
+      - name: Private Service Connect
+        icon: private-service-connect
+        summary: Private endpoints in your VPC for Google APIs, managed services and producer services published by other organisations. Private Google Access is the simpler option for VMs without external IPs.

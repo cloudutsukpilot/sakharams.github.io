@@ -1,0 +1,85 @@
+# Layout of the Projects tab (_tabs/projects.md → _includes/projects-catalog.html).
+#
+# categories: the tile groups, in display order. A project joins a group through its `category`:
+#   - project playbooks: `category:` and `clouds:` in _data/projects/<slug>.yml
+#   - hands-on labs: `category:` and `clouds:` in _data/labs/<slug>.yml (normally hands-on-labs)
+#   - older projects that aren't playbooks: the `extra:` list below
+# A project whose category is missing or unknown still shows, under "More projects".
+#
+# clouds: the filter buttons. Each project lists the clouds it targets (`clouds: [azure, aws]`);
+# a project with more than one also matches "Multi-cloud".
+
+categories:
+  - id: platform-engineering
+    title: Platform Engineering & Developer Experience
+    icon: fas fa-cubes
+    blurb: Internal platforms, self-service and infrastructure as code that make other teams faster.
+  - id: ai-automation
+    title: AI & Intelligent Automation
+    icon: fas fa-robot
+    blurb: LLMs and agents put to work on operations and reporting, with humans kept in the loop.
+  - id: devops-kubernetes
+    title: DevOps, CI/CD & Kubernetes
+    icon: fas fa-infinity
+    blurb: Pipelines, containers, Kubernetes and the metrics that show whether DevOps is working.
+  - id: solution-architecture
+    title: Cloud Solution Architecture
+    icon: fas fa-sitemap
+    blurb: End-to-end designs for business problems, from requirements to cost, on one cloud or three.
+  - id: hands-on-labs
+    title: Hands-on Labs
+    icon: fas fa-flask
+    blurb: Build it, deploy it, poke it, and read the dashboards. Each lab has runnable code and real screenshots.
+
+clouds:
+  - { id: azure, title: Azure, icon: fab fa-microsoft }
+  - { id: aws, title: AWS, icon: fab fa-aws }
+  - { id: gcp, title: GCP, icon: fab fa-google }
+  - { id: agnostic, title: Cloud-agnostic, icon: fas fa-cloud }
+
+# Projects that aren't playbooks (no _data/projects/<slug>.yml).
+extra:
+  - name: E-Commerce Platform
+    url: /posts/projects/e-commerce/e-commerce-platform-cloud/
+    category: solution-architecture
+    clouds: [azure, aws, gcp]
+    status: Live
+    kind: Solution design + demos
+    summary: A scalable, highly available e-commerce platform designed for peak seasons, then built on Azure,
+      AWS and GCP side by side.
+    links:
+      - { label: Azure, url: /posts/projects/e-commerce/e-commerce-platform-azure/ }
+      - { label: Azure demo, url: /posts/projects/e-commerce/e-commerce-platform-azure-demo/ }
+      - { label: AWS, url: /posts/projects/e-commerce/e-commerce-platform-aws/ }
+      - { label: AWS demo, url: /posts/projects/e-commerce/e-commerce-platform-aws-demo/ }
+      - { label: GCP, url: /posts/projects/e-commerce/e-commerce-platform-gcp/ }
+      - { label: GCP demo, url: /posts/projects/e-commerce/e-commerce-platform-gcp-demo/ }
+  - name: Email Journaling
+    url: /posts/projects/email%20journaling/email-journaling-cloud/
+    category: solution-architecture
+    clouds: [azure, aws, gcp]
+    status: Live
+    kind: Solution design + demos
+    summary: Compliance-grade email archiving with secure, auditable retention, designed and demonstrated on
+      each of the three major clouds.
+    links:
+      - { label: Azure, url: /posts/projects/email%20journaling/email-journaling-azure/ }
+      - { label: Azure demo, url: /posts/projects/email%20journaling/email-journaling-azure-demo/ }
+      - { label: AWS, url: /posts/projects/email%20journaling/email-journaling-aws/ }
+      - { label: AWS demo, url: /posts/projects/email%20journaling/email-journaling-aws-demo/ }
+      - { label: GCP, url: /posts/projects/email%20journaling/email-journaling-gcp/ }
+      - { label: GCP demo, url: /posts/projects/email%20journaling/email-journaling-gcp-demo/ }
+  - name: DevOps - Complete CI/CD Project
+    url: /posts/projects/devops/devops-project-1/
+    category: devops-kubernetes
+    clouds: [agnostic]
+    status: Live
+    kind: Hands-on project
+    summary: A React and FastAPI app taken from source to Kubernetes with Docker, Helm and a full CI/CD pipeline.
+  - name: Voting App on AKS
+    url: /posts/projects/voting-app/voting-app-on-aks/
+    category: devops-kubernetes
+    clouds: [azure]
+    status: In progress
+    kind: Hands-on project
+    summary: The classic multi-service voting app on Azure Kubernetes Service, starting with the network design.

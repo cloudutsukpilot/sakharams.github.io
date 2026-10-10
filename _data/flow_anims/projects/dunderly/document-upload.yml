@@ -1,0 +1,47 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-06-security-and-privacy.md
+# (include id: projects/dunderly/document-upload). How a scanned HR document is validated,
+# quarantined, malware-scanned and only then made available.
+title: Dunderly document upload and malware scan
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 280]
+modes:
+  - { id: clean, label: "Clean file" }
+  - { id: malicious, label: "Simulate a malicious file" }
+
+nodes:
+  - { id: USR, label: "HR upload", x: 80, y: 80, w: 120, shape: terminal, icon: file, icon_pos: corner }
+  - { id: API, label: "HR API", sub: "role, type, size", x: 250, y: 80, w: 140, icon: api, icon_pos: corner }
+  - { id: QB, label: "Quarantine\ncontainer", x: 430, y: 80, w: 140, h: 62, shape: cylinder, icon: container }
+  - { id: SCAN, label: "Defender\nscan", x: 610, y: 80, w: 130, h: 84, shape: diamond }
+  - { id: DOC, label: "Documents\ncontainer", x: 840, y: 80, w: 150, h: 62, shape: cylinder, tone: ok, icon: container }
+  - { id: DEL, label: "Delete + alert", sub: "row: Rejected", x: 610, y: 230, w: 150, tone: fail, icon: cross, icon_pos: corner }
+
+edges:
+  - { id: USRAPI, from: USR, to: API }
+  - { id: APIQB, from: API, to: QB }
+  - { id: QBSCAN, from: QB, to: SCAN }
+  - { id: SCANDOC, from: SCAN, to: DOC, label: "clean", tone: ok }
+  - { id: SCANDEL, from: SCAN, to: DEL, label: "malicious", tone: fail }
+
+steps:
+  - lights: [USR]
+    title: HR attaches a scan
+    text: An HR admin attaches a signed contract or review to an employee record. Only HR roles can upload, and files are capped at 10 MB.
+  - edges: [USRAPI]
+    title: Validate first
+    text: The API checks the role, an allow-list of types (PDF, JPEG, PNG) and the file's magic bytes, not just the name and content type the browser sent.
+  - edges: [APIQB]
+    title: Quarantine
+    text: The file is stored under a random GUID name in a quarantine container. Its SQL metadata row says PendingScan, so nobody can download it yet.
+  - edges: [QBSCAN]
+    title: Malware scan
+    text: Microsoft Defender for Storage scans the blob on upload and publishes the verdict as an Event Grid event.
+  - edges: [SCANDOC]
+    when: clean
+    title: Promote
+    text: A small Function moves clean files to the documents container and marks the row Available. Versioning and soft delete protect it from then on.
+  - edges: [SCANDEL]
+    when: malicious
+    title: Contain
+    text: A malicious verdict deletes the blob, marks the row Rejected and raises a security alert. The file was never readable by anyone.

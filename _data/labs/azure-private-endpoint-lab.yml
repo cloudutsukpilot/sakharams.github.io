@@ -1,0 +1,310 @@
+# Hands-on lab card for /tags/azure-private-endpoint-lab/ (see _includes/lab-index.html).
+# Created by the cloudutsuk-learning-lab skill. `experiments` drive the experiment cards in part 6,
+# the index tiles and scripts/capture.cjs. `brief` is the author's request, not rendered.
+# Experiments 2 and 3 change the DGX's network with sudo: capture.cjs waits (scripts/dgx-step.sh)
+# while the author runs `make exp-tunnel-up` / `make exp-split-dns` in a terminal.
+name: DGX Spark to Azure Private Endpoint
+tag: Azure Private Endpoint Lab
+summary: "Reach a private-only Microsoft Foundry account from an NVIDIA DGX Spark at home through a
+  fourteen-dollar-a-month WireGuard VM, with split DNS that sends only the Azure AI names to Azure DNS,
+  and watch every DNS answer and HTTP status flip in Grafana."
+status: Built
+created: '2026-10-10'
+level: Intermediate
+duration: about 90 minutes
+category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
+lab_category: cloud       # Labs tab group (_data/lab_catalog.yml)
+clouds: [azure]
+repo:
+  path: /home/sakharam/gitrepos/private-connectivity-labs/azure-private-endpoint
+  # Private for now: github.com/cloudutsukpilot/private-connectivity-labs (add `url:` once public)
+platform:
+  runtime: azure-cli + WireGuard (Azure VM) + docker-compose (local probe)
+  observability: OpenTelemetry SDK + Grafana LGTM (local)
+  cost: "About $0.75/day while the lab runs (VM, IP, disk, private endpoint, zones); make down deletes it all"
+facts:
+  - {label: Stack, value: "Azure VNet, Private Endpoint, Private DNS, Foundry (AIServices), WireGuard, dnsmasq, systemd-resolved"}
+  - {label: Connectivity cost, value: "about $14/month (B1s VM + static IP + 32 GB SSD) vs about $157 for a VPN Gateway"}
+endpoints:
+  grafana: http://localhost:3012
+capture:
+  urls:
+    grafana: http://localhost:3012
+  viewport: {width: 1440, height: 900}
+  color_scheme: dark
+  window: 6m
+  settle_ms: 3500
+  preflight: make status
+  cooldown: 20
+experiments:
+  - id: baseline
+    title: Call the account over the internet
+    goal: "See what the DGX gets today: all three names resolve to a public IP and the account's firewall answers 403."
+    signals: [metrics, logs]
+    action:
+      say: "With no tunnel up, restart the probe so it starts from a clean slate."
+      run: make exp-baseline
+    predict: "Public network access is disabled on the account. Will DNS fail, will the TCP connection fail, or will something else stop the call?"
+    wait: 40
+    verify: make verify-baseline
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Name resolves to, HTTP status"
+        query: 'max by (host) (pe_probe_dns_private)'
+        expect: "PUBLIC for all three names, and HTTP 403 for all three."
+      - signal: logs
+        where: "Dashboard › Probe log"
+        query: '{service_name="pe-probe"} | host=~".+"'
+        expect: "A CNAME chain through `privatelink.*` that still ends at a public IP, then `HTTP 403`."
+    shots:
+      - name: resolves
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
+        alt: "Name resolves to stat panel showing PUBLIC for cognitiveservices, openai and services-ai"
+        caption: "All three names resolve to a public address."
+      - name: http
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "HTTP status stat panel showing 403 for all three names"
+        caption: "The account is reachable but refuses the call."
+      - name: log
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-7"]'
+        viewport: {width: 1440, height: 1500}
+        wide: true
+        alt: "Probe log lines: each name's CNAME chain through privatelink ending at a public IP, then HTTP 403"
+        caption: "The CNAME already points at privatelink. Public DNS just has no private answer for it."
+
+  - id: tunnel-up
+    title: Bring up the tunnel, change nothing else
+    goal: "Prove that routing alone is not enough: the private endpoint's IP answers over WireGuard, but the names still resolve to the public IP."
+    signals: [metrics]
+    action:
+      say: "Bring up wg0 (tunnel only, no DNS changes) in your terminal."
+      run: make exp-tunnel-up
+    predict: "The DGX can now reach 10.60.0.0/16. Will the HTTP status for the cognitiveservices name change?"
+    wait: 40
+    verify: make verify-tunnel-up
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Tunnel"
+        query: 'max(pe_probe_pe_tcp_up)'
+        expect: "wg0 interface, VM 10.200.0.1:53 and Private endpoint :443 all go from DOWN to UP."
+      - signal: metrics
+        where: "Dashboard › Name resolves to"
+        query: 'max by (host) (pe_probe_dns_private)'
+        expect: "Still PUBLIC for all three names, so HTTP stays 403."
+    shots:
+      - name: tunnel-before
+        phase: before
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-3"]'
+        alt: "Tunnel stat panel before wg0 is up: all three checks DOWN"
+        caption: "Before: no wg0, nothing in the VNet answers."
+      - name: tunnel-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-3"]'
+        alt: "Tunnel stat panel after wg0 is up: all three checks UP"
+        caption: "After: the VM and the private endpoint answer over the tunnel."
+      - name: still-public
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "HTTP status stat panel still showing 403 for all three names with the tunnel up"
+        caption: "Still 403: the names still point at the public IP."
+
+  - id: split-dns
+    title: Send the Azure AI names through the tunnel
+    goal: "Turn on split DNS and watch the cognitiveservices name flip to the private endpoint's IP and the call succeed, while the openai name stays public."
+    signals: [metrics, logs, traces]
+    action:
+      say: "Point the three Azure AI domains at dnsmasq on the VM (resolvectl, in your terminal)."
+      run: make exp-split-dns
+    predict: "All three domains now go to the VM's dnsmasq. Will all three names turn PRIVATE?"
+    wait: 40
+    verify: make verify-split-dns
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Name resolves to, HTTP status"
+        query: 'max by (host) (pe_probe_ok)'
+        expect: "cognitiveservices: PRIVATE and 200. openai and services-ai: still PUBLIC and 403."
+      - signal: logs
+        where: "Dashboard › Probe log"
+        query: '{service_name="pe-probe"} |= "[PRIVATE]"'
+        expect: "`cognitiveservices: … privatelink.cognitiveservices.azure.com → 10.60.1.4 [PRIVATE] HTTP 200`."
+      - signal: traces
+        where: "Explore › Tempo, then open the trace"
+        query: '{ resource.service.name = "pe-probe" && name = "probe cognitiveservices" && span.net.path = "private" }'
+        expect: "dns.resolve, tcp.connect, tls.handshake and http.request spans, with the time each one took over the tunnel."
+    shots:
+      - name: resolves-before
+        phase: before
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
+        alt: "Name resolves to stat panel before split DNS: all PUBLIC"
+        caption: "Before: all three names public."
+      - name: resolves-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
+        alt: "Name resolves to stat panel after split DNS: cognitiveservices PRIVATE, openai and services-ai NO ANSWER"
+        caption: "After: only cognitiveservices turns private. The other two got no answer in this run (see below)."
+      - name: http-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "HTTP status stat panel after split DNS: 200 for cognitiveservices, no response for openai and services-ai"
+        caption: "The private name gets 200. The other two never got as far as a connection."
+      - name: waterfall
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.service.name%20%3D%20%5C%22pe-probe%5C%22%20%26%26%20name%20%3D%20%5C%22probe%20cognitiveservices%5C%22%20%26%26%20span.net.path%20%3D%20%5C%22private%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${start}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        steps:
+          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1100}
+        wide: true
+        alt: "Tempo waterfall of one probe over the private path: dns.resolve, tcp.connect, tls.handshake, http.request"
+        caption: "One private call, step by step."
+
+  - id: openai-zone
+    title: Add the missing openai and services.ai zones
+    goal: "Fix the mistake from the brief: give the private endpoint's zone group the privatelink.openai and privatelink.services.ai zones, and time how long the DNS answers take to change."
+    signals: [metrics, logs]
+    action:
+      say: "Add the two zones, link them to the VNet and add them to the endpoint's zone group (az CLI)."
+      run: make exp-openai-zone
+    predict: "The zones are created in Azure in about a minute. Will the DGX see the private answer as soon as the command returns?"
+    wait: 30
+    verify: make verify-openai-zone
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Where each name resolves"
+        query: 'max by (host) (pe_probe_dns_private)'
+        expect: "openai and services-ai change from PUBLIC to PRIVATE, but only once the cached public answers expire, minutes after the command finished."
+      - signal: logs
+        where: "Dashboard › Probe log"
+        query: '{service_name="pe-probe"} |= "openai: " |= "[PRIVATE]"'
+        expect: "`openai: … privatelink.openai.azure.com → 10.60.1.4 [PRIVATE] HTTP 200`."
+    shots:
+      - name: timeline
+        phase: during
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-4"]'
+        window: 20m
+        timelapse: {seconds: 1080, every: 30, reload: true}
+        wide: true
+        alt: "Animated state timeline over 20 minutes: after the fix at 17:06 the openai and services-ai rows stay red PUBLIC until about 17:21 and 17:23, then turn green PRIVATE"
+        caption: "The fix went in at about 17:06. The orange stretch before it is my reset of the zones (see below)."
+      - name: http-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "HTTP status stat panel: 200 for all three names"
+        caption: "All three names now get 200."
+      - name: log
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-7"]'
+        viewport: {width: 1440, height: 1500}
+        wide: true
+        alt: "Probe log: openai and services-ai lines now resolve through privatelink to their private IPs and return HTTP 200"
+        caption: "Same names, new answers."
+      - name: dashboard
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        viewport: {width: 1440, height: 1500}
+        full_page: true
+        wide: true
+        alt: "The whole DGX Spark to Azure Private Endpoint dashboard after the zones were added"
+        caption: "The whole dashboard: status stats, the two timelines, step timings, traces and the probe log."
+
+  - id: vm-deallocate
+    title: Deallocate the VM to save money
+    goal: "Stop paying for compute when you don't need the tunnel, and see what the DGX gets while the VM is off."
+    signals: [metrics, logs]
+    action:
+      say: "Deallocate the WireGuard VM."
+      run: make exp-vm-deallocate
+    predict: "wg0 stays up on the DGX. When the VM is gone, will the Azure AI names fall back to the public IP, or fail?"
+    wait: 45
+    verify: make verify-vm-deallocate
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Tunnel, Name resolves to"
+        query: 'max(pe_probe_vpn_peer_up)'
+        expect: "The VM and the private endpoint go DOWN; the names show NO ANSWER instead of falling back to public."
+      - signal: logs
+        where: "Dashboard › Probe log"
+        query: '{service_name="pe-probe"} |= "[NO ANSWER]"'
+        expect: "`DNS TIMEOUT` or `DNS SERVFAIL` for all three names."
+    shots:
+      - name: tunnel-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-3"]'
+        alt: "Tunnel stat panel with the VM deallocated: wg0 UP, VM and private endpoint DOWN"
+        caption: "wg0 still exists, but nothing answers at the other end."
+      - name: resolves-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
+        alt: "Name resolves to stat panel with the VM deallocated: NO ANSWER for all three names"
+        caption: "The names fail closed. They do not fall back to the public IP."
+      - name: log
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-7"]'
+        viewport: {width: 1440, height: 1500}
+        wide: true
+        alt: "Probe log lines with DNS failures for all three names while the VM is deallocated"
+        caption: "What your SDK would see: a DNS error, not a 403."
+
+  - id: vm-start
+    title: Start the VM and watch the tunnel come back
+    goal: "Start the VM again and see the DGX reconnect without anyone touching it, thanks to the static IP and PersistentKeepalive."
+    signals: [metrics]
+    action:
+      say: "Start the WireGuard VM again. Don't touch the DGX."
+      run: make exp-vm-start
+    predict: "Nothing on the DGX is restarted. How long until the first 200: seconds, or minutes?"
+    wait: 40
+    verify: make verify-vm-start
+    look_for:
+      - signal: metrics
+        where: "Dashboard › HTTP status over time"
+        query: 'max by (host) (pe_probe_http_status)'
+        expect: "`no response` until the VM has booted, then 200 on all three rows."
+    shots:
+      - name: timeline
+        phase: during
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-5"]'
+        timelapse: {seconds: 120, every: 10, reload: true}
+        wide: true
+        alt: "Animated state timeline of HTTP status: no response while the VM starts, then 200 for all three names"
+        caption: "From VM start to the first 200, one frame every 10 seconds."
+      - name: tunnel-after
+        phase: after
+        url: "grafana:/d/azure-pe-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-3"]'
+        alt: "Tunnel stat panel after the VM restart: all three checks UP"
+        caption: "Back up, with no change on the DGX."
+brief: |
+  Author's request (2026-10-10): "I need to create a lab documenation in order to setup a connectivity
+  from my dgx spark to the a private endpoint in azure. Please research for the most cost efficent way
+  to implement this. I have one example, which can be used for reference (ignore anything about
+  resources.yaml and replace it with az cli commands when adding steps). Please create a plan first
+  after the research and then create a lab to setup private connectivity"
+  The example (summarised): a WireGuard VM in the VNet (about $0.43/day) instead of a VPN Gateway
+  (about $5.20/day); link the private DNS zones to the VNet; add privatelink.openai.azure.com and
+  privatelink.services.ai.azure.com to the endpoint's zone group; IP forwarding + MASQUERADE + dnsmasq
+  (server=168.63.129.16) on the VM; split-tunnel wg0.conf and resolvectl split DNS on the DGX, made
+  permanent with PostUp; Tailscale subnet router as an alternative.
+  Answers: go-ahead to create billable resources in subscription "dev" and tear down after capture;
+  the author runs the DGX sudo steps; the lab builds its own resource group rather than reusing the
+  author's dev VNet and Foundry account.

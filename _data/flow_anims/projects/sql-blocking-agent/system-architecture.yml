@@ -1,0 +1,100 @@
+# Animated flow diagram for _posts/projects/sql-blocking-agent/2026-10-05-05-technical-architecture.md
+# (include id: projects/sql-blocking-agent/system-architecture). One monitoring cycle, from the
+# TargetServers config to audit, report and email. Only Analyzer, Determination and RCA call the LLM;
+# those steps light the Azure AI Foundry node. Source: docs/ARCHITECTURE.md, docs/END_TO_END_PROCESS.md.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: SQL Blocking Agent system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 590]
+modes:
+  - { id: kill, label: "KILL decision, approved" }
+  - { id: alert, label: "Simulate an ALERT_ONLY or SKIP decision" }
+
+lanes:
+  - { label: "Detect (deterministic)", x: 8, y: 8, w: 984, h: 135 }
+  - { label: "Analyze and decide", x: 8, y: 170, w: 984, h: 175 }
+  - { label: "Act, explain and record", x: 8, y: 370, w: 984, h: 212 }
+
+nodes:
+  - { id: CFG, label: "TargetServers\nconfig", x: 100, y: 80, w: 140, h: 62, shape: cylinder, icon: file, icon_pos: corner }
+  - { id: POLL, label: "Per-server\npoller", x: 300, y: 80, icon: server }
+  - { id: DET, label: "Detection", sub: "DMVs, no LLM", x: 500, y: 80, icon: server }
+  - { id: SQL, label: "Monitored\nSQL Server", x: 700, y: 80, w: 140, h: 62, shape: cylinder, icon: "databases/mssql-18.svg" }
+  - { id: FDY, label: "Azure AI\nFoundry", x: 900, y: 80, w: 140, h: 62, shape: cylinder, icon: cloud }
+
+  - { id: AN, label: "Analyzer\nagent", x: 160, y: 260, w: 140, icon: server }
+  - { id: DETM, label: "Determination", sub: "gates + LLM", x: 360, y: 260, w: 150, icon: server, icon_pos: corner }
+  - { id: APR, label: "Human\napproval", x: 560, y: 260, w: 130, h: 88, shape: diamond }
+  - { id: ACT, label: "KILL +\nvalidate", x: 780, y: 260, w: 150, icon: check }
+
+  - { id: RCA, label: "RCA agent", sub: "LLM", x: 840, y: 430, w: 150, icon: server }
+  - { id: NOT, label: "Notification", x: 840, y: 515, w: 150, h: 50, icon: bell, icon_pos: corner }
+  - { id: LOG, label: "AgentLogDB\naudit", x: 600, y: 515, w: 140, h: 56, shape: cylinder, icon: shield }
+  - { id: BLOB, label: "Blob HTML\nreport", x: 420, y: 515, w: 140, h: 56, shape: cylinder, icon: bucket }
+  - { id: MAIL, label: "DBA email", x: 240, y: 515, w: 140, h: 50, icon: mail }
+
+edges:
+  - { id: CFGPOLL, from: CFG, to: POLL }
+  - { id: POLLDET, from: POLL, to: DET }
+  - { id: SQLDET, from: SQL, to: DET, points: [[630, 80], [575, 80]] }
+  - { id: DETAN, from: DET, to: AN, points: [[500, 108], [500, 155], [160, 155], [160, 232]] }
+  - { id: ANDETM, from: AN, to: DETM }
+  - { id: DETMAN, from: DETM, to: AN, label: "retry once", points: [[330, 288], [330, 322], [190, 322], [190, 288]] }
+  - { id: DETMAPR, from: DETM, to: APR, label: "KILL" }
+  - { id: APRACT, from: APR, to: ACT, label: "approve", tone: ok }
+  - { id: ACTRCA, from: ACT, to: RCA, points: [[800, 288], [800, 402]] }
+  - { id: DETMRCA, from: DETM, to: RCA, label: "ALERT_ONLY / SKIP", points: [[400, 288], [400, 445], [765, 445]] }
+  - { id: RCANOT, from: RCA, to: NOT }
+  - { id: NOTLOG, from: NOT, to: LOG, points: [[840, 540], [840, 568], [600, 568], [600, 543]] }
+  - { id: NOTBLOB, from: NOT, to: BLOB, points: [[840, 540], [840, 568], [420, 568], [420, 543]] }
+  - { id: NOTMAIL, from: NOT, to: MAIL, points: [[840, 540], [840, 568], [240, 568], [240, 540]] }
+
+steps:
+  - lights: [CFG, SQL]
+    title: What to watch
+    text: AgentConfigDB.dbo.TargetServers lists the SQL Servers to monitor, with per-server thresholds, kill limits and the DBA email. It is re-read every minute.
+  - edges: [CFGPOLL]
+    title: One poller per server
+    text: In loop mode an asyncio poller runs per server, every 15 seconds by default. If the previous cycle is still running, the next tick is skipped.
+  - edges: [POLLDET, SQLDET]
+    title: Deterministic detection
+    text: DMV queries find blocking and walk session_id to blocking_session_id up to the head blocker. No LLM. With no blocking, the cycle just records and ends.
+  - edges: [DETAN]
+    lights: [AN, FDY]
+    title: Analyzer agent (LLM)
+    text: Read-only diagnostics run in code (log safety, plans, Query Store, locks, KB scenario), then one Pydantic AI call on Azure AI Foundry returns a validated analysis.
+  - edges: [ANDETM]
+    lights: [DETM, FDY]
+    title: Determination
+    text: Hard safety gates run in code first (R1, R2, R3, R6, R9 to R13). Only if none fires does the LLM choose KILL, ALERT_ONLY or SKIP under rules R4, R5, R7 and R8.
+  - edges: [DETMAN]
+    title: At most one retry
+    text: If Determination asks for more analysis, the Analyzer runs once more. MAX_ANALYSIS_RETRIES is 1, so the loop can never run away.
+  - edges: [ANDETM]
+    title: Decide again
+    text: The second decision is final. Whatever it is, a KILL can only happen through the deterministic action path, never as an LLM tool call.
+  - edges: [DETMAPR]
+    when: kill
+    title: Human approval
+    text: A KILL waits for a DBA to approve through the approval API or approve.py, with the evidence shown. Denied or timed out means ALERT_ONLY and no kill.
+  - edges: [APRACT]
+    when: kill
+    title: KILL and validate
+    text: On an autocommit connection with @@TRANCOUNT at zero, the KILL runs, then the validator checks the session is gone and the chain cleared. Production runs this in dry-run today.
+  - edges: [ACTRCA]
+    when: kill
+    lights: [RCA, FDY]
+    title: RCA agent (LLM)
+    text: The third and last LLM call writes the root-cause report, business impact and prioritized P1 to P4 recommendations with T-SQL.
+  - edges: [DETMRCA]
+    when: alert
+    lights: [RCA, FDY]
+    title: ALERT_ONLY or SKIP
+    text: A safety gate fired or the LLM chose not to kill, so nothing touches the session. The RCA agent still explains the incident for the DBA team.
+  - edges: [RCANOT]
+    title: Notification
+    text: Notification is the last node on every path. It writes the blocking event first, then the rest of the audit and the reports.
+  - edges: [NOTLOG, NOTBLOB, NOTMAIL]
+    title: Audit, report, email
+    text: Immutable audit rows go to AgentLogDB, the HTML RCA report is uploaded to Blob Storage, and the DBA team gets an email with the report link.

@@ -1,0 +1,421 @@
+# Explorable diagram for _posts/labs/azure-private-endpoint-lab/2026-10-10-01-overview.md
+# (include id: labs/azure-private-endpoint-lab/architecture), reused in part 7.
+# Facts from parts 1, 3, 5 and 6 of the lab and _data/labs/azure-private-endpoint-lab.yml
+# (VNet 10.60.0.0/16, snet-pe 10.60.1.0/24, snet-vpn 10.60.2.0/28, tunnel 10.200.0.0/24,
+# WireGuard UDP 51820, dnsmasq 10.200.0.1:53, Azure DNS 168.63.129.16, OTLP 14318, Grafana 3012).
+title: DGX Spark to Azure Private Endpoint
+accent: "#22D3EE"
+accent2: "#A3E635"
+level: 1
+levels: [Overview, Systems, Components, Subnets, VM]
+
+views:
+  - {id: networking, label: Networking, icon: router}
+  - {id: security, label: Security, icon: lock}
+  - {id: observability, label: Observability, icon: chart}
+  - {id: provisioning, label: Provisioning, icon: rocket}
+
+nodes:
+  - id: you
+    label: You
+    sub: on the DGX
+    icon: user
+    detail: You run the `make` targets, open Grafana on `localhost:3012` and, for experiments, SSH to the VM.
+
+  - id: dgx
+    label: DGX Spark
+    sub: home network
+    icon: cpu
+    color: green
+    detail: The NVIDIA DGX Spark at home (Ubuntu 24.04). The lab adds one WireGuard interface, three
+      `resolvectl` routing domains, and a probe with a local Grafana.
+    children:
+      - id: probe
+        label: pe-probe
+        sub: App / SDK
+        icon: programming/python.svg
+        detail: Calls the account's three names (`cognitiveservices`, `openai`, `services.ai`) every 10 seconds.
+          Reports the DNS answer, the path (PRIVATE or PUBLIC) and the HTTP status as metrics, logs and traces.
+      - id: dgx-net
+        label: Host networking
+        sub: split DNS + tunnel
+        icon: router
+        children:
+          - id: resolved
+            label: systemd-resolved
+            sub: 127.0.0.53
+            icon: operatingsystems/ubuntuos-18.svg
+            detail: Picks a DNS server per link by matching routing domains. `~cognitiveservices.azure.com`,
+              `~openai.azure.com` and `~services.ai.azure.com` go to `10.200.0.1` on `wg0`; every other name
+              goes to the home router.
+            config:
+              title: wg0.conf PostUp (render.sh --dns)
+              lang: ini
+              code: |
+                PostUp = resolvectl dns %i 10.200.0.1; resolvectl domain %i ~cognitiveservices.azure.com ~openai.azure.com ~services.ai.azure.com; resolvectl default-route %i false
+          - id: wg0
+            label: wg0
+            sub: 10.200.0.2
+            icon: lock
+            detail: The WireGuard interface. `AllowedIPs` routes only the VM's tunnel address and the VNet into
+              the tunnel; everything else stays on the home connection. `PersistentKeepalive = 25` keeps the
+              home router's NAT entry open.
+            config:
+              title: .state/wg0.conf (tunnel only)
+              lang: ini
+              code: |
+                [Interface]
+                PrivateKey = <dgx private key>
+                Address    = 10.200.0.2/32
+
+                [Peer]
+                PublicKey  = OWcvAw0eW83wZR08sN8GT7F2ZAGdSqTnOqGApKFzimE=
+                Endpoint   = 20.102.50.119:51820
+                AllowedIPs = 10.200.0.1/32, 10.60.0.0/16
+                PersistentKeepalive = 25
+      - id: lgtm
+        label: Grafana LGTM
+        sub: Docker, grafana/otel-lgtm
+        icon: devops/orchestration/docker-18.svg
+        detail: One container with an OTLP receiver, Loki, Mimir, Tempo and Grafana. Needs about 1 GiB of memory.
+        children:
+          - id: lgtm-otlp
+            label: OTLP receiver
+            sub: ":14318 → 4318"
+            icon: chart
+            detail: Receives the probe's metrics, logs and traces over OTLP/HTTP and stores them in Mimir, Loki and Tempo.
+          - id: grafana
+            label: Grafana
+            sub: ":3012"
+            icon: devops/monitoring/grafana-18.svg
+            detail: The `azure-pe-lab` dashboard (anonymous admin, DGX only) shows each name's DNS answer,
+              HTTP status, the tunnel's health and the probe log.
+
+  - id: home-router
+    label: Home router DNS
+    sub: every other name
+    icon: globe
+    color: slate
+    detail: Answers every name that matches no routing domain, through the public internet's resolvers. For
+      the account's names it follows the public CNAME through `privatelink.*` to a **public** IP.
+
+  - id: azure
+    label: Azure
+    sub: rg for the lab, East US
+    icon: cloud/azure/services/resource-manager.svg
+    color: sky
+    detail: One disposable resource group, created with the `az` CLI (`make azure-up`, about 10 minutes) and
+      deleted by `make down`. About $0.75 a day while it runs.
+    children:
+      - id: arm
+        label: Azure Resource Manager
+        sub: az CLI
+        icon: cloud/azure/services/resource-manager.svg
+        views: [provisioning]
+        detail: Every resource in the lab is created through ARM by `make azure-up` (`az` CLI) and deleted by `make down`.
+      - id: vnet
+        label: VNet
+        sub: 10.60.0.0/16
+        icon: cloud/azure/networks/virtualnetwork.svg
+        detail: Chosen so it doesn't overlap the home LAN or Docker's `172.17-19.0.0/16` networks.
+        children:
+          - id: snet-vpn
+            label: snet-vpn
+            sub: 10.60.2.0/28
+            icon: router
+            children:
+              - id: nsg
+                label: NSG nsg-vpn
+                sub: your home IP only
+                icon: cloud/azure/services/firewall.svg
+                detail: On the subnet. Allows UDP 51820 (WireGuard) and TCP 22 (SSH) from your home IPv4 address only.
+              - id: vm
+                label: vm-wg-pe-lab
+                sub: Standard_B1s, 10.60.2.4
+                icon: cloud/azure/compute/non-serverless/virtualmachine.svg
+                detail: About $14 a month with its static public IP and disk, a tenth of a VPN Gateway. cloud-init
+                  sets up WireGuard, IP forwarding, MASQUERADE and dnsmasq.
+                children:
+                  - id: wg-peer
+                    label: WireGuard peer
+                    sub: wg0 10.200.0.1
+                    icon: lock
+                    detail: Accepts packets from the DGX only if they come from `10.200.0.2/32`. `net.ipv4.ip_forward = 1`
+                      passes them on out of `eth0`.
+                  - id: dnsmasq
+                    label: dnsmasq
+                    sub: 10.200.0.1:53
+                    icon: search
+                    detail: Answers only on the tunnel address and has one upstream, Azure DNS.
+                    config:
+                      title: /etc/dnsmasq.d/pe-lab.conf (cloud-init)
+                      lang: ini
+                      code: |
+                        listen-address=__WG_VM_IP__
+                        bind-dynamic
+                        except-interface=lo
+                        no-resolv
+                        server=168.63.129.16
+                        log-queries
+                        log-facility=/var/log/dnsmasq.log
+                  - id: nat
+                    label: MASQUERADE
+                    sub: src 10.60.2.4
+                    icon: firewall
+                    detail: Rewrites the source of everything from the tunnel to the VM's own `10.60.2.4`, so the VNet
+                      needs no route (UDR) back to `10.200.0.0/24`.
+                    config:
+                      title: wg0.conf on the VM
+                      lang: ini
+                      code: |
+                        PostUp   = iptables -t nat -A POSTROUTING -s __WG_NET__ -o eth0 -j MASQUERADE
+                        PostDown = iptables -t nat -D POSTROUTING -s __WG_NET__ -o eth0 -j MASQUERADE
+          - id: snet-pe
+            label: snet-pe
+            sub: 10.60.1.0/24
+            icon: router
+            children:
+              - id: pe
+                label: Private endpoint
+                sub: 10.60.1.4 to .6
+                icon: cloud/azure/services/private-link.svg
+                detail: 'One NIC with one IP per public name: `.4` cognitiveservices, `.5` openai, `.6` services.ai.
+                  Its zone group writes the A records into the private zones.'
+      - id: azure-dns
+        label: Azure DNS
+        sub: 168.63.129.16
+        icon: cloud/azure/services/dns.svg
+        detail: Answers only from inside Azure, and is the one resolver that sees the private zones linked to the VNet.
+      - id: zones
+        label: Private DNS zones
+        sub: linked to the VNet
+        icon: cloud/azure/services/dns.svg
+        detail: A zone is consulted only for VNets linked to it, however correct its records are.
+        children:
+          - id: zone-cog
+            label: cognitiveservices zone
+            sub: privatelink.… → 10.60.1.4
+            icon: file
+            detail: The first zone the brief asked for.
+          - id: zone-oai
+            label: openai zone
+            sub: privatelink.… → 10.60.1.5
+            icon: file
+            detail: Missing from the brief; added in experiment 4. The DGX saw the private answer only once the
+              cached public answers expired.
+          - id: zone-ai
+            label: services.ai zone
+            sub: privatelink.… → 10.60.1.6
+            icon: file
+            detail: Also added in experiment 4.
+      - id: foundry
+        label: Foundry account
+        sub: AIServices
+        icon: cloud/azure/services/ai-services.svg
+        detail: '`publicNetworkAccess: Disabled`. Reachable by its public names, but only traffic arriving through
+          the private endpoint is let in.'
+        children:
+          - id: foundry-fw
+            label: Network rules
+            sub: public access off
+            icon: shield
+            detail: A call from the internet still resolves and connects, then gets `403 Public access is disabled`.
+          - id: foundry-api
+            label: Data plane
+            sub: cognitiveservices, openai, services.ai
+            icon: cloud/azure/services/openai.svg
+            detail: The API behind the three names. Traffic through the private endpoint is allowed even with
+              public network access disabled.
+
+edges:
+  # DNS
+  - {id: probe_res, from: probe, to: resolved, proto: DNS, port: 53, label: lookup, why: "Before every call: the SDK's lookup goes to systemd-resolved on 127.0.0.53, which decides where to ask."}
+  - {id: res_home, from: resolved, to: home-router, proto: DNS, port: 53, label: other names, why: "Every name that matches no routing domain (and, before split DNS, the Azure AI names too) is asked at the home router."}
+  - {id: res_wg, from: resolved, to: wg0, proto: DNS, port: 53, label: "~openai.azure.com", why: "With split DNS on: the three Azure AI domains are asked at 10.200.0.1, which is only reachable through wg0."}
+  - {id: peer_dns, from: wg-peer, to: dnsmasq, proto: DNS, port: 53, why: "When a DNS query comes out of the tunnel: it is addressed to 10.200.0.1, where dnsmasq listens."}
+  - {id: dns_azure, from: dnsmasq, to: azure-dns, proto: DNS, port: 53, label: forward, why: "For every Azure AI name: dnsmasq's one upstream is Azure DNS, the only resolver that sees the linked zones."}
+  - {id: az_cog, from: azure-dns, to: zone-cog, label: linked, kind: data, why: "When the public CNAME points into privatelink.cognitiveservices.azure.com, the linked zone answers 10.60.1.4."}
+  - {id: az_oai, from: azure-dns, to: zone-oai, label: linked, kind: data, why: "When the public CNAME points into privatelink.openai.azure.com, the linked zone answers 10.60.1.5."}
+  - {id: az_ai, from: azure-dns, to: zone-ai, label: linked, kind: data, why: "When the public CNAME points into privatelink.services.ai.azure.com, the linked zone answers 10.60.1.6."}
+  # The tunnel and the request
+  - {id: probe_wg, from: probe, to: wg0, proto: HTTPS, port: 443, label: to 10.60.1.x, why: "Once the name resolves privately: 10.60.0.0/16 is in AllowedIPs, so the HTTPS connection is routed into wg0."}
+  - {id: wg_nsg, view: [networking, security], main: true, from: wg0, to: nsg, proto: WireGuard, port: 51820, kind: request, label: UDP, why: "Every packet for the VNet (DNS or HTTPS) is wrapped in UDP to the VM's public IP; the NSG lets 51820 in from your home IP only."}
+  - {id: nsg_peer, view: [networking, security], main: true, from: nsg, to: wg-peer, proto: WireGuard, port: 51820, kind: request, why: "Allowed by the NSG: the VM decrypts the packet and sees the original DNS query or TCP connection from 10.200.0.2."}
+  - {id: peer_nat, view: networking, main: true, from: wg-peer, to: nat, proto: TCP, port: 443, kind: request, label: ip_forward, why: "For the HTTPS request: IP forwarding passes the packet from wg0 out of eth0, where MASQUERADE rewrites its source."}
+  - {id: nat_pe, view: networking, main: true, from: nat, to: pe, proto: HTTPS, port: 443, label: src 10.60.2.4, why: "Every forwarded request reaches the private endpoint from 10.60.2.4, an address the VNet already knows how to answer."}
+  - {id: pe_api, from: pe, to: foundry-api, proto: HTTPS, port: 443, label: Private Link, why: "Every call through the endpoint is delivered to the account, which allows it although public access is disabled."}
+  - {id: probe_public, view: security, main: true, from: probe, to: foundry-fw, proto: HTTPS, port: 443, label: over the internet, why: "Before the tunnel and split DNS (and whenever a name still resolves publicly): the call reaches the public endpoint and gets 403."}
+  # Security
+  - {id: you_ssh, view: security, from: you, to: nsg, proto: SSH, port: 22, label: make vm-ssh, why: "Used to check the VM (iptables, dnsmasq, logs): the NSG lets SSH in from your home IP only."}
+  - {id: nsg_ssh, view: security, from: nsg, to: vm, proto: SSH, port: 22, why: "Allowed by the NSG: SSH lands on the VM with the key kept in .state/ssh."}
+  # Observability
+  - {id: probe_otlp, view: observability, main: true, from: probe, to: lgtm-otlp, proto: OTLP/HTTP, port: 14318, label: "metrics, logs, traces", why: "Always on: every probe round's DNS answer, path, HTTP status and spans are exported to the local LGTM."}
+  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTP, port: 3012, why: "Used during every experiment: you watch the azure-pe-lab dashboard react to each change."}
+  - {id: graf_store, view: observability, from: grafana, to: lgtm-otlp, proto: HTTP, label: query, why: "Every dashboard refresh queries Mimir, Loki and Tempo inside the same container."}
+  # Provisioning
+  - {id: you_arm, view: provisioning, from: you, to: arm, proto: HTTPS, port: 443, label: make azure-up, why: "Used to build or delete the lab: make azure-up (and make down) drives everything through the az CLI."}
+  - {id: arm_vnet, view: provisioning, oneway: true, from: arm, to: vnet, kind: control, label: create, why: "During make azure-up: the VNet, both subnets, the NSG, the public IP and the VM are created."}
+  - {id: arm_foundry, view: provisioning, oneway: true, from: arm, to: foundry, kind: control, label: create, why: "During make azure-up: the AIServices account is created with publicNetworkAccess Disabled."}
+  - {id: arm_zones, view: provisioning, oneway: true, from: arm, to: zones, kind: control, label: "create, link", why: "During make azure-up: the private zones are created and linked to the VNet, or Azure DNS never consults them."}
+  - {id: pe_zones, view: provisioning, oneway: true, from: pe, to: zones, kind: control, label: zone group, why: "When the endpoint is created (or recreated): its zone group writes the A records, so nobody edits them by hand."}
+
+scenarios:
+  - id: public
+    title: Call over the internet
+    summary: "Experiment 1: no tunnel, no split DNS. The name resolves publicly and the account says 403."
+    steps:
+      - title: Look up the name
+        action: "pe-probe → systemd-resolved: resolve <account>.openai.azure.com"
+        text: "The SDK needs an IP first. glibc asks systemd-resolved on 127.0.0.53."
+        path: [probe_res]
+      - title: Ask the home router
+        action: "systemd-resolved ↔ home router: no routing domain matches, ask DNS (53)"
+        text: "Without split DNS no link claims the name, so the router's DNS answers: a CNAME through privatelink.* to a public IP."
+        path: [res_home, ~res_home, ~probe_res]
+      - title: Call the public endpoint
+        action: "pe-probe → Foundry: HTTPS 443 to the public IP"
+        text: "DNS worked and the TCP and TLS handshakes succeed. Hover the arrow for both."
+        path: [probe_public]
+      - title: Refused
+        action: "Foundry → pe-probe: 403 Public access is disabled"
+        text: "The account's network rules reject anything that doesn't arrive through its private endpoint."
+        path: [~probe_public]
+        result: fail
+        outcome: "403: public access is disabled"
+
+  - id: private-dns
+    title: Resolve the name privately
+    summary: "Experiment 3: split DNS sends only the Azure AI names through the tunnel to Azure DNS."
+    steps:
+      - title: Look up the name
+        action: "pe-probe → systemd-resolved: resolve <account>.openai.azure.com"
+        text: "The same lookup as before; this time a routing domain on wg0 matches it."
+        path: [probe_res]
+      - title: Route it to wg0
+        action: "systemd-resolved → wg0: ~openai.azure.com matches, ask 10.200.0.1"
+        text: "Only the three Azure AI domains are routed to wg0. github.com still goes to the home router."
+        path: [res_wg]
+      - title: Through the tunnel
+        action: "wg0 → NSG → WireGuard peer: the query in UDP 51820"
+        text: "WireGuard wraps the query in UDP to the VM's public IP; the NSG accepts it from your home IP only."
+        path: [wg_nsg, nsg_peer]
+      - title: dnsmasq picks it up
+        action: "WireGuard peer → dnsmasq: DNS query to 10.200.0.1:53"
+        text: "dnsmasq listens on the VM's tunnel address only."
+        path: [peer_dns]
+      - title: Forward to Azure DNS
+        action: "dnsmasq → Azure DNS 168.63.129.16: forward the query"
+        text: "Azure DNS answers only from inside Azure, and only it sees the zones linked to the VNet."
+        path: [dns_azure]
+      - title: The private zone answers
+        action: "Azure DNS ↔ privatelink.openai.azure.com: 10.60.1.5"
+        text: "The public CNAME points into the privatelink zone; because it is linked, the answer is private."
+        path: [az_oai, ~az_oai]
+      - title: The answer comes back
+        action: "Azure DNS → dnsmasq → tunnel → systemd-resolved → pe-probe: 10.60.1.5"
+        text: "The answer retraces the path through the tunnel to the probe."
+        path: [~dns_azure, ~peer_dns, ~nsg_peer, ~wg_nsg, ~res_wg, ~probe_res]
+        result: success
+        outcome: "10.60.1.5: a private answer"
+
+  - id: private-call
+    title: Call through the private endpoint
+    summary: "With 10.60.1.5 in hand, the HTTPS request takes the tunnel and comes back 200."
+    steps:
+      - title: Into wg0
+        action: "pe-probe → wg0: HTTPS to 10.60.1.5:443"
+        text: "wg-quick routed 10.60.0.0/16 via wg0 (the AllowedIPs); nothing else uses the tunnel."
+        path: [probe_wg]
+      - title: Encrypted to the VM
+        action: "wg0 → NSG → WireGuard peer: UDP 51820"
+        text: "Same tunnel, same UDP port. The VM decrypts a TCP SYN from 10.200.0.2 to 10.60.1.5:443."
+        path: [wg_nsg, nsg_peer]
+      - title: Forward and NAT
+        action: "WireGuard peer → MASQUERADE: ip_forward, source becomes 10.60.2.4"
+        text: "MASQUERADE rewrites the source, so the VNet needs no route back to 10.200.0.0/24."
+        path: [peer_nat]
+      - title: Into the private endpoint
+        action: "MASQUERADE → private endpoint: HTTPS from 10.60.2.4"
+        text: "The private endpoint has one IP per public name: .4 cognitiveservices, .5 openai, .6 services.ai."
+        path: [nat_pe]
+      - title: The account answers
+        action: "Private endpoint ↔ Foundry data plane: the call is allowed"
+        text: "Traffic through the private endpoint is allowed even with public network access disabled."
+        path: [pe_api, ~pe_api]
+      - title: 200 back to the DGX
+        action: "Foundry → endpoint → VM → tunnel → pe-probe: HTTP 200"
+        text: "The reply goes to 10.60.2.4, the VM un-NATs it and sends it back through the tunnel."
+        path: [~nat_pe, ~peer_nat, ~nsg_peer, ~wg_nsg, ~probe_wg]
+        result: success
+        outcome: "HTTP 200 through the private endpoint"
+
+  - id: vm-off
+    title: VM deallocated
+    summary: "Experiment 5: with the VM off the Azure AI names fail instead of falling back to public."
+    steps:
+      - title: Look up the name
+        action: "pe-probe → systemd-resolved: resolve <account>.openai.azure.com"
+        text: "wg0 is still up on the DGX, so the routing domain still matches."
+        path: [probe_res]
+      - title: Still sent to wg0
+        action: "systemd-resolved → wg0: ask 10.200.0.1"
+        text: "systemd-resolved doesn't fall back to the router for a name a link claims."
+        path: [res_wg]
+      - title: Nobody answers
+        action: "wg0 → systemd-resolved → pe-probe: the query times out"
+        text: "The query goes into the tunnel to a VM that is off and nothing comes back: DNS TIMEOUT or SERVFAIL for all three names."
+        path: [~res_wg, ~probe_res]
+        lights: [vm]
+        result: fail
+        at: vm
+        outcome: "DNS TIMEOUT: no fallback to public"
+
+  - id: monitor
+    title: Watch it in Grafana
+    summary: "Every probe round becomes metrics, logs and traces on the local dashboard."
+    steps:
+      - title: Probe exports
+        action: "pe-probe → OTLP receiver: metrics, logs, traces (OTLP/HTTP 14318)"
+        text: "Each round's DNS answer, path, HTTP status and spans are exported to grafana/otel-lgtm."
+        path: [probe_otlp]
+      - title: Open the dashboard
+        action: "You → Grafana: localhost:3012/d/azure-pe-lab"
+        text: "No login: the container runs Grafana with anonymous admin, on the DGX only."
+        path: [you_graf]
+      - title: Query the signals
+        action: "Grafana ↔ Mimir, Loki, Tempo: the dashboard's queries"
+        text: "Name resolves to, HTTP status, the tunnel's health and the probe log."
+        path: [graf_store, ~graf_store, ~you_graf]
+        result: done
+        outcome: "Every DNS answer and status on one dashboard"
+
+  - id: provision
+    title: Build the lab
+    summary: "make azure-up creates every Azure resource with the az CLI in about 10 minutes."
+    steps:
+      - title: Run make azure-up
+        action: "You → Azure Resource Manager: az CLI over HTTPS"
+        text: "One resource group holds everything, so make down can delete it all."
+        path: [you_arm]
+      - title: Network and VM
+        action: "ARM → VNet: VNet, subnets, NSG, public IP and the WireGuard VM"
+        text: "cloud-init on the VM sets up WireGuard, IP forwarding, MASQUERADE and dnsmasq."
+        edges: [arm_vnet]
+      - title: The account
+        action: "ARM → Foundry: AIServices account, public access disabled"
+        text: "From here on, only traffic through the private endpoint is let in."
+        edges: [arm_foundry]
+      - title: Zones and links
+        action: "ARM → Private DNS zones: create the zones and link them to the VNet"
+        text: "A zone with no VNet link is never consulted by Azure DNS."
+        edges: [arm_zones]
+      - title: Records written
+        action: "Private endpoint → zones: the zone group writes the A records"
+        text: "If the endpoint is ever recreated with new IPs, the records follow."
+        edges: [pe_zones]
+      - title: Done
+        action: "Azure Resource Manager → you: make azure-up finishes"
+        text: "About 10 minutes end to end. make probe-up then starts the local Grafana and the probe."
+        path: [~you_arm]
+        result: done
+        outcome: "The lab is built: about $0.75 a day"

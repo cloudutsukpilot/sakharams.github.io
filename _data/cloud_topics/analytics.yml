@@ -1,0 +1,66 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-analytics-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: warehouse
+    title: Data warehouses
+    aws:
+      - ref: Amazon Redshift
+        summary: Columnar MPP data warehouse, available as provisioned RA3 clusters or Redshift Serverless (billed per RPU-hour). Queries data in S3 through Redshift Spectrum, supports zero-ETL integrations from Aurora and DynamoDB, and data sharing across accounts.
+    azure:
+      - ref: Synapse Analytics
+        summary: Dedicated SQL pools (MPP warehouse), serverless SQL over the data lake, Spark pools and pipelines in one workspace. Still supported, but Microsoft's new investment goes to **Microsoft Fabric**, which is the default choice for new analytics platforms on Azure.
+    gcp:
+      - ref: BigQuery
+        summary: Serverless warehouse with no clusters to size; pay per TB scanned or reserve slots. Separation of storage and compute, BigQuery ML for SQL-based models, BI Engine for fast dashboards, and BigLake tables over open formats such as Apache Iceberg.
+
+  - id: spark
+    title: Spark and Hadoop processing
+    aws:
+      - ref: Amazon EMR
+        summary: Managed Spark, Hive, Presto/Trino, Flink and HBase on EC2, EKS or EMR Serverless. Spot-friendly and cost-effective for large batch jobs; the EMR runtime for Spark is tuned for performance on AWS.
+    azure:
+      - ref: Azure Databricks
+        summary: First-party Azure service from Databricks, providing the lakehouse platform with Delta Lake, Unity Catalog, collaborative notebooks, Databricks SQL and MLflow. The most common Spark choice on Azure.
+      - ref: HDInsight
+        summary: Managed open-source clusters (Spark, Hadoop, Kafka, HBase). Still available, but most new Spark work on Azure goes to Databricks or Fabric.
+    gcp:
+      - ref: Dataproc
+        summary: Managed Spark and Hadoop clusters that start in about 90 seconds, plus Serverless for Apache Spark (formerly Dataproc Serverless) for batch and interactive Spark without clusters.
+
+  - id: streaming
+    title: Real-time streaming analytics
+    aws:
+      - ref: Amazon Kinesis
+        summary: Kinesis Data Streams for ingesting and replaying event streams, Amazon Data Firehose for loading streams into S3, Redshift or OpenSearch, and Amazon Managed Service for Apache Flink for stateful stream processing. Amazon MSK offers managed Kafka.
+    azure:
+      - ref: Stream Analytics
+        summary: Serverless stream processing with a SQL-like query language over Event Hubs, IoT Hub or Blob inputs, including windowing and reference-data joins. Outputs to SQL, Cosmos DB, Power BI, Data Lake and more.
+      - ref: Data Explorer
+        summary: Fast analytics on high-volume telemetry, logs and time series with KQL. The same engine powers Log Analytics and Fabric Real-Time Intelligence.
+    gcp:
+      - ref: Dataflow
+        summary: Fully managed Apache Beam runner for unified streaming and batch pipelines, with autoscaling, exactly-once processing and templates for common Pub/Sub-to-BigQuery patterns.
+
+  - id: etl
+    title: ETL and data integration
+    aws:
+      - ref: AWS Glue
+        summary: Serverless Spark-based ETL jobs, crawlers that infer schemas, and the Glue Data Catalog used by Athena, EMR and Redshift Spectrum. Glue DataBrew offers no-code data preparation.
+    azure:
+      - ref: Data Factory
+        summary: Orchestrates data movement and transformation with 90+ connectors, visual data flows and a self-hosted integration runtime for on-premises sources. Data Factory in Microsoft Fabric is its next generation.
+    gcp:
+      - ref: Cloud Data Fusion
+        summary: Visual, code-free pipeline builder based on open-source CDAP, with a large connector library. For orchestration, Google Cloud also offers Cloud Composer (managed Apache Airflow).
+
+  - id: lake
+    title: Data lake storage and interactive query
+    aws:
+      - ref: Amazon Athena
+        summary: Serverless SQL (Trino-based) over data in S3 in Parquet, ORC, JSON, CSV or Iceberg, billed per TB scanned. Pairs with the Glue Data Catalog and Lake Formation for fine-grained access control.
+    azure:
+      - ref: Data Lake Storage
+        summary: Blob Storage with a hierarchical namespace, POSIX-like ACLs and Hadoop-compatible access, used as the lake layer for Synapse, Databricks and HDInsight. Fabric's OneLake builds on the same technology.
+    gcp:
+      - ref: BigQuery
+        name: BigQuery with BigLake
+        summary: BigLake tables let BigQuery query Iceberg, Parquet and other files in Cloud Storage with the same fine-grained security as native tables, and Dataplex governs the lake.

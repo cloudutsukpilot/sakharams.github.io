@@ -1,0 +1,322 @@
+// Project playbooks: the index on /tags/<project>/ (_includes/project-index.html) and the in-post
+// bar (_includes/project-nav.html). Colors derive from Chirpy's theme variables, so light and dark
+// mode both work. The accent is the `projects` entry in .claude/skills/cloudutsuk-image-common/brand.json.
+
+.project-index,
+.project-nav {
+  --proj-accent: #f472b6;
+  --proj-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --proj-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+}
+
+.project-summary {
+  font-size: 1.05rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.project-chip {
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--proj-line);
+  border-radius: 1rem;
+  font-size: 0.85rem;
+}
+
+a.project-chip-link {
+  border-color: var(--proj-accent);
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    background: color-mix(in srgb, var(--proj-accent) 12%, transparent);
+  }
+}
+
+.project-chip-status {
+  border-color: var(--proj-accent);
+  font-weight: 600;
+}
+
+.project-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--proj-line);
+  font-size: 0.9rem;
+}
+
+.project-phase {
+  margin-top: 2rem;
+}
+
+.project-phase-title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.project-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--proj-line);
+  border-top: 3px solid var(--proj-accent);
+  border-radius: 0.6rem;
+  background: var(--proj-card);
+
+  &.is-missing {
+    border-top-color: var(--proj-line);
+    opacity: 0.75;
+  }
+}
+
+.project-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.project-step {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--proj-accent);
+  color: #1f1f1f;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.project-card-title {
+  font-weight: 600;
+  color: var(--heading-color);
+}
+
+.project-card-summary {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+// Chirpy styles `#page-tag ul > li` (and its links) as the roomy tag post list; undo that here.
+#page-tag .project-topics {
+  margin: 0;
+  padding-left: 1.1rem;
+
+  > li {
+    margin: 0;
+    padding: 0.15rem 0;
+    line-height: 1.35;
+    font-size: 0.875rem;
+    list-style: disc;
+
+    &::before {
+      display: none;
+    }
+
+    > a {
+      font-size: inherit;
+    }
+  }
+}
+
+.project-card-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+// Interview Prep tile: one full-width card whose category links flow into columns.
+#page-tag .project-topics.project-topics-cols {
+  columns: 3 16rem;
+  column-gap: 1.5rem;
+  padding-left: 0;
+
+  > li {
+    list-style: none;
+    break-inside: avoid;
+  }
+}
+
+.project-card-pending {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.project-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--proj-line);
+  border-left: 3px solid var(--proj-accent);
+  border-radius: 0.5rem;
+  background: var(--proj-card);
+  font-size: 0.9rem;
+
+  .project-nav-index {
+    font-weight: 600;
+  }
+
+  .project-nav-links {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+  }
+}
+
+// Interview questions post: each question is a <details class="project-iq"> whose <summary> is the question.
+details.project-iq {
+  --proj-accent: #f472b6;
+  --proj-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --proj-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--proj-line);
+  border-left: 3px solid var(--proj-accent);
+  border-radius: 0.5rem;
+  background: var(--proj-card);
+
+  > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--heading-color);
+  }
+
+  &[open] > summary {
+    margin-bottom: 0.6rem;
+  }
+}
+
+// Role-based answers inside an interview question (_includes/project-iq-roles.html).
+// Without JS every .iq-role shows stacked with a label from ::before; with JS one tab shows at a time.
+.iq-role::before {
+  display: block;
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--proj-accent, #f472b6);
+}
+
+details.project-iq.iq-has-tabs:not(.iq-show-all) > .iq-role::before {
+  display: none;
+}
+
+.iq-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--heading-color) 14%, transparent);
+
+  details.iq-show-all & {
+    display: none;
+  }
+}
+
+.iq-tab,
+.iq-filter-btn {
+  padding: 0.2rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--heading-color) 18%, transparent);
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.82rem;
+  line-height: 1.5;
+
+  &:hover {
+    border-color: #f472b6;
+  }
+
+  &.is-active {
+    border-color: #f472b6;
+    background: color-mix(in srgb, #f472b6 16%, transparent);
+    color: var(--heading-color);
+    font-weight: 600;
+  }
+}
+
+.iq-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 1.25rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--heading-color) 14%, transparent);
+  border-radius: 0.5rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.iq-filter-label {
+  margin-right: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.iq-filter-count:not(:empty) {
+  margin-left: 0.2rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+/* Architecture decision records: status badges (ADR post, log table, index tile). */
+.adr-status {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+
+  a { color: inherit; text-decoration: underline; }
+}
+
+.adr-status-accepted { color: #15803d; background: rgba(34, 197, 94, 0.12); }
+.adr-status-proposed { color: #a16207; background: rgba(234, 179, 8, 0.14); }
+.adr-status-deprecated,
+.adr-status-superseded { color: #6b7280; background: rgba(107, 114, 128, 0.12); }
+
+[data-mode='dark'] {
+  .adr-status-accepted { color: #4ade80; }
+  .adr-status-proposed { color: #facc15; }
+  .adr-status-deprecated,
+  .adr-status-superseded { color: #9ca3af; }
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-mode='light']) {
+    .adr-status-accepted { color: #4ade80; }
+    .adr-status-proposed { color: #facc15; }
+    .adr-status-deprecated,
+    .adr-status-superseded { color: #9ca3af; }
+  }
+}
+
+.adr-meta { font-size: 0.85rem; margin-left: 0.35rem; }
+.adr-log td:first-child a { font-variant-numeric: tabular-nums; }
+.adr-tile-counts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.25rem 0 0.5rem; }

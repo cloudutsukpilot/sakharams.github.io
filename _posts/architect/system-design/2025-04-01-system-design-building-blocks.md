@@ -102,6 +102,9 @@ One way to reduce latency is by deploying our service across multiple data cente
 
 This way, users can connect to the nearest server instead of waiting for data to travel across the globe.
 
+{% include flow-anim.html id="architect/system-design/global-latency" %}
+
+
 Once a connection is made, how do clients and servers actually communicate?
 
 6. HTTP/HTTPS
@@ -119,6 +122,9 @@ The server processes the request and responds with an HTTP response—either ret
 HTTP has a major security flaw, it sends data in plain text. This is a serious problem, especially for sensitive information like passwords, credit card details, and personal data.
 
 That’s why modern websites use HTTPS (Hypertext Transfer Protocol Secure) instead. HTTPS encrypts all data using SSL/TLS, ensuring that even if someone intercepts the request, they can’t read or alter it.
+
+{% include flow-anim.html id="architect/system-design/https-handshake" %}
+
 
 But clients and servers don’t directly exchange raw HTTP requests and response.
 
@@ -666,6 +672,9 @@ The client can also send messages instantly to the server.
 
 This enables real-time interactions and eliminates the need for polling.
 
+{% include flow-anim.html id="architect/system-design/websocket-connection" %}
+
+
 To learn more about WebSockets, check out this article:
 
 What are WebSockets and Why are they Used?
@@ -697,6 +706,9 @@ When an event occurs (e.g., user makes a payment), the provider sends an HTTP PO
 Your app processes the incoming request and updates data accordingly.
 
 This saves server resources and reduces unnecessary API calls.
+
+{% include flow-anim.html id="architect/system-design/webhook-delivery" %}
+
 
 26. Microservices
 Traditionally, applications were built using a monolithic architecture, where:
@@ -853,5 +865,8 @@ If yes → It ignores the duplicate request.
 If no → It processes the request normally.
 
 Idempotency prevents duplicate transactions and ensures data consistency in distributed systems.
+
+{% include flow-anim.html id="architect/system-design/idempotency-key" %}
+
 
 https://blog.algomaster.io/p/30-system-design-concepts

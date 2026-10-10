@@ -6,6 +6,7 @@ tags: [Agentic AI, AI Agents, LLM, Frameworks, Observability, Architecture]
 image:
   path: /assets/img/agenticai/agentic-ai-cover.png
   alt: Agentic AI Architecture
+mermaid: true
 ---
 
 > *Having spent years designing and deploying systems — from classic 3 tier systems to multi-model production workloads — the shift to Agentic AI is the most architecturally significant change that we are seeing in the market. It is not just about smarter models; it is about systems that think, plan, delegate, and act with minimal human intervention. This article is my attempt to distill the essence of Agentic AI from an architect's lens.*
@@ -19,12 +20,13 @@ Agentic AI refers to AI systems that can autonomously pursue goals over multiple
 The defining trait of Agentic AI is **agency** — the capacity to make decisions, take initiative, recover from failures, and adapt its strategy without waiting for human instruction at every step.
 
 ```mermaid
+%%{init: {"flowchart": {"useMaxWidth": false}}}%%
 flowchart TD
     Goal["🎯 Goal / User Instruction"] --> Perceive
-    Perceive["👁️ Perceive\n(Gather context, tools, memory)"] --> Reason
-    Reason["🧠 Reason & Plan\n(LLM orchestrator)"] --> Act
-    Act["⚡ Act\n(Call tools, APIs, sub-agents)"] --> Observe
-    Observe["📊 Observe\n(Evaluate output / feedback)"] -->|Goal not met| Reason
+    Perceive["👁️ Perceive<br>(Gather context, tools, memory)"] --> Reason
+    Reason["🧠 Reason & Plan<br>(LLM orchestrator)"] --> Act
+    Act["⚡ Act<br>(Call tools, APIs, sub-agents)"] --> Observe
+    Observe["📊 Observe<br>(Evaluate output / feedback)"] -->|Goal not met| Reason
     Observe -->|Goal met| Done["✅ Task Complete"]
 
     style Goal fill:#4A90D9,color:#fff
@@ -87,10 +89,10 @@ flowchart LR
     subgraph "Agentic AI System"
         direction TB
         UserGoal["Complex Goal"] --> Orch["Orchestrator Agent"]
-        Orch --> AgentA["Agent A\n(Research)"]
-        Orch --> AgentB["Agent B\n(Code Gen)"]
-        Orch --> AgentC["Agent C\n(Validation)"]
-        AgentA --> Memory["Shared Memory\n& Context"]
+        Orch --> AgentA["Agent A<br>(Research)"]
+        Orch --> AgentB["Agent B<br>(Code Gen)"]
+        Orch --> AgentC["Agent C<br>(Validation)"]
+        AgentA --> Memory["Shared Memory<br>& Context"]
         AgentB --> Memory
         AgentC --> Memory
         Memory --> Orch
@@ -118,44 +120,57 @@ flowchart LR
 
 As an architect, choosing the right topology is as important as choosing the right model. Here are the four patterns I use most frequently:
 
+### 1. Sequential Pipeline
+
+Each agent processes and passes output to the next. Great for structured workflows (extract → transform → validate).
+
 ```mermaid
+%%{init: {"flowchart": {"useMaxWidth": false}}}%%
+flowchart LR
+    A1["Agent A"] --> A2["Agent B"] --> A3["Agent C"]
+```
+
+### 2. Hierarchical (Orchestrator–Worker)
+
+An orchestrator delegates to specialised workers. Ideal for complex research or software engineering tasks.
+
+```mermaid
+%%{init: {"flowchart": {"useMaxWidth": false}}}%%
 flowchart TD
-    subgraph P1["1. Sequential Pipeline"]
-        direction LR
-        A1["Agent A"] --> A2["Agent B"] --> A3["Agent C"]
-    end
-
-    subgraph P2["2. Hierarchical (Orchestrator–Worker)"]
-        direction TB
-        O["Orchestrator"] --> W1["Worker 1"]
-        O --> W2["Worker 2"]
-        O --> W3["Worker 3"]
-    end
-
-    subgraph P3["3. Parallel Fan-Out"]
-        direction TB
-        Fanout["Dispatcher"] --> P3A["Agent A"]
-        Fanout --> P3B["Agent B"]
-        Fanout --> P3C["Agent C"]
-        P3A & P3B & P3C --> Agg["Aggregator"]
-    end
-
-    subgraph P4["4. Swarm / Peer-to-Peer"]
-        direction LR
-        S1["Agent"] <--> S2["Agent"]
-        S2 <--> S3["Agent"]
-        S1 <--> S3["Agent"]
-    end
+    O["Orchestrator"] --> W1["Worker 1"]
+    O --> W2["Worker 2"]
+    O --> W3["Worker 3"]
 
     style O fill:#8E44AD,color:#fff
+```
+
+### 3. Parallel Fan-Out
+
+Multiple agents work simultaneously on sub-problems, then results are aggregated. Best for latency-sensitive tasks.
+
+```mermaid
+%%{init: {"flowchart": {"useMaxWidth": false}}}%%
+flowchart TD
+    Fanout["Dispatcher"] --> P3A["Agent A"]
+    Fanout --> P3B["Agent B"]
+    Fanout --> P3C["Agent C"]
+    P3A & P3B & P3C --> Agg["Aggregator"]
+
     style Fanout fill:#E67E22,color:#fff
     style Agg fill:#27AE60,color:#fff
 ```
 
-- **Sequential Pipeline** — Each agent processes and passes output to the next. Great for structured workflows (extract → transform → validate).
-- **Hierarchical** — An orchestrator delegates to specialised workers. Ideal for complex research or software engineering tasks.
-- **Parallel Fan-Out** — Multiple agents work simultaneously on sub-problems, then results are aggregated. Best for latency-sensitive tasks.
-- **Swarm** — Agents communicate peer-to-peer without a central controller. Suited for exploration, brainstorming, and adversarial evaluation.
+### 4. Swarm / Peer-to-Peer
+
+Agents communicate peer-to-peer without a central controller. Suited for exploration, brainstorming, and adversarial evaluation.
+
+```mermaid
+%%{init: {"flowchart": {"useMaxWidth": false}}}%%
+flowchart LR
+    S1["Agent"] <--> S2["Agent"]
+    S2 <--> S3["Agent"]
+    S1 <--> S3
+```
 
 ---
 
@@ -249,10 +264,10 @@ flowchart LR
     Agent["Agentic AI System"] --> Traces
 
     subgraph "Observability Stack"
-        Traces["Traces & Spans\n(LangSmith / Phoenix / Langfuse)"]
-        Evals["Evaluations\n(RAGAS / DeepEval / Braintrust)"]
-        Guardrails["Guardrails\n(Guardrails AI / NeMo)"]
-        Cost["Cost & Latency\n(Helicone / Langfuse)"]
+        Traces["Traces & Spans<br>(LangSmith / Phoenix / Langfuse)"]
+        Evals["Evaluations<br>(RAGAS / DeepEval / Braintrust)"]
+        Guardrails["Guardrails<br>(Guardrails AI / NeMo)"]
+        Cost["Cost & Latency<br>(Helicone / Langfuse)"]
     end
 
     Traces --> Dashboard["📊 Monitoring Dashboard"]

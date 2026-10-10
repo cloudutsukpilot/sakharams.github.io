@@ -1,0 +1,57 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-soap.md
+# (include id: communication/api/soap-request-fault). A SOAP call through a WSDL-generated proxy
+# and WS-Security check, with a SOAP Fault mode.
+title: A SOAP call and a SOAP Fault
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 300]
+modes:
+  - {id: ok, label: "Request is valid"}
+  - {id: fault, label: "Simulate a SOAP Fault"}
+
+nodes:
+  - {id: C, label: "Client app", x: 95, y: 120, w: 130, shape: terminal, icon: user, icon_pos: corner}
+  - {id: P, label: "Generated proxy", sub: "from WSDL", x: 280, y: 120, w: 160, icon: balancer, icon_pos: corner}
+  - {id: H, label: "SOAP endpoint", sub: "HTTP POST", x: 470, y: 120, w: 150, icon: api, icon_pos: corner}
+  - {id: D, label: "WS-Security\nvalid?", x: 665, y: 120, w: 160, h: 96, shape: diamond}
+  - {id: S, label: "Operation", sub: "GetAccountBalance", x: 880, y: 120, w: 170}
+  - {id: F, label: "SOAP Fault", sub: "soap:Sender", x: 665, y: 245, w: 150, h: 50, tone: fail, icon: api}
+
+edges:
+  - {id: CP, from: C, to: P}
+  - {id: PH, from: P, to: H}
+  - {id: HD, from: H, to: D}
+  - {id: DS, from: D, to: S, label: "yes", tone: ok}
+  - {id: SC, from: S, to: C, exit: top, enter: top, offset: 45, tone: ok, label: "200 OK, response Envelope"}
+  - {id: DF, from: D, to: F, label: "no", tone: fail}
+  - {id: FC, from: F, to: C, points: [[590, 245], [95, 245], [95, 148]], tone: fail, label: "500 + Fault element"}
+
+steps:
+  - lights: [C]
+    title: Call a typed method
+    text: The application calls GetAccountBalance(accountId) on a proxy class that a tool generated from the service's WSDL.
+  - edges: [CP]
+    title: Build the envelope
+    text: The proxy serialises the call into an XML Envelope with a Header (security token, addressing) and a Body that matches the XSD types.
+  - edges: [PH]
+    title: POST to the endpoint
+    text: "SOAP 1.2 posts to one URL with Content-Type: application/soap+xml. The HTTP verb carries no meaning; the operation is in the Body."
+  - edges: [HD]
+    title: Check the header
+    text: The server validates the XML against the schema and checks the WS-Security signature, timestamp and token in the Header.
+  - edges: [DS]
+    when: ok
+    title: Run the operation
+    text: The Body is mapped to the GetAccountBalance operation defined in the WSDL portType and executed.
+  - edges: [SC]
+    when: ok
+    title: Response envelope
+    text: The result comes back as another Envelope. The proxy deserialises it into a typed object for the caller.
+  - edges: [DF]
+    when: fault
+    title: Raise a fault
+    text: The signature is invalid, so the server builds a standard Fault element with a code (Client or Sender), a reason and optional detail.
+  - edges: [FC]
+    when: fault
+    title: Fault reaches the client
+    text: The Fault travels back with HTTP 500. Generated proxies turn it into a typed exception, so error handling is part of the contract.

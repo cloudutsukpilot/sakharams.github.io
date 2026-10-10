@@ -1,0 +1,168 @@
+# Expedition Map (/posts/sitemap/map/ and the "Map" tab).
+#
+# Countries are the map's top-level regions. Posts are placed by their `categories:` list:
+# the longest matching prefix in `routes` decides the country (and optionally the state).
+#
+#   routes:
+#     devops: devops              # country only: the next category becomes the state
+#                                 #   [devops, cicd, github-actions] -> DevOps › CI/CD (district: Github Actions)
+#     azure: cloud/azure          # country and state: the next category becomes the district
+#                                 #   [azure, networking] -> Cloud › Microsoft Azure (district: Networking)
+#
+# Keys are lowercase category paths joined with "/". A post whose top category has no route lands
+# in "Uncharted Territory" and test/expedition_map_test.rb fails until you add one.
+# A single post can also be placed explicitly with `map: country/state` in its front matter.
+# Changing this file never changes post URLs.
+
+countries:
+  - id: cloud
+    name: Cloud
+    icon: fas fa-cloud
+    color: "#3b82f6"
+  - id: devops
+    name: DevOps
+    icon: fas fa-infinity
+    color: "#f97316"
+  - id: security
+    name: Security
+    icon: fas fa-shield-halved
+    color: "#ef4444"
+  - id: ai
+    name: AI & ML
+    icon: fas fa-robot
+    color: "#a855f7"
+  - id: architecture
+    name: Architecture
+    icon: fas fa-landmark
+    color: "#14b8a6"
+  - id: infrastructure
+    name: Infrastructure
+    icon: fas fa-server
+    color: "#eab308"
+  - id: programming
+    name: Programming
+    icon: fas fa-code
+    color: "#22c55e"
+  - id: homelab
+    name: Homelab & Projects
+    icon: fas fa-campground
+    color: "#ec4899"
+  - id: career
+    name: Career & Field Notes
+    icon: fas fa-compass
+    color: "#06b6d4"
+
+# Category paths that are not placed on the map at all.
+skip:
+  - sitemap
+
+routes:
+  # Cloud
+  cloud: cloud
+  azure: cloud/azure
+  finops: cloud/finops
+  m365: cloud/m365
+  exchange: cloud/m365
+  # DevOps
+  devops: devops
+  artifacts: devops/artifacts
+  platform engineering: devops/platform-engineering
+  cloud native: devops/cloud-native
+  microservices: devops/microservices
+  # Security
+  cybersecurity: security
+  cybersecurity/cloudsecurity: security/cloud-security
+  cloud/security: security/cloud-security
+  devsecops: security/devsecops
+  iam: security/iam
+  securityarchitect: security/security-architecture
+  # AI & ML
+  artificialintelligence: ai
+  agenticai: ai/agentic-ai
+  mlops: ai/mlops
+  aicodingtools: ai/ai-coding-tools
+  ai coding tools: ai/ai-coding-tools
+  # Architecture
+  architect: architecture
+  comparison: architecture/comparisons
+  communication: architecture
+  # Infrastructure
+  operating systems: infrastructure/operating-systems
+  linuxtools: infrastructure/linux-tools
+  networking: infrastructure/networking
+  virtualization: infrastructure/virtualization
+  databases: infrastructure/databases
+  basics: infrastructure/basics
+  # Programming
+  programming: programming
+  # Homelab & Projects
+  projects: homelab/projects
+  labs: homelab/labs
+  homelab: homelab/homelab
+  website: homelab/website
+  templates: homelab/website
+  # Career & Field Notes
+  devops/interview questions: career/interviews
+  certification: career/certifications
+  interview: career/interviews
+  productivity: career/productivity
+  issues-fixes: career/issues-and-fixes
+
+# Display names for state and district slugs. Anything not listed is title-cased from the
+# category name ("build-tools" -> "Build Tools", "DeepLearning" -> "Deep Learning").
+names:
+  general: General
+  labs: Hands-on Labs
+  azure: Microsoft Azure
+  aws: AWS
+  gcp: Google Cloud
+  m365: Microsoft 365
+  finops: FinOps
+  cicd: CI/CD
+  iac: Infrastructure as Code
+  dac: Diagrams as Code
+  dora: DORA Metrics
+  devops: DevOps
+  devsecops: DevSecOps
+  iam: IAM
+  entraid: Entra ID
+  sso: SSO
+  owasp: OWASP
+  owaspzap: OWASP ZAP
+  sonarqube: SonarQube
+  tfsec: tfsec
+  appscan: AppScan
+  burpsuite: Burp Suite
+  cloudsecurity: Cloud Security
+  webapplicationsecurity: Web App Security
+  operatingsystems: Operating Systems
+  azureai: Azure AI
+  genai: GenAI
+  mlops: MLOps
+  ai: AI
+  ml: ML
+  iot: IoT
+  sentinel: Sentinel
+  defenderforcloud: Defender for Cloud
+  az-cli: Azure CLI
+  api: APIs
+  csharp: C#
+  yaml: YAML
+  wsl: WSL
+  cka: CKA
+  macos: macOS
+  ssl: SSL
+  ssh: SSH
+  mssql: SQL Server
+  postgres: PostgreSQL
+  hyperv: Hyper-V
+  vmware: VMware
+  e-commerce: E-Commerce
+  servicemesh: Service Mesh
+  knowledgegraphs: Knowledge Graphs
+  claude-code: Claude Code
+  ai-coding-tools: AI Coding Tools
+  agentic-ai: Agentic AI
+  issues-and-fixes: Issues & Fixes
+  largelanguagemodel: Large Language Models
+  interactive-guides: Interactive Guides

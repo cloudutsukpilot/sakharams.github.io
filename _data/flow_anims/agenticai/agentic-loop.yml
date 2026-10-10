@@ -1,0 +1,83 @@
+# Post: _posts/agenticai/2026-10-09-ai-agent-architecture.md ("The full flow at a glance")
+# UML sequence diagram of one request through the agentic loop, animated message by message.
+# Heads = participants, thin lanes = lifelines, narrow nodes = activation bars, lanes = loop/alt frames.
+title: The agentic loop as a UML sequence diagram
+accent: "#A855F7"
+accent2: "#84CC16"
+viewbox: [1000, 650]
+
+lanes:
+  # Frames (drawn first so lifelines sit on top)
+  - {label: "loop: until done", x: 150, y: 205, w: 840, h: 360}
+  - {label: "alt: tool needed", x: 164, y: 345, w: 812, h: 125}
+  - {label: "else: complete", x: 164, y: 478, w: 812, h: 75}
+  # Lifelines
+  - {label: "", x: 108, y: 62, w: 4, h: 570}
+  - {label: "", x: 358, y: 62, w: 4, h: 570}
+  - {label: "", x: 638, y: 62, w: 4, h: 570}
+  - {label: "", x: 878, y: 62, w: 4, h: 570}
+
+nodes:
+  # Participants
+  - {id: Uh, label: "User", x: 110, y: 40, w: 120, h: 44, shape: terminal, icon: user}
+  - {id: Ah, label: "Agent", x: 360, y: 40, w: 120, h: 44, icon: server}
+  - {id: Lh, label: "LLM", x: 640, y: 40, w: 120, h: 44, icon: server}
+  - {id: Th, label: "Tools / MCP", x: 880, y: 40, w: 120, h: 44}
+  # Activation bars
+  - {id: U1, label: "", x: 110, y: 115, w: 16, h: 30}
+  - {id: A1, label: "", x: 360, y: 125, w: 16, h: 40}
+  - {id: A2, label: "", x: 360, y: 232, w: 16, h: 44}
+  - {id: L1, label: "", x: 640, y: 255, w: 16, h: 40}
+  - {id: L2, label: "", x: 640, y: 345, w: 16, h: 70}
+  - {id: A3, label: "", x: 360, y: 415, w: 16, h: 90}
+  - {id: T1, label: "", x: 880, y: 410, w: 16, h: 40}
+  - {id: L3, label: "", x: 640, y: 485, w: 16, h: 70}
+  - {id: A4, label: "", x: 360, y: 550, w: 16, h: 100}
+  - {id: U2, label: "", x: 110, y: 595, w: 16, h: 30}
+
+edges:
+  - {id: m1, from: U1, to: A1, points: [[118, 115], [352, 115]], label: "user message"}
+  - {id: m2, from: A1, to: A2, points: [[368, 135], [420, 135], [420, 225], [368, 225]], label: "init with prompt", label_at: [490, 184]}
+  - {id: m3, from: A2, to: L1, points: [[368, 240], [632, 240]], label: "request + prompt + context", label_at: [500, 232]}
+  - {id: m4, from: L1, to: L2, points: [[648, 265], [700, 265], [700, 360], [648, 360]], label: "decide next action", label_at: [775, 318]}
+  - {id: m5, from: L2, to: A3, points: [[632, 375], [368, 375]], dashed: true, label: "tool call request"}
+  - {id: m6, from: A3, to: T1, points: [[368, 400], [872, 400]], label: "execute tool / MCP function", label_at: [760, 392]}
+  - {id: m7, from: T1, to: A3, points: [[872, 425], [368, 425]], dashed: true, label: "result"}
+  - {id: m8, from: A3, to: L3, points: [[368, 455], [632, 455]], label: "tool result + updated context"}
+  - {id: m9, from: L3, to: A4, points: [[632, 515], [368, 515]], dashed: true, tone: ok, label: "final response"}
+  - {id: m10, from: A4, to: U2, points: [[352, 590], [118, 590]], dashed: true, tone: ok, label: "final response"}
+
+steps:
+  - lights: [Uh, Ah, Lh, Th, U1]
+    title: The participants
+    text: 'Four lifelines: User, Agent (your code), LLM (the brain) and Tools/MCP (the hands). The user asks "What is the weather in London today?"'
+  - edges: [m1]
+    title: User message
+    text: The question reaches the agent. It needs live data the model was never trained on.
+  - edges: [m2]
+    title: Initialize with prompt
+    text: The agent builds the request, with the system prompt, the tool schemas (get_current_weather), memory and the user message.
+  - edges: [m3]
+    title: Request + prompt + context
+    text: The agentic loop starts. LLM APIs are stateless, so the full context is sent on every iteration.
+  - edges: [m4]
+    title: Decide next action
+    text: Today's weather can't be in the training data, and a matching tool exists, so the model chooses to call it.
+  - edges: [m5]
+    title: Tool call request
+    text: 'The LLM returns no prose, just get_current_weather({"city": "London"}). It asks; it does not execute.'
+  - edges: [m6]
+    title: Execute tool / MCP function
+    text: The agent validates the arguments, checks policy, then runs the function or sends an MCP tools/call request.
+  - edges: [m7]
+    title: Result
+    text: 'The weather API returns {"temperature_c": 15, "conditions": "Cloudy"} to the agent.'
+  - edges: [m8]
+    title: Loop continues with tool results
+    text: The agent appends the tool call and its result to the history and goes back to the LLM, because raw data is not the answer.
+  - edges: [m9]
+    title: Task complete
+    text: With live data in context and nothing left to look up, the LLM returns plain text. No tool calls means the loop ends.
+  - edges: [m10]
+    title: Final response
+    text: '"It''s currently 15°C and cloudy in London." Two LLM calls, one tool run, one answer.'

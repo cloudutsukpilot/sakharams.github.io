@@ -1,0 +1,107 @@
+{% comment %}
+  Hot topics explorer for the home page (_layouts/home.html): one tab per topic curated in
+  _data/hot_topics.yml, each listing the newest posts from that topic's tags/categories.
+  Tabs are links to their panels, so without JavaScript (assets/js/hot-topics.js) every panel shows.
+{% endcomment %}
+{% assign ht = site.data.hot_topics %}
+{% assign ht_limit = ht.limit | default: 6 %}
+
+<section id="hot-topics" class="hot-topics px-xl-1" aria-labelledby="hot-topics-title">
+  <h2 id="hot-topics-title" class="home-section-title">
+    <i class="fas fa-fire ht-flame" aria-hidden="true"></i> Hot topics
+  </h2>
+
+  <div class="ht-tabs" role="tablist" aria-labelledby="hot-topics-title">
+    {% for topic in ht.topics %}
+      {% assign ht_id = topic.name | slugify | prepend: 'ht-' %}
+      <a
+        class="ht-tab"
+        role="tab"
+        id="{{ ht_id }}-tab"
+        href="#{{ ht_id }}"
+        aria-controls="{{ ht_id }}"
+        aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+      >
+        <i class="{{ topic.icon | default: 'fas fa-hashtag' }} fa-fw" aria-hidden="true"></i>
+        {{- topic.name -}}
+      </a>
+    {% endfor %}
+  </div>
+
+  {% for topic in ht.topics %}
+    {% assign ht_id = topic.name | slugify | prepend: 'ht-' %}
+    {% assign ht_posts = '' | split: '' %}
+    {% for t in topic.tags %}
+      {% if site.tags[t] %}{% assign ht_posts = ht_posts | concat: site.tags[t] %}{% endif %}
+    {% endfor %}
+    {% for c in topic.categories %}
+      {% if site.categories[c] %}{% assign ht_posts = ht_posts | concat: site.categories[c] %}{% endif %}
+    {% endfor %}
+    {% assign ht_posts = ht_posts
+      | uniq
+      | where_exp: 'p', 'p.published != false'
+      | where_exp: 'p', 'p.hidden != true'
+      | sort: 'date'
+      | reverse
+    %}
+
+    {% if topic.link %}
+      {% assign ht_all = topic.link | relative_url %}
+    {% elsif topic.tags.size > 0 %}
+      {% assign ht_all = topic.tags[0] | slugify | url_encode | prepend: '/tags/' | append: '/' | relative_url %}
+    {% else %}
+      {% assign ht_all = topic.categories[0] | slugify | url_encode | prepend: '/categories/' | append: '/' | relative_url %}
+    {% endif %}
+
+    <div class="ht-panel" role="tabpanel" id="{{ ht_id }}" aria-labelledby="{{ ht_id }}-tab" tabindex="0">
+      <div class="ht-panel-head">
+        <p class="ht-blurb">{{ topic.blurb }}</p>
+        <a class="ht-all" href="{{ ht_all }}">
+          View all {{ ht_posts.size }} post{% unless ht_posts.size == 1 %}s{% endunless %}
+          <i class="fas fa-arrow-right fa-fw" aria-hidden="true"></i>
+        </a>
+      </div>
+      <ol class="ht-posts">
+        {% comment %} A lab or project series is listed once, linking to its index page. {% endcomment %}
+        {% assign ht_seen = '|' %}
+        {% assign ht_shown = 0 %}
+        {% for p in ht_posts %}
+          {% if ht_shown >= ht_limit %}{% break %}{% endif %}
+          {% assign ht_series = p.lab | default: p.project %}
+          {% if ht_series %}
+            {% assign ht_key = '|' | append: ht_series | append: '|' %}
+            {% if ht_seen contains ht_key %}{% continue %}{% endif %}
+            {% assign ht_seen = ht_seen | append: ht_series | append: '|' %}
+            {% if p.lab %}
+              {% assign ht_card = site.data.labs[ht_series] %}
+              {% assign ht_kind = 'Lab' %}
+              {% assign ht_parts = site.posts | where: 'lab', ht_series | size %}
+            {% else %}
+              {% assign ht_card = site.data.projects[ht_series] %}
+              {% assign ht_kind = 'Project' %}
+              {% assign ht_parts = site.posts | where: 'project', ht_series | size %}
+            {% endif %}
+          {% endif %}
+          {% assign ht_shown = ht_shown | plus: 1 %}
+          <li style="--i: {{ ht_shown }}">
+            {% if ht_series and ht_card %}
+              <a href="{{ ht_card.tag | slugify | url_encode | prepend: '/tags/' | append: '/' | relative_url }}">
+                {{- ht_card.name -}}
+              </a>
+              <span class="ht-meta">
+                <span class="ht-kind">{{ ht_kind }}</span> {{ ht_parts }} parts &middot; {{ p.date | date: '%b %Y' }}
+              </span>
+            {% else %}
+              <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
+              <span class="ht-meta">
+                {%- if p.categories.size > 0 -%}{{ p.categories | last }} &middot; {% endif -%}
+                {{- p.date | date: '%b %Y' -}}
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+  {% endfor %}
+</section>
+<script defer src="{{ '/assets/js/hot-topics.js' | relative_url }}"></script>

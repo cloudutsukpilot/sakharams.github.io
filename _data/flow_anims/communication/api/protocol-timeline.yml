@@ -1,0 +1,71 @@
+# Animated timeline for _posts/communication/api/2026-10-06-api-communication-protocols.md
+# (include id: communication/api/protocol-timeline). When each protocol or style appeared and
+# what problem pushed it into existence.
+title: A timeline of API and messaging protocols
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 345]
+
+lanes:
+  - {label: "Foundations: documents, RPC and messaging", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Real-time push and contract-first APIs", x: 8, y: 205, w: 984, h: 132}
+
+nodes:
+  - {id: A, label: "HTTP", sub: "1991 · CERN", x: 100, y: 78, w: 130, shape: terminal}
+  - {id: B, label: "XML-RPC, SOAP", sub: "1998 · Microsoft", x: 300, y: 78, w: 150, icon: api, icon_pos: corner}
+  - {id: C, label: "MQTT", sub: "1999 · IBM", x: 500, y: 78, w: 130, icon: queue}
+  - {id: D, label: "REST", sub: "2000 · Fielding", x: 700, y: 78, w: 140, icon: api, icon_pos: corner}
+  - {id: E, label: "AMQP", sub: "2003 · JPMorgan", x: 900, y: 78, w: 140, icon: queue, icon_pos: corner}
+  - {id: F, label: "Comet, SSE", sub: "2006", x: 100, y: 275, w: 130, icon: message, icon_pos: corner}
+  - {id: G, label: "Webhooks", sub: "2007", x: 260, y: 275, w: 130}
+  - {id: H, label: "WebSocket", sub: "2011 · RFC 6455", x: 420, y: 275, w: 140, icon: message, icon_pos: corner}
+  - {id: I, label: "gRPC", sub: "2015 · Google", x: 580, y: 275, w: 130, icon: api, icon_pos: corner}
+  - {id: J, label: "GraphQL", sub: "2015 · Facebook", x: 740, y: 275, w: 140, icon: api, icon_pos: corner}
+  - {id: K, label: "HTTP/3", sub: "2022 · QUIC", x: 900, y: 275, w: 130, shape: terminal}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[900, 106], [900, 165], [14, 165], [14, 275], [35, 275]]}
+  - {id: FG, from: F, to: G}
+  - {id: GH, from: G, to: H}
+  - {id: HI, from: H, to: I}
+  - {id: IJ, from: I, to: J}
+  - {id: JK, from: J, to: K}
+
+steps:
+  - lights: [A]
+    title: 1991, HTTP
+    text: Tim Berners-Lee's HTTP fetches documents with a request and a response. Almost every protocol in this series runs on it or starts from it.
+  - edges: [AB]
+    title: 1998, XML-RPC and SOAP
+    text: Enterprises want to call remote procedures across firewalls and languages, so they wrap calls in XML and send them over HTTP POST.
+  - edges: [BC]
+    title: 1999, MQTT
+    text: IBM and Arcom need a tiny publish/subscribe protocol for oil pipeline sensors on expensive, unreliable satellite links.
+  - edges: [CD]
+    title: 2000, REST
+    text: Roy Fielding's dissertation describes the architecture of the web itself, resources, URLs, verbs and caching, as a style for APIs.
+  - edges: [DE]
+    title: 2003, AMQP
+    text: JPMorgan Chase starts an open, interoperable wire protocol for reliable business messaging to replace proprietary middleware.
+  - edges: [EF]
+    title: 2006, Comet and SSE
+    text: Web apps like chat need server push. Long polling and streaming (Comet) work around HTTP, and Server-Sent Events standardise one-way streams.
+  - edges: [FG]
+    title: 2007, Webhooks
+    text: Jeff Lindsay names the pattern of user-defined HTTP callbacks, so services can notify each other instead of being polled.
+  - edges: [GH]
+    title: 2011, WebSocket
+    text: RFC 6455 gives browsers a real full-duplex connection, ending the Comet workarounds for chat, games and live data.
+  - edges: [HI]
+    title: 2015, gRPC
+    text: Google open-sources the successor of its internal Stubby RPC system, built on HTTP/2 and Protocol Buffers.
+  - edges: [IJ]
+    title: 2015, GraphQL
+    text: Facebook open-sources the query language it built in 2012 for its mobile News Feed, to fetch nested data in one request.
+  - edges: [JK]
+    title: 2022, HTTP/3
+    text: HTTP moves onto QUIC over UDP (RFC 9114), removing TCP head-of-line blocking for every protocol that rides on HTTP.

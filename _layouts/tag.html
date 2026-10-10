@@ -1,0 +1,43 @@
+---
+layout: page
+# The layout for Tag page
+# Override of jekyll-theme-chirpy 7.6.0 `_layouts/tag.html` (the page jekyll-archives builds at /tags/<name>/).
+# Our addition: a tag with a project file at _data/projects/<tag | slugify>.yml shows that project's
+# playbook index (_includes/project-index.html) instead of the plain post list. The tag named in
+# _data/interview_index.yml shows the interview question index (_includes/interview-index.html).
+# A tag with a lab file at _data/labs/<tag | slugify>.yml shows that hands-on lab's index
+# (_includes/lab-index.html). Other tags are unchanged.
+---
+
+{% include lang.html %}
+
+{% assign project_key = page.title | slugify %}
+{% assign project = site.data.projects[project_key] %}
+{% assign lab = site.data.labs[project_key] %}
+{% assign iq = site.data.interview_questions %}
+{% assign iq_config = site.data.interview_index %}
+
+{% if project %}
+  {% include project-index.html %}
+{% elsif lab %}
+  {% include lab-index.html %}
+{% elsif iq and project_key == iq.tag_key %}
+  {% include interview-index.html %}
+{% else %}
+  <div id="page-tag">
+    <h1 class="ps-lg-2">
+      <i class="fa fa-tag fa-fw text-muted"></i>
+      {{ page.title }}
+      <span class="lead text-muted ps-2">{{ page.posts | size }}</span>
+    </h1>
+    <ul class="content ps-0">
+      {% for post in page.posts %}
+        <li class="d-flex justify-content-between px-md-3">
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+          <span class="dash flex-grow-1"></span>
+          {% include datetime.html date=post.date class='text-muted small text-nowrap' lang=lang %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}

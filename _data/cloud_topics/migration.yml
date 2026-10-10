@@ -1,0 +1,54 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-migration-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: discovery
+    title: Discovery and assessment
+    aws:
+      - name: AWS Transform and Migration Evaluator
+        icon: transform
+        summary: AWS Transform uses AI agents to discover and assess VMware estates, plan migration waves and convert network configurations. AWS Migration Evaluator builds the business case and right-sized cost estimate from discovered usage.
+    azure:
+      - ref: Azure Migrate
+        summary: Agentless discovery of VMware, Hyper-V and physical servers, dependency mapping, readiness and right-sized cost assessments for VMs, SQL Server and web apps, and business-case reports, all in one hub.
+    gcp:
+      - name: Migration Center
+        summary: Discovers on-premises and other-cloud assets, estimates Google Cloud costs and total cost of ownership, and plans migration waves, linking into Migrate to Virtual Machines for execution.
+
+  - id: servers
+    title: Server migration (lift and shift)
+    aws:
+      - ref: AWS Application Migration Service
+        summary: Block-level continuous replication of physical, virtual or cloud servers into a staging area, then non-disruptive test launches and a short cutover to EC2. The recommended rehost tool on AWS.
+    azure:
+      - ref: Azure Migrate
+        summary: Azure Migrate's server migration replicates VMware, Hyper-V and physical servers (agentless for VMware and Hyper-V) to Azure VMs, with test migrations and orchestrated cutover.
+    gcp:
+      - ref: Migrate to Virtual Machines
+        summary: Streams VMs from VMware, AWS EC2 and Azure into Compute Engine with test clones, waves and quick cutover. VMs can start running in the cloud before all data has moved.
+
+  - id: databases
+    title: Database migration
+    aws:
+      - ref: AWS Database Migration Service
+        summary: Homogeneous and heterogeneous migrations with continuous replication (CDC) to keep the source live until cutover. DMS Schema Conversion and the Schema Conversion Tool translate schemas and code between engines, for example Oracle to PostgreSQL.
+    azure:
+      - ref: Database Migration Service
+        summary: Online and offline migrations of SQL Server to Azure SQL Database, SQL Managed Instance or SQL Server on VMs, integrated with the Azure SQL Migration extension. Azure Database for PostgreSQL and MySQL have their own migration services.
+    gcp:
+      - ref: Database Migration Service
+        summary: Serverless continuous migrations from MySQL, PostgreSQL, SQL Server and Oracle into Cloud SQL and AlloyDB, with conversion workspaces (Gemini-assisted) for Oracle to PostgreSQL schemas and code.
+
+  - id: transfer
+    title: Bulk and offline data transfer
+    aws:
+      - name: AWS DataSync and Data Transfer Terminal
+        icon: datasync
+        summary: DataSync moves data online from NFS, SMB, HDFS and object stores into S3, EFS or FSx with scheduling and verification. AWS no longer offers Snow Family devices to new customers; for physical transfer it points to Data Transfer Terminal locations and partners.
+    azure:
+      - name: Azure Data Box
+        post: _posts/cloud/azure/storage/2024-06-01-azure-data-box.md
+        icon: data-box
+        summary: Microsoft ships rugged appliances (Data Box and Data Box Disk) for offline transfer of terabytes to petabytes into Azure Storage. Azure Storage Mover and AzCopy cover online transfers.
+    gcp:
+      - name: Storage Transfer Service and Transfer Appliance
+        icon: transfer-appliance
+        summary: Storage Transfer Service moves data online from other clouds, HTTP sources and on-premises file systems into Cloud Storage. Transfer Appliance is Google's shippable device for offline bulk transfer.

@@ -1,0 +1,79 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-05-technical-architecture.md
+# (include id: projects/dunderly/system-architecture). The target (modernized) architecture of the
+# Dunderly HR System: browser, Entra ID, Static Web Apps, one modular ASP.NET Core API, Azure SQL and
+# Blob, the payroll Functions app and the pull-based hand-off to the on-premises payment system.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Dunderly HR System architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 650]
+
+lanes:
+  - { label: "Users and identity", x: 8, y: 8, w: 984, h: 150 }
+  - { label: "Application (Azure, West Europe)", x: 8, y: 180, w: 984, h: 140 }
+  - { label: "Azure data", x: 8, y: 340, w: 984, h: 140 }
+  - { label: "On-premises server farm", x: 8, y: 500, w: 984, h: 140 }
+
+nodes:
+  - { id: USR, label: "Browser", sub: "staff and HR", x: 110, y: 105, shape: terminal, icon: browser }
+  - { id: ENTRA, label: "Entra ID", sub: "SSO, MFA, roles", x: 330, y: 105, icon: "iam/entraid/azuread-18.svg", icon_pos: corner }
+  - { id: SWA, label: "Static Web Apps", sub: "Blazor WASM", x: 560, y: 105 }
+
+  - { id: AI, label: "App Insights", sub: "OpenTelemetry", x: 180, y: 255, icon: chart, icon_pos: corner }
+  - { id: API, label: "HR API", sub: "ASP.NET Core", x: 560, y: 255, icon: api }
+  - { id: FUNC, label: "Payroll\nFunctions", x: 820, y: 255, icon: function }
+
+  - { id: SQL, label: "Azure SQL", x: 360, y: 420, w: 140, h: 62, shape: cylinder, icon: database }
+  - { id: BLOB, label: "Document\nBlob", x: 560, y: 420, w: 140, h: 62, shape: cylinder, icon: bucket }
+  - { id: PAY, label: "Payroll\noutbound", x: 820, y: 420, w: 140, h: 62, shape: cylinder, icon: function }
+
+  - { id: LEG, label: "Payment system", sub: "legacy C++", x: 560, y: 580 }
+  - { id: AGENT, label: "Pickup agent", sub: "AzCopy, Arc MI", x: 820, y: 580, icon: server, icon_pos: corner }
+
+edges:
+  - { id: USRSWA, from: USR, to: SWA, label: "load app", points: [[110, 77], [110, 48], [560, 48], [560, 77]] }
+  - { id: USRENTRA, from: USR, to: ENTRA, label: "sign in" }
+  - { id: SWAAPI, from: SWA, to: API, label: "HTTPS + JWT" }
+  - { id: APISQL, from: API, to: SQL, points: [[520, 283], [520, 370], [360, 370], [360, 389]] }
+  - { id: APIBLOB, from: API, to: BLOB }
+  - { id: APIAI, from: API, to: AI, label: "telemetry", points: [[485, 255], [255, 255]] }
+  - { id: APIFUNC, from: API, to: FUNC, label: "queue" }
+  - { id: FUNCPAY, from: FUNC, to: PAY, label: "write file" }
+  - { id: PAYAGENT, from: PAY, to: AGENT, label: "pull, 443", label_at: [772, 492] }
+  - { id: AGENTLEG, from: AGENT, to: LEG, label: "drop file", points: [[745, 580], [635, 580]] }
+  - { id: AGENTPAY, from: AGENT, to: PAY, label: "receipt", label_at: [928, 500], dashed: true, tone: ok, points: [[880, 552], [880, 451]] }
+
+steps:
+  - lights: [USR]
+    title: Who uses it
+    text: About 250 employees, their managers and HR use one web app, with roughly 10 people active at once. Nobody installs anything.
+  - edges: [USRSWA]
+    title: Load the app
+    text: Azure Static Web Apps serves the Blazor WebAssembly bundle from its edge. Nothing renders on a server, which is what the old View service did.
+  - edges: [USRENTRA]
+    title: Sign in
+    text: Microsoft Entra ID signs the user in with MFA and Conditional Access and issues a token carrying app roles such as Manager or HRManager.
+  - edges: [SWAAPI]
+    title: Call the API
+    text: The app in the browser calls one ASP.NET Core API on App Service with the Entra access token. The API checks the token, the role and the reporting line.
+  - edges: [APISQL, APIBLOB]
+    title: Store and fetch
+    text: Employee, salary and vacation data live in one Azure SQL database; scanned documents go to Blob Storage. Both use private endpoints and managed identity.
+  - edges: [APIAI]
+    title: Observe
+    text: The API and the Functions send traces, logs and metrics to Application Insights through OpenTelemetry. This replaces the custom logging service and its queue.
+  - edges: [APIFUNC]
+    title: Approve payroll
+    text: When HR approves the month's payroll run, the API puts a message on a Storage queue. The Payroll Functions app reads the frozen run from SQL.
+  - edges: [FUNCPAY]
+    title: Write the file
+    text: The Function writes the payroll file plus a manifest (record count, control total, SHA-256) to a locked-down outbound container.
+  - edges: [PAYAGENT]
+    title: Pull, don't push
+    text: A scheduled agent in the server farm pulls the file over HTTPS 443 with an Azure Arc managed identity. No inbound port opens into the data center.
+  - edges: [AGENTLEG]
+    title: Hand off
+    text: The agent verifies the checksum and drops the file into the payment system's input folder, the only interface the legacy C++ system has.
+  - edges: [AGENTPAY]
+    title: Close the loop
+    text: The agent uploads a receipt. If none arrives by the deadline an alert fires, so a missed payroll is caught in hours, not on payday.

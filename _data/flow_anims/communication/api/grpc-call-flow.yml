@@ -1,0 +1,58 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-grpc.md
+# (include id: communication/api/grpc-call-flow). A call through generated stubs over an HTTP/2
+# channel, in unary and server-streaming modes.
+title: A gRPC call through generated stubs
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 210]
+grid: {x0: 100, y0: 70, dx: 200, dy: 0, w: 150, h: 56}
+modes:
+  - {id: unary, label: "Unary call"}
+  - {id: stream, label: "Show server streaming instead"}
+
+nodes:
+  - {id: A, label: "Client code", sub: "stub.GetOrder()", col: 0, row: 0, shape: terminal, icon: user, icon_pos: corner}
+  - {id: CS, label: "Client stub", sub: "protobuf encode", col: 1, row: 0, icon: user, icon_pos: corner}
+  - {id: H, label: "HTTP/2 channel", sub: "TLS, multiplexed", col: 2, row: 0, h: 66, shape: cylinder, icon: cert, icon_pos: corner}
+  - {id: SS, label: "Server stub", sub: "protobuf decode", col: 3, row: 0, icon: server, icon_pos: corner}
+  - {id: S, label: "Service impl", sub: "OrderService", col: 4, row: 0, icon: server, icon_pos: corner}
+
+edges:
+  - {id: ACS, from: A, to: CS}
+  - {id: CSH, from: CS, to: H}
+  - {id: HSS, from: H, to: SS}
+  - {id: SSS, from: SS, to: S}
+  - {id: SA, from: S, to: A, offset: 55, tone: ok, label: "Order message(s), then trailers grpc-status: 0"}
+
+steps:
+  - lights: [A]
+    title: Call a local method
+    text: Client code calls a method on a stub generated from the .proto file, as if it were a local function, with a deadline attached.
+  - edges: [ACS]
+    title: Serialize with protobuf
+    text: The stub encodes the request message to compact binary using the field numbers from the contract.
+  - edges: [CSH]
+    title: Open a stream
+    text: "The call becomes a new HTTP/2 stream: a HEADERS frame with :path /orders.v1.OrderService/GetOrder and content-type application/grpc."
+  - edges: [HSS]
+    title: Send the message
+    text: The request travels as a length-prefixed DATA frame. Many calls share one TCP connection without blocking each other.
+  - edges: [SSS]
+    title: Dispatch to the handler
+    text: The server stub decodes the bytes back into a typed object and invokes the implementation of GetOrder.
+  - edges: [SA]
+    when: unary
+    title: Unary response
+    text: One response message, then trailers carry grpc-status 0 (OK). The client stub decodes it and returns a typed Order.
+  - edges: [SA]
+    when: stream
+    title: First streamed message
+    text: For a server-streaming method such as WatchOrders, the server writes the first message on the same stream.
+  - edges: [SA]
+    when: stream
+    title: More messages
+    text: It keeps writing messages as events happen; the client reads them in a loop. Flow control stops a slow client from being flooded.
+  - edges: [SA]
+    when: stream
+    title: Close with a status
+    text: The server ends the stream with trailers holding grpc-status. Client and bidirectional streaming work the same way in the other direction.

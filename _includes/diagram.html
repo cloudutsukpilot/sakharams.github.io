@@ -1,0 +1,75 @@
+{% comment %}
+  Explorable diagram: levels of detail, expand/collapse, pan and zoom, protocol cards, optional tour.
+  Usage: {% include diagram.html id="projects/cloudutsuk-platform/system-architecture" %}
+  The id is the data file's path under _data/diagrams/ without .yml (folders mirror the post's folders).
+  assets/js/diagram.js draws it (ELK.js is loaded on demand for the layout). The nested list below is the
+  no-JavaScript fallback; the script hides it once the diagram is ready.
+  Keep this file free of blank lines and indentation so kramdown passes it through as one HTML block.
+  Plan and data format: .claude/skills/cloudutsuk-diagram/
+{% endcomment %}
+{%- assign dg = site.data.diagrams -%}
+{%- assign dg_parts = include.id | split: "/" -%}
+{%- for part in dg_parts -%}{%- assign dg = dg[part] -%}{%- endfor -%}
+{%- assign dg_dom_id = include.id | replace: "/", "--" | prepend: "dgm-" -%}
+{%- if dg.nodes %}
+<figure class="dgm" id="{{ dg_dom_id }}" data-icon-base="{{ '/assets/img/icons/' | relative_url }}" style="--dgm-accent: {{ dg.accent | default: '#38BDF8' }}; --dgm-accent2: {{ dg.accent2 | default: '#8B5CF6' }};">
+<div class="dgm-toolbar"></div>
+<div class="dgm-body">
+{%- if dg.scenarios or dg.tour.steps %}
+<nav class="dgm-scenarios" role="tablist" aria-label="Use cases" hidden><span class="dgm-scenarios-head">Use cases</span></nav>
+{%- endif %}
+<div class="dgm-stage" tabindex="0" aria-label="{{ dg.title | escape }}: explorable diagram. Drag to pan, Control plus scroll or pinch to zoom, arrow keys to move.">
+<svg class="dgm-svg" role="img" aria-label="{{ dg.title | escape }}"></svg>
+<div class="dgm-hint" aria-hidden="true">Ctrl + scroll (or pinch) to zoom</div>
+<div class="dgm-card" role="tooltip" hidden></div>
+<aside class="dgm-panel" hidden><button type="button" class="dgm-panel-close" aria-label="Close details"><i class="fas fa-xmark" aria-hidden="true"></i></button><div class="dgm-panel-body"></div></aside>
+<p class="dgm-loading">Laying out the diagram…</p>
+<div class="dgm-banner" role="status" aria-live="polite"></div>
+</div>
+</div>
+<div class="dgm-legend"></div>
+<figcaption class="dgm-caption" aria-live="polite" hidden><span class="dgm-counter"></span> <strong class="dgm-step-title"></strong> <span class="dgm-step-text"></span></figcaption>
+{%- if dg.scenarios or dg.tour.steps %}
+<div class="dgm-controls" hidden>
+<button type="button" class="dgm-btn dgm-btn-primary" data-act="play" aria-label="Play"><i class="fas fa-play" aria-hidden="true"></i></button>
+<button type="button" class="dgm-btn" data-act="prev" aria-label="Previous step"><i class="fas fa-backward-step" aria-hidden="true"></i></button>
+<button type="button" class="dgm-btn" data-act="next" aria-label="Next step"><i class="fas fa-forward-step" aria-hidden="true"></i></button>
+<button type="button" class="dgm-btn" data-act="restart" aria-label="Restart"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+<button type="button" class="dgm-btn" data-act="speed" aria-label="Speed">1&times;</button>
+<div class="dgm-dots" role="group" aria-label="Steps"></div>
+<label class="dgm-toggle-mode" hidden><input type="checkbox" data-act="mode"> <span></span></label>
+</div>
+{%- endif %}
+<div class="dgm-fallback">
+<p><strong>{{ dg.title | escape }}</strong></p>
+<ul>
+{%- for n in dg.nodes %}
+<li><strong>{{ n.label | escape }}</strong>{% if n.sub %} ({{ n.sub | escape }}){% endif %}{% if n.detail %}: {{ n.detail | strip_newlines | escape }}{% endif %}
+{%- if n.children %}<ul>{% for c in n.children %}<li>{{ c.label | escape }}{% if c.sub %} ({{ c.sub | escape }}){% endif %}{% if c.children %}: {% for g in c.children %}{{ g.label | escape }}{% unless forloop.last %}, {% endunless %}{% endfor %}{% endif %}</li>{% endfor %}</ul>{% endif %}</li>
+{%- endfor %}
+</ul>
+{%- for scn in dg.scenarios %}
+<p><strong>{{ scn.title | escape }}</strong>{% if scn.summary %}: {{ scn.summary | escape }}{% endif %}</p>
+<ol>
+{%- for step in scn.steps %}
+<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}</li>
+{%- endfor %}
+</ol>
+{%- endfor %}
+{%- if dg.tour.steps %}
+<ol>
+{%- for step in dg.tour.steps %}
+<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}</li>
+{%- endfor %}
+</ol>
+{%- endif %}
+</div>
+<script type="application/json" class="dgm-data">{{ dg | jsonify | replace: '<', '\u003c' }}</script>
+{%- if dg.map %}{%- assign dg_map = site.data.flow_maps[dg.map.name] | default: site.data.flow_maps.world %}
+<script type="application/json" class="dgm-map-data">{{ dg_map | jsonify }}</script>
+{%- endif %}
+</figure>
+<script defer src="{{ '/assets/js/diagram.js' | relative_url }}"></script>
+{%- else %}
+<p class="prompt-danger">Diagram not found: no data at <code>_data/diagrams/{{ include.id }}.yml</code>.</p>
+{%- endif %}

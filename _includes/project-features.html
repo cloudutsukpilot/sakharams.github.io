@@ -1,0 +1,33 @@
+<!--
+  Feature catalog for a project playbook, from _data/project_features/<project>.yml.
+  Usage in a post:  include project-features.html with project="oneplatform" (Liquid include tag)
+  One table per category (in the data file's `categories` order). A feature with `post` links to its
+  deep-dive. Kept out of _data/projects/ because the Projects tab lists every file there as a project.
+-->
+{% assign pf = site.data.project_features[include.project] %}
+{% if pf %}
+{% assign live = pf.features | where: 'status', 'Live' %}
+<p class="text-muted small">{{ pf.features | size }} features, {{ live | size }} live. "Since" is the month of the first commit on main.</p>
+{% for cat in pf.categories %}
+  {% assign items = pf.features | where: 'category', cat[0] %}
+  {% if items.size > 0 %}
+<h3 id="features-{{ cat[0] }}">{{ cat[1] }} <span class="text-muted small">({{ items | size }})</span></h3>
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Kind</th><th>Since</th><th>Status</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    {% for f in items %}
+    <tr id="feature-{{ f.id }}">
+      <td>{% if f.post %}<a href="{{ f.post | relative_url }}">{{ f.name }}</a>{% else %}{{ f.name }}{% endif %}</td>
+      <td>{{ f.kind }}</td>
+      <td class="text-nowrap">{{ f.shipped }}</td>
+      <td>{{ f.status }}</td>
+      <td>{{ f.summary }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+  {% endif %}
+{% endfor %}
+{% endif %}

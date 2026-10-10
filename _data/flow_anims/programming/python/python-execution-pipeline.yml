@@ -1,0 +1,34 @@
+# Animated flow diagram for _posts/programming/python/2026-10-08-python-at-a-glance.md
+# (include id: programming/python/python-execution-pipeline).
+title: What happens when you run a Python file
+accent: "#FACC15"
+accent2: "#3B82F6"
+viewbox: [1000, 250]
+modes:
+  - { id: first, label: "First run" }
+  - { id: cached, label: "Show a cached import (.pyc already exists)" }
+grid: { x0: 100, y0: 75, dx: 200, dy: 0, w: 150, h: 56 }
+nodes:
+  - { id: S, label: "module.py", sub: "plain text", col: 0, row: 0, shape: terminal }
+  - { id: P, label: "Parse", sub: "tokens + AST", col: 1, row: 0, icon: code }
+  - { id: C, label: "Compile to\nbytecode", col: 2, row: 0, icon: code }
+  - { id: V, label: "Python VM", sub: "eval loop", col: 3, row: 0, icon: "programming/python.svg" }
+  - { id: O, label: "Output", col: 4, row: 0, shape: terminal, tone: ok }
+  - { id: K, label: "__pycache__", sub: "*.pyc", x: 500, y: 200, w: 150, h: 60, shape: cylinder }
+edges:
+  - { id: SP, from: S, to: P }
+  - { id: PC, from: P, to: C }
+  - { id: CV, from: C, to: V }
+  - { id: VO, from: V, to: O }
+  - { id: CK, from: C, to: K, label: "cache", dashed: true }
+  - { id: SK, from: S, to: K, points: [[100, 103], [100, 200], [425, 200]], label: "unchanged?" }
+  - { id: KV, from: K, to: V, points: [[575, 200], [700, 200], [700, 103]], label: "load" }
+steps:
+  - { lights: [S], title: "A plain text file", text: "Your .py file is just text. Nothing is compiled ahead of time and there is no build step you trigger." }
+  - { edges: [SP], when: first, title: "Parse", text: "The interpreter reads the source, tokenises it and builds a syntax tree. Syntax errors surface here, before any line runs." }
+  - { edges: [PC], when: first, title: "Compile to bytecode", text: "The tree is compiled into bytecode: compact, platform-independent instructions for the Python VM, not machine code." }
+  - { edges: [CK], when: first, title: "Cache imported modules", text: "For imported modules, CPython writes the bytecode to __pycache__/*.pyc so the next import can skip parsing and compiling." }
+  - { edges: [SK], when: cached, title: "Source unchanged?", text: "On a later import, Python checks the .pyc against the source's timestamp (or hash). If the source hasn't changed, the cache is valid." }
+  - { edges: [KV], when: cached, title: "Load cached bytecode", text: "The cached bytecode goes straight to the VM. Parsing and compiling are skipped, which is why .pyc files are useful, not clutter." }
+  - { edges: [CV], when: first, title: "Hand off to the VM", text: "The Python virtual machine is part of the interpreter, not a separate install. It executes bytecode one instruction at a time." }
+  - { edges: [VO], title: "Your program runs", text: "Runtime errors such as a NameError only appear when the VM reaches that exact line. That is why tests matter in Python." }

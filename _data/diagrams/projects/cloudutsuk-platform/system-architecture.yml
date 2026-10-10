@@ -1,0 +1,763 @@
+# Pilot of the explorable diagram engine (assets/js/diagram.js; plan in .claude/skills/cloudutsuk-diagram/PLAN.md).
+# Cloudutsuk Platform system architecture, from _posts/projects/cloudutsuk-platform/2026-10-10-05-technical-architecture.md
+# and the flow-anim version (_data/flow_anims/projects/cloudutsuk-platform/system-architecture.yml).
+# Ports: products' defaults where the post names none (Backstage 7007, LiteLLM 4000, vLLM 8000, Qdrant 6333,
+# Redis 6379, Postgres 5432, OTLP gRPC 4317, Kubernetes API 6443, OpenBao 8200). The post says every
+# cross-cluster call is HTTPS on a *.home.cloudutsuk.com certificate, so those arrows carry `tls: true`.
+title: Cloudutsuk Platform system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+level: 1
+levels: [Overview, Clusters, Areas, Services, Components]
+# Tabs at the top centre: cross-cutting connections stay hidden in the main view until their tab is on.
+views:
+  - {id: networking, label: Networking, icon: router}
+  - {id: observability, label: Observability, icon: chart}
+  - {id: security, label: Security, icon: lock}
+  - {id: cicd, label: CI/CD, icon: rocket}
+
+nodes:
+  - id: you
+    label: You
+    sub: browser
+    icon: user
+    detail: You open `portal.cloudutsuk.com` (also `grafana.`, `argocd.` and `phoenix.`). Everything is behind Cloudflare
+      Access and then a second sign-in in each tool.
+  - id: cloudflare
+    label: Cloudflare
+    sub: edge
+    icon: globe
+    color: orange
+    detail: 'Cloudflare Access + Tunnel: SSO with an allowlist, and an outbound-only path to the portal, so no port
+      is open at home.'
+    children:
+    - id: access
+      label: Access
+      sub: SSO + allowlist
+      icon: lock
+      detail: Sits in front of `portal.`, `grafana.`, `argocd.` and `phoenix.cloudutsuk.com`, with Keycloak as its
+        identity provider and an allowlist of my addresses. A direct Google login limited to my own address stays
+        as a **break-glass** route if `core` is down.
+    - id: tunnel
+      label: Tunnel
+      sub: edge side
+      icon: router
+      detail: The Cloudflare side of the tunnel. `cloudflared` (×2, in the platform cluster) dials out to it, so traffic
+        reaches the portal without any inbound port.
+  - id: homelab
+    label: Homelab
+    sub: DGX Spark · k3d
+    direction: down
+    icon: server
+    color: violet
+    detail: Everything runs on the DGX Spark, so hosting costs $0. All clusters are k3d clusters on one Docker network
+      called `homelab`, so they reach each other by name.
+    children:
+    - id: core
+      label: core cluster
+      sub: boots first
+      icon: cluster
+      color: slate
+      detail: Boots first and holds identity (Keycloak), secrets (OpenBao), the registry (Zot) and internal DNS (PowerDNS).
+      children:
+      - id: keycloak
+        label: Keycloak
+        sub: identity
+        icon: lock
+        detail: 'The one identity provider. It holds no accounts of its own: it brokers Google and Entra ID logins
+          and adds groups such as `platform-admins` and `viewers` that map to roles in every tool. Also issues OAuth2
+          client-credential tokens (5-minute JWTs) to services.'
+      - id: openbao
+        label: OpenBao
+        sub: secrets
+        icon: key
+        detail: The only place secrets are stored (open-source fork of Vault). One Kubernetes-auth mount per cluster;
+          each cluster's policy reads only its own paths (`platform/*`, `labs/<slug>/*`, …) plus `shared/*`. Unsealed
+          from a root-only key file on the DGX; nightly encrypted snapshot to R2.
+      - id: zot
+        label: Zot
+        sub: registry
+        icon: package
+        detail: 'The container registry: our signed images, plus a cache of every upstream image the clusters pull.'
+      - id: powerdns
+        label: PowerDNS
+        sub: home zone
+        icon: globe
+        detail: Internal zone `home.cloudutsuk.com`, fed by ExternalDNS in every cluster.
+      - id: core-db
+        label: core-db
+        sub: Postgres
+        icon: databases/postgresql-18.svg
+        detail: 'Keycloak''s realm, users'' links to Google/Entra, groups. **Not rebuildable**: backed up with OpenBao''s
+          snapshot.'
+      - id: core-otel
+        label: OTel collector
+        sub: monitoring pack
+        icon: chart
+        views:
+        - observability
+        detail: The core cluster's collector from the monitoring pack. It picks up Keycloak's events and OpenBao's
+          audit log and forwards them to mon.
+    - id: platform
+      label: platform cluster
+      sub: portal and its data
+      icon: cluster
+      color: indigo
+      detail: The long-lived cluster with the portal and its data stores.
+      children:
+      - id: portal-area
+        label: Portal
+        sub: edge to Backstage
+        icon: browser
+        color: indigo
+        detail: 'The path a browser takes: the tunnel connectors and Backstage with its plugins.'
+        children:
+        - id: cloudflared
+          label: cloudflared ×2
+          sub: tunnel connector
+          icon: router
+          detail: Two `cloudflared` replicas hold the outbound tunnel to Cloudflare and forward requests to Backstage.
+        - id: backstage
+          label: Backstage
+          sub: portal
+          icon: browser
+          detail: 'The `self-service-portal`: inventory and cost, labs, chat, and Argo CD and Kubernetes views. Signs
+            you in again through Keycloak OIDC.'
+          children:
+          - id: inv-plugin
+            label: Inventory plugin
+            icon: chart
+            detail: Shows resources and cost from the inventory service, with Sync now.
+          - id: labs-plugin
+            label: Labs plugin
+            icon: rocket
+            detail: Lab tiles with Deploy and Destroy, backed by the lab runner.
+          - id: chat-plugin
+            label: Chat plugin
+            icon: message
+            detail: Sends questions to the RAG API and shows streamed answers with citations and a View trace link.
+          - id: ops-views
+            label: Argo CD + K8s views
+            icon: cluster
+            detail: 'The Argo CD and Kubernetes plugins: sync state and workloads of every cluster.'
+      - id: platform-services
+        label: Platform services
+        sub: inventory, GitOps, agent
+        icon: gear
+        color: violet
+        detail: 'The services behind the portal: inventory and cost, Argo CD, the SRE agent and External Secrets.'
+        children:
+        - id: inventory
+          label: Inventory
+          sub: CronJob · 6 h
+          icon: chart
+          detail: 'Pulls resources and cost from Azure, AWS, GCP and the DGX into `platform-db.inventory`, every 6
+            hours or on Sync now. Uses read-only identities: Azure Reader + Cost Management Reader; AWS ReadOnly +
+            `ce:Get*`; GCP Viewer + BigQuery Data Viewer.'
+        - id: argocd
+          label: Argo CD
+          sub: hub
+          icon: git
+          color: orange
+          detail: One instance that deploys to every cluster from `homelab-gitops`. An ApplicationSet installs the
+            monitoring pack (OTel collectors, kube-state-metrics, ServiceMonitor discovery) on every cluster, labs
+            included.
+        - id: sre
+          label: SRE agent
+          sub: human in the loop
+          icon: server
+          detail: Alert-triggered diagnosis with human approval before any change. Read-only Kubernetes access on
+            every cluster through short-lived tokens; fixes go out as PRs to `homelab-gitops`. Stays in platform so
+            it can still report when `ai` is down.
+        - id: eso-platform
+          label: External Secrets
+          sub: in every cluster
+          icon: key
+          detail: Every cluster runs the External Secrets Operator. Apps read ordinary Kubernetes Secrets; ExternalSecret
+            objects in `homelab-gitops` say which OpenBao path each comes from.
+      - id: platform-db
+        label: platform-db
+        sub: Postgres
+        icon: databases/postgresql-18.svg
+        detail: 'Databases `backstage`, `inventory`, `labs`, `agent`, one owner role each. **Not rebuildable**: nightly
+          `pg_dump` to R2. Each entity has exactly one service that writes it.'
+        config:
+          title: platform-db.labs (from the data model)
+          lang: text
+          code: 'LAB            slug PK, lab_category, repo_path, memory_gb, ports, uses_cloud, ttl_hours
+
+            CLUSTER        name PK, role (core platform mon ai lab), lab_slug FK, pod_cidr, service_cidr, argocd_registered
+
+            LAB_DEPLOYMENT id PK, lab_slug FK, cluster_name FK, requested_by (Keycloak subject), status, ttl_expires_at,
+            destroyed_at
+
+            LAB_JOB        id PK, deployment_id FK, action (up down status), status, exit_code, log_ref (Loki query)
+
+            '
+      - id: platform-otel
+        label: OTel collector
+        sub: monitoring pack
+        icon: chart
+        views:
+        - observability
+        detail: The platform cluster's collector from the monitoring pack (installed on every cluster by one ApplicationSet).
+      - id: extdns
+        label: ExternalDNS
+        sub: in every cluster
+        icon: globe
+        views:
+        - networking
+        detail: ExternalDNS runs in every cluster and publishes service names into the internal `home.cloudutsuk.com`
+          zone on PowerDNS.
+    - id: ai
+      label: ai cluster
+      sub: GPU
+      icon: cpu
+      color: violet
+      detail: 'The whole AI stack: RAG API and ingest, Qdrant, the Redis cache, Phoenix, the LiteLLM gateway and the
+        vLLM model servers.'
+      children:
+      - id: rag
+        label: RAG
+        sub: chat retrieval
+        icon: search
+        color: violet
+        detail: Chat retrieval with a semantic cache, scheduled indexing of the blog and repos, and its state.
+        children:
+        - id: rag-api
+          label: RAG API
+          sub: rag-api
+          icon: api
+          detail: '`POST /chat` (streamed, with citations), `POST /search`, `POST /reindex`. Consumers: the Backstage
+            chat plugin and the SRE agent.'
+        - id: rag-ingest
+          label: rag-ingest
+          sub: every 6 h
+          icon: function
+          detail: Clones the repos with a read-only token and re-embeds only changed files, every 6 hours or on Re-index
+            now. Only pushed work is indexed.
+        - id: redis
+          label: Redis
+          sub: semantic cache
+          icon: bolt
+          detail: 'Semantic cache entries keyed by the index version (RedisVL `SemanticCache`). Rebuildable: it''s
+            a cache.'
+        - id: qdrant
+          label: Qdrant
+          sub: vectors
+          icon: database
+          detail: Chunks of posts, lab cards and repos with embeddings. Each point carries `source`, `repo`, `lab`,
+            `cloud`, `path` and `commit`, so chat can filter and ingest can delete removed files.
+        - id: ai-db
+          label: ai-db
+          sub: Postgres
+          icon: databases/postgresql-18.svg
+          detail: 'Schemas `rag` (ingest state, chat history) and `phoenix` (traces, evals). Partly rebuildable: `rag`
+            rebuilds from git; chat history and evals are backed up.'
+      - id: serving
+        label: Model serving
+        sub: LiteLLM + vLLM
+        icon: balancer
+        color: teal
+        detail: One OpenAI-compatible gateway in front of the local chat and embedding models.
+        children:
+        - id: gateway
+          label: Model gateway
+          sub: LiteLLM
+          icon: balancer
+          detail: 'The one OpenAI-compatible endpoint for every model call (`/v1/chat/completions`, `/v1/embeddings`):
+            routing by model name, queueing, limits, token counts, later overflow.'
+        - id: vllm-chat
+          label: vLLM chat
+          sub: local model
+          icon: message
+          detail: The local chat model on the GB10 GPU, with its own memory slice.
+        - id: vllm-embed
+          label: vLLM embed
+          sub: embeddings
+          icon: cpu
+          detail: The embedding model, with its own memory slice.
+      - id: phoenix
+        label: Phoenix
+        sub: RAG traces
+        icon: chart
+        detail: 'Arize Phoenix shows every chat and agent request as a trace: retrieved chunks and scores, prompt,
+          tokens, latency per step. Where answer quality is investigated.'
+      - id: ai-otel
+        label: OTel collector
+        sub: monitoring pack
+        icon: chart
+        views:
+        - observability
+        detail: 'The ai cluster''s collector: GPU, vLLM, gateway and RAG telemetry, and the RAG traces that also go
+          to Phoenix.'
+      - id: eso-ai
+        label: External Secrets
+        sub: ai cluster
+        icon: key
+        views:
+        - security
+        detail: 'The ai cluster''s External Secrets Operator: LiteLLM keys and database passwords come from OpenBao
+          through its own Kubernetes-auth mount.'
+    - id: mon
+      label: mon cluster
+      sub: observability
+      icon: chart
+      color: green
+      detail: OpenTelemetry gateway, Grafana LGTM and Alertmanager, with ready-made dashboards for the fleet, Kubernetes,
+        data stores, AI serving and the platform.
+      children:
+      - id: otel-gw
+        label: OTel gateway
+        sub: collector
+        icon: chart
+        detail: Receives traces, metrics and logs from every cluster's collector.
+      - id: lgtm
+        label: Grafana LGTM
+        sub: ~15 days
+        icon: devops/monitoring/grafana-18.svg
+        detail: 'Where the platform is operated: every dashboard and alert for the GPU, vLLM''s queue and time to
+          first token, the gateway, cache hit rate and ingest lag. Data is kept about 15 days (accepted loss).'
+        children:
+        - id: grafana
+          label: Grafana
+          icon: devops/monitoring/grafana-18.svg
+          detail: Dashboards and alert rules; signs you in through Keycloak OIDC.
+        - id: mimir
+          label: Mimir
+          sub: metrics
+          icon: chart
+          detail: Metrics store.
+        - id: loki
+          label: Loki
+          sub: logs
+          icon: devops/monitoring/loki-18.svg
+          detail: Logs, including Keycloak events and OpenBao's audit log.
+        - id: tempo
+          label: Tempo
+          sub: traces
+          icon: chart
+          detail: Traces; the same trace ID links a slow request in Grafana to its readable version in Phoenix.
+      - id: alertmanager
+        label: Alertmanager
+        sub: alerts
+        icon: bell
+        detail: Calls the SRE agent's `/alerts` webhook with the cluster, namespace and pod labels.
+    - id: labs
+      label: Lab clusters
+      sub: one per lab
+      icon: cluster
+      color: teal
+      detail: Disposable k3d clusters, one per lab, created by the lab runner and registered with Argo CD.
+      children:
+      - id: lab-app
+        label: Lab app
+        icon: server
+        detail: The lab's own application, from its repo.
+      - id: lab-otel
+        label: OTel collector
+        sub: monitoring pack
+        icon: chart
+        detail: Installed by Argo CD's ApplicationSet; sends traces, metrics and logs to the mon cluster.
+    - id: cicd
+      label: CI/CD
+      sub: on the DGX
+      icon: git
+      color: orange
+      detail: 'Self-hosted GitHub Actions runners (ARC) and BuildKit: tests and scans, then a signed image and a digest
+        commit.'
+      children:
+      - id: arc
+        label: ARC runners
+        sub: tests, scans
+        icon: devops/cicd/githubactions-18.svg
+        detail: Poll GitHub for jobs (no inbound). Tests run, then Gitleaks, Semgrep, Trivy and Checkov must pass.
+          Log in to OpenBao with GitHub OIDC, so nothing is stored as a GitHub secret.
+      - id: buildkit
+        label: BuildKit
+        sub: SBOM, Cosign
+        icon: package
+        detail: Builds the image; Trivy scans it, Syft adds an SBOM, Cosign signs it, and it is pushed to Zot. Kyverno
+          only admits signed images.
+    - id: runner
+      label: Lab runner
+      sub: systemd on host
+      icon: terminal
+      color: amber
+      detail: Runs a lab's `make up` / `make down` after checking the memory budget and taking a per-lab lock, then
+        registers the cluster with Argo CD. Uses an OpenBao agent with AppRole.
+  - id: clouds
+    label: Clouds
+    sub: read-only
+    icon: cloud
+    detail: Read only by the inventory service, with credentials rotated every 90 days.
+    children:
+    - id: azure
+      label: Azure
+      icon: cloud/azure/azure-18.svg
+      detail: Azure Resource Graph and Cost Management.
+    - id: aws
+      label: AWS
+      icon: cloud/aws/amazonwebservices-18.svg
+      detail: AWS Resource Explorer and Cost Explorer.
+    - id: gcp
+      label: GCP
+      icon: cloud/gcp/googlecloudplatform-18.svg
+      detail: Cloud Asset Inventory and the BigQuery billing export.
+  - id: github
+    label: GitHub
+    sub: repos
+    icon: devops/cicd/github-18.svg
+    detail: Source of truth for code and deployments.
+    children:
+    - id: repos
+      label: Blog + repos
+      sub: content
+      icon: devops/cicd/github-18.svg
+      detail: 'This blog, the lab repos and the `infra-*` repos: what rag-ingest indexes.'
+    - id: gitops
+      label: homelab-gitops
+      sub: desired state
+      icon: git
+      detail: Argo CD app-of-apps, Helm values, image digests, ADRs. Every change is a reviewed commit.
+  - id: slack
+    label: Slack
+    sub: approvals
+    icon: message
+    detail: Where the SRE agent posts its root cause and proposed fix, with approve / reject buttons.
+  - id: more
+    label: More capacity
+    sub: later
+    icon: cpu
+    tone: warn
+    detail: One GB10 can't scale out. When the queue stays long, a second machine or a hosted model is added behind
+      the gateway, with no change to its callers.
+
+edges:
+  - {id: u_cf, view: networking, main: true, from: you, to: access, proto: HTTPS, port: 443, label: SSO, why: "Every visit to the portal starts here: Cloudflare Access checks who you are before anything at home is reached."}
+  - {id: access_kc, view: security, main: true, from: access, to: keycloak, proto: OIDC, tls: true, detail: "Keycloak is Cloudflare Access's identity provider; it brokers your Google or Entra ID login.", why: "Used at sign-in: Access hands the login to Keycloak, which brokers your Google or Entra ID account and checks the allowlist."}
+  - {id: access_tun, view: networking, main: true, from: access, to: tunnel, label: authorized, kind: control, why: "Used after a successful sign-in at the edge: Access passes the authorized request to the tunnel that leads home."}
+  - {id: cf_tun, view: networking, main: true, from: tunnel, to: cloudflared, label: outbound tunnel, kind: control, detail: "cloudflared dials out; requests come back down the same connection.", why: "Carries every portal request home. cloudflared dials out to Cloudflare, so no inbound port is open on the DGX."}
+  - {id: cf_bs, view: networking, main: true, from: cloudflared, to: backstage, proto: HTTP, port: 7007, why: "Every request that passed Cloudflare Access is forwarded from the tunnel connector to Backstage."}
+  - {id: bs_kc, view: security, main: true, from: backstage, to: keycloak, proto: OIDC, tls: true, detail: "Every tool signs you in again through Keycloak OIDC; roles come from groups.", why: "Used when you sign in to Backstage: a second sign-in maps your Keycloak groups to roles, so one bad edge policy can't expose the portal."}
+  - {id: bs_inv, from: inv-plugin, to: inventory, proto: HTTP, detail: "OAuth2 client credentials from Keycloak (5-minute JWTs).", why: "Used when you open the Inventory page or press Sync now: the plugin reads resources and cost from the inventory service."}
+  - {id: inv_cl, from: inventory, to: clouds, proto: HTTPS, port: 443, label: every 6 h, why: "Runs every 6 hours (or on Sync now) to pull resources and cost from the cloud APIs with read-only credentials."}
+  - {id: inv_pg, from: inventory, to: platform-db, proto: PostgreSQL, port: 5432, why: "After each sync the inventory writes resources and daily cost to its own database, so the portal shows history without calling the clouds."}
+  - {id: eso_bao, view: security, from: eso-platform, to: openbao, proto: HTTPS, port: 8200, dashed: true, detail: "Per-cluster Kubernetes auth; the cluster's policy reads only its own paths.", why: "Used whenever the platform cluster needs a secret (cloud credentials, OAuth clients, passwords): External Secrets copies it from OpenBao."}
+  - {id: kc_db, view: security, main: true, from: keycloak, to: core-db, proto: PostgreSQL, port: 5432, why: "Keycloak keeps its realm, groups and your Google/Entra links here, and reads them on every sign-in."}
+  - {id: bs_run, from: labs-plugin, to: runner, proto: HTTP, why: "Used when you click Deploy or Destroy on a lab tile: the Labs plugin asks the lab runner to do it."}
+  - {id: run_labs, oneway: true, from: runner, to: labs, label: make up, kind: control, why: "Used when a lab is deployed: the runner runs the lab's make up, which creates the lab's k3d cluster."}
+  - {id: run_argo, from: runner, to: argocd, proto: HTTPS, label: register, why: "Used right after a lab cluster is created: the runner registers it with Argo CD so GitOps can deploy to it and keep it in sync."}
+  - {id: argo_git, view: cicd, main: true, from: argocd, to: gitops, proto: HTTPS, port: 443, label: sync, why: "Argo CD watches homelab-gitops all the time; every merged change (a new image digest, an approved fix) is synced from here."}
+  - {id: argo_labs, view: cicd, main: true, from: argocd, to: lab-otel, proto: HTTPS, port: 6443, detail: "Kubernetes API, with a per-cluster ServiceAccount token refreshed from OpenBao.", why: "Used when a cluster is registered or homelab-gitops changes: Argo CD applies the monitoring pack and apps through the cluster's Kubernetes API."}
+  - {id: you_push, view: cicd, from: you, to: repos, proto: HTTPS, port: 443, label: git push, why: "Every release starts here: you push a commit (or merge a pull request), and GitHub queues the CI workflow."}
+  - {id: argo_platform, view: cicd, from: argocd, to: portal-area, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the changed manifests (here the portal's) through the Kubernetes API, so the new image rolls out."}
+  - {id: argo_ai, view: cicd, from: argocd, to: ai, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the ai cluster's changed manifests (RAG, gateway, model serving) through its Kubernetes API."}
+  - {id: labs_mon, main: true, view: observability, from: lab-otel, to: otel-gw, proto: OTLP gRPC, port: 4317, tls: true, why: "Always on: the lab's collector streams traces, metrics and logs to the mon cluster, so every lab can be observed."}
+  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTPS, port: 443, label: "grafana.cloudutsuk.com", detail: "Behind Cloudflare Access, then Grafana's own Keycloak sign-in.", why: "Used when you open Grafana to look at a dashboard or an alert."}
+  - {id: bs_rag, from: chat-plugin, to: rag-api, proto: HTTPS, label: chat, why: "Used every time you ask the chatbot a question in the portal."}
+  - {id: rag_cache, from: rag-api, to: redis, proto: Redis, port: 6379, why: "First step of every chat request: an answer to a similar earlier question is returned straight from the cache."}
+  - {id: rag_qd, from: rag-api, to: qdrant, proto: Qdrant, port: 6333, why: "On a cache miss, the RAG API retrieves the most relevant chunks of posts and repos to ground the answer."}
+  - {id: rag_gw, from: rag-api, to: gateway, proto: HTTP, port: 4000, why: "On a cache miss, the prompt with the retrieved chunks goes to the model through the single gateway."}
+  - {id: rag_px, main: true, view: observability, from: rag-api, to: phoenix, proto: OTLP gRPC, port: 4317, label: traces, why: "Every chat request is traced, so a wrong answer can be investigated step by step in Phoenix."}
+  - {id: rag_db, from: rag-api, to: ai-db, proto: PostgreSQL, port: 5432, why: "Stores the RAG service's ingest state and chat history."}
+  - {id: gw_llm, from: gateway, to: vllm-chat, proto: HTTP, port: 8000, why: "Every chat completion, from the portal chat or the SRE agent, is routed here by model name."}
+  - {id: gw_emb, from: gateway, to: vllm-embed, proto: HTTP, port: 8000, why: "Every embedding request (ingest, and question vectors for the cache and retrieval) is routed here."}
+  - {id: gw_more, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers."}
+  - {id: ing_gh, oneway: true, from: repos, to: rag-ingest, proto: HTTPS, port: 443, label: clone, why: "Every 6 hours (or on Re-index now) rag-ingest pulls the latest pushed content of the blog and repos."}
+  - {id: ing_qd, from: rag-ingest, to: qdrant, proto: Qdrant, port: 6333, why: "After embedding, new and changed chunks are written to Qdrant and the chunks of removed files deleted."}
+  - {id: ing_gw, from: rag-ingest, to: gateway, proto: HTTP, port: 4000, label: embeddings, why: "Changed files are embedded through the gateway before they are stored."}
+  - {id: mon_sre, view: observability, main: true, from: alertmanager, to: sre, proto: Webhook, tls: true, label: alert, why: "Used when an alert fires: Alertmanager hands it to the SRE agent for diagnosis."}
+  - {id: sre_labs, from: sre, to: lab-app, proto: HTTPS, port: 6443, dashed: true, label: read-only, detail: "15-minute read-only ServiceAccount tokens from OpenBao's Kubernetes secrets engine.", why: "During an investigation the agent reads the affected cluster's pods, events and logs, read-only."}
+  - {id: sre_rag, from: sre, to: rag-api, proto: HTTPS, label: runbooks, why: "During an investigation the agent searches the knowledge base for matching runbooks."}
+  - {id: sre_gw, from: sre, to: gateway, proto: HTTPS, label: root cause, why: "The agent asks the local model for a root cause and a proposed fix."}
+  - {id: sre_slack, oneway: true, from: sre, to: slack, proto: HTTPS, port: 443, label: RCA, why: "When the diagnosis is done, the agent posts the root cause and fix to Slack for your approval."}
+  - {id: slack_git, oneway: true, from: slack, to: gitops, label: approve → PR, kind: control, why: "Used when you approve a fix: it is opened as a pull request to homelab-gitops, so nothing changes without review."}
+  - {id: ci_gh, view: cicd, main: true, from: arc, to: github, proto: HTTPS, port: 443, label: poll jobs, why: "Always polling: the runners ask GitHub for queued jobs, so no inbound connection is needed."}
+  - {id: ci_bao, view: [security, cicd], from: arc, to: openbao, proto: OIDC, tls: true, label: GitHub OIDC, why: "At the start of a CI job the runner logs in to OpenBao with GitHub OIDC to get short-lived secrets."}
+  - {id: ci_bk, view: cicd, main: true, oneway: true, from: arc, to: buildkit, label: gates pass, kind: control, why: "Used when tests and security gates pass: the job hands over to BuildKit to build the image."}
+  - {id: bk_zot, view: cicd, main: true, from: buildkit, to: zot, proto: HTTPS, label: signed image, why: "After a successful build, the signed image and its SBOM are pushed to the registry."}
+  - {id: bk_git, view: cicd, main: true, oneway: true, from: buildkit, to: gitops, proto: HTTPS, port: 443, label: digest commit, why: "After the push, the new image digest is committed to homelab-gitops so Argo CD deploys it."}
+  - {id: gw_logs, main: true, from: otel-gw, to: loki, view: observability, kind: telemetry, label: logs, why: "Always on: logs from every cluster (including Keycloak events and OpenBao's audit log) are written to Loki."}
+  - {id: gw_metrics, main: true, from: otel-gw, to: mimir, view: observability, kind: telemetry, label: metrics, why: "Always on: metrics from every cluster are written to Mimir for dashboards and alert rules."}
+  - {id: gw_traces, main: true, from: otel-gw, to: tempo, view: observability, kind: telemetry, label: traces, why: "Always on: traces from every cluster are written to Tempo; one trace ID links Grafana to Phoenix."}
+  - {id: kc_logs, from: keycloak, to: core-otel, view: observability, kind: telemetry, label: events, why: "Always on: Keycloak's sign-in and admin events are collected, so every login can be audited in Loki."}
+  - {id: bao_audit, from: openbao, to: core-otel, view: observability, kind: telemetry, label: audit log, why: "Always on: OpenBao's audit log of every secret read is collected and kept in Loki."}
+  - {id: core_otel, from: core-otel, to: otel-gw, view: observability, proto: OTLP gRPC, port: 4317, tls: true, why: "Always on: the core cluster's collector forwards its logs, metrics and traces to mon like every other cluster."}
+  - {id: platform_otel, from: platform-otel, to: otel-gw, view: observability, proto: OTLP gRPC, port: 4317, tls: true, why: "Always on: the platform cluster's telemetry (portal, inventory, agent) streams to mon."}
+  - {id: ai_otel, from: ai-otel, to: otel-gw, view: observability, proto: OTLP gRPC, port: 4317, tls: true, why: "Always on: GPU, vLLM queue, gateway and cache telemetry streams to mon for the AI dashboards."}
+  - {id: eso_ai_bao, from: eso-ai, to: openbao, view: security, proto: HTTPS, port: 8200, dashed: true, why: "Used when the ai cluster needs a secret (LiteLLM keys, database passwords); it can read only its own OpenBao paths."}
+  - {id: argo_bao, from: argocd, to: openbao, view: security, proto: HTTPS, port: 8200, label: cluster tokens, why: "Argo CD's per-cluster ServiceAccount tokens are refreshed from OpenBao, so no long-lived cluster token is stored."}
+  - {id: sre_bao, from: sre, to: openbao, view: security, proto: HTTPS, port: 8200, label: 15-min tokens, why: "Before reading a cluster, the agent gets a 15-minute read-only token from OpenBao's Kubernetes secrets engine."}
+  - {id: run_bao, from: runner, to: openbao, view: security, proto: HTTPS, port: 8200, label: AppRole, why: "The lab runner reads per-lab deploy credentials through an OpenBao agent with AppRole, and creates each lab's mount and policy."}
+  - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
+  - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
+  - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's cache."}
+  - {id: pull_labs, from: labs, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Lab clusters also pull through Zot, so labs keep working when an upstream registry is slow or rate-limited."}
+
+# Use cases: one activity each, one action per step (the reader picks one; auto-play runs them in turn).
+# `path` hops run one after another; `~id` is the response travelling back. `action` is the banner line;
+# `result` (success / done / fail) celebrates the outcome at the last hop's target.
+scenarios:
+  - id: login
+    title: Sign in to the portal
+    summary: "How a browser reaches the portal: two sign-ins, no open port at home."
+    steps:
+      - title: You open the portal
+        action: "Browser opens portal.cloudutsuk.com"
+        text: "You browse to portal.cloudutsuk.com. The core cluster booted first, so Keycloak is ready."
+        lights: [you]
+      - title: HTTPS to Cloudflare
+        action: "Browser → Cloudflare Access: GET / over HTTPS (443)"
+        text: "The request reaches Cloudflare Access over HTTPS on 443. Hover the arrow for the TCP and TLS handshakes."
+        edges: [u_cf]
+      - title: Access asks Keycloak
+        action: "Cloudflare Access → Keycloak: start the OIDC login"
+        text: "Access uses Keycloak as its identity provider; Keycloak brokers your Google or Entra ID login and checks the allowlist."
+        edges: [access_kc]
+      - title: Look up your account
+        action: "Keycloak ↔ core-db: read your account and groups"
+        text: "Keycloak reads its realm, your Google/Entra link and your groups from core-db, and gets them back."
+        path: [kc_db, ~kc_db]
+      - title: Tokens back to Access
+        action: "Keycloak → Cloudflare Access: login OK, tokens issued"
+        text: "Keycloak returns signed tokens to Access; your address is on the allowlist, so the edge lets you through."
+        path: [~access_kc]
+      - title: Down the tunnel
+        action: "Access → Tunnel → cloudflared → Backstage: forward the request home"
+        text: "Access hands the authorized request to the tunnel, which carries it down the outbound-only connection to cloudflared and on to Backstage (7007)."
+        path: [access_tun, cf_tun, cf_bs]
+      - title: Signed in again
+        action: "Backstage ↔ Keycloak: second sign-in (OIDC)"
+        text: "Backstage signs you in a second time through Keycloak and maps your groups to roles, so one bad edge policy can't expose it."
+        path: [bs_kc, ~bs_kc]
+      - title: Portal page returns
+        action: "Backstage → tunnel → Cloudflare → browser: the portal page"
+        text: "The portal page travels back the same way: through the tunnel, the edge and HTTPS to your browser."
+        path: [~cf_bs, ~cf_tun, ~access_tun, ~u_cf]
+        result: success
+        outcome: "Signed in to the portal"
+
+  - id: inventory
+    title: Resources and cost
+    summary: "How the inventory collects cloud resources and cost, and how you see them."
+    steps:
+      - title: Credentials from OpenBao
+        action: "External Secrets ↔ OpenBao: fetch read-only cloud credentials"
+        text: "External Secrets fetches the read-only cloud credentials from OpenBao (8200); no secret lives in git."
+        path: [eso_bao, ~eso_bao]
+      - title: Read the clouds
+        action: "Inventory ↔ Azure, AWS, GCP APIs: list resources and cost"
+        text: "Every 6 hours (or on Sync now) the inventory calls the cloud APIs over HTTPS and gets resources and cost back."
+        path: [inv_cl, ~inv_cl]
+      - title: Store the results
+        action: "Inventory → platform-db: write resources and daily cost"
+        text: "Resources and daily cost go into platform-db.inventory (PostgreSQL, 5432), grouped by lab and repo tags."
+        path: [inv_pg, ~inv_pg]
+      - title: You look at cost
+        action: "Inventory plugin ↔ inventory: show cost per lab"
+        text: "The Inventory plugin in Backstage calls the inventory service and renders resources and cost per lab."
+        path: [bs_inv, ~bs_inv]
+        result: success
+        outcome: "Cost per lab shown"
+
+  - id: deploy-lab
+    title: Deploy a lab
+    summary: "One click on a lab tile creates a cluster and wires it into GitOps and monitoring."
+    steps:
+      - title: Deploy clicked
+        action: "Labs plugin → lab runner: deploy this lab"
+        text: "The Labs plugin asks the lab runner to deploy; it checks the memory budget and takes a per-lab lock."
+        edges: [bs_run]
+      - title: Cluster created
+        action: "Lab runner → k3d: make up creates the lab cluster"
+        text: "The runner runs the lab's make up, which creates a new k3d cluster."
+        edges: [run_labs]
+      - title: Registered with Argo CD
+        action: "Lab runner ↔ Argo CD: register the new cluster"
+        text: "The runner registers the new cluster with the central Argo CD and gets a confirmation."
+        path: [run_argo, ~run_argo]
+      - title: Monitoring installed
+        action: "Argo CD → lab cluster: install the monitoring pack (6443)"
+        text: "Argo CD's ApplicationSet installs the monitoring pack through the cluster's Kubernetes API (6443)."
+        path: [argo_labs, ~argo_labs]
+      - title: Lab ready
+        action: "Lab runner → Labs plugin: deployment finished"
+        text: "The runner reports the deployment as ready; the lab tile shows its links."
+        path: [~bs_run]
+        result: success
+        outcome: "Lab deployed"
+
+  - id: monitoring
+    title: Monitor a lab
+    summary: "Telemetry streams from every cluster into the mon cluster, where you read it in Grafana."
+    steps:
+      - title: Collector streams out
+        action: "OTel collector → OTel gateway: stream traces, metrics, logs (OTLP 4317)"
+        text: "The lab's OTel collector streams traces, metrics and logs to the OTel gateway in mon over OTLP gRPC (4317), with TLS."
+        edges: [labs_mon]
+      - title: Stored in LGTM
+        action: "OTel gateway → Mimir, Loki, Tempo: store the telemetry"
+        text: "The gateway writes metrics to Mimir, logs to Loki and traces to Tempo, kept about 15 days."
+        edges: [gw_metrics, gw_logs, gw_traces]
+      - title: You open Grafana
+        action: "Browser ↔ Grafana: load the lab dashboard"
+        text: "grafana.cloudutsuk.com sits behind Cloudflare Access; Grafana signs you in through Keycloak and returns the lab's dashboards."
+        path: [you_graf, ~you_graf]
+        result: done
+        outcome: "Dashboard loaded"
+
+  - id: chat
+    title: Ask the chatbot
+    summary: "A question goes through the RAG API: cache first, then retrieval and the local model."
+    modes:
+      - {id: miss, label: "Cache miss"}
+      - {id: hit, label: "Simulate a cache hit"}
+    steps:
+      - title: Question sent
+        action: "Chat plugin → RAG API: your question (HTTPS)"
+        text: "The chat plugin sends your question to the RAG API in the ai cluster over HTTPS."
+        edges: [bs_rag]
+      - title: Check the cache
+        action: "RAG API ↔ Redis: is there a similar answer?"
+        text: "The RAG API looks for a semantically similar question in Redis (6379)."
+        path: [rag_cache, ~rag_cache]
+      - title: Instant answer
+        when: hit
+        action: "RAG API → chat plugin: cached answer"
+        text: "A cache hit (same index version) answers immediately, without retrieval or the model."
+        path: [~bs_rag]
+        result: success
+        outcome: "Answered from the cache"
+      - title: Retrieve documents
+        when: miss
+        action: "RAG API ↔ Qdrant: find the closest chunks"
+        text: "On a miss, Qdrant (6333) returns the closest chunks, filtered by repo, lab or cloud."
+        path: [rag_qd, ~rag_qd]
+      - title: Prompt to the model
+        when: miss
+        action: "RAG API → gateway → vLLM chat: generate the answer"
+        text: "The prompt with the chunks goes to the LiteLLM gateway (4000), which routes it to vLLM chat (8000) on the GPU."
+        path: [rag_gw, gw_llm]
+      - title: Answer streams back
+        when: miss
+        action: "vLLM chat → gateway → RAG API: the generated answer"
+        text: "The answer streams back through the gateway to the RAG API."
+        path: [~gw_llm, ~rag_gw]
+      - title: Trace recorded
+        when: miss
+        action: "RAG API → Phoenix: record the request trace"
+        text: "The request's spans (cache check, chunks and scores, prompt, tokens) go to Phoenix."
+        edges: [rag_px]
+      - title: Answer shown
+        when: miss
+        action: "RAG API → chat plugin: answer with citations"
+        text: "The answer, with citations and a View trace link, is shown in the portal."
+        path: [~bs_rag]
+        result: success
+        outcome: "Answer with citations shown"
+
+  - id: ingest
+    title: Keep knowledge fresh
+    summary: "Every 6 hours, changed files are re-embedded into Qdrant."
+    steps:
+      - title: Clone the repos
+        action: "GitHub → rag-ingest: latest pushed content"
+        text: "rag-ingest clones the blog and repos from GitHub over HTTPS with a read-only token; only pushed work is indexed."
+        edges: [ing_gh]
+      - title: Embed changed files
+        action: "rag-ingest → gateway → vLLM embed: embed changed files"
+        text: "Only changed files are sent through the gateway (4000) to vLLM embed (8000)."
+        path: [ing_gw, gw_emb]
+      - title: Vectors come back
+        action: "vLLM embed → gateway → rag-ingest: the embeddings"
+        text: "The embeddings come back through the gateway to rag-ingest."
+        path: [~gw_emb, ~ing_gw]
+      - title: Update Qdrant
+        action: "rag-ingest → Qdrant: upsert new chunks, delete removed ones"
+        text: "New chunks are written to Qdrant and removed files deleted; the cache invalidates with the index version."
+        path: [ing_qd, ~ing_qd]
+        result: done
+        outcome: "Index updated"
+
+  - id: sre
+    title: SRE agent handles an alert
+    summary: "An alert becomes a root cause and a reviewed fix, never an unapproved change."
+    steps:
+      - title: Alert fires
+        action: "Alertmanager → SRE agent: POST /alerts"
+        text: "Alertmanager in mon POSTs to the SRE agent's /alerts webhook with the cluster, namespace and pod labels."
+        edges: [mon_sre]
+      - title: Read the cluster
+        action: "SRE agent ↔ lab cluster: read pods, events and logs"
+        text: "The agent reads the lab cluster through the Kubernetes API with a 15-minute read-only token."
+        path: [sre_labs, ~sre_labs]
+      - title: Find runbooks
+        action: "SRE agent ↔ RAG API: search matching runbooks"
+        text: "It searches the knowledge base through the RAG API for matching runbooks."
+        path: [sre_rag, ~sre_rag]
+      - title: Ask for a root cause
+        action: "SRE agent → gateway → vLLM chat: what is the root cause?"
+        text: "It asks the local model, through the gateway, for a root cause and a proposed fix."
+        path: [sre_gw, gw_llm]
+      - title: Diagnosis returns
+        action: "vLLM chat → gateway → SRE agent: root cause and fix"
+        text: "The model's diagnosis comes back through the gateway."
+        path: [~gw_llm, ~sre_gw]
+      - title: Post to Slack
+        action: "SRE agent → Slack: RCA with approve / reject"
+        text: "The root cause and proposed fix are posted to Slack with approve and reject buttons."
+        edges: [sre_slack]
+      - title: Approve, open a PR
+        action: "Slack → homelab-gitops: approved fix as a pull request"
+        text: "Approving opens a pull request to homelab-gitops; nothing changes without your approval."
+        edges: [slack_git]
+      - title: Argo CD syncs the fix
+        action: "Argo CD ↔ homelab-gitops: sync the merged fix"
+        text: "Once merged, Argo CD syncs the fix, so every change is reviewed and reversible."
+        path: [argo_git, ~argo_git]
+        result: success
+        outcome: "Fix deployed through GitOps"
+
+  - id: release
+    title: Code to cluster
+    summary: "A push becomes a signed image and a digest commit that Argo CD deploys."
+    steps:
+      - title: Commit pushed
+        action: "You → GitHub: git push a commit to the repo"
+        text: "A pushed commit (or a merged pull request) queues the CI workflow on GitHub."
+        path: [you_push, ~you_push]
+      - title: Runner picks up the job
+        action: "ARC runner ↔ GitHub: poll for queued jobs"
+        text: "An ARC runner on the DGX polls GitHub for jobs (no inbound connection) and runs the tests."
+        path: [ci_gh, ~ci_gh]
+      - title: Log in to OpenBao
+        action: "ARC runner ↔ OpenBao: GitHub OIDC login, short-lived secrets"
+        text: "The runner logs in to OpenBao with GitHub's OIDC token, so nothing is stored as a GitHub secret."
+        path: [ci_bao, ~ci_bao]
+      - title: Gates pass
+        action: "ARC runner → BuildKit: tests and scans passed, build the image"
+        text: "Gitleaks, Semgrep, Trivy and Checkov must pass before BuildKit builds the image."
+        edges: [ci_bk]
+      - title: Signed image to Zot
+        action: "BuildKit → Zot: push the signed image and SBOM"
+        text: "BuildKit adds an SBOM, Cosign signs the image and it is pushed to Zot in the core cluster."
+        path: [bk_zot, ~bk_zot]
+      - title: Digest commit
+        action: "BuildKit → homelab-gitops: commit the new image digest"
+        text: "The new image digest is committed to homelab-gitops."
+        edges: [bk_git]
+      - title: Argo CD syncs
+        action: "Argo CD ↔ homelab-gitops: sync the release"
+        text: "Argo CD notices the new digest in homelab-gitops and reads the changed manifests."
+        path: [argo_git, ~argo_git]
+      - title: Rolled out
+        action: "Argo CD → Portal: apply the new manifests (Kubernetes API 6443)"
+        text: "Argo CD applies the change; Kyverno only admits the image because it is signed."
+        path: [argo_platform, ~argo_platform]
+      - title: Image pulled
+        action: "platform cluster ↔ Zot: pull the signed image and start the new pods"
+        text: "The new pods pull the signed image from Zot and start; the release is live."
+        path: [pull_platform, ~pull_platform]
+        result: success
+        outcome: "Released: commit to running pods"

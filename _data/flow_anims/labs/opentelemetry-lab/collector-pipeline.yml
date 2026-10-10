@@ -1,0 +1,58 @@
+# Animated flow diagram for _posts/labs/opentelemetry-lab/2026-10-08-03-set-up-infrastructure.md
+# (include id: labs/opentelemetry-lab/collector-pipeline).
+# The Collector's receivers, processors and exporter, from k8s/observability/otel-collector-config.yaml
+# in ~/gitrepos/observability/otel-static-site-k3d at 8fbd1b1.
+title: Inside the OpenTelemetry Collector
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 450]
+
+lanes:
+  - { label: "Receivers", x: 8, y: 8, w: 244, h: 434 }
+  - { label: "Processors", x: 262, y: 8, w: 512, h: 434 }
+  - { label: "Exporter and backend", x: 784, y: 8, w: 208, h: 434 }
+
+nodes:
+  - { id: OTLP, label: "otlp", sub: "push :4317/:4318", x: 130, y: 85, w: 170, h: 56 }
+  - { id: NGL, label: "file_log", sub: "nginx pod logs", x: 130, y: 185, w: 170, h: 56, icon: chart }
+  - { id: APL, label: "file_log/api", sub: "api pod logs", x: 130, y: 285, w: 170, h: 56, icon: chart }
+  - { id: SCR, label: "prometheus", sub: "scrape :9113", x: 130, y: 385, w: 170, h: 56, icon: "devops/monitoring/prometheus-18.svg" }
+  - { id: ML, label: "memory_limiter", sub: "200 MiB cap", x: 370, y: 235, w: 160, h: 56 }
+  - { id: RES, label: "resource", sub: "service.name", x: 535, y: 345, w: 140, h: 56, icon: server, icon_pos: corner }
+  - { id: BAT, label: "batch", x: 690, y: 235, w: 120, h: 56, icon: function }
+  - { id: EXP, label: "otlp_grpc", sub: "lgtm:4317", x: 888, y: 235, w: 160, h: 56, icon: chart }
+  - { id: LGTM, label: "otel-lgtm", sub: "Tempo Loki Prom", x: 888, y: 370, w: 160, h: 66, shape: cylinder, icon: "devops/monitoring/loki-18.svg", icon_pos: corner }
+
+edges:
+  - { id: OTLP_ML, from: OTLP, to: ML }
+  - { id: NGL_ML, from: NGL, to: ML }
+  - { id: APL_ML, from: APL, to: ML }
+  - { id: SCR_ML, from: SCR, to: ML }
+  - { id: ML_BAT, from: ML, to: BAT, label: "traces, metrics", label_at: [530, 222] }
+  - { id: ML_RES, from: ML, to: RES, points: [[370, 263], [370, 345], [465, 345]], label: "logs", label_at: [384, 318] }
+  - { id: RES_BAT, from: RES, to: BAT, points: [[605, 345], [690, 345], [690, 263]] }
+  - { id: BAT_EXP, from: BAT, to: EXP }
+  - { id: EXP_LGTM, from: EXP, to: LGTM, label: "OTLP gRPC", label_at: [902, 300] }
+
+steps:
+  - lights: [OTLP, NGL, APL, SCR]
+    title: Four ways in
+    text: "otlp takes pushed spans and Traefik metrics; two file_log receivers tail nginx and API pod logs; prometheus scrapes the nginx exporter every 15 s."
+  - edges: [OTLP_ML, NGL_ML, APL_ML, SCR_ML]
+    title: memory_limiter first
+    text: "Every pipeline starts with memory_limiter, which refuses data instead of crashing when the Collector nears 200 MiB."
+  - edges: [ML_BAT]
+    title: Traces and metrics
+    text: "The traces and metrics pipelines go straight on to batch."
+  - edges: [ML_RES]
+    title: Logs get a service name
+    text: "Log lines read from files carry no service.name, so a resource processor inserts state-site-nginx or state-site-api."
+  - edges: [RES_BAT]
+    title: Then batching
+    text: "batch groups records into larger sends, which is cheaper and kinder to the backend than one request per span."
+  - edges: [BAT_EXP]
+    title: One exporter for everything
+    text: "All five pipelines share one otlp_grpc exporter pointing at the lgtm Service."
+  - edges: [EXP_LGTM]
+    title: Stored by signal
+    text: "Inside the otel-lgtm container, traces land in Tempo, logs in Loki and metrics in the Prometheus-compatible store."

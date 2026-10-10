@@ -1,0 +1,56 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-api-protocols-comparison.md
+# (include id: communication/api/hybrid-architecture). One "place order" journey that uses
+# GraphQL, gRPC, REST, a webhook, AMQP and WebSocket, each where it fits best.
+title: One order, six protocols
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 330]
+
+nodes:
+  - {id: C, label: "Mobile app", x: 100, y: 75, w: 140, shape: terminal, icon: phone}
+  - {id: G, label: "BFF", sub: "GraphQL server", x: 330, y: 75, w: 150, icon: api, icon_pos: corner}
+  - {id: O, label: "Order service", x: 570, y: 75, w: 150, icon: server, icon_pos: corner}
+  - {id: I, label: "Inventory\nservice", x: 830, y: 75, w: 140, icon: server}
+  - {id: N, label: "Notification\nservice", x: 100, y: 255, w: 140, icon: bell, icon_pos: corner}
+  - {id: B, label: "Message broker", sub: "RabbitMQ", x: 370, y: 255, w: 150, h: 66, shape: cylinder, icon: queue, icon_pos: corner}
+  - {id: W, label: "Webhook\nhandler", x: 650, y: 255, w: 140, icon: message}
+  - {id: P, label: "Payment API", sub: "third party", x: 900, y: 255, w: 130, icon: api, icon_pos: corner}
+
+edges:
+  - {id: CG, from: C, to: G, label: "GraphQL"}
+  - {id: GO, from: G, to: O, label: "gRPC"}
+  - {id: OI, from: O, to: I, label: "gRPC"}
+  - {id: OP, from: O, to: P, points: [[570, 103], [570, 165], [900, 165], [900, 227]], label: "REST", label_at: [735, 157]}
+  - {id: PW, from: P, to: W, exit: left, enter: right, label: "webhook"}
+  - {id: WB, from: W, to: B, exit: left, enter: right, label: "AMQP"}
+  - {id: BN, from: B, to: N, exit: left, enter: right, label: "AMQP"}
+  - {id: NC, from: N, to: C, exit: top, enter: bottom, label: "WebSocket", tone: ok}
+
+steps:
+  - lights: [C]
+    title: Customer taps Pay
+    text: The app has one screen to render and wants one round trip for everything it shows.
+  - edges: [CG]
+    title: GraphQL at the edge
+    text: A placeOrder mutation goes to the backend-for-frontend, which asks for exactly the fields the screen needs.
+  - edges: [GO]
+    title: gRPC inside
+    text: The BFF calls OrderService.CreateOrder over gRPC with a deadline. Typed, binary and fast on the internal network.
+  - edges: [OI]
+    title: Service to service
+    text: The Order service reserves stock with another gRPC call. Generated clients mean no hand-written HTTP code.
+  - edges: [OP]
+    title: REST to a third party
+    text: Card payment goes to an external provider's public REST API, the lingua franca between organisations.
+  - edges: [PW]
+    title: Webhook back
+    text: Seconds later the provider POSTs a signed payment-succeeded event to a webhook endpoint instead of being polled.
+  - edges: [WB]
+    title: Publish an event
+    text: The handler verifies the signature and publishes order.paid to an AMQP exchange. Billing, shipping and analytics can all subscribe.
+  - edges: [BN]
+    title: Consume asynchronously
+    text: The notification service consumes the message from its queue at its own pace and acknowledges it.
+  - edges: [NC]
+    title: Push to the device
+    text: The app holds an open WebSocket, so the confirmation appears instantly. Mobile push or SSE would also fit a one-way update.

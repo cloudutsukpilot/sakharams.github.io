@@ -1,0 +1,137 @@
+<!--
+  Hands-on lab index, rendered on /tags/<lab>/ by _layouts/tag.html when _data/labs/<lab>.yml exists.
+  Expects `lab`, `project_key` (the tag slug) and the tag `page`. Parts and topics come from
+  _data/lab_framework.yml; each part links to the post with `lab: <slug>` and `lab_part: <part id>`,
+  each topic to that post's #<topic | slugify>, and each experiment to the experiments post's #exp-<id>
+  with the first captured "after" screenshot (listed in _data/lab_shots/<slug>.json) as its thumbnail.
+  Reuses the project playbook styles (_sass/project-index.scss) plus _sass/lab.scss.
+  Created and checked by the cloudutsuk-learning-lab skill (.claude/skills/cloudutsuk-learning-lab/).
+-->
+{% assign framework = site.data.lab_framework %}
+{% assign lab_key = project_key %}
+{% assign lab_posts = page.posts | where: 'lab', lab_key %}
+{% assign written = lab_posts | where_exp: 'p', 'p.lab_part' %}
+{% assign exp_post = lab_posts | where: 'lab_part', 6 | first %}
+{% assign shots_meta = site.data.lab_shots[lab_key] %}
+{% assign others = page.posts | where_exp: 'p', 'p.lab != lab_key or p.lab_part == nil' %}
+
+<div id="page-tag" class="project-index lab-index">
+  <h1 class="ps-lg-2">
+    <i class="fas fa-flask fa-fw text-muted"></i>
+    {{ lab.name }}
+    <span class="lead text-muted ps-2">{{ page.posts | size }}</span>
+  </h1>
+
+  {% if lab.summary %}
+    <p class="project-summary">{{ lab.summary }}</p>
+  {% endif %}
+
+  <div class="project-meta">
+    {% if lab.status %}<span class="project-chip project-chip-status">{{ lab.status }}</span>{% endif %}
+    {% if lab.level %}<span class="project-chip"><span class="text-muted">Level:</span> {{ lab.level }}</span>{% endif %}
+    {% if lab.duration %}<span class="project-chip"><span class="text-muted">Time:</span> {{ lab.duration }}</span>{% endif %}
+    {% if lab.platform.runtime %}<span class="project-chip"><span class="text-muted">Runs on:</span> {{ lab.platform.runtime }}</span>{% endif %}
+    {% if lab.platform.observability %}<span class="project-chip"><span class="text-muted">Observability:</span> {{ lab.platform.observability }}</span>{% endif %}
+    {% for fact in lab.facts %}
+      {% if fact.url %}
+        <a class="project-chip project-chip-link" href="{{ fact.url | relative_url }}"><span class="text-muted">{{ fact.label }}:</span> {{ fact.value }} <i class="fas fa-arrow-right fa-xs" aria-hidden="true"></i></a>
+      {% else %}
+        <span class="project-chip"><span class="text-muted">{{ fact.label }}:</span> {{ fact.value }}</span>
+      {% endif %}
+    {% endfor %}
+    {% if lab.repo.url %}
+      <a class="project-chip project-chip-link" href="{{ lab.repo.url }}"><i class="fab fa-github" aria-hidden="true"></i> Lab code</a>
+    {% endif %}
+    <span class="project-chip">{{ written | size }} of {{ framework.parts | size }} parts written</span>
+  </div>
+
+  {% if lab.platform.cost and lab.platform.cost != 'free-local' %}
+    <p class="lab-cost-note"><i class="fas fa-coins" aria-hidden="true"></i> {{ lab.platform.cost }}</p>
+  {% endif %}
+
+  <nav class="project-phases" aria-label="Lab sections">
+    <a href="#lab-parts">Parts</a>
+    {% if lab.experiments.size > 0 %}<a href="#lab-experiments">Experiments ({{ lab.experiments | size }})</a>{% endif %}
+  </nav>
+
+  <section class="project-phase" id="lab-parts">
+    <h2 class="project-phase-title">Parts</h2>
+    <div class="project-grid">
+      {% for part in framework.parts %}
+        {% assign post = lab_posts | where: 'lab_part', part.id | first %}
+        <article class="project-card{% unless post %} is-missing{% endunless %}">
+          <header class="project-card-head">
+            <span class="project-step">{{ part.id }}</span>
+            <i class="{{ part.icon }} fa-fw text-muted" aria-hidden="true"></i>
+            {% if post %}
+              <a class="project-card-title" href="{{ post.url | relative_url }}">{{ part.title }}</a>
+            {% else %}
+              <span class="project-card-title">{{ part.title }}</span>
+            {% endif %}
+          </header>
+          <p class="project-card-summary">{{ part.summary }}</p>
+          <ul class="project-topics">
+            {% for topic in part.topics %}
+              <li>{% if post %}<a href="{{ post.url | relative_url }}#{{ topic | slugify }}">{{ topic }}</a>{% else %}{{ topic }}{% endif %}</li>
+            {% endfor %}
+            {% if part.experiments %}
+              {% for exp in lab.experiments %}
+                <li>{% if post %}<a href="{{ post.url | relative_url }}#exp-{{ exp.id }}">{{ exp.title }}</a>{% else %}{{ exp.title }}{% endif %}</li>
+              {% endfor %}
+            {% endif %}
+          </ul>
+          {% unless post %}<p class="project-card-pending text-muted">Not written yet</p>{% endunless %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if lab.experiments.size > 0 %}
+    <section class="project-phase" id="lab-experiments">
+      <h2 class="project-phase-title">Experiments</h2>
+      <div class="lab-exp-tiles">
+        {% for exp in lab.experiments %}
+          {% assign thumb = nil %}
+          {% for shot in exp.shots %}
+            {% capture shot_file %}{{ exp.id }}-{{ shot.name }}.webp{% endcapture %}
+            {% if shots_meta[shot_file] and shot.phase != 'before' %}{% assign thumb = shot_file %}{% assign thumb_alt = shot.alt %}{% break %}{% endif %}
+          {% endfor %}
+          <article class="lab-exp-tile">
+            {% if thumb %}
+              <img src="{{ '/assets/img/labs/' | append: lab_key | append: '/' | append: thumb | relative_url }}" alt="{{ thumb_alt | escape }}" width="{{ shots_meta[thumb].w }}" height="{{ shots_meta[thumb].h }}" loading="lazy">
+            {% else %}
+              <div class="lab-exp-tile-blank"><i class="fas fa-flask" aria-hidden="true"></i></div>
+            {% endif %}
+            <div class="lab-exp-tile-body">
+              <span class="project-step">{{ forloop.index }}</span>
+              {% if exp_post %}
+                <a class="project-card-title" href="{{ exp_post.url | relative_url }}#exp-{{ exp.id }}">{{ exp.title }}</a>
+              {% else %}
+                <span class="project-card-title">{{ exp.title }}</span>
+              {% endif %}
+              {% if exp.goal %}<p class="project-card-summary">{{ exp.goal }}</p>{% endif %}
+              <div class="lab-exp-meta">
+                {% for s in exp.signals %}<span class="lab-sig lab-sig-{{ s }}">{{ s }}</span>{% endfor %}
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if others.size > 0 %}
+    <section class="project-phase" id="other-posts">
+      <h2 class="project-phase-title">Other posts tagged {{ page.title }}</h2>
+      <ul class="content ps-0">
+        {% for post in others %}
+          <li class="d-flex justify-content-between px-md-3">
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <span class="dash flex-grow-1"></span>
+            {% include datetime.html date=post.date class='text-muted small text-nowrap' lang=lang %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>

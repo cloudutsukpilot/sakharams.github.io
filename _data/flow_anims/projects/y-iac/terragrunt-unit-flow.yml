@@ -1,0 +1,103 @@
+# Animated flow diagram for _posts/projects/y-iac/2026-10-05-05-technical-architecture.md
+# (include id: projects/y-iac/terragrunt-unit-flow). Part 2 of "how one run works": inside one
+# generated unit, how root.hcl turns YAML and environment variables into provider.tf and backend.tf,
+# and how the plan reaches the gates. Source: template/root.hcl, cloud/aws/terragrunt/aws_vpc,
+# src/<org>_iac/handlers/terragrunt/runner.py.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: "Y-IaC part 2: inside one generated Terragrunt unit"
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 580]
+modes:
+  - { id: pass, label: "Gates pass" }
+  - { id: fail, label: "Simulate a blocking policy gate" }
+
+lanes:
+  - { label: "Generated unit and root.hcl (.terragrunt-stack/aws_vpc)", x: 8, y: 8, w: 984, h: 300 }
+  - { label: "Terraform run", x: 8, y: 345, w: 984, h: 227 }
+
+nodes:
+  - { id: RES, label: "resources\n.yaml", x: 90, y: 75, w: 120, h: 60, shape: cylinder, icon: file, icon_pos: corner }
+  - { id: CV, label: "common_vars\n(merged)", x: 260, y: 75, w: 120, h: 60, shape: cylinder }
+  - { id: CFG, label: "config.yaml", sub: "backend", x: 420, y: 75, w: 120, h: 60, shape: cylinder, icon: server, icon_pos: corner }
+  - { id: PY, label: "providers\n.yaml", x: 580, y: 75, w: 120, h: 60, shape: cylinder, icon: file, icon_pos: corner }
+  - { id: ENV, label: "Env vars", sub: "ARM_*, tokens", x: 740, y: 75, w: 120, h: 60, shape: cylinder, icon: "devops/iac/azureresourcemanager-18.svg", icon_pos: corner }
+
+  - { id: UNIT, label: "Unit\nterragrunt.hcl", x: 90, y: 220, w: 140 }
+  - { id: ROOT, label: "root.hcl", sub: "include \"root\"", x: 500, y: 220, w: 600, h: 70 }
+  - { id: PROV, label: "provider.tf", x: 905, y: 185, w: 130, h: 46 }
+  - { id: BACK, label: "backend.tf", x: 905, y: 255, w: 130, h: 46, icon: server, icon_pos: corner }
+
+  - { id: MOD, label: "Shared module\nsource", x: 90, y: 425, w: 136, icon: git, icon_pos: corner }
+  - { id: INIT, label: "init", sub: "tflint hook", x: 254, y: 425, w: 136 }
+  - { id: PLAN, label: "plan", sub: "retry on lock", x: 418, y: 425, w: 136, icon: clock, icon_pos: corner }
+  - { id: JSON, label: "Plan to JSON", sub: "redacted", x: 582, y: 425, w: 136 }
+  - { id: GATE, label: "Plan\ngates", x: 746, y: 425, w: 110, h: 84, shape: diamond }
+  - { id: REP, label: "Plan summary\n+ report", x: 910, y: 425, w: 136, tone: ok, icon: chart, icon_pos: corner }
+  - { id: STATE, label: "Remote state", x: 254, y: 525, w: 136, h: 56, shape: cylinder }
+  - { id: CLOUD, label: "Cloud and\nSaaS APIs", x: 418, y: 525, w: 136, h: 50, icon: cloud }
+  - { id: BLK, label: "Blocked:\nexit non-zero", x: 746, y: 530, w: 136, h: 46, tone: fail, icon: cross, icon_pos: corner }
+
+edges:
+  - { id: RESUNIT, from: RES, to: UNIT }
+  - { id: UNITROOT, from: UNIT, to: ROOT }
+  - { id: CVROOT, from: CV, to: ROOT, points: [[260, 105], [260, 185]] }
+  - { id: CFGROOT, from: CFG, to: ROOT, points: [[420, 105], [420, 185]] }
+  - { id: PYROOT, from: PY, to: ROOT, points: [[580, 105], [580, 185]] }
+  - { id: ENVROOT, from: ENV, to: ROOT, points: [[740, 105], [740, 185]] }
+  - { id: ROOTPROV, from: ROOT, to: PROV, points: [[800, 205], [820, 205], [820, 185], [840, 185]] }
+  - { id: ROOTBACK, from: ROOT, to: BACK, points: [[800, 235], [820, 235], [820, 255], [840, 255]] }
+  - { id: UNITMOD, from: UNIT, to: MOD, label: "source" }
+  - { id: MODINIT, from: MOD, to: INIT }
+  - { id: PROVINIT, from: PROV, to: INIT, points: [[970, 185], [984, 185], [984, 332], [244, 332], [244, 397]] }
+  - { id: BACKINIT, from: BACK, to: INIT, points: [[905, 278], [905, 320], [264, 320], [264, 397]] }
+  - { id: INITSTATE, from: INIT, to: STATE }
+  - { id: INITPLAN, from: INIT, to: PLAN }
+  - { id: PLANCLOUD, from: PLAN, to: CLOUD }
+  - { id: PLANJSON, from: PLAN, to: JSON }
+  - { id: JSONGATE, from: JSON, to: GATE }
+  - { id: GATEREP, from: GATE, to: REP, label: "pass", tone: ok }
+  - { id: GATEBLK, from: GATE, to: BLK, label: "fail", label_at: [760, 490], tone: fail }
+
+steps:
+  - lights: [UNIT, RES, CV, CFG, PY, ENV]
+    title: One unit per resource type
+    text: Part 1 left .terragrunt-stack/aws_vpc/terragrunt.hcl, a copy of the shared template cloud/aws/terragrunt/aws_vpc. The inputs above are what it can see.
+  - edges: [RESUNIT]
+    title: The unit reads the YAML
+    text: Its locals find resources.yaml and the merged common_vars.yaml with find_in_parent_folders and map each aws_vpc entry to module inputs, with common_tags merged in.
+  - edges: [UNITROOT]
+    title: Include root.hcl
+    text: include "root" pulls in environments/aws/root.hcl, which bootstrap wrote from the shared template. Every unit in every consumer gets the same root.
+  - edges: [CVROOT, CFGROOT]
+    title: Which providers, which backend
+    text: root.hcl reads the providers list, subscriptions and override_versions from common_vars, and the backend entry whose repo matches the folder name from config.yaml.
+  - edges: [PYROOT, ENVROOT]
+    title: Versions and credentials
+    text: providers.yaml pins versions (aws 6.55.0, azurerm 5.0.0). Credentials only arrive as env vars such as ARM_CLIENT_ID, <SUB>_ARM_SUBSCRIPTION_ID or GH_TOKEN, never from YAML.
+  - edges: [ROOTPROV, ROOTBACK]
+    title: Generate provider.tf and backend.tf
+    text: Only the providers the stack listed, plus one aliased azurerm per subscription. The backend (local, azurerm, s3 or gcs) keys state by repo, cloud and unit path.
+  - edges: [UNITMOD]
+    title: Point at the shared module
+    text: terraform.source resolves to terragrunt_shared_module/cloud/aws/terraform/aws_vpc. Consumers never hold their own copy of module code.
+  - edges: [MODINIT, PROVINIT, BACKINIT]
+    title: terraform init
+    text: Terragrunt runs the tflint hook, downloads providers through a plugin cache and writes the generated files next to the module code.
+  - edges: [INITSTATE, INITPLAN]
+    title: State, then plan
+    text: Init connects to this unit's own state file in the remote backend. Then terragrunt stack run plan runs the units in dependency waves.
+  - edges: [PLANCLOUD, PLANJSON]
+    title: Refresh and convert
+    text: The plan refreshes against the cloud or SaaS APIs, retrying stale locks only when they are old enough. Each plan is converted to JSON with secrets redacted.
+  - edges: [JSONGATE]
+    title: Plan gates
+    text: The plan JSON is evaluated by OPA policies, Trivy or Wiz, and Infracost. Each gate can be advisory or blocking.
+  - edges: [GATEREP]
+    when: pass
+    title: Report
+    text: Gates pass. The CLI prints a per-unit add/change/destroy summary and the final report, which CI posts to the pull request.
+  - edges: [GATEBLK]
+    when: fail
+    title: Blocked
+    text: A blocking policy fails, so the CLI exits non-zero and CI marks the plan red. OPA_OVERRIDE and similar flags exist for an approved exception.

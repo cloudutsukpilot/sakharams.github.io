@@ -1,0 +1,85 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-05-technical-architecture.md
+# (include id: projects/oneplatform/system-architecture). One request through OnePlatform: sign-in,
+# permission check, a template run that calls Azure and GitHub, and the .NET middleware with its
+# scheduled jobs. Source: the portal's C4 diagrams and architecture model, and the middleware's
+# architecture doc. Coordinates are in viewBox units; node x/y is the centre.
+title: OnePlatform system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 620]
+
+lanes:
+  - { label: "Users and identity", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Portal backend (Backstage on AKS)", x: 8, y: 160, w: 984, h: 140 }
+  - { label: "Middleware and data", x: 8, y: 330, w: 984, h: 130 }
+  - { label: "External systems", x: 8, y: 490, w: 984, h: 122 }
+
+nodes:
+  - { id: USER, label: "Users", x: 120, y: 75, w: 70, h: 70, shape: circle }
+  - { id: FE, label: "Portal frontend", sub: "React SPA", x: 400, y: 75, icon: browser, icon_pos: corner }
+  - { id: ENTRA, label: "Entra ID", sub: "SSO + groups", x: 700, y: 75, w: 150, h: 62, shape: cylinder, icon: "iam/entraid/azuread-18.svg" }
+
+  - { id: PERM, label: "Permission\npolicy", x: 140, y: 235, icon: lock }
+  - { id: BE, label: "Portal backend", sub: "Node, ~45 plugins", x: 400, y: 235, w: 160, icon: cpu, icon_pos: corner }
+  - { id: SCAF, label: "Scaffolder\nactions", x: 660, y: 235 }
+
+  - { id: MW, label: "Middleware API", sub: ".NET 10", x: 140, y: 400, icon: api, icon_pos: corner }
+  - { id: PG, label: "PostgreSQL 16", x: 400, y: 400, w: 150, h: 62, shape: cylinder, icon: "databases/postgresql-18.svg", icon_pos: corner }
+  - { id: FUNC, label: "Scheduled jobs", sub: "Azure Functions", x: 870, y: 400, icon: "cloud/azure/compute/serverless/function-apps.svg", icon_pos: corner }
+
+  - { id: GH, label: "GitHub", sub: "API + Actions", x: 400, y: 555, icon: "devops/cicd/github-18.svg", icon_pos: corner }
+  - { id: AZ, label: "Azure", sub: "ARM, Graph", x: 660, y: 555, icon: "devops/iac/azureresourcemanager-18.svg" }
+  - { id: OTHER, label: "Jira, SQL,\nBlob, SMTP", x: 870, y: 555, w: 150, h: 60, icon: database }
+
+edges:
+  - { id: UF, from: USER, to: FE }
+  - { id: FEEN, from: FE, to: ENTRA, label: "sign in" }
+  - { id: FEBE, from: FE, to: BE }
+  - { id: BEPERM, from: BE, to: PERM, exit: left, enter: right }
+  - { id: BEPG, from: BE, to: PG }
+  - { id: BESCAF, from: BE, to: SCAF }
+  - { id: SCAFAZ, from: SCAF, to: AZ }
+  - { id: SCAFGH, from: SCAF, to: GH, points: [[610, 263], [610, 482], [400, 482], [400, 527]] }
+  - { id: BEMW, from: BE, to: MW, points: [[360, 263], [360, 318], [140, 318], [140, 372]] }
+  - { id: MWPG, from: MW, to: PG }
+  - { id: MWFUNC, from: MW, to: FUNC, exit: bottom, enter: bottom, offset: 38, dashed: true }
+  - { id: FUNCPG, from: FUNC, to: PG, exit: left, enter: right }
+  - { id: FUNCOT, from: FUNC, to: OTHER }
+
+steps:
+  - lights: [USER]
+    title: Who uses it
+    text: Engineers, SREs, operations, managers, auditors and leadership. Thirteen roles decide what each of them sees.
+  - edges: [UF]
+    title: Open the portal
+    text: Everyone reaches the same internal URL. The React single-page app loads, and nothing works until you sign in.
+  - edges: [FEEN]
+    title: Single sign-on
+    text: The React app signs users in with Entra ID. Their security groups become portal roles; a GitHub sign-in is added only when a GitHub action needs it.
+  - edges: [FEBE]
+    title: One backend
+    text: Every page and form calls the Backstage backend with a portal token. About 45 custom plugins and modules run there next to the core ones.
+  - edges: [BEPERM]
+    title: Permission check
+    text: A custom policy checks the caller's role, the target environment and hard blocks before any route or template step runs. Denied means 403, not a hidden button.
+  - edges: [BEPG]
+    title: Catalog and plugin data
+    text: Catalog entities, search, role mappings, Copilot requests and other plugin data live in PostgreSQL 16. Azure, Graph and GitHub are ingested into the catalog on schedules.
+  - edges: [BESCAF]
+    title: A template runs
+    text: Allowed requests run as scaffolder tasks built from about 50 custom actions, each validating before it acts.
+  - edges: [SCAFAZ, SCAFGH]
+    title: Act on Azure and GitHub
+    text: Actions call Azure directly for role assignments or starting a VM, or call GitHub to create repos and dispatch the Terraform workflows that build infrastructure.
+  - edges: [BEMW]
+    title: Middleware for heavy data
+    text: Audits, FinOps, file and SQL monitoring and terminations go to the .NET middleware. The portal backend logs in with client credentials and calls it with a cached JWT.
+  - edges: [MWPG]
+    title: Middleware schemas
+    text: EF Core contexts own their own schemas (user audits, FinOps, file monitoring, Jira audit, termination) in PostgreSQL. SQL Server is read-only.
+  - edges: [MWFUNC]
+    title: Same code, on a timer
+    text: Azure Functions share the middleware's services library and run on timers, independent of any user request.
+  - edges: [FUNCPG, FUNCOT]
+    title: Import, scan, notify
+    text: Jobs import FOCUS cost exports daily, scan for 90-day inactivity and ingest State of DevOps data, using Jira, SQL Server, Blob Storage and SMTP.

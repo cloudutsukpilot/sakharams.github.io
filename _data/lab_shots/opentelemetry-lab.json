@@ -1,0 +1,119 @@
+{
+  "cache-hit-waterfall.webp": {
+    "w": 1018,
+    "h": 718,
+    "animated": false,
+    "captured": "2026-10-08T11:07:05.142Z",
+    "verify": "ok",
+    "experiment": "cache-hit",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "cache-miss-waterfall.webp": {
+    "w": 1018,
+    "h": 782,
+    "animated": false,
+    "captured": "2026-10-08T11:05:49.055Z",
+    "verify": "ok",
+    "experiment": "cache-miss",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "log-to-trace-api-logs.webp": {
+    "w": 920,
+    "h": 800,
+    "animated": false,
+    "captured": "2026-10-08T11:10:14.636Z",
+    "verify": "ok",
+    "experiment": "log-to-trace",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "log-to-trace-page-panel.webp": {
+    "w": 1060,
+    "h": 542,
+    "animated": false,
+    "captured": "2026-10-08T11:10:14.636Z",
+    "verify": "ok",
+    "experiment": "log-to-trace",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "outage-api-logs.webp": {
+    "w": 920,
+    "h": 1072,
+    "animated": false,
+    "captured": "2026-10-08T11:19:54.124Z",
+    "verify": "ok",
+    "experiment": "outage",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "outage-codes.webp": {
+    "w": 920,
+    "h": 401,
+    "animated": false,
+    "captured": "2026-10-08T11:19:54.124Z",
+    "verify": "ok",
+    "experiment": "outage",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "outage-error-trace.webp": {
+    "w": 1018,
+    "h": 558,
+    "animated": false,
+    "captured": "2026-10-08T11:19:54.124Z",
+    "verify": "ok",
+    "experiment": "outage",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "reload-logs.webp": {
+    "w": 700,
+    "h": 448,
+    "animated": false,
+    "captured": "2026-10-08T11:04:32.965Z",
+    "verify": "ok",
+    "experiment": "reload",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "reload-requests-after.webp": {
+    "w": 464,
+    "h": 296,
+    "animated": false,
+    "captured": "2026-10-08T11:04:32.965Z",
+    "verify": "ok",
+    "experiment": "reload",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "reload-requests-before.webp": {
+    "w": 464,
+    "h": 296,
+    "animated": false,
+    "captured": "2026-10-08T11:04:32.965Z",
+    "verify": "ok",
+    "experiment": "reload",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "traffic-dashboard.webp": {
+    "w": 1440,
+    "h": 1180,
+    "animated": false,
+    "captured": "2026-10-08T11:15:54.829Z",
+    "verify": "ok",
+    "experiment": "traffic",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "traffic-rate.webp": {
+    "w": 920,
+    "h": 401,
+    "animated": false,
+    "captured": "2026-10-08T11:15:54.829Z",
+    "verify": "ok",
+    "experiment": "traffic",
+    "repo_rev": "8fbd1b1-dirty"
+  },
+  "traffic-traefik-live.webp": {
+    "w": 464,
+    "h": 296,
+    "animated": true,
+    "captured": "2026-10-08T11:15:54.829Z",
+    "verify": "ok",
+    "experiment": "traffic",
+    "repo_rev": "8fbd1b1-dirty"
+  }
+}

@@ -1,0 +1,87 @@
+# Animated flow diagram for _posts/projects/sql-blocking-agent/2026-10-05-06-security-and-privacy.md
+# (include id: projects/sql-blocking-agent/governance-gates). The Determination agent's hard safety
+# gates, in code order (src/agents/determination/agent.py), before the LLM may decide R4/R5/R7/R8.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: SQL Blocking Agent governance gates
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 372]
+modes:
+  - { id: pass, label: "Every hard gate passes" }
+  - { id: fail, label: "Simulate R1: rollback would take hours" }
+
+lanes:
+  - { label: "Hard gates in code (the LLM cannot override), then the LLM", x: 8, y: 8, w: 984, h: 356 }
+
+nodes:
+  - { id: IN, label: "Analysis\nready", x: 90, y: 80, w: 136, shape: terminal }
+  - { id: G13, label: "R13 maint.\nwindow", x: 254, y: 80, w: 136 }
+  - { id: G32, label: "R3 / R2\nprotected", x: 418, y: 80, w: 136 }
+  - { id: G1, label: "R1 rollback\ntoo long", x: 582, y: 80, w: 136 }
+  - { id: G9, label: "R9 log\nsize", x: 746, y: 80, w: 136, icon: chart }
+  - { id: G6, label: "R6 log\nused %", x: 910, y: 80, w: 136, icon: chart }
+  - { id: ALR, label: "ALERT_ONLY", x: 582, y: 180, w: 136, h: 42, tone: fail, icon: bell, icon_pos: corner }
+  - { id: G10, label: "R10 kill\nrate", x: 130, y: 322, w: 150 }
+  - { id: G12, label: "R12\nisolation", x: 320, y: 322, w: 150 }
+  - { id: G11, label: "R11 app\nvictims", x: 510, y: 322, w: 150, icon: server }
+  - { id: LLM, label: "LLM decides", sub: "R4 R5 R7 R8", x: 700, y: 322, w: 150, icon: server }
+  - { id: OUT, label: "KILL, ALERT\nor SKIP", x: 890, y: 322, w: 150, shape: terminal, icon: bell }
+
+edges:
+  - { id: E1, from: IN, to: G13 }
+  - { id: E2, from: G13, to: G32 }
+  - { id: E3, from: G32, to: G1 }
+  - { id: E4, from: G1, to: G9 }
+  - { id: E5, from: G9, to: G6 }
+  - { id: FAIL, from: G1, to: ALR, points: [[582, 108], [582, 159]], label: "fires", label_at: [596, 140], tone: fail }
+  - { id: WRAP, from: G6, to: G10, points: [[910, 108], [910, 245], [35, 245], [35, 322], [55, 322]] }
+  - { id: E7, from: G10, to: G12 }
+  - { id: E8, from: G12, to: G11 }
+  - { id: E9, from: G11, to: LLM }
+  - { id: E10, from: LLM, to: OUT }
+
+steps:
+  - lights: [IN]
+    title: Facts first
+    text: The Analyzer has gathered blocker, victims, log usage, rollback estimate, isolation level and plans. Now Determination runs its gates in a fixed order.
+  - edges: [E1]
+    title: R13 maintenance window
+    text: Is this server inside a configured ExclusionWindows period? Then SKIP. Planned maintenance blocking is expected, not an incident.
+  - edges: [E2]
+    title: R3 and R2 protected sessions
+    text: Session ID 50 or below, not a user process, or a login in ProtectedLogins is never auto-killed, and unknown values fail closed. Result ALERT_ONLY.
+  - edges: [E3]
+    title: R1 rollback estimate
+    text: If killing would start a rollback estimated in hours, the cure is worse than the blocking. Result ALERT_ONLY with critical risk.
+  - edges: [FAIL]
+    when: fail
+    title: Stopped at R1
+    text: The gate fires and the decision is final. No LLM call is made for the decision, and the RCA report explains why the agent held back.
+  - edges: [E4]
+    when: pass
+    title: R9 transaction log size
+    text: A transaction log above log_size_kill_threshold_gb means a long rollback risk. Result ALERT_ONLY and the DBA team is asked to decide.
+  - edges: [E5]
+    when: pass
+    title: R6 log used percentage
+    text: Log usage at or above log_used_pct_threshold also blocks an automatic kill, for the same reason.
+  - edges: [WRAP]
+    when: pass
+    title: R10 kill-rate limiter
+    text: Real kills on this server in the last hour already at max_kills_per_hour? Then ALERT_ONLY. A runaway agent can't kill its way through a bad day.
+  - edges: [E7]
+    when: pass
+    title: R12 isolation level
+    text: Isolation levels in skip_isolation_levels (for example SERIALIZABLE) are never acted on. Result SKIP.
+  - edges: [E8]
+    when: pass
+    title: R11 application victims
+    text: At least one victim must be an application account (pattern match or ProtectedLogins entry). Otherwise SKIP, because nobody's app is waiting.
+  - edges: [E9]
+    when: pass
+    title: Now the LLM may decide
+    text: "Only now does the model weigh R4 (wait below threshold), R5 (too few victims), R7 (better plan exists) and R8 (object lock with short wait)."
+  - edges: [E10]
+    when: pass
+    title: One structured decision
+    text: The answer is a validated Pydantic object with decision, risk, reason and rule. A KILL still needs human approval before anything runs.

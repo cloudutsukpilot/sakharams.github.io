@@ -1,0 +1,613 @@
+// Expedition Map (_includes/expedition-map.html, assets/js/expedition-map.js).
+// Colors derive from Chirpy's theme variables, so light and dark mode both work.
+
+.xm {
+  --xm-ink: var(--heading-color);
+  --xm-sea: color-mix(in srgb, #38bdf8 16%, var(--main-bg));
+  --xm-land: color-mix(in srgb, #c8a46a 42%, var(--main-bg));
+  --xm-line: color-mix(in srgb, var(--xm-ink) 12%, transparent);
+
+  // No `container-type` here: it would trap the fixed fullscreen overlay inside the article.
+  margin-top: 1.5rem;
+
+  // Chirpy's post typography is too airy for dense panels.
+  h3,
+  h4 {
+    margin: 0;
+  }
+
+  ul {
+    padding-left: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* --- header --- */
+
+.xm-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.xm-stats {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  color: var(--text-muted-color);
+
+  strong {
+    color: var(--xm-ink);
+    font-size: 1.15rem;
+  }
+}
+
+.xm-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border-color, var(--xm-line));
+  border-radius: 999px;
+  background: var(--main-bg);
+  color: var(--text-muted-color);
+  min-width: min(18rem, 100%);
+
+  input {
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-color);
+  }
+
+  &:focus-within {
+    border-color: var(--link-color);
+  }
+}
+
+/* --- map + travel guide --- */
+
+.xm-stage {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  // The map needs room; small screens use the Atlas instead.
+  @media (max-width: 849.98px) {
+    display: none !important;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+// Map and travel guide side by side once the article column is wide enough.
+@media (min-width: 1500px) {
+  .xm-stage {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+  }
+
+  .xm-guide {
+    max-height: none;
+  }
+}
+
+.xm-map {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* --- world map underneath --- */
+
+.xm-ocean {
+  fill: var(--xm-sea);
+  stroke: color-mix(in srgb, #0284c7 35%, var(--main-bg));
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.xm-graticule {
+  fill: none;
+  stroke: var(--xm-line);
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.xm-geo-land {
+  fill: var(--xm-land);
+}
+
+.xm-geo-borders {
+  fill: none;
+  stroke: color-mix(in srgb, var(--xm-ink) 22%, transparent);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.xm-compass {
+  fill: none;
+  stroke: color-mix(in srgb, var(--xm-ink) 30%, transparent);
+  stroke-width: 1;
+
+  path {
+    fill: color-mix(in srgb, var(--xm-ink) 18%, transparent);
+  }
+
+  text {
+    fill: color-mix(in srgb, var(--xm-ink) 55%, transparent);
+    stroke: none;
+    font-size: 12px;
+    font-weight: 700;
+    text-anchor: middle;
+  }
+}
+
+.xm-shore path {
+  fill: none;
+  stroke: color-mix(in srgb, #0284c7 30%, var(--main-bg));
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+
+  &:first-child {
+    stroke-dasharray: 3 5;
+  }
+}
+
+.xm-region {
+  stroke: var(--main-bg);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill-opacity 0.15s, opacity 0.3s;
+
+  // Regions are tinted glass over the world map; hovering makes one solid.
+  &:hover {
+    fill-opacity: 0.8 !important;
+  }
+
+  &.xm-faded {
+    opacity: 0.15;
+  }
+
+  &.xm-active {
+    fill-opacity: 0.85 !important;
+    stroke: var(--xm-ink);
+    stroke-width: 2.5;
+  }
+
+  &:focus-visible {
+    outline: none;
+    stroke: var(--link-color);
+    stroke-width: 3;
+  }
+}
+
+.xm-searching .xm-region:not(.xm-hit) {
+  opacity: 0.18;
+}
+
+.xm-searching .xm-region.xm-hit {
+  stroke: var(--xm-ink);
+  stroke-width: 2;
+}
+
+.xm-border {
+  fill: none;
+  stroke: var(--main-bg);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+
+  &:focus-visible {
+    outline: none;
+    stroke: var(--link-color);
+    stroke-width: 4;
+  }
+}
+
+.xm-country-label text,
+.xm-state-label text {
+  fill: #fff;
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 3px;
+  paint-order: stroke;
+  text-anchor: middle;
+  pointer-events: none;
+  font-family: Lato, sans-serif;
+}
+
+.xm-cname {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.xm-ccount,
+.xm-scount {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.xm-state-label text:first-child {
+  font-weight: 700;
+}
+
+.xm-country-labels {
+  transition: opacity 0.3s;
+}
+
+.xm-zoomed .xm-country-labels {
+  opacity: 0;
+}
+
+.xm-back,
+.xm-fs-btn {
+  position: absolute;
+  top: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--xm-line);
+  border-radius: 999px;
+  background: var(--main-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--link-color);
+  }
+}
+
+.xm-back {
+  left: 0.75rem;
+}
+
+.xm-fs-btn {
+  right: 0.75rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+}
+
+/* --- fullscreen ---
+   A fixed overlay toggled by a class (see assets/js/expedition-map.js); the native Fullscreen API
+   is used on top when available. */
+
+.xm-viewer.xm-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem;
+  background: var(--main-bg);
+  overflow: hidden;
+
+  .xm-header {
+    flex: none;
+  }
+
+  .xm-stage {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+
+  .xm-map {
+    height: 100%;
+
+    svg {
+      height: 100%;
+    }
+  }
+
+  .xm-guide {
+    max-height: none;
+    height: 100%;
+  }
+}
+
+body.xm-fullscreen-open {
+  overflow: hidden;
+}
+
+.xm-tooltip {
+  position: absolute;
+  z-index: 2;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--xm-line);
+  border-radius: 6px;
+  background: var(--main-bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.xm-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--text-muted-color);
+  font-style: italic;
+}
+
+.xm-guide {
+  max-height: 32rem;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--xm-line);
+  border-radius: 12px;
+  background: var(--card-bg, var(--main-bg));
+
+  h4 {
+    margin: 1rem 0 0.4rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted-color);
+  }
+}
+
+.xm-guide-head {
+  margin-bottom: 0.8rem;
+  padding-left: 0.6rem;
+  border-left: 4px solid var(--xm-color, var(--link-color));
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.15rem;
+
+    i {
+      color: var(--xm-color, var(--link-color));
+    }
+  }
+}
+
+.xm-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted-color);
+}
+
+.xm-choices {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.xm-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-left: 3px solid var(--xm-color);
+  border-radius: 4px;
+  text-align: left;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--xm-color) 20%, transparent) var(--xm-fill, 0%),
+    color-mix(in srgb, var(--xm-color) 5%, transparent) 0
+  );
+
+  i {
+    width: 1.1rem;
+    color: var(--xm-color);
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--xm-color) 28%, transparent);
+  }
+}
+
+.xm-name {
+  flex: 1;
+}
+
+.xm-count {
+  color: var(--text-muted-color);
+  font-size: 0.85rem;
+}
+
+.xm-crumb {
+  margin-bottom: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.85rem;
+  color: var(--link-color) !important;
+}
+
+.xm-districts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+}
+
+.xm-district {
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--xm-line);
+  border-radius: 999px;
+  background: none;
+  font-size: 0.8rem;
+
+  &[aria-pressed='true'] {
+    border-color: var(--link-color);
+    color: var(--link-color) !important;
+  }
+}
+
+.xm-district-select {
+  width: 100%;
+  margin-bottom: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--xm-line);
+  border-radius: 6px;
+  background: var(--main-bg);
+  color: var(--text-color);
+}
+
+.xm-posts li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--xm-line);
+  font-size: 0.92rem;
+
+  time,
+  .xm-where {
+    color: var(--text-muted-color);
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}
+
+.xm-browse {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* --- passport chips --- */
+
+.xm-passport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--xm-color) 55%, transparent);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    text-decoration: none;
+    border-bottom-width: 1px !important;
+
+    i {
+      color: var(--xm-color);
+    }
+
+    span {
+      color: var(--text-muted-color);
+      font-size: 0.8rem;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--xm-color) 14%, transparent);
+    }
+  }
+}
+
+/* --- atlas --- */
+
+.xm-atlas {
+  h2 {
+    margin-top: 0;
+  }
+
+  details > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: '\203A';
+      transition: transform 0.2s;
+      color: var(--text-muted-color);
+    }
+  }
+
+  details[open] > summary::after {
+    transform: rotate(90deg);
+  }
+}
+
+.xm-country {
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--xm-line);
+  border-left: 4px solid var(--xm-color);
+  border-radius: 8px;
+
+  > summary {
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+
+    i {
+      color: var(--xm-color);
+      width: 1.2rem;
+    }
+  }
+}
+
+.xm-states {
+  padding: 0 0.9rem 0.6rem 2.6rem;
+}
+
+.xm-state {
+  > summary {
+    padding: 0.3rem 0;
+  }
+
+  ul {
+    margin: 0.2rem 0 0.6rem;
+    padding-left: 0.9rem;
+    border-left: 2px solid color-mix(in srgb, var(--xm-color) 40%, transparent);
+  }
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.15rem 0;
+    font-size: 0.92rem;
+
+    time {
+      color: var(--text-muted-color);
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+  }
+
+  .xm-browse {
+    margin: 0 0 0.6rem 0.9rem;
+  }
+}

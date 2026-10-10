@@ -1,0 +1,50 @@
+# Example: a feedback loop (GitOps reconcile). Shows grid placement, a back-edge (Cluster -> Observe
+# routes as a U below the row automatically), re-travelling an edge that is already lit (OD in
+# step 7), a vertical edge (Diff -> In sync), a dashed edge and the `ok` tone.
+title: GitOps reconcile loop
+accent: "#2DD4BF"
+accent2: "#F472B6"
+viewbox: [1000, 330]
+grid: {x0: 110, y0: 200, dx: 195, dy: 140, w: 150, h: 56}
+
+nodes:
+  - {id: G, label: "Git repo\n(desired state)", col: 0, row: 0, h: 70, shape: cylinder}
+  - {id: O, label: "Observe", col: 1, row: 0}
+  - {id: D, label: "Diff", col: 2, row: 0, w: 110, h: 80, shape: diamond}
+  - {id: A, label: "Apply\nchanges", col: 3, row: 0}
+  - {id: C, label: "Cluster\n(live state)", col: 4, row: 0, h: 70, shape: cylinder}
+  - {id: S, label: "In sync: wait", col: 2, row: -1, w: 150, h: 46, tone: ok}
+
+edges:
+  - {id: GO, from: G, to: O, dashed: true, label: "poll"}
+  - {id: OD, from: O, to: D}
+  - {id: DA, from: D, to: A, label: "drift"}
+  - {id: AC, from: A, to: C}
+  - {id: CO, from: C, to: O, offset: 50, label: "next interval"}
+  - {id: DS, from: D, to: S, label: "no diff", tone: ok}
+
+steps:
+  - lights: [G]
+    title: Desired state in Git
+    text: Manifests in Git are the single source of truth for what should run.
+  - edges: [GO]
+    title: Observe
+    text: The controller fetches the latest commit and reads the live state from the cluster API.
+  - edges: [OD]
+    title: Diff
+    text: Desired and live state are compared object by object.
+  - edges: [DA]
+    title: Apply changes
+    text: Drift is found, so the controller applies the difference.
+  - edges: [AC]
+    title: Cluster converges
+    text: The cluster now matches Git.
+  - edges: [CO]
+    title: Next interval
+    text: The loop never ends. After the sync interval the controller observes again.
+  - edges: [OD]
+    title: Diff again
+    text: The same comparison runs on the fresh state.
+  - edges: [DS]
+    title: In sync
+    text: No difference this time, so nothing is applied until the next interval or webhook.

@@ -1,0 +1,67 @@
+receivers:
+  # Traces, metrics and logs pushed by the app (OTLP SDKs, nginx otel module, ...)
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Container logs of the app pods, read from the node
+  file_log:
+    include:
+      - /var/log/pods/__APP_NS___*/*/*.log
+    include_file_path: true      # the container operator reads pod metadata from the path
+    start_at: beginning
+    operators:
+      - type: container          # CRI format + k8s.* resource attributes from the path
+      - type: json_parser        # parse JSON log lines; plain lines pass through unparsed
+        if: body startsWith "{"
+        parse_to: attributes
+        on_error: send_quiet
+
+  # Pull-based metrics (exporter sidecars, /metrics endpoints). Remove if the app only pushes OTLP.
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: __SERVICE__
+          scrape_interval: 15s
+          static_configs:
+            - targets: [__APP__.__APP_NS__.svc.cluster.local:9113]
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+  batch: {}
+  resource/logs:
+    attributes:
+      - key: service.name
+        value: __SERVICE__
+        action: insert
+
+exporters:
+  otlp_grpc:
+    endpoint: lgtm.observability.svc.cluster.local:4317
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc]
+    logs:
+      receivers: [otlp, file_log]
+      processors: [memory_limiter, resource/logs, batch]
+      exporters: [otlp_grpc]

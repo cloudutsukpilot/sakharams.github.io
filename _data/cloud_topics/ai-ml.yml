@@ -1,0 +1,53 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-ai-ml-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: platform
+    title: Machine learning platforms
+    aws:
+      - ref: Amazon SageMaker AI
+        summary: End-to-end ML service (renamed from Amazon SageMaker in December 2024) for data labelling, notebooks, training on managed clusters including HyperPod, hyperparameter tuning, model registry, endpoints and MLOps pipelines.
+    azure:
+      - ref: Azure Machine Learning
+        summary: Workspaces for training and deploying models with compute clusters, AutoML, designer pipelines, a model registry, managed online and batch endpoints, and MLflow integration. Works alongside Microsoft Foundry for generative AI.
+    gcp:
+      - ref: Vertex AI
+        summary: Unified platform for AutoML and custom training, Workbench notebooks, Pipelines, Feature Store, Model Registry and endpoints, with TPUs as well as GPUs available for training.
+
+  - id: genai
+    title: Foundation models and generative AI
+    aws:
+      - ref: Amazon Bedrock
+        summary: Serverless API access to foundation models from Anthropic (Claude), Meta, Mistral, Amazon Nova and others, with knowledge bases for RAG, guardrails, fine-tuning, and Bedrock AgentCore for deploying and operating agents.
+    azure:
+      - ref: Azure OpenAI
+        summary: OpenAI's GPT and reasoning models with Azure security, private networking and data residency, now delivered through **Microsoft Foundry** (formerly Azure AI Foundry), which also hosts models from Anthropic, Meta, Mistral, xAI and others plus an agent service.
+    gcp:
+      - ref: Vertex AI
+        name: Vertex AI (Gemini and Model Garden)
+        summary: Google's Gemini models plus Model Garden (Anthropic Claude, Llama, Mistral and open models), grounding with Google Search or your own data, tuning, evaluation and agent-building tools.
+
+  - id: apis
+    title: Prebuilt AI APIs
+    aws:
+      - ref: Amazon Rekognition
+        summary: Image and video analysis (object and face detection, content moderation, text in images). Sibling APIs cover documents (Textract), language (Comprehend), speech (Transcribe, Polly) and translation (Translate).
+    azure:
+      - ref: Azure AI services
+        summary: Prebuilt APIs for vision, speech, language, translation, content safety and Document Intelligence (formerly Form Recognizer), callable from one multi-service resource and integrated with Foundry.
+    gcp:
+      - ref: Vision AI
+        summary: Cloud Vision API for image labelling, OCR and safe-search detection, and Video Intelligence for video. Siblings include Speech-to-Text, Text-to-Speech, Natural Language, Translation and Document AI.
+
+  - id: conversational
+    title: Conversational AI and search
+    aws:
+      - name: Amazon Lex and Amazon Kendra
+        icon: lex
+        summary: Lex builds voice and chat bots with built-in speech recognition and language understanding, integrated with Amazon Connect. Kendra provides intelligent enterprise search, often used as a retriever for RAG.
+    azure:
+      - ref: Azure Bot Service
+        summary: Hosts and connects bots to Teams, web chat, Slack and other channels. Most new conversational experiences are built with Copilot Studio or Foundry agents, with Bot Service as the channel layer.
+      - ref: Azure AI Search
+        summary: Full-text, vector and hybrid search with semantic ranking, integrated chunking and vectorisation. The standard retrieval layer for RAG applications on Azure.
+    gcp:
+      - ref: Dialogflow
+        summary: Dialogflow CX (Conversational Agents) builds chat and voice agents with flows, generative playbooks and contact-centre integration. Vertex AI Search covers enterprise and website search for RAG.
