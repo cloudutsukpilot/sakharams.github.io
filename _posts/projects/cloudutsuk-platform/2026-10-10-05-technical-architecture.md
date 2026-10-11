@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Technical Architecture"
 date: 2026-10-10 00:05:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Architecture]
-description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD with Karmada, monitoring, OpenCost, LitmusChaos, a local LLM with RAG, and the ADRs behind each choice."
+description: "How the Cloudutsuk Platform fits on one DGX Spark: k3d clusters, Backstage, central Argo CD with Karmada, monitoring, OpenCost, LitmusChaos, KEDA, a local LLM with RAG, and the ADRs behind each choice."
 project: cloudutsuk-platform
 project_step: 5
 mermaid: true
@@ -43,7 +43,7 @@ There are six zones:
 All of them are k3d clusters on one Docker network called `homelab`, so they reach each other by name.
 The diagram below opens one layer deep. Use the level buttons or click a cluster to open it, drag and
 zoom like a map, and hover an arrow for its protocol and why it exists. The tabs at the top add the
-networking, observability, security, CI/CD and chaos connections. Pick a use case on the left and press
+networking, observability, security, CI/CD, and chaos and scaling connections. Pick a use case on the left and press
 play to follow a packet through it:
 
 {% include diagram.html id="projects/cloudutsuk-platform/system-architecture" %}
@@ -63,6 +63,7 @@ play to follow a packet through it:
 | Arize Phoenix | `ai` cluster | Shows every chat and agent request as a trace: retrieved chunks and scores, prompt, tokens, latency per step |
 | Model gateway (LiteLLM) | `ai` cluster | The one OpenAI-compatible endpoint for every model call: routing, queueing, limits, token counts, later overflow |
 | vLLM chat + vLLM embeddings | `ai` cluster (GPU) | Local chat model and embedding model, each with its own memory slice |
+| KEDA | `ai` cluster | Scales on-demand models from 0 to 1 when the gateway sees demand and back to 0 when idle, so an unused model frees its memory (phase 5) |
 | SRE agent | platform | Alert-triggered diagnosis with human approval before any change |
 | mon cluster | its own k3d cluster | OpenTelemetry gateway, Grafana LGTM, Alertmanager; ready-made dashboards for the fleet, Kubernetes, data stores, AI serving and the platform |
 | Monitoring pack | every cluster, including labs | OTel collectors, kube-state-metrics and ServiceMonitor discovery, installed by one ApplicationSet |
@@ -95,6 +96,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | Observability | OpenTelemetry Collector + Grafana LGTM | The same stack the [OpenTelemetry lab](/tags/opentelemetry-lab/) already teaches |
 | LLM serving | vLLM | OpenAI-compatible API, continuous batching, runs on the GB10 GPU |
 | Model gateway | LiteLLM proxy | One endpoint for all callers, so adding a model, a second machine or a hosted fallback doesn't touch the services |
+| Scale to zero | **KEDA** (CNCF graduated) in the `ai` cluster | Plain HPA can't go to zero replicas, and CPU-based scaling is useless on one GPU. KEDA scales on a Prometheus query, so a rarely used model unloads when idle. Knative would also scale to zero, but needs its own serving layer |
 | Vector store | Qdrant | Payload filters (repo, lab, cloud, path) and hybrid search |
 | Semantic cache | Redis with RedisVL `SemanticCache` | Small, well understood, TTL and similarity threshold built in |
 | RAG visualization | Arize Phoenix (self-hosted) | Understands LLM and retrieval spans (documents, scores, prompts), has an embeddings map and evals, and takes OpenTelemetry input like the rest of the platform. Langfuse is the fallback, but it also needs ClickHouse |
@@ -104,6 +106,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | Supply chain | Cosign signatures, SBOM attestations, Kyverno admission | Only signed images from our own registry can run, in every cluster |
 | Chaos engineering | **LitmusChaos** (open source, CNCF), ChaosCenter in the `core` cluster | Chaos Mesh was the earlier note in ADR 0031 and is lighter, but Litmus adds a control plane for every cluster, a hub of ready-made experiments, probes that score each run, and experiments kept in git. Hosted tools such as Gremlin cost money and reach in from outside |
 | Container registry | **Zot** in the `core` cluster | Harbor is the usual pick, but its official images are amd64 only and the DGX is arm64. Zot is a single multi-arch binary with access control, OIDC, a pull-through mirror, built-in CVE scanning and the OCI referrers API for signatures |
+| Pod networking and policy | k3s defaults: flannel and its built-in NetworkPolicy controller | Enough for default-deny today. **Cilium** was considered and deferred: a lab first, then the long-lived clusters, see [Cilium](#cilium-considered-deferred) |
 
 > **GPU test, done 2026-10-11.** vLLM runs *inside* the `ai` k3d cluster: a k3s image with NVIDIA's
 > container toolkit, the NVIDIA device plugin, and pods that ask for `nvidia.com/gpu`. A chat model and an
@@ -751,6 +754,44 @@ Inside every cluster, NetworkPolicies default to deny. They allow ingress from T
 the identity table above, DNS, and egress to the targets in this table. Inside a cluster, Traefik
 terminates TLS and talks plain HTTP to the pod. Pod-to-pod mTLS waits for the service mesh option.
 
+#### Cilium: considered, deferred
+{: #cilium-considered-deferred }
+
+**Cilium** (eBPF networking, policy and observability) fits where this platform is heading, but not
+yet. I'm recording it so the reasoning isn't lost.
+
+Why it fits:
+- The address plan already leaves room for it: unique pod and service CIDRs per cluster are exactly
+  what Cilium's ClusterMesh needs.
+- It could fill the "pod-to-pod mTLS waits for the service mesh" gap with mutual authentication and no
+  sidecars.
+- Hubble shows every flow, including the ones a policy dropped, and its metrics would go to Mimir like
+  everything else. That makes default-deny NetworkPolicies far easier to debug.
+- Policies by HTTP path and DNS name, for example the inventory limited to its three cloud APIs by name
+  instead of "HTTPS anywhere".
+- arm64 is supported.
+
+Why not now:
+- **k3d makes it fiddly.** Each cluster has to be created without flannel and k3s's policy controller,
+  and each node container needs the BPF filesystem mounted and cgroup settings adjusted. That's fine for
+  four long-lived clusters, but it adds steps and failure points to every lab's `make up`.
+- **One shared kernel.** Every k3d cluster runs on the DGX's one Linux kernel. Some Cilium features hook
+  in at the host level (its kube-proxy replacement and socket load balancing), so one cluster's Cilium
+  might affect another's traffic. A risk to test, not a known blocker.
+- **Memory.** An estimated 0.3–0.5 GB per cluster (agent and operator, more with Hubble), about 2–3 GB
+  with labs, on a budget that's already tight.
+- **ClusterMesh buys little on one machine.** Cross-cluster calls already go over HTTPS through Traefik
+  with a JWT (ADR 0029), and every cluster shares the same host.
+- **Today's need is met.** k3s's built-in controller already enforces default-deny NetworkPolicies.
+
+The path, if and when it's worth it:
+
+| Step | What | Trigger |
+|---|---|---|
+| 1. A lab | "Cilium on k3d": Hubble, an HTTP-path or DNS-name policy, two clusters joined by ClusterMesh. Answers the k3d and shared-kernel questions cheaply, and it's a blog lab in its own right | Any time; no platform change |
+| 2. Long-lived clusters | `core`, `platform`, `mon` and `ai` move to Cilium in one change, with its own ADR. Labs keep k3s defaults unless the lab is about Cilium | The lab shows no cross-cluster interference and the memory fits |
+| 3. ClusterMesh and mutual authentication | Direct pod routing and mTLS between clusters | A second machine joins, the same point where Karmada's failover starts to matter |
+
 > **Checked 2026-10-11.** The home LAN is a `/24` inside `192.168.0.0/16` and the DGX joins it over
 > Wi-Fi. Docker's existing networks use `172.17` and `172.18`, and no host route touches `172.30.x` or
 > `10.x`, so the plan stands. `infra-local/host/check-prereqs.sh` repeats this check before any cluster
@@ -768,6 +809,7 @@ on the same chip and the same memory. So the budget is the main design constrain
 |---|---|---|
 | `ai` cluster: vLLM chat model (~20–30B MoE, FP8/MXFP4) | ~35–40 GB | ~30 GB to start |
 | `ai` cluster: vLLM embeddings + model gateway | ~3–5 GB | ~4 GB |
+| `ai` cluster: KEDA operator and metrics server (on-demand models use 0 GB while idle) | ~0.1–0.3 GB | ~0.2 GB |
 | `ai` cluster: RAG API, rag-ingest, Qdrant, Redis, Phoenix | ~4–6 GB | ~5 GB |
 | core cluster (Keycloak, OpenBao, PowerDNS, Zot, ESO, ExternalDNS, LitmusChaos ChaosCenter + MongoDB) | ~4–5.5 GB | ~4.5 GB |
 | Litmus chaos agents (one per target cluster, from phase 2a) | ~0.2–0.4 GB each | ~1 GB |
@@ -824,6 +866,58 @@ scaling steps below possible:
 start copies that compete for the same chip. Instead, `mon` watches vLLM's waiting-request count and
 time to first token. When those stay high, that's the signal to add a backend or turn on overflow. Real
 autoscaling, such as KEDA on queue depth, becomes possible once there's a second GPU node.
+
+### On-demand models with KEDA
+{: #on-demand-models-with-keda }
+
+There's one kind of scaling that does pay off on one box: **scaling to zero**. The table above says
+rarely used models are "loaded on demand and unloaded when idle", because memory is the only lever.
+**KEDA** (Kubernetes event-driven autoscaling, a CNCF graduated project) does exactly that, and it runs
+only in the **`ai` cluster**:
+
+- **Which models.** Only the on-demand ones, such as a reranker or a coding model if they're added. The
+  chat model and the embedding model keep `minReplicaCount: 1` and are never scaled to zero, because the
+  portal chat and ingest need them all the time.
+- **The trigger.** KEDA's Prometheus scaler queries Mimir for the model gateway's request metrics for
+  that model. Demand scales its vLLM Deployment from 0 to 1; a long quiet spell (the cooldown) scales it
+  back to 0 and hands its memory slice back to the desktop and the labs.
+- **Cold starts.** Loading a model takes time, so the first request after a quiet spell waits. The
+  gateway queues and retries that request, and its callers already expect a slow first answer from an
+  on-demand model. That trade is the whole point: memory when nobody's using it, a wait when someone is.
+- **Admission.** Before the model scales up, its memory slice must fit what's free on the host, the same
+  rule the lab runner follows (ADR 0017). If it doesn't fit, it stays at 0 and the gateway answers with a
+  clear "model unavailable" instead of starving the chat model.
+
+```yaml
+# Sketch: an on-demand model that sleeps when idle
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: vllm-reranker
+  namespace: serving
+spec:
+  scaleTargetRef:
+    name: vllm-reranker
+  minReplicaCount: 0
+  maxReplicaCount: 1                 # one GPU: never more than one copy
+  cooldownPeriod: 1800               # 30 quiet minutes before it unloads
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: https://mimir.mon.home.cloudutsuk.com/prometheus
+        query: sum(rate(litellm_requests_total{model="reranker"}[5m]))   # metric name checked in phase 5
+        threshold: "0.01"
+      authenticationRef:
+        name: mimir-reader           # OAuth2 token from OpenBao through External Secrets
+```
+
+KEDA isn't used for the services: CPU-based scaling on one host only starts copies that compete for the
+same chip. Its other uses wait for a second GPU node: vLLM replicas on queue depth, and the overflow
+backend described above.
+
+> **TODO:** Confirm in phase 5 how the gateway behaves while a model scales from 0 (queue, retry or fail
+> fast), the gateway's real metric names, and how long the on-demand models take to load on the GB10.
+{: .prompt-warning }
 
 Elsewhere:
 - The lab runner refuses or queues a deploy that would push free memory below the headroom.
@@ -970,7 +1064,8 @@ LitmusChaos in `core` is recorded as **ADR 0036** (proposed until the phase 2a s
 "Chaos Mesh in a lab cluster later" line in ADR 0031. It joins the log below once it's merged in
 `homelab-gitops` and synced. Karmada for multi-cluster placement is **ADR 0037**, also proposed until
 its phase 1a trial. It adds to ADR 0007 rather than replacing it: Argo CD stays the single GitOps hub.
-OpenCost on every k3d cluster for the DGX's cost is **ADR 0038**, proposed until phase 4.
+OpenCost on every k3d cluster for the DGX's cost is **ADR 0038**, proposed until phase 4. KEDA in
+the `ai` cluster for on-demand models is **ADR 0039**, proposed until phase 5.
 
 {% include project-adr-log.html project="cloudutsuk-platform" %}
 
@@ -989,6 +1084,7 @@ OpenCost on every k3d cluster for the DGX's cost is **ADR 0038**, proposed until
 - [ ] Litmus spike done: arm64 images, k3s containerd socket, Keycloak sign-in through Dex, measured memory
 - [ ] The first chaos experiments pass on a lab, then on `platform`, with results in Grafana
 - [ ] ADR 0037 (Karmada) merged in `homelab-gitops` and synced to the blog
+- [ ] ADR 0039 (KEDA in `ai`) merged in `homelab-gitops` and synced; an on-demand model scales 0 → 1 → 0 with its memory returned
 - [ ] ADR 0038 (OpenCost on every k3d cluster) merged in `homelab-gitops` and synced to the blog
 - [ ] OpenCost running on every cluster with custom DGX prices, and the DGX's daily cost in the portal per cluster and lab
 - [ ] Karmada trial done: arm64 images, Argo CD health through Karmada, a lab joining and leaving in pull mode, measured memory

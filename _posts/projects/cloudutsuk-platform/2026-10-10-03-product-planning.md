@@ -39,7 +39,7 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 | 2a. Chaos engineering | Open-source LitmusChaos: ChaosCenter and its MongoDB in `core`, chaos agents on target clusters by an ApplicationSet (labs first), the experiment library in `homelab-gitops`, a Chaos dashboard in Grafana, first game day | 1, 2 | Not started |
 | 3. Portal + labs | Backstage custom image through CI, SSO, Labs plugin, lab runner, `deploy:` blocks, Dashboard tab on the blog | 1, 2 | Not started |
 | 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, OpenCost on every k3d cluster with custom DGX prices, Inventory & Cost plugin, budget alerts | 2, 3 | Not started |
-| 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | Not started |
+| 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; KEDA scaling on-demand models to zero when idle; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | Not started |
 | 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 | Not started |
 
 **Phase 0 progress:**
@@ -106,8 +106,9 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Chaos engineering | `homelab-gitops` | ChaosCenter Helm values in `core`; agent ApplicationSet; experiment library with probes; game-day runbook |
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
 | Inventory + cost | `homelab-services`, `homelab-gitops` | Azure collector; AWS collector; GCP billing export; DGX power estimate; OpenCost in the monitoring pack with custom DGX prices; daily OpenCost allocation into `COST_DAILY` |
-| RAG + chat | `homelab-services` | Incremental ingest; semantic cache; Chat plugin with citations |
+| RAG + chat | `homelab-services`, `homelab-gitops` | Incremental ingest; semantic cache; Chat plugin with citations; KEDA ScaledObject for each on-demand model |
 | Alert agent | `sre-agent` | Alertmanager webhook; RAG tool; eval cases from lab experiments |
+| Later (deferred) | a new lab repo, then `infra-local` | Cilium on k3d as a lab first; the long-lived clusters only if the lab passes ([why deferred](/posts/projects/cloudutsuk-platform/05-technical-architecture/#cilium-considered-deferred)) |
 | Playbook | this blog | Area posts per phase; ADR sync; diagrams |
 
 Issues live on GitHub in each repo, labelled by epic.
@@ -183,6 +184,7 @@ There's one decider, so this stays light:
 - [ ] arm64 image check done for every planned chart, including LitmusChaos and its MongoDB
 - [ ] ADR 0036 (LitmusChaos in `core`) written in `homelab-gitops` and synced
 - [ ] ADR 0038 (OpenCost on every k3d cluster) written in `homelab-gitops` and synced
+- [ ] ADR 0039 (KEDA for on-demand models in `ai`) written in `homelab-gitops` and synced
 - [ ] ADR 0037 (Karmada) written in `homelab-gitops`, and accepted or dropped after the phase 1a trial
 - [ ] This post and the project card status updated at the end of every phase
 

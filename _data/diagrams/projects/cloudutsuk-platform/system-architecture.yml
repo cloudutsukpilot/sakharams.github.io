@@ -15,7 +15,7 @@ views:
   - {id: observability, label: Observability, icon: chart}
   - {id: security, label: Security, icon: lock}
   - {id: cicd, label: CI/CD, icon: rocket}
-  - {id: chaos, label: Chaos, icon: bolt}
+  - {id: ops, label: Chaos + scaling, icon: bolt}
 
 nodes:
   - id: you
@@ -315,16 +315,39 @@ nodes:
           icon: balancer
           detail: 'The one OpenAI-compatible endpoint for every model call (`/v1/chat/completions`, `/v1/embeddings`):
             routing by model name, queueing, limits, token counts, later overflow.'
-        - id: vllm-chat
-          label: vLLM chat
-          sub: local model
-          icon: message
-          detail: The local chat model on the GB10 GPU, with its own memory slice.
-        - id: vllm-embed
-          label: vLLM embed
-          sub: embeddings
+        - id: vllm
+          label: vLLM
+          sub: model servers
           icon: cpu
-          detail: The embedding model, with its own memory slice.
+          color: teal
+          detail: 'The vLLM instances on the GPU, each with its own memory slice: the chat and embedding models are
+            always on; on-demand models sleep at 0 replicas until KEDA wakes them.'
+          children:
+          - id: vllm-chat
+            label: vLLM chat
+            sub: local model
+            icon: message
+            detail: The local chat model on the GB10 GPU, with its own memory slice.
+          - id: vllm-embed
+            label: vLLM embed
+            sub: embeddings
+            icon: cpu
+            detail: The embedding model, with its own memory slice.
+          - id: vllm-ondemand
+            label: On-demand models
+            sub: 0 replicas when idle
+            icon: cpu
+            tone: warn
+            detail: 'Rarely used models, such as a reranker or a coding model if they are added. KEDA keeps them at 0
+              replicas until the gateway sees demand, then loads one copy; after a quiet spell they unload and hand
+              their memory slice back. The first request after a quiet spell waits for the model to load.'
+        - id: keda
+          label: KEDA
+          sub: scale to zero
+          icon: gear
+          detail: 'Kubernetes event-driven autoscaling (CNCF graduated), in the ai cluster only (phase 5, ADR 0039
+            proposed). Its Prometheus scaler reads the gateway''s per-model request rate from Mimir and scales each
+            on-demand model between 0 and 1. The chat and embedding models are never scaled to zero.'
       - id: phoenix
         label: Phoenix
         sub: RAG traces
@@ -534,7 +557,7 @@ edges:
   - {id: rag_db, from: rag-api, to: ai-db, proto: PostgreSQL, port: 5432, why: "Stores the RAG service's ingest state and chat history."}
   - {id: gw_llm, from: gateway, to: vllm-chat, proto: HTTP, port: 8000, why: "Every chat completion, from the portal chat or the SRE agent, is routed here by model name."}
   - {id: gw_emb, from: gateway, to: vllm-embed, proto: HTTP, port: 8000, why: "Every embedding request (ingest, and question vectors for the cache and retrieval) is routed here."}
-  - {id: gw_more, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers."}
+  - {id: gw_more, view: ops, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers."}
   - {id: ing_gh, oneway: true, from: repos, to: rag-ingest, proto: HTTPS, port: 443, label: clone, why: "Every 6 hours (or on Re-index now) rag-ingest pulls the latest pushed content of the blog and repos."}
   - {id: ing_qd, from: rag-ingest, to: qdrant, proto: Qdrant, port: 6333, why: "After embedding, new and changed chunks are written to Qdrant and the chunks of removed files deleted."}
   - {id: ing_gw, from: rag-ingest, to: gateway, proto: HTTP, port: 4000, label: embeddings, why: "Changed files are embedded through the gateway before they are stored."}
@@ -564,6 +587,9 @@ edges:
   - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
   - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
   - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's cache."}
+  - {id: gw_od, view: ops, from: gateway, to: vllm-ondemand, proto: HTTP, port: 8000, dashed: true, label: on demand, why: "Used only when a caller asks for an on-demand model: the gateway routes it here once KEDA has loaded it."}
+  - {id: keda_mimir, view: observability, from: keda, to: mimir, proto: HTTPS, port: 443, label: PromQL, detail: "An OAuth2 token from OpenBao through External Secrets.", why: "Every polling interval: KEDA asks Mimir how many requests the gateway has seen for each on-demand model."}
+  - {id: keda_scale, view: ops, oneway: true, from: keda, to: vllm-ondemand, kind: control, label: "scale 0 ↔ 1", why: "Used when demand appears or after a quiet spell: KEDA loads one copy of the model, or unloads it and frees its memory."}
   - {id: inv_oc, from: inventory, to: lab-opencost, proto: HTTPS, port: 443, label: daily allocation, detail: "OAuth2 client credentials from Keycloak (ADR 0029).", why: "Once a day: the inventory reads each cluster's cost by namespace from OpenCost and stores it as the DGX's line in the cost view."}
   - {id: oc_mimir, view: observability, from: lab-opencost, to: mimir, proto: HTTPS, port: 443, label: PromQL, detail: "Filtered by the cluster's own label; no Prometheus runs in the cluster.", why: "Whenever OpenCost computes an allocation: it reads that cluster's CPU, memory and pod metrics from Mimir."}
   - {id: oc_metrics, view: observability, main: true, from: lab-opencost, to: lab-otel, kind: telemetry, label: cost metrics, why: "Always on: OpenCost's cost metrics are scraped by the monitoring pack, so Grafana shows cost per cluster and lab."}
@@ -571,13 +597,13 @@ edges:
   - {id: run_karmada, view: cicd, oneway: true, from: runner, to: karmada, kind: control, label: register, why: "Used when a lab is deployed or destroyed: the runner registers the new cluster with Karmada (role lab) or removes it."}
   - {id: kagent_karmada, view: cicd, from: lab-karmada, to: karmada, proto: HTTPS, port: 5443, label: pull, detail: "Pull mode: the agent's own client certificate; Karmada never connects in.", why: "Always on: the agent watches Karmada for add-ons placed on its cluster and reports their status back."}
   - {id: kagent_apply, view: cicd, oneway: true, from: lab-karmada, to: lab-otel, kind: control, label: apply add-ons, why: "Used when an add-on is placed on this cluster: the agent applies it locally, here the monitoring pack's collector."}
-  - {id: you_chaos, view: chaos, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", detail: "Internal only: reached from the home LAN, not through Cloudflare.", why: "Used when you start, schedule or review a chaos experiment in ChaosCenter."}
-  - {id: cc_db, view: chaos, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB."}
-  - {id: chaos_agent, view: chaos, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key from OpenBao.", why: "Always on while a cluster is a chaos target: the agent dials out to ChaosCenter for experiments and reports their results."}
-  - {id: chaos_inject, view: chaos, oneway: true, from: lab-chaos, to: lab-app, kind: control, label: inject fault, why: "During an experiment: the chaos operator injects the fault (for example pod-delete) into the target app, within the blast radius set in git."}
-  - {id: chaos_metrics, view: [observability, chaos], main: true, from: lab-chaos, to: lab-otel, kind: telemetry, label: chaos exporter, why: "Always on: experiment state and resilience scores from the chaos exporter are scraped, so Grafana shows faults next to their effects."}
-  - {id: chaos_git, view: [cicd, chaos], from: chaoscenter, to: gitops, proto: HTTPS, port: 443, label: experiments as code, why: "Experiment definitions are reviewed in homelab-gitops; ChaosCenter's GitOps sync keeps its library equal to git."}
-  - {id: chaos_kc, view: [security, chaos], from: chaoscenter, to: keycloak, proto: OIDC, tls: true, dashed: true, detail: "Through Litmus's Dex integration with Keycloak as the upstream; checked in the phase 2a spike.", why: "Planned: you sign in to ChaosCenter with Keycloak like every other tool; only platform-admins may run experiments."}
+  - {id: you_chaos, view: ops, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", detail: "Internal only: reached from the home LAN, not through Cloudflare.", why: "Used when you start, schedule or review a chaos experiment in ChaosCenter."}
+  - {id: cc_db, view: ops, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB."}
+  - {id: chaos_agent, view: ops, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key from OpenBao.", why: "Always on while a cluster is a chaos target: the agent dials out to ChaosCenter for experiments and reports their results."}
+  - {id: chaos_inject, view: ops, oneway: true, from: lab-chaos, to: lab-app, kind: control, label: inject fault, why: "During an experiment: the chaos operator injects the fault (for example pod-delete) into the target app, within the blast radius set in git."}
+  - {id: chaos_metrics, view: [observability, ops], main: true, from: lab-chaos, to: lab-otel, kind: telemetry, label: chaos exporter, why: "Always on: experiment state and resilience scores from the chaos exporter are scraped, so Grafana shows faults next to their effects."}
+  - {id: chaos_git, view: [cicd, ops], from: chaoscenter, to: gitops, proto: HTTPS, port: 443, label: experiments as code, why: "Experiment definitions are reviewed in homelab-gitops; ChaosCenter's GitOps sync keeps its library equal to git."}
+  - {id: chaos_kc, view: [security, ops], from: chaoscenter, to: keycloak, proto: OIDC, tls: true, dashed: true, detail: "Through Litmus's Dex integration with Keycloak as the upstream; checked in the phase 2a spike.", why: "Planned: you sign in to ChaosCenter with Keycloak like every other tool; only platform-admins may run experiments."}
   - {id: pull_labs, from: labs, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Lab clusters also pull through Zot, so labs keep working when an upstream registry is slow or rate-limited."}
 
 # Use cases: one activity each, one action per step (the reader picks one; auto-play runs them in turn).
@@ -691,6 +717,29 @@ scenarios:
         path: [you_graf, ~you_graf]
         result: done
         outcome: "Dashboard loaded"
+
+  - id: wake-model
+    title: Wake an idle model
+    summary: "Planned (phase 5): KEDA loads a rarely used model on demand and unloads it when idle."
+    steps:
+      - title: A request for a sleeping model
+        action: "Gateway: a request arrives for an on-demand model at 0 replicas"
+        text: "A caller asks the gateway for an on-demand model; the gateway queues the request while the model is asleep."
+        lights: [gateway, vllm-ondemand]
+      - title: KEDA sees the demand
+        action: "KEDA ↔ Mimir: requests for this model in the last 5 minutes (PromQL)"
+        text: "KEDA's Prometheus scaler reads the gateway's per-model request rate from Mimir over HTTPS."
+        path: [keda_mimir, ~keda_mimir]
+      - title: Load the model
+        action: "KEDA → on-demand model: scale 0 → 1"
+        text: "If its memory slice fits what's free on the host, KEDA scales the model to one copy and vLLM loads it."
+        edges: [keda_scale]
+      - title: Serve the request
+        action: "Gateway ↔ on-demand model: the queued request (HTTP 8000)"
+        text: "The queued request is answered. After 30 quiet minutes KEDA scales the model back to 0 and its memory returns."
+        path: [gw_od, ~gw_od]
+        result: success
+        outcome: "Model served, then unloaded when idle"
 
   - id: dgx-cost
     title: Price a lab on the DGX
