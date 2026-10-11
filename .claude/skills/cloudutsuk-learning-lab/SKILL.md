@@ -70,7 +70,9 @@ python3 $S/scaffold.py card --name "<Name>" [--tag "<Tag>"] --summary "<1-2 sent
 
 Fill in `_data/labs/<slug>.yml`: `lab_category` (an id from `_data/lab_catalog.yml`; add a category
 there only if none fits), level, duration, platform, endpoints/`capture.urls` (the lab's own
-ports), and **3–7 experiments**. Before writing shots, read the "Gotchas" in
+ports), the `deploy:` block (Make targets, `memory_gb` from `docker stats` once the lab runs, every
+published host port, `ttl_hours` for cloud labs; `repo.path` must be absolute) that the platform's lab
+runner reads so the portal can deploy the lab, and **3–7 experiments**. Before writing shots, read the "Gotchas" in
 references/experiments.md (search lag, lazy panels, stale dashboards, probe noise). Design them following [references/experiments.md](references/experiments.md):
 each with `goal`, `signals`, `action` (`say` + `run` and/or `browser`), `predict`, `wait`, `verify`,
 `look_for` and `shots`. Copy shapes from the reference card. **Double-quote every prose value.**

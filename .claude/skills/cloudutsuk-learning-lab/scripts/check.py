@@ -10,7 +10,10 @@ Errors (exit 1):
   shots     a shot in the card with no file in assets/img/labs/<slug>/ or no entry in
             _data/lab_shots/<slug>.json (skip with --allow-missing-shots while drafting)
   repo      a `make <target>` in an action, verify or preflight that the lab repo's Makefile lacks
-Notes: parts not written, no architecture animation, orphan screenshots, word counts, TODO callouts,
+  deploy    a `deploy:` block the lab runner would skip: repo.path not absolute, bad target names,
+            targets the Makefile lacks, bad memory_gb, ports or ttl_hours (mirrors
+            homelab-services/services/lab-runner/src/lab_runner/cards.py)
+Notes: no `deploy:` block (the portal can't deploy the lab), parts not written, no architecture animation, orphan screenshots, word counts, TODO callouts,
 phrases that read as machine-written.
 
 Usage (from the repo root):
@@ -25,6 +28,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path.cwd()
+TARGET = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,62}$")
 SIGNALS = {"metrics", "logs", "traces", "profiles", "events"}
 PHASES = {"before", "after", "during"}
 BANNED = [
@@ -161,7 +165,48 @@ def check_shots(card, slug, exps, errors, notes, allow_missing):
             notes.append("some screenshots were captured from uncommitted lab code; commit the lab repo and recapture")
 
 
-def check_repo(card, exps, errors, notes):
+def check_deploy(card, errors, notes):
+    """The same rules the lab runner applies when it reads the card; returns the Make targets to check."""
+    deploy = card.get("deploy")
+    if deploy is None:
+        notes.append("card: no `deploy:` block, so the portal's Labs page can't deploy this lab")
+        return []
+    if not isinstance(deploy, dict):
+        errors.append("deploy: must be a mapping")
+        return []
+    repo = str((card.get("repo") or {}).get("path") or "")
+    if not repo.startswith("/"):
+        errors.append(f"deploy: repo.path {repo!r} must be absolute (the lab runner rejects ~ and relative paths)")
+    targets = deploy.get("targets") or {}
+    if not isinstance(targets, dict):
+        errors.append("deploy.targets: must be a mapping")
+        targets = {}
+    names = []
+    for key, default in (("up", "up"), ("down", "down"), ("status", None)):
+        name = targets.get(key, default)
+        if name is None:
+            continue
+        if not isinstance(name, str) or not TARGET.match(name):
+            errors.append(f"deploy.targets.{key}: {name!r} is not a plain Make target name")
+        else:
+            names.append((f"deploy.targets.{key}", name))
+    try:
+        if float(deploy.get("memory_gb") or 0) <= 0:
+            notes.append("deploy.memory_gb: not set, so admission control can't reserve memory for the lab")
+    except (TypeError, ValueError):
+        errors.append(f"deploy.memory_gb: {deploy.get('memory_gb')!r} is not a number")
+    ports = deploy.get("ports") or []
+    if not isinstance(ports, list) or not all(isinstance(p, int) and 0 < p < 65536 for p in ports):
+        errors.append(f"deploy.ports: {ports!r} must be a list of port numbers")
+    elif not ports:
+        notes.append("deploy.ports: empty, so the runner can't detect port clashes with other labs")
+    ttl = deploy.get("ttl_hours")
+    if ttl is not None and not (isinstance(ttl, (int, float)) and ttl > 0):
+        errors.append(f"deploy.ttl_hours: {ttl!r} must be a positive number")
+    return names
+
+
+def check_repo(card, exps, errors, notes, deploy_targets=()):
     repo = (card.get("repo") or {}).get("path")
     if not repo or "TODO" in str(repo):
         notes.append("card: repo.path not set; skipped Makefile checks")
@@ -179,6 +224,7 @@ def check_repo(card, exps, errors, notes):
     for e in exps:
         cmds += [(f"{e.get('id')}.action.run", (e.get("action") or {}).get("run")),
                  (f"{e.get('id')}.verify", e.get("verify"))]
+    cmds += [(where, f"make {name}") for where, name in deploy_targets]
     for where, cmd in cmds:
         for t in re.findall(r"(?:^|[;&|]\s*)make\s+((?:[A-Za-z0-9_.-]+\s*)+)", cmd or ""):
             for name in t.split():
@@ -272,7 +318,7 @@ def main():
         errors.append(f"_data/projects/{args.slug}.yml also exists; the project index wins on /tags/{args.slug}/")
     exps = check_card(card, args.slug, errors, notes)
     check_shots(card, args.slug, exps, errors, notes, args.allow_missing_shots)
-    check_repo(card, exps, errors, notes)
+    check_repo(card, exps, errors, notes, check_deploy(card, errors, notes))
 
     parts = framework["parts"]
     if args.parts:

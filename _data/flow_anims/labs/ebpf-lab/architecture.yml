@@ -1,0 +1,81 @@
+# Animated flow diagram for _posts/labs/ebpf-lab/2026-10-11-01-overview.md
+# (include id: labs/ebpf-lab/architecture), reused in part 7.
+# One visit through the demo app, the four eBPF tools that watch it from the shared kernel, and where
+# each one's output lands. Facts from ~/gitrepos/observability/ebpf-lab and the 2026-10-11 runs.
+title: eBPF Lab, request path and the eBPF tools around it
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 520]
+grid: { x0: 100, y0: 95, dx: 200, dy: 175, w: 150, h: 56 }
+
+lanes:
+  - { label: "lab-ebpf cluster (k3d node containers on the homelab network)", x: 8, y: 8, w: 984, h: 160 }
+  - { label: "The DGX's one Linux kernel: eBPF programs", x: 8, y: 182, w: 984, h: 160 }
+  - { label: "Where you look", x: 8, y: 356, w: 984, h: 156 }
+
+nodes:
+  - { id: USER, label: "You", col: 0, row: 0, shape: circle, w: 70, h: 70 }
+  - { id: WEB, label: "web", sub: "nginx", col: 1, row: 0 }
+  - { id: API, label: "api", sub: "Go, no tracing", col: 2, row: 0 }
+  - { id: REDIS, label: "redis", sub: "PVC redis-data", col: 3, row: 0, shape: cylinder, h: 62 }
+  - { id: PV, label: "Static local PV", sub: "/srv/homelab/...", col: 4, row: 0, shape: cylinder, h: 62 }
+  - { id: CIL, label: "Cilium", sub: "tc + socket LB", col: 0.5, row: 1 }
+  - { id: OBI, label: "OBI", sub: "uprobes, kprobes", col: 1.5, row: 1 }
+  - { id: TET, label: "Tetragon", sub: "kprobe execve", col: 2.5, row: 1 }
+  - { id: FAL, label: "Falco", sub: "syscalls", col: 3.5, row: 1 }
+  - { id: HUB, label: "Hubble UI", sub: ":8092", col: 0.5, row: 2, shape: terminal }
+  - { id: MON, label: "Grafana in mon", sub: "OTLP, Phase 2", col: 1.5, row: 2, shape: terminal }
+  - { id: KILL, label: "SIGKILL", sub: "in the kernel", col: 2.5, row: 2, shape: terminal, tone: fail }
+  - { id: FSK, label: "Falcosidekick UI", sub: ":8093", col: 3.5, row: 2, shape: terminal }
+
+edges:
+  - { id: USER_WEB, from: USER, to: WEB, label: "HTTP" }
+  - { id: WEB_API, from: WEB, to: API, label: "/api" }
+  - { id: API_REDIS, from: API, to: REDIS, label: "INCR" }
+  - { id: REDIS_PV, from: REDIS, to: PV, label: "AOF" }
+  - { id: WEB_CIL, from: WEB, to: CIL, points: [[260, 123], [260, 200], [200, 200], [200, 242]], dashed: true }
+  - { id: API_OBI, from: API, to: OBI, points: [[460, 123], [460, 200], [400, 200], [400, 242]], dashed: true }
+  - { id: WEB_TET, from: WEB, to: TET, points: [[340, 123], [340, 150], [600, 150], [600, 242]], dashed: true }
+  - { id: WEB_FAL, from: WEB, to: FAL, points: [[320, 123], [320, 160], [800, 160], [800, 242]], dashed: true, label: "exec", label_at: [700, 152] }
+  - { id: CIL_HUB, from: CIL, to: HUB, label: "flows" }
+  - { id: OBI_MON, from: OBI, to: MON, label: "OTLP" }
+  - { id: TET_KILL, from: TET, to: KILL, label: "policy", tone: fail }
+  - { id: FAL_FSK, from: FAL, to: FSK, label: "alerts" }
+
+steps:
+  - lights: [USER]
+    title: A visit starts
+    text: "You open the app on 127.0.0.1:8091. k3d maps it to NodePort 30091 on the server node."
+  - edges: [USER_WEB]
+    title: nginx answers
+    text: "No kube-proxy: Cilium's eBPF programs translate the NodePort and pick the web pod."
+  - edges: [WEB_API]
+    title: web calls the api Service
+    text: "The api ClusterIP is rewritten to a pod IP by Cilium's tc program on web's veth, on this node or across VXLAN."
+  - edges: [API_REDIS]
+    title: The api increments a counter
+    text: "Plain RESP over TCP. The Go code has no tracing, metrics or logging libraries at all."
+  - edges: [REDIS_PV]
+    title: Redis writes to a PVC
+    text: "The claim is bound to a static local PV over a host folder, so the data outlives the cluster."
+  - edges: [WEB_CIL]
+    title: Cilium sees every packet
+    text: "Each pod has a security identity from its labels. Policy is checked against identities in eBPF, not IP addresses."
+  - edges: [CIL_HUB]
+    title: Hubble shows the flows
+    text: "Every forwarded or dropped flow, with source and destination identity and verdict, in the Hubble UI."
+  - edges: [API_OBI]
+    title: OBI watches from the kernel
+    text: "OpenTelemetry eBPF Instrumentation hooks the Go runtime and the kernel to see each HTTP request and Redis command."
+  - edges: [OBI_MON]
+    title: Metrics and traces leave by OTLP
+    text: "RED metrics and spans go to the platform's collector and on to Grafana in mon (homelab Phase 2)."
+  - edges: [WEB_TET, WEB_FAL]
+    title: Someone runs wget in a pod
+    text: "One execve in the web pod is seen by two independent eBPF tools at the same moment."
+  - edges: [FAL_FSK]
+    title: Falco reports it
+    text: "A matching rule fires and Falcosidekick shows it with pod and container metadata."
+  - edges: [TET_KILL]
+    title: Tetragon stops it
+    text: "A TracingPolicy matches the execve and sends SIGKILL before wget runs a single instruction."

@@ -1,0 +1,265 @@
+# Hands-on lab card for /tags/ebpf-lab/ (see _includes/lab-index.html).
+# Created by the cloudutsuk-learning-lab skill. `experiments` drive the experiment cards in part 6,
+# the index tiles and scripts/capture.cjs. `brief` is the author's request, not rendered.
+#
+# Lab contract v2 (homelab Phase 2, step 5): the lab cluster joins the `homelab` network, declares
+# `deploy` (ADR 0017) and bundles no LGTM. Telemetry goes to the platform's collectors and the mon
+# cluster. Shots on `grafana:` URLs wait for mon's Grafana (Phase 2, being deployed 2026-10-11);
+# until then capture them with --only on the other experiments.
+name: eBPF Lab
+tag: eBPF Lab
+summary: "Swap a k3d cluster's networking for Cilium and watch every flow in Hubble, get RED metrics
+  and traces from an app with no instrumentation code, and catch (then kill) a shell's download in a
+  container with Falco and Tetragon, all with eBPF on one DGX Spark."
+status: Built
+created: '2026-10-11'
+level: Advanced
+duration: about 2 hours
+category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
+lab_category: observability   # Labs tab group (_data/lab_catalog.yml)
+clouds: [agnostic]
+repo:
+  path: /home/sakharam/gitrepos/observability/ebpf-lab
+platform:
+  runtime: "k3d (lab-ebpf) on the homelab network, Cilium as the CNI"
+  observability: "Hubble, Tetragon, Falco + Falcosidekick UI, OpenTelemetry eBPF Instrumentation → homelab mon cluster"
+  cost: free-local
+deploy:              # lab contract v2 (ADR 0017): what the lab runner checks before `make up`
+  memory_gb: 6
+  ports: [6450, 8091, 8092, 8093]
+facts:
+  - {label: Stack, value: "Cilium 1.20, Hubble, Tetragon 1.7, Falco 0.45, OBI 0.13, k3s 1.35, Go, Redis"}
+  - {label: Storage, value: "static local PVs bound to PVCs, no hostPath; data survives make rebuild"}
+endpoints:
+  app: http://127.0.0.1:8091
+  hubble: http://127.0.0.1:8092
+  falco: http://127.0.0.1:8093
+  grafana: https://grafana.mon.home.cloudutsuk.com
+capture:
+  urls:
+    app: http://127.0.0.1:8091
+    hubble: http://127.0.0.1:8092
+    falco: http://127.0.0.1:8093
+    grafana: https://grafana.mon.home.cloudutsuk.com
+  viewport: {width: 1440, height: 900}
+  color_scheme: dark
+  window: 10m
+  settle_ms: 3500
+  preflight: make status
+  cooldown: 20
+experiments:
+  - id: cilium-cni
+    title: See every flow without kube-proxy
+    goal: "Send traffic through web, api and redis and see each hop in Hubble, with Cilium's eBPF doing the service load balancing that kube-proxy used to do."
+    signals: [events, metrics]
+    action:
+      say: "Send 120 requests through the app."
+      run: make exp-cilium-cni
+    predict: "There is no kube-proxy and no iptables service rules. How does a request to the `api` ClusterIP reach a pod, and on which node?"
+    wait: 15
+    verify: make verify-cilium-cni
+    look_for:
+      - signal: events
+        where: "Hubble UI › namespace demo"
+        query: "hubble observe --namespace demo"
+        expect: "web → api → redis edges, with flows to the api pod on the other node marked to-overlay (VXLAN)."
+      - signal: metrics
+        where: "cilium-dbg service list"
+        query: "cilium-dbg service list"
+        expect: "The api ClusterIP with two backends, translated in eBPF on each pod's veth."
+    shots:
+      - name: service-map
+        phase: after
+        url: "hubble:/?namespace=demo"
+        steps:
+          - {wait_for_text: "redis"}
+        viewport: {width: 1440, height: 1000}
+        wide: true
+        alt: "Hubble UI service map for namespace demo: world, web, api and redis connected by flows"
+        caption: "The demo app as Hubble sees it, built only from packets."
+
+  - id: identity-policy
+    title: Drop a connection by identity
+    goal: "Allow only api pods to talk to redis and watch Cilium drop web's direct connection in eBPF, while the app keeps working."
+    signals: [events]
+    action:
+      say: "Apply the policy, then try to reach redis from the web pod."
+      run: make exp-identity-policy
+    predict: "The web pod and the api pods share a node network. What does Cilium check to tell them apart?"
+    wait: 10
+    verify: make verify-identity-policy
+    look_for:
+      - signal: events
+        where: "Hubble UI › namespace demo, then the flows table"
+        query: "hubble observe --namespace demo --verdict DROPPED"
+        expect: "web → redis:6379 with verdict DROPPED and reason Policy denied, repeated for each SYN retry; api → redis still FORWARDED."
+    shots:
+      - name: flows
+        phase: after
+        url: "hubble:/?namespace=demo"
+        steps:
+          - {wait_for_text: "redis"}
+        viewport: {width: 1440, height: 1000}
+        wide: true
+        alt: "Hubble UI for namespace demo with the web to redis edge shown as dropped and dropped flows in the table"
+        caption: "web → redis dropped by policy; the api path is untouched."
+
+  - id: obi-red-metrics
+    title: RED metrics from an app with no instrumentation
+    goal: "Let OpenTelemetry eBPF Instrumentation watch the Go API and Redis from the kernel and turn their traffic into request rate, errors and duration per route."
+    signals: [metrics]
+    action:
+      say: "Send traffic, then read the HTTP and Redis metrics OBI produced."
+      run: make exp-obi-red-metrics
+    predict: "The API has no OpenTelemetry, no metrics library, nothing. Where can OBI get the route name /api/visits from?"
+    wait: 30
+    verify: make verify-obi-red-metrics
+    look_for:
+      - signal: metrics
+        where: "Grafana (mon) › Explore › Prometheus"
+        query: 'sum by (http_route) (rate(http_server_request_duration_seconds_count{k8s_namespace_name="demo"}[1m]))'
+        expect: "/api/visits, /api/items and /healthz with their request rates, and db_client_operation_duration_seconds for the Redis INCR."
+    shots:
+      - name: red
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22prometheus%22%7D%2C%22expr%22%3A%22sum%20by%20(http_route)%20(rate(http_server_request_duration_seconds_count%7Bk8s_namespace_name%3D%5C%22demo%5C%22%7D%5B1m%5D))%22%2C%22legendFormat%22%3A%22%7B%7Bhttp_route%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${from}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        selector: 'section[data-testid="data-testid Panel header Graph"]'
+        wide: true
+        alt: "Request rate per route for the demo app, produced by eBPF instrumentation"
+        caption: "Per-route request rate for a service with no metrics code."
+
+  - id: obi-traces
+    title: A trace across web, api and redis
+    goal: "Follow one request through nginx, the Go API and Redis as a single trace, joined by trace context that OBI injects on the wire."
+    signals: [traces]
+    action:
+      say: "Click Count a visit on the app once."
+      run: make exp-obi-traces
+    predict: "Nobody propagates a traceparent header in this code. Will the nginx span and the API span end up in the same trace?"
+    wait: 60
+    verify: make verify-obi-traces
+    look_for:
+      - signal: traces
+        where: "Grafana (mon) › Explore › Tempo"
+        query: '{ resource.k8s.namespace.name = "demo" && name = "GET /api/visits" }'
+        expect: "One trace: web's server span, the api's GET /api/visits server span and a Redis INCR client span under it."
+    shots:
+      - name: waterfall
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.namespace.name%20%3D%20%5C%22demo%5C%22%20%26%26%20name%20%3D%20%5C%22GET%20%2Fapi%2Fvisits%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${start}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        steps:
+          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1300}
+        wide: true
+        alt: "Tempo waterfall of one visit: nginx, the Go API and a Redis INCR span, all from eBPF"
+        caption: "One request, three processes, zero lines of tracing code."
+
+  - id: falco-shell
+    title: Catch a shell in a container
+    goal: "Open a shell in the web pod and see Falco's syscall rules flag it within a second, with pod and container metadata, in the Falcosidekick UI."
+    signals: [events]
+    action:
+      say: "Run a command through kubectl exec in the web pod."
+      run: make exp-falco-shell
+    predict: "kubectl exec without -t has no terminal, so Falco's stock rule doesn't fire. What else in the event could identify this as suspicious?"
+    wait: 10
+    verify: make verify-falco-shell
+    look_for:
+      - signal: events
+        where: "Falcosidekick UI › Events"
+        query: 'rule = "Shell in demo pod"'
+        expect: "A WARNING with the command line, uid 101, pod web-… and namespace demo, resolved from k3s's containerd."
+    shots:
+      - name: events
+        phase: after
+        url: "falco:/"
+        viewport: {width: 1440, height: 1000}
+        wide: true
+        alt: "Falcosidekick UI dashboard with the Shell in demo pod event from the web pod"
+        caption: "Falco's view: the shell, who ran it and where."
+
+  - id: tetragon-enforce
+    title: Kill a download before it starts
+    goal: "Apply a Tetragon policy that SIGKILLs wget, curl and nc in demo pods at the execve syscall, run wget, and compare Tetragon stopping it with Falco reporting it."
+    signals: [events, logs]
+    action:
+      say: "Apply the Tetragon policy, then run wget from the web pod."
+      run: make exp-tetragon-enforce
+    predict: "Falco and Tetragon both see the same execve. Which one can stop wget, and how far does wget get?"
+    wait: 10
+    verify: make verify-tetragon-enforce
+    look_for:
+      - signal: events
+        where: "Falcosidekick UI › Events"
+        query: 'rule = "Network tool in demo pod"'
+        expect: "A CRITICAL Network tool in demo pod event: Falco saw it but couldn't stop it."
+      - signal: logs
+        where: "make tetragon-events (Grafana Loki once the platform collector runs)"
+        query: '{k8s_namespace_name="kube-system", k8s_container_name="export-stdout"} |= "SIGKILL"'
+        expect: "process_kprobe __arm64_sys_execve with action SIGKILL and policy block-network-tools, then process_exit with signal SIGKILL; wget exits 137."
+    shots:
+      - name: falco
+        phase: after
+        url: "falco:/"
+        viewport: {width: 1440, height: 1000}
+        wide: true
+        alt: "Falcosidekick UI with a critical Network tool in demo pod event for wget in the web pod"
+        caption: "Falco reports the download attempt; Tetragon already killed it."
+      - name: tetragon
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bk8s_container_name%3D%5C%22export-stdout%5C%22%7D%20%7C%3D%20%5C%22SIGKILL%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${start}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        selector: 'section[data-testid="data-testid Panel header Logs"]'
+        wide: true
+        alt: "Tetragon process_kprobe event with action SIGKILL for wget in Grafana Loki"
+        caption: "Tetragon's event: the execve that never completed."
+
+  - id: rebuild-persists
+    title: Delete the cluster and keep the data
+    goal: "Delete and recreate the whole cluster and see Redis come back with the same counter, because its PVC re-binds to a static local PV over the same host folder."
+    signals: [events]
+    action:
+      say: "Note the visit count, rebuild the cluster from scratch, then count a visit again."
+      run: make exp-rebuild-persists
+      browser:
+        url: app:/
+        steps: [{wait_for_text: "served by"}]
+    predict: "k3d deletes both node containers. Where does the counter live, and which object makes the new Redis pod find it?"
+    wait: 10
+    verify: make verify-rebuild-persists
+    look_for:
+      - signal: events
+        where: "The app page"
+        query: "GET /api/visits"
+        expect: "The counter continues from its value before the rebuild instead of starting at 1."
+    shots:
+      - name: before
+        phase: before
+        url: "app:/"
+        steps: [{wait_for_text: "served by"}]
+        alt: "Demo app page showing the visit counter before the rebuild"
+        caption: "Before: the counter in Redis."
+      - name: after
+        phase: after
+        url: "app:/"
+        steps: [{wait_for_text: "served by"}]
+        alt: "Demo app page after a full cluster rebuild, the counter continuing from before"
+        caption: "After a full rebuild: same data, new cluster."
+brief: |
+  Author's request (2026-10-11), with this context pasted from another session:
+  "Better options that keep the 'survives a rebuild' property: Static local PVs and PVCs ... Point the
+  local-path provisioner at /srv/homelab ... Where eBPF could fit, from least to most effort: Grafana
+  Beyla, now OpenTelemetry eBPF Instrumentation ... Runtime security with Tetragon or Falco ... Cilium
+  as the CNI ... would need recreating with flannel and the built-in policy controller turned off;
+  the k3d nodes need the BPF filesystem mounted; it uses more memory per cluster; it would deserve its
+  own ADR."
+  "Similar to opentelemetry lab project, I would like to create a project to understand eBPF
+  instrumentation, runtime security and Cilium as the CNI in a controlled lab environment. I would
+  like setting up a dedicated k3d cluster, experimenting with the different eBPF tools, and
+  documenting the findings and best practices. Please create a new lab project for eBPF
+  experimentation, covering instrumentation, runtime security, and Cilium as the CNI. Use PV and PVCs
+  whenever possible to ensure data persists across node rebuilds and we dont mount local paths
+  directly."
+  Answers: name eBPF Lab, repo ~/gitrepos/observability/ebpf-lab; runtime security: both Falco and
+  Tetragon, compared; no bundled LGTM: use the platform's (homelab mon cluster, Phase 2).

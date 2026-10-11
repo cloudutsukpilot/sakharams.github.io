@@ -15,7 +15,11 @@ category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
 lab_category: observability   # Labs tab group (_data/lab_catalog.yml)
 clouds: [agnostic]
 repo:
-  path: ~/gitrepos/observability/otel-static-site-k3d
+  path: /home/sakharam/gitrepos/observability/otel-static-site-k3d   # absolute: the lab runner rejects ~
+deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
+  targets: {up: up, down: down, status: status}
+  memory_gb: 4            # the k3d cluster with LGTM uses about 3 GB
+  ports: [8081, 3002]     # site (Traefik) and Grafana
 platform:
   runtime: k3d
   observability: OpenTelemetry Collector + Grafana LGTM

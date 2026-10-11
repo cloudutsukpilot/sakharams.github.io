@@ -173,8 +173,13 @@ category: hands-on-labs  # Projects tab group (_data/project_catalog.yml)
 lab_category: TODO       # Labs tab group: an id from _data/lab_catalog.yml (observability, ...)
 clouds: [agnostic]       # azure | aws | gcp | agnostic
 repo:
-  path: {repo}           # local path of the lab repo (not rendered)
+  path: {repo}           # absolute local path of the lab repo (not rendered; the lab runner rejects ~)
   # url: https://github.com/<owner>/<repo>   # rendered as a "Lab code" chip once public
+deploy:                  # read by the lab runner so the portal's Labs page can deploy the lab (not rendered)
+  targets: {{up: up, down: down, status: status}}   # plain Make target names in repo.path
+  memory_gb: TODO        # admission control: what the running lab uses (docker stats), rounded up
+  ports: [8081, 3002]    # every host port the lab publishes (same as endpoints)
+  # ttl_hours: 4         # cloud labs only: auto-destroy after this many hours
 platform:
   runtime: k3d           # k3d | docker-compose | kind | aks | eks | gke ...
   observability: OpenTelemetry Collector + Grafana LGTM

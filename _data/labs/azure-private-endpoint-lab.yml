@@ -18,6 +18,13 @@ clouds: [azure]
 repo:
   path: /home/sakharam/gitrepos/private-connectivity-labs/azure-private-endpoint
   # Private for now: github.com/cloudutsukpilot/private-connectivity-labs (add `url:` once public)
+deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
+  # `up` creates the Azure side and the local probe. The DGX tunnel and split-DNS steps need sudo and
+  # stay manual (the experiments); run `make dgx-down` before Destroy if you brought wg0 up.
+  targets: {up: up, down: down, status: status}
+  memory_gb: 2            # Grafana LGTM and the probe
+  ports: [3012, 14318]    # Grafana and OTLP/HTTP in
+  ttl_hours: 4            # cloud lab: the portal asks to confirm the cost, the runner destroys it at the TTL
 platform:
   runtime: azure-cli + WireGuard (Azure VM) + docker-compose (local probe)
   observability: OpenTelemetry SDK + Grafana LGTM (local)

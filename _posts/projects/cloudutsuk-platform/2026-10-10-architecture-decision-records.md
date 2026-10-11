@@ -1887,6 +1887,18 @@ a scale set to selected repos. ARC can, though, register a scale set with a sing
     It's the only runner with Docker access and with the cluster kubeconfigs (read from OpenBao). Still
     ephemeral, one job per pod.
 - `infra-local`'s `config.yaml` names `homelab-iac` as its runner (`iac_runner`).
+- How `homelab-iac` gets its access (Phase 1 step 1b), all from OpenBao `kv/platform/ci-iac` through
+  one ExternalSecret that only its pods mount:
+  - **Docker**: the pod has no Docker socket. A ghostunnel container on the `homelab` bridge
+    (172.30.0.10:2376) forwards to the host's socket only for a client certificate with CN
+    `homelab-iac` (mutual TLS, its own CA). Lab clusters share the bridge, so the certificate is
+    what opens the socket, not the network. The `platform` cluster isn't recreated to mount the socket.
+  - **Clusters**: a kubeconfig with the `k3d-core`, `-platform`, `-mon` and `-ai` admin contexts.
+  - **Terraform state**: `BACKEND_ARM_*` for a service principal (`homelab-iac-state`) whose only
+    role is Storage Account Contributor on the state storage account (`backend_auth_alias: management`).
+  - **Tools**: k3d and kubectl, downloaded by an init container and checked against their release
+    checksums.
+- No Azure, Docker or Kubernetes credential is stored in GitHub.
 - The Default runner group keeps "allow public repositories" off, so no public repo can use either set.
 
 #### Considered options
@@ -1904,7 +1916,11 @@ a scale set to selected repos. ARC can, though, register a scale set with a sing
 - Bad: a compromised `infra-local` workflow is root on the DGX. Branch protection isn't available
   for private repos on GitHub's free plan, so the guard is who can push: only the owner has write
   access to `infra-local`, and the GitHub App never gets Contents write on it.
-- Bad: how the `homelab-iac` pod reaches Docker is still to be built (Phase 1 step 1b).
+- Bad: the platform cluster's `openbao` ClusterSecretStore can read all of `kv/platform/*`, so any
+  ExternalSecret in `platform` could read these credentials. Only Argo CD (from this repo) creates
+  them today; a per-namespace store is the fix if that changes.
+- Bad: the client certificate (one year), the k3s admin certificates (one year) and the principal's
+  secret (one year) need rotating: re-run the `infra-local` host scripts.
 
 #### Related
 

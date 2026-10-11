@@ -381,3 +381,24 @@ lessons:
     fix: "Limited the host-access scale set by registering it with `infra-local` alone instead of with a runner group. ADR 0040 relies on who has write access to that repo, not on branch protection."
     lesson: "Check which plan features a design depends on before writing them into an ADR. A repo-scoped ARC scale set stands in for a runner group restricted to selected repos."
     adrs: ["0019", "0040"]
+
+  - id: L036
+    date: 2026-10-11
+    step: "Phase 1, step 1b: IaC runner"
+    title: "Lossy DNS over Wi-Fi looks like a different failure in every tool"
+    tags: [dns, networking, dgx]
+    symptom: "In one hour: `git push` couldn't resolve github.com, Docker Hub pulls timed out, `az` failed on graph.microsoft.com, Terraform couldn't reach the state blob, and the entrypoint started an interactive `az login` because its session check failed."
+    cause: "The DGX is on Wi-Fi, and its UDP DNS lookups were being dropped: the router answered 3 of 5, Google's IPv6 resolver 1 of 5. Tailscale's resolver (100.100.100.100) answered all 5."
+    fix: "Retried network steps. Pulled the Docker Hub images inside a k3d node, which goes through the Zot mirror, and loaded them into Docker. The host's resolver settings weren't changed."
+    lesson: "When unrelated tools fail with name or timeout errors at once, test each resolver with `dig` before debugging the tools. Put the DGX on wired Ethernet, or make a reliable resolver its first choice."
+
+  - id: L037
+    date: 2026-10-11
+    step: "Phase 1, step 5: Kyverno"
+    title: "Zot reports a failed upstream download as \"image is filtered out by sync config\""
+    tags: [zot, registry, networking]
+    symptom: "Every Kyverno pod in `platform`, `mon` and `ai` sat in ImagePullBackOff with a 502 from Zot, and Zot's log said \"failed to sync image: image is filtered out by sync config\" for `mirror/ghcr.io/kyverno/*`, although the ghcr.io mirror allows every repository (`prefix: \"**\"`)."
+    cause: "Zot had started the copy from ghcr.io, but GitHub's blob CDN (`pkg-containers.githubusercontent.com`) kept resetting the connection over the DGX's degraded link. Zot then tried its other mirrors, whose content rules don't match `ghcr.io` names, and reported the last error, the filter, instead of the download failure. It also copies every architecture in an image's index, so a slow link has several times more to fetch than the arm64 image alone."
+    fix: "None needed in the config: the kubelet keeps retrying, and the pods start once a sync completes. Kyverno's webhooks don't exist until its admission pod runs, and its policies only audit, so nothing was blocked meanwhile."
+    lesson: "When Zot says an image is filtered out but the content rule clearly matches, look for \"Failed to copy layer\" just before it: that's the real error. Test the upstream blob host from the DGX with `curl` before changing the sync config."
+    adrs: ["0034"]
