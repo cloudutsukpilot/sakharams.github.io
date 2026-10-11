@@ -45,6 +45,12 @@ Fallbacks when tasks fail:
   existing `adsense_*.html` includes.
 - **Standalone pages** live in [pages/](pages/); navigation tabs in [_tabs/](_tabs/).
 - **Data files** in [_data/](_data/) (`contact.yml`, `share.yml`) drive footer/share links.
+- **Project playbooks are living docs.** For a project being built (Cloudutsuk Platform today), every
+  piece of implementation work, in any of its repos, follows
+  [cloudutsuk-project → Building the project](.claude/skills/cloudutsuk-project/SKILL.md#building-the-project-plan-the-step-then-build-then-document):
+  first add the step to its phase's *Phase N steps* list in the area 3 Product Planning post, then
+  implement it, and update the affected docs (repo READMEs, ADRs, playbook sections and diagrams,
+  lessons, step status) in the same change. Work isn't done until its docs are.
 - **Lab screenshots** in `assets/img/labs/<slug>/` and `_data/lab_shots/<slug>.json` are written only by
   the learning-lab skill's `capture.cjs` from a real run; never hand-edit or replace them with mock-ups.
 

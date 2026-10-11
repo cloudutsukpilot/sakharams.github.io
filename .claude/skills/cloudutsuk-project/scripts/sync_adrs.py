@@ -13,8 +13,9 @@ scrubs anything private and writes two things:
                                   The post is created with a starter intro if it doesn't exist.
 
 Links between ADRs become anchors in the post (#adr-NNNN); other relative links keep only their text.
-Scrubbed: email addresses, GUIDs, GitHub tokens, AWS keys and links into private GitHub repos (anything
-under github.com/<org>/ except the public repos listed in PUBLIC_REPOS). Each scrub is reported, so fix
+Scrubbed: email addresses, GUIDs, GitHub tokens, AWS keys, links into private GitHub repos (anything
+under github.com/<org>/ except the public repos listed in PUBLIC_REPOS) and the words in
+~/.config/cloudutsuk/lesson-denylist.txt. Each scrub is reported, so fix
 the source ADR rather than relying on it.
 
 Usage (from the repo root):
@@ -39,6 +40,11 @@ SCRUB = [
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "[token removed]", "GitHub token"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[key removed]", "AWS key"),
 ]
+# Words that must never reach the public blog (an employer's name, for example), one per line. Kept
+# outside the repo so the list itself is never published; shared with lessons.py.
+DENYLIST = Path.home() / ".config" / "cloudutsuk" / "lesson-denylist.txt"
+DENY = [w.strip() for w in DENYLIST.read_text().splitlines()
+        if w.strip() and not w.startswith("#")] if DENYLIST.exists() else []
 PRIVATE_LINK = re.compile(r"\[([^\]]+)\]\((https?://github\.com/[^/\s)]+/([^/\s)]+)[^)]*)\)")
 SECTIONS = ["Context", "Decision", "Considered options", "Consequences", "Related"]
 
@@ -48,6 +54,11 @@ def scrub(text, where, report):
         text, n = rx.subn(repl, text)
         if n:
             report.append(f"{where}: {n} {label}(s) removed")
+
+    for word in DENY:
+        text, n = re.subn(re.escape(word), "[removed]", text, flags=re.I)
+        if n:
+            report.append(f"{where}: {n} denylisted word(s) removed")
 
     def link(m):
         if m.group(3) in PUBLIC_REPOS:

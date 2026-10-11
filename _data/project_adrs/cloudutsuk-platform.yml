@@ -37,3 +37,8 @@ adrs:
   - {id: "0033", title: "Supply chain: Cosign signing with an OpenBao transit key and Kyverno admission", status: accepted, date: 2026-10-10, anchor: adr-0033, repos: [homelab-gitops, homelab-services]}
   - {id: "0034", title: "Zot in core as the only container registry", status: accepted, date: 2026-10-10, anchor: adr-0034, repos: [infra-local, homelab-gitops, homelab-services]}
   - {id: "0035", title: "Data ownership: one writing service per entity", status: accepted, date: 2026-10-10, anchor: adr-0035, repos: [homelab-services, self-service-portal, sre-agent, homelab-gitops]}
+  - {id: "0036", title: "Bootstrap charts through the shared module's Helm layer; Argo CD for the rest", status: accepted, date: 2026-10-11, anchor: adr-0036, repos: [infra-local, terragrunt-shared-module, homelab-gitops]}
+  - {id: "0037", title: "Private remote access through Tailscale instead of Cloudflare Tunnel and Access", status: accepted, date: 2026-10-11, anchor: adr-0037, repos: [infra-local, homelab-gitops]}
+  - {id: "0038", title: "Argo CD: installed by Terraform, everything else through an app-of-apps in homelab-gitops", status: accepted, date: 2026-10-11, anchor: adr-0038, repos: [infra-local, homelab-gitops]}
+  - {id: "0039", title: "Backups with Velero: application dumps through file-system backup to Azure Blob", status: accepted, date: 2026-10-11, anchor: adr-0039, repos: [infra-local, homelab-gitops, infra-azure]}
+  - {id: "0040", title: "A second, repo-scoped runner scale set for infra-local's IaC jobs", status: accepted, date: 2026-10-11, anchor: adr-0040, repos: [homelab-gitops, infra-local]}

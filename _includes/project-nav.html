@@ -4,8 +4,27 @@
   Links back to the project index (/tags/<project>/) and to the previous and next written areas.
   On the interview post (`project_interview: true`) it links back to the index and to area 1 instead.
   On the ADR post (`project_adrs: true`) it links back to the index and to area 5 (Technical Architecture).
+  On the Lessons Learned post (`project_lessons: true`) it links back to the index and to area 18
+  (Continuous Improvement) once that is written.
 {% endcomment %}
-{% if page.project and page.project_adrs %}
+{% if page.project and page.project_lessons %}
+  {% assign nav_project = site.data.projects[page.project] %}
+  {% assign nav_ci = site.posts | where: 'project', page.project | where: 'project_step', 18 | first %}
+  <nav class="project-nav" aria-label="Project navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.project | append: '/' | relative_url }}">
+      <i class="fas fa-th-large fa-fw" aria-hidden="true"></i>
+      {{ nav_project.name | default: page.project }}: project index
+    </a>
+    <span class="project-nav-step text-muted">Lessons Learned</span>
+    {% if nav_ci %}
+      <span class="project-nav-links">
+        <a href="{{ nav_ci.url | relative_url }}" title="{{ nav_ci.title }}">
+          <i class="fas fa-angle-left" aria-hidden="true"></i> Continuous Improvement
+        </a>
+      </span>
+    {% endif %}
+  </nav>
+{% elsif page.project and page.project_adrs %}
   {% assign nav_project = site.data.projects[page.project] %}
   {% assign nav_arch = site.posts | where: 'project', page.project | where: 'project_step', 5 | first %}
   <nav class="project-nav" aria-label="Project navigation">

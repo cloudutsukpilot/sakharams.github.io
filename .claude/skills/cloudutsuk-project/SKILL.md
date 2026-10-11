@@ -17,7 +17,11 @@ description: >-
   start, scaffold or document a "project", "project playbook", "project plan posts", "project
   blogs/series" or "project tag with an index page", to fill in or extend an existing playbook, to
   add or update a project's "interview questions" / "interview prep" post or its developer, DevOps or
-  SRE answers, or names this skill. For a single standalone post use /create-blog instead.
+  SRE answers, to log a problem hit while building a project as a lesson learned (or update its Lessons
+  Learned post), before starting the next step or phase of a project that is being built (the step must
+  be added to the phase first), when code or configuration of a documented project changes (its docs
+  change in the same piece of work), or names this skill. For a single standalone post use /create-blog
+  instead.
 ---
 
 # Cloudutsuk project playbook
@@ -38,6 +42,7 @@ A project playbook is **a tag plus 18 area posts, one interview post and one dat
 | Diagram types (system architecture, network, data flow, sequence, identity, threat model, data model, deployment, CI/CD, telemetry, incident, user journey) | `diagrams:` in [_data/project_framework.yml](../../../_data/project_framework.yml) | Fixed; shared by all projects |
 | Diagrams lane on the index (one tile per type, "Not drawn yet" until the project has one, plus "More diagrams" for `type: other`) | `diagrams:` list in `_data/projects/<slug>.yml`, rendered by [_includes/project-index.html](../../../_includes/project-index.html) | `scripts/diagrams.py <slug> --write` after every new or moved diagram |
 | Architecture decision records (optional): ADR post, log table, Architecture Decisions tile | ADRs as MADR files in the project's own repo; `_data/project_adrs/<slug>.yml`, `<date>-architecture-decision-records.md` (`project_adrs: true`), [_includes/project-adr-log.html](../../../_includes/project-adr-log.html) | `scripts/sync_adrs.py <slug>` (see [ADRs](#adrs-optional)) |
+| Lessons learned (while building): Lessons Learned post, Lessons Learned tile | `_data/project_lessons/<slug>.yml`, `<date>-lessons-learned.md` (`project_lessons: true`), [_includes/project-lessons-log.html](../../../_includes/project-lessons-log.html) | You, one entry per problem as it's fixed; `scripts/lessons.py <slug>` checks it (see [Lessons learned](#lessons-learned-log-as-you-build)) |
 | Projects tab entry | [_tabs/projects.md](../../../_tabs/projects.md) loops over `_data/projects/` | Automatic |
 | Styles | [_sass/project-index.scss](../../../_sass/project-index.scss) | Shared; don't edit for one project |
 
@@ -297,6 +302,110 @@ python3 $S/sync_adrs.py <slug> --check                    # exit 1 if the blog c
 - Put `{% include project-adr-log.html project="<slug>" %}` in area 5's *Architectural decision records*
   section. The index shows the Architecture Decisions tile (counts per status, proposed ADRs listed)
   only when the data file exists, so projects without ADRs are unaffected.
+
+## Building the project (plan the step, then build, then document)
+
+A living playbook (status `In progress`, or a card comment saying it's built in phases) must never
+fall behind the build. Two rules apply to every piece of implementation work on such a project, in
+any repo (`infra-local`, `infra-github`, `homelab-gitops`, `homelab-services`, `self-service-portal`
+and the like), not only to work in this blog repo.
+
+### 1. Add the step to its phase before implementing it
+
+Each phase in area 3's *Product roadmap* (`<date>-03-product-planning.md`) has a numbered step list
+directly under the roadmap table, one `### Phase N steps` subsection per phase (later phases are refined when they start):
+
+```markdown
+### Phase 0 steps
+{: #phase-0-steps }
+
+| Step | Does | Repos | Done when | Status |
+|---|---|---|---|---|
+| 8 | Certificates and DNS: cert-manager, PowerDNS, ExternalDNS, split DNS | infra-local, homelab-gitops | `https://bao.core.home.<domain>` serves a valid certificate | Done (2026-10-11) |
+| 11 | Keycloak in `core` | infra-local | Login works with both brokers | Not started |
+```
+
+Before writing any code or config for new work:
+
+1. Find the phase the work belongs to (the roadmap table's *Delivers* column). If it fits no phase,
+   stop and ask the user: that's a roadmap change and goes through the post's *Change-control process*.
+2. If the step isn't in that phase's list, **add it first**: next free number
+   (never renumber; insert as `9a` if order matters), what it does, the repos it touches, and a
+   checkable *Done when*, with status `Not started`. Tell the user in one line which step you added.
+3. Set it to `In progress` (with a short note of what's there) when work starts, and `Done (<date>)`
+   only when *Done when* is verified. A step broken down further when its phase starts keeps its
+   number; split it into lettered steps (`3a`, `3b`) rather than renumbering.
+
+These tables are the **source of truth for every session** working on the project. Plan files, memory
+and session notes may hold extra detail, but when they disagree with the post about a step's scope or
+status, the post wins: update the post, not just the notes.
+
+Step numbers are what lessons (`step: "Phase 0, step 8: …"`), ADRs and commit messages refer to, so a
+lesson or ADR must never cite a step that isn't in the list.
+
+### 2. Update the docs in the same change as the code or config
+
+Code and docs ship together. A change isn't finished, and isn't reported as done, until the docs it
+affects are updated in the same piece of work:
+
+| What changed | Update |
+|---|---|
+| Anything in a repo | That repo's README and folder/service READMEs where behaviour, layout, commands or ports changed |
+| A decision made, changed or reversed | An ADR in `homelab-gitops/docs/adr` (new, or superseding), then `sync_adrs.py <slug>` |
+| A step started or finished | Its row in *Phase N steps*; the roadmap table's status when a phase starts or ends |
+| Architecture, network, data flow, CI/CD, deployment | The area post section that describes it, its diagram, then `diagrams.py <slug> --write` |
+| A problem that cost real time | A lesson (see below) |
+| A fact that resolves a TODO callout | Replace the callout with the fact |
+| A phase finished | The areas that phase gives facts for (scaffold them with `--areas` if missing), the card's `status` |
+
+If you find docs that are already behind (a built component the posts don't mention, a step with no
+row), fix that gap or list it for the user before starting new work, rather than building further on
+top of it. Finish with `check.py <slug>` (and `sync_adrs.py <slug> --check` when ADRs changed), and in
+the report list the docs you updated next to the code changes.
+
+## Lessons learned (log as you build)
+
+While building a project (not while writing about it), **log every problem that cost real time or would
+bite again**, in the same change as its fix. Don't batch them up at the end of a phase: the details
+(exact error text, what was tried) are gone by then. Typical entries: a tool that behaves differently
+from its docs, a default that leaked in, a permission that was too narrow, a fix that needed two tries.
+
+Each lesson is one entry in `_data/project_lessons/<slug>.yml`:
+
+```yaml
+lessons:
+  - id: L015                      # python3 $S/lessons.py <slug> --next
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "The lesson as one sentence"   # what a reader should remember
+    tags: [k3d, dns]
+    symptom: "What was seen, with the error text that matters."
+    cause: "Why it happened."
+    fix: "What changed (config, code, process)."
+    lesson: "What to do next time, or what to check first."
+    adrs: ["0024"]                # optional: decisions it informed or changed
+```
+
+```bash
+python3 $S/lessons.py <slug>          # validate; exit 1 on errors
+```
+
+- **Public.** The blog is public: describe, don't paste. No IDs (subscription, zone, account), tokens,
+  emails or private repo links; `lessons.py` fails on them and on any word in
+  `~/.config/cloudutsuk/lesson-denylist.txt` (names that must stay out, such as an employer; kept
+  outside the repo). Internal names already in the playbook are fine.
+- **Append only.** Never reuse or renumber an id; correct a wrong entry in place rather than deleting it.
+  If a lesson changes a decision, write or supersede the ADR too and list it in `adrs`.
+- **Rendering.** The post `_posts/projects/<slug>/<date>-lessons-learned.md` (`project_lessons: true`,
+  the nav include at top and bottom) holds a short hand-written intro and
+  `{% include project-lessons-log.html project="<slug>" %}`, which renders the index table and one
+  section per lesson (`#lesson-lNNN`), newest first. The project index shows a Lessons Learned tile (count,
+  latest six) only when the data file exists. Give the post a hero image (step 6) with
+  `--tags "Lessons Learned,Troubleshooting"`.
+- **Reuse.** Area 18's *Retrospectives* topic and the interview post's "what went wrong" answers draw on
+  this log; link to `#lesson-lNNN` anchors instead of retelling the story.
+- Also save a lesson to memory when it changes how future work should be done (for example a tool's
+  required run order), so it's applied in the next session, not just documented.
 
 ## Changing the framework
 

@@ -20,31 +20,32 @@ views:
 nodes:
   - id: you
     label: You
-    sub: browser
+    sub: phone, laptop
     icon: user
-    detail: You open `portal.cloudutsuk.com` (also `grafana.`, `argocd.` and `phoenix.`). Everything is behind Cloudflare
-      Access and then a second sign-in in each tool.
-  - id: cloudflare
-    label: Cloudflare
-    sub: edge
-    icon: globe
-    color: orange
-    detail: 'Cloudflare Access + Tunnel: SSO with an allowlist, and an outbound-only path to the portal, so no port
-      is open at home.'
+    detail: You open `portal.platform.home.cloudutsuk.com` (also Grafana, Argo CD and Phoenix under their clusters'
+      names) from a device on the private Tailscale network. Nothing is published on the internet, and each tool
+      signs you in through Keycloak.
+  - id: tailnet
+    label: Tailscale
+    sub: private network
+    icon: lock
+    color: teal
+    detail: 'A private WireGuard network between my devices and the DGX (ADR 0037). Both ends dial out, so no port
+      is open at home and nothing is reachable from the internet.'
     children:
-    - id: access
-      label: Access
-      sub: SSO + allowlist
+    - id: ts-policy
+      label: Policy
+      sub: only my login
       icon: lock
-      detail: Sits in front of `portal.`, `grafana.`, `argocd.` and `phoenix.cloudutsuk.com`, with Keycloak as its
-        identity provider and an allowlist of my addresses. A direct Google login limited to my own address stays
-        as a **break-glass** route if `core` is down.
-    - id: tunnel
-      label: Tunnel
-      sub: edge side
+      detail: The tailnet policy lets only my Tailscale login reach the `homelab` bridge (`172.30.0.0/24`), and only on
+        80/443 (UIs), 53 (DNS) and 6441-6444 (Kubernetes APIs). Split DNS sends `home.cloudutsuk.com` to PowerDNS.
+        Break-glass if `core` is down is SSH to the DGX over the same tailnet.
+    - id: ts-router
+      label: Subnet router
+      sub: tailscaled on the DGX
       icon: router
-      detail: The Cloudflare side of the tunnel. `cloudflared` (×2, in the platform cluster) dials out to it, so traffic
-        reaches the portal without any inbound port.
+      detail: '`tailscaled` runs on the DGX host, outside every cluster, and routes tailnet traffic onto the `homelab`
+        bridge, where each cluster has its own address (`core` .1, `platform` .2, `mon` .3, `ai` .4).'
   - id: homelab
     label: Homelab
     sub: DGX Spark · k3d
@@ -131,16 +132,17 @@ nodes:
       children:
       - id: portal-area
         label: Portal
-        sub: edge to Backstage
+        sub: ingress to Backstage
         icon: browser
         color: indigo
-        detail: 'The path a browser takes: the tunnel connectors and Backstage with its plugins.'
+        detail: 'The path a request takes: platform''s Traefik ingress, then Backstage with its plugins.'
         children:
-        - id: cloudflared
-          label: cloudflared ×2
-          sub: tunnel connector
+        - id: traefik-platform
+          label: Traefik
+          sub: ingress on 172.30.0.2
           icon: router
-          detail: Two `cloudflared` replicas hold the outbound tunnel to Cloudflare and forward requests to Backstage.
+          detail: platform's ingress, published by its k3d load balancer on its own bridge address, `172.30.0.2:443`. Ends
+            TLS with the Let's Encrypt certificate for `*.platform.home.cloudutsuk.com`.
         - id: backstage
           label: Backstage
           sub: portal
@@ -528,12 +530,11 @@ nodes:
       the gateway, with no change to its callers.
 
 edges:
-  - {id: u_cf, view: networking, main: true, from: you, to: access, proto: HTTPS, port: 443, label: SSO, why: "Every visit to the portal starts here: Cloudflare Access checks who you are before anything at home is reached."}
-  - {id: access_kc, view: security, main: true, from: access, to: keycloak, proto: OIDC, tls: true, detail: "Keycloak is Cloudflare Access's identity provider; it brokers your Google or Entra ID login.", why: "Used at sign-in: Access hands the login to Keycloak, which brokers your Google or Entra ID account and checks the allowlist."}
-  - {id: access_tun, view: networking, main: true, from: access, to: tunnel, label: authorized, kind: control, why: "Used after a successful sign-in at the edge: Access passes the authorized request to the tunnel that leads home."}
-  - {id: cf_tun, view: networking, main: true, from: tunnel, to: cloudflared, label: outbound tunnel, kind: control, detail: "cloudflared dials out; requests come back down the same connection.", why: "Carries every portal request home. cloudflared dials out to Cloudflare, so no inbound port is open on the DGX."}
-  - {id: cf_bs, view: networking, main: true, from: cloudflared, to: backstage, proto: HTTP, port: 7007, why: "Every request that passed Cloudflare Access is forwarded from the tunnel connector to Backstage."}
-  - {id: bs_kc, view: security, main: true, from: backstage, to: keycloak, proto: OIDC, tls: true, detail: "Every tool signs you in again through Keycloak OIDC; roles come from groups.", why: "Used when you sign in to Backstage: a second sign-in maps your Keycloak groups to roles, so one bad edge policy can't expose the portal."}
+  - {id: you_tailnet, view: networking, main: true, from: you, to: ts-policy, proto: WireGuard, kind: stream, label: tailnet, why: "Every visit starts here: your device sends the request over WireGuard into the private tailnet; nothing at home listens on the internet."}
+  - {id: ts_allow, view: networking, main: true, from: ts-policy, to: ts-router, label: allowed, kind: control, why: "The tailnet policy only lets your login reach the platform's addresses; anyone else's packets are dropped here."}
+  - {id: ts_route, view: networking, main: true, from: ts-router, to: traefik-platform, proto: HTTPS, port: 443, tls: true, label: "172.30.0.2", why: "Carries every request home: tailscaled on the DGX routes it onto the homelab bridge to platform's Traefik."}
+  - {id: tr_bs, view: networking, main: true, from: traefik-platform, to: backstage, proto: HTTP, port: 7007, why: "Traefik forwards each portal request to Backstage inside the platform cluster."}
+  - {id: bs_kc, view: security, main: true, from: backstage, to: keycloak, proto: OIDC, tls: true, detail: "Every tool signs you in through Keycloak OIDC; roles come from groups.", why: "Used when you sign in to Backstage: Keycloak brokers your Entra ID login and your groups become roles. The tailnet decides who reaches the network; Keycloak decides who may use the portal."}
   - {id: bs_inv, from: inv-plugin, to: inventory, proto: HTTP, detail: "OAuth2 client credentials from Keycloak (5-minute JWTs).", why: "Used when you open the Inventory page or press Sync now: the plugin reads resources and cost from the inventory service."}
   - {id: inv_cl, from: inventory, to: clouds, proto: HTTPS, port: 443, label: every 6 h, why: "Runs every 6 hours (or on Sync now) to pull resources and cost from the cloud APIs with read-only credentials."}
   - {id: inv_pg, from: inventory, to: platform-db, proto: PostgreSQL, port: 5432, why: "After each sync the inventory writes resources and daily cost to its own database, so the portal shows history without calling the clouds."}
@@ -548,7 +549,7 @@ edges:
   - {id: argo_platform, view: cicd, from: argocd, to: portal-area, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the changed manifests (here the portal's) through the Kubernetes API, so the new image rolls out."}
   - {id: argo_ai, view: cicd, from: argocd, to: ai, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the ai cluster's changed manifests (RAG, gateway, model serving) through its Kubernetes API."}
   - {id: labs_mon, main: true, view: observability, from: lab-otel, to: otel-gw, proto: OTLP gRPC, port: 4317, tls: true, why: "Always on: the lab's collector streams traces, metrics and logs to the mon cluster, so every lab can be observed."}
-  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTPS, port: 443, label: "grafana.cloudutsuk.com", detail: "Behind Cloudflare Access, then Grafana's own Keycloak sign-in.", why: "Used when you open Grafana to look at a dashboard or an alert."}
+  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTPS, port: 443, label: "grafana.mon", detail: "grafana.mon.home.cloudutsuk.com over the tailnet, then Grafana's own Keycloak sign-in.", why: "Used when you open Grafana to look at a dashboard or an alert."}
   - {id: bs_rag, from: chat-plugin, to: rag-api, proto: HTTPS, label: chat, why: "Used every time you ask the chatbot a question in the portal."}
   - {id: rag_cache, from: rag-api, to: redis, proto: Redis, port: 6379, why: "First step of every chat request: an answer to a similar earlier question is returned straight from the cache."}
   - {id: rag_qd, from: rag-api, to: qdrant, proto: Qdrant, port: 6333, why: "On a cache miss, the RAG API retrieves the most relevant chunks of posts and repos to ground the answer."}
@@ -612,40 +613,36 @@ edges:
 scenarios:
   - id: login
     title: Sign in to the portal
-    summary: "How a browser reaches the portal: two sign-ins, no open port at home."
+    summary: "How a device reaches the portal: a private tailnet, one Keycloak sign-in, nothing open on the internet."
     steps:
       - title: You open the portal
-        action: "Browser opens portal.cloudutsuk.com"
-        text: "You browse to portal.cloudutsuk.com. The core cluster booted first, so Keycloak is ready."
+        action: "Browser opens portal.platform.home.cloudutsuk.com"
+        text: "From your phone or laptop on the tailnet; split DNS resolves the name to 172.30.0.2. The core cluster booted first, so Keycloak is ready."
         lights: [you]
-      - title: HTTPS to Cloudflare
-        action: "Browser → Cloudflare Access: GET / over HTTPS (443)"
-        text: "The request reaches Cloudflare Access over HTTPS on 443. Hover the arrow for the TCP and TLS handshakes."
-        edges: [u_cf]
-      - title: Access asks Keycloak
-        action: "Cloudflare Access → Keycloak: start the OIDC login"
-        text: "Access uses Keycloak as its identity provider; Keycloak brokers your Google or Entra ID login and checks the allowlist."
-        edges: [access_kc]
+      - title: Into the tailnet
+        action: "Device → tailnet: WireGuard to 172.30.0.2:443"
+        text: "Your device sends the request over WireGuard into the private tailnet. Nothing at home listens on the internet."
+        edges: [you_tailnet]
+      - title: Policy and route
+        action: "Policy OK → DGX subnet router → platform's Traefik (443)"
+        text: "The policy lets only your login through, and tailscaled on the DGX routes the packets onto the homelab bridge to platform's Traefik, which ends TLS."
+        path: [ts_allow, ts_route]
+      - title: To Backstage
+        action: "Traefik → Backstage: GET / (7007)"
+        text: "Traefik forwards the request to Backstage inside the platform cluster."
+        edges: [tr_bs]
+      - title: Sign in through Keycloak
+        action: "Backstage ↔ Keycloak: OIDC sign-in"
+        text: "Backstage sends you to Keycloak, which brokers your Entra ID login and maps your groups to roles. Network access alone gets nobody in."
+        path: [bs_kc, ~bs_kc]
       - title: Look up your account
         action: "Keycloak ↔ core-db: read your account and groups"
-        text: "Keycloak reads its realm, your Google/Entra link and your groups from core-db, and gets them back."
+        text: "Keycloak reads its realm, your Entra ID link and your groups from core-db, and gets them back."
         path: [kc_db, ~kc_db]
-      - title: Tokens back to Access
-        action: "Keycloak → Cloudflare Access: login OK, tokens issued"
-        text: "Keycloak returns signed tokens to Access; your address is on the allowlist, so the edge lets you through."
-        path: [~access_kc]
-      - title: Down the tunnel
-        action: "Access → Tunnel → cloudflared → Backstage: forward the request home"
-        text: "Access hands the authorized request to the tunnel, which carries it down the outbound-only connection to cloudflared and on to Backstage (7007)."
-        path: [access_tun, cf_tun, cf_bs]
-      - title: Signed in again
-        action: "Backstage ↔ Keycloak: second sign-in (OIDC)"
-        text: "Backstage signs you in a second time through Keycloak and maps your groups to roles, so one bad edge policy can't expose it."
-        path: [bs_kc, ~bs_kc]
       - title: Portal page returns
-        action: "Backstage → tunnel → Cloudflare → browser: the portal page"
-        text: "The portal page travels back the same way: through the tunnel, the edge and HTTPS to your browser."
-        path: [~cf_bs, ~cf_tun, ~access_tun, ~u_cf]
+        action: "Backstage → Traefik → tailnet → your device: the portal page"
+        text: "The portal page travels back the same way: through Traefik, the subnet router and the tailnet to your device."
+        path: [~tr_bs, ~ts_route, ~ts_allow, ~you_tailnet]
         result: success
         outcome: "Signed in to the portal"
 
@@ -713,7 +710,7 @@ scenarios:
         edges: [gw_metrics, gw_logs, gw_traces]
       - title: You open Grafana
         action: "Browser ↔ Grafana: load the lab dashboard"
-        text: "grafana.cloudutsuk.com sits behind Cloudflare Access; Grafana signs you in through Keycloak and returns the lab's dashboards."
+        text: "grafana.mon.home.cloudutsuk.com is reached over the tailnet; Grafana signs you in through Keycloak and returns the lab's dashboards."
         path: [you_graf, ~you_graf]
         result: done
         outcome: "Dashboard loaded"

@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Architecture Decision Records"
 date: 2026-10-10 00:30:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Architecture, ADR]
-description: "All 35 architecture decisions behind the Cloudutsuk Platform on a DGX Spark: context, the options that lost, and the consequences of each."
+description: "Every architecture decision behind the Cloudutsuk Platform on a DGX Spark: context, the options that lost, and the consequences of each."
 project: cloudutsuk-platform
 project_adrs: true
 image:
@@ -132,6 +132,10 @@ anywhere behind SSO. cloudutsuk.com's DNS is at GoDaddy and holds only GitHub Pa
 - cloudutsuk.com's DNS moves from GoDaddy to Cloudflare. Every record is exported first and compared
   with `dig` after the move.
 
+- On hold (2026-10-11): the Cloudflare Zero Trust team asks for a payment method, which the owner
+  declined. ADR 0037 (accepted the same day) replaces the tunnel and Access with Tailscale; the DNS move
+  above is done and stays.
+
 #### Considered options
 
 1. **Port forwarding plus a reverse proxy**: inbound exposure of the home network and its IP.
@@ -248,11 +252,18 @@ and the lab repos already have `make up/down/status`.
   `k3d_config_cluster`, which renders k3d's own config file (`k3d.io/v1alpha5`) and runs the k3d CLI
   from `terraform_data`. `plan` shows the rendered config. Any change to it recreates the cluster (data
   on `/srv/homelab` survives), so settings that change after creation (OIDC flags, registry mirrors) go
-  in k3s drop-ins under `/srv/homelab/k3s/<cluster>/`, which need only a node restart.
+  in k3s drop-ins under `/srv/homelab/k3s/<cluster>/`, which need only `k3d cluster stop/start` (not `docker restart`, which drops the host aliases).
 - Not the shared module's original `k3d_cluster` unit: its `moio/k3d` provider calls `update.k3s.io`
   at start-up and panics when that fails (it did on 2026-10-11, so no plan could run), can't set host
   aliases, and hasn't been released upstream since 2023.
+- k3d writes host aliases into a node's `/etc/hosts` only at create or `k3d cluster start`; Docker drops
+  them on every container start, including after a reboot. `infra-local/host/k3s/node-hosts.sh`
+  re-applies them from the node label k3d keeps them in, and the boot unit runs it (lesson L026).
 - Lab clusters (`lab-<slug>`) stay owned by each lab repo's Makefile, because they're short-lived.
+- Exception (2026-10-11): ports on a cluster's load balancer can be added or removed in place, so they
+  go in `load_balancer_ports`, which is kept out of the rebuild hash and applied with
+  `k3d node edit <cluster>-serverlb --port-add/--port-delete` (only that container restarts). `core`'s
+  port 80 (HTTP to HTTPS redirect) was added this way; the DNS port for the other clusters will be too.
 
 #### Considered options
 
@@ -338,7 +349,14 @@ credential that can change a cluster. The DGX has no inbound ports (ADR 0003).
 
 1. **GitHub-hosted runners pushing to the cluster**: needs inbound access and a kubeconfig in GitHub; can't reach Zot.
 2. **Gitea Actions**: fully local, but the repos are on GitHub; kept as the fallback.
-3. **Jenkins or Tekton**: heavier to run and maintain.
+3. **Jenkins or Tekton**: heavier to run and maintain. Tekton was re-checked when Phase 1 started
+   (2026-10-11) and still lost. Its triggers (Tekton Triggers, Pipelines as Code) need GitHub to
+   send webhooks into the cluster, but the platform has no inbound ports (ADR 0030, ADR 0037). The
+   only documented relay, gosmee, is a hosted service that isn't meant for production. Every repo's
+   workflows, the shared Terragrunt module's IaC pipeline among them, would have to be rewritten as
+   Tasks. Pull requests would lose native checks unless the Pipelines as Code GitHub App were also
+   run. What Tekton does better, Chains signing and SLSA provenance through a KMS key, Cosign with
+   the OpenBao transit key already covers (ADR 0033).
 4. **ARC runners plus Argo CD pull** (chosen).
 
 #### Consequences
@@ -651,6 +669,10 @@ history, lab jobs, agent investigations, Keycloak), OpenBao, and a few config fi
 - An offline copy of the OpenBao unseal keys, root token and age key.
 - A restore test every quarter.
 
+- Amended (2026-10-11, proposed in ADR 0039): R2 needs a payment method, which the owner declined.
+  The scope above stays; the transport becomes Velero (dump hooks into an `emptyDir`, file-system
+  backup with Kopia) to an Azure Blob container, and Kopia's encryption replaces the age key.
+
 #### Considered options
 
 1. **Back up every volume**: large and mostly rebuildable.
@@ -692,6 +714,12 @@ forgotten cloud lab keeps billing; a double click could deploy the same lab twic
   with confirmation, or automatically if enabled. Budget alerts per cloud and per lab.
 - The runner only runs the allowlisted Make targets from the lab card, listens only on the Docker
   bridge, needs a bearer token and audit-logs every job.
+- As built (2026-10-11): `homelab-services/services/lab-runner`, a host systemd service running as the
+  owner on `172.30.0.1:8095` (lab Makefiles need Docker, k3d, the lab repos and cloud CLI logins). The
+  portal's labs backend is its only client, through `lab-runner-api.yaml` in the portal repo. Target
+  names and repo paths from the card are validated before they reach `make` (no shell, minimal
+  environment, own process group, job timeout). State is in SQLite until `platform-db` exists, then
+  Postgres through the same database URL. Cloud labs are destroyed automatically at the TTL.
 
 #### Considered options
 
@@ -776,6 +804,7 @@ sits on the home network next to every cluster.
 
 - [ADR 0008](#adr-0008)
 - [ADR 0034](#adr-0034)
+- [ADR 0040](#adr-0040): the IaC-only scale set for `infra-local`
 
 ## ADR-0020: Platform SLOs and burn-rate alerting
 {: #adr-0020 }
@@ -867,6 +896,11 @@ same box don't add capacity.
 - Callers use only the gateway's OpenAI-compatible endpoint, by model name.
 - The GB10 has no MIG: vLLM pods share the GPU through the device plugin's time-slicing, and each
   one's `--gpu-memory-utilization` is its memory slice (ADR 0010).
+- As built (2026-10-11): `ai` runs on `k3s-gpu` (`infra-local/images/k3s-gpu`: k3s plus the NVIDIA
+  container toolkit, the device plugin baked in) with `gpus: all`; k3s registers the `nvidia`
+  RuntimeClass and the node advertises 4 time-sliced `nvidia.com/gpu`. The image tag ends in a hash of
+  its build files, because a stale image once hid behind an unchanged tag (lesson L027). The cluster's
+  memory cap (16 GB) covers only CPU-side memory: GPU allocations aren't charged to the container.
 - The SRE agent stays in `platform` so it can report when `ai` is down.
 - Scaling path: tune the single instance (batching, FP8/FP4, prefix caching) and lean on the cache;
   give each extra model a fixed memory slice, loading rarely used ones on demand; add a second box or
@@ -913,6 +947,27 @@ passwords) and by CI. They must never be in git, must work offline, and must cos
 - After a reboot the boot unit unseals from a root-only key file; nightly raft snapshots go to R2;
   the unseal keys have an offline copy.
 - This replaces the earlier SOPS plus KSOPS idea; at most one SOPS-encrypted seed file remains for DR.
+- As built (2026-10-11):
+  - One KV v2 mount, `kv/`, with the folders above. Kubernetes auth mounts are named
+    `kubernetes-<cluster>`; in `core`, role `external-secrets` gets policy `core-eso`
+    (`kv/core/*`, `kv/shared/*`).
+  - The other clusters (`mon` first, 2026-10-11) are set up by `host/openbao/configure-cluster.sh
+    <cluster>` with the admin token: policy `<cluster>-eso`, a mount pointed at that cluster's API on
+    the gateway, and `disable_local_ca_jwt`, because OpenBao's own service account (in `core`) can't
+    review another cluster's tokens. OpenBao sends each client's own JWT to that cluster's TokenReview
+    API instead, so External Secrets' service account there is bound to `system:auth-delegator`. Their
+    ClusterSecretStores use `https://bao.core.home.cloudutsuk.com`. Checked in `mon`: its own path
+    syncs and `kv/core/*` is refused (403).
+  - Shamir keys, 5 shares with threshold 3, in `/etc/homelab/openbao/init.json` (root, 0600), with an
+    offline encrypted copy. `infra-local/host/openbao/{init,unseal,configure-core}.sh` call the API
+    through a localhost port-forward and never print a key or token.
+  - The root token is break-glass only. Day-to-day changes use a periodic `homelab-admin` token
+    (30-day period; no seal, rekey, root generation or audit changes) in a 0600 file of the owner. The
+    root token is revoked once an admin login through Keycloak exists.
+  - The audit device is declared in the server config: OpenBao 2.x refuses audit devices created
+    through the API.
+  - The ClusterSecretStore is a raw resource in a small Helm release, because Terraform's
+    `kubernetes_manifest` can't type the External Secrets v2 Vault schema (ADR 0036).
 
 #### Considered options
 
@@ -952,8 +1007,15 @@ cross-cluster call should use trusted TLS without distributing a private CA.
   `home.cloudutsuk.com`, never published in Cloudflare.
 - ExternalDNS in every cluster (pdns provider) writes Ingress and Service names such as
   `grafana.mon.home.cloudutsuk.com`; ownership TXT records stop clusters overwriting each other.
-- The `core` load balancer publishes DNS on the gateway address `172.30.0.1:53`. Each cluster's
-  CoreDNS forwards the zone there; the DGX uses `systemd-resolved` split DNS.
+- The `core` load balancer publishes DNS on the gateway address `172.30.0.1:53`, and the DGX uses
+  `systemd-resolved` split DNS to send only this zone there.
+- Pods can't use `172.30.0.1:53`: k3d's DNS fix redirects that address inside every node to Docker's
+  embedded resolver (found while building step 8, 2026-10-11). So `core`'s CoreDNS forwards the zone to
+  PowerDNS's fixed ClusterIP service (`10.11.0.53`), and the other clusters forward to a second port that
+  `core`'s load balancer publishes on the gateway: `172.30.0.1:1053` (added 2026-10-11 with `mon`; k3d's
+  redirect only matches port 53).
+- Ingresses report their cluster's published address (Traefik's ingress endpoint), so ExternalDNS
+  points names there: `172.30.0.1` for `core`, and each other cluster's own bridge address (ADR 0030).
 - cert-manager issues Let's Encrypt certificates through a Cloudflare DNS-01 challenge; only
   `_acme-challenge` TXT records are written to Cloudflare, with a token scoped to DNS edit.
 - Public names stay in Cloudflare behind the tunnel.
@@ -1115,6 +1177,20 @@ accounts.
 - Break-glass: Cloudflare Access keeps Google as a direct IdP limited to the owner, and local admin
   accounts for OpenBao and Argo CD are sealed in OpenBao and the offline backup.
 - Only Keycloak stores email addresses (ADR 0035).
+- As built (2026-10-11): Keycloak 26.7.4 in `core` (bootstrap release, ADR 0036) on its own Postgres
+  (`core-db`, Postgres 17.10, ADR 0035), at `https://auth.core.home.cloudutsuk.com`; with no fixed
+  hostname it builds URLs from Traefik's forwarded headers, so the public `auth.cloudutsuk.com` works
+  through the tunnel without a change. Realm `homelab`, groups `platform-admins` and `viewers`, and the
+  Entra ID provider (`entra`, OIDC v2, PKCE) come from `infra-local/host/keycloak/configure-realm.sh`; the
+  Entra app (`cloudutsuk-keycloak`, single-tenant, tenant-wide consent for openid, profile, email,
+  User.Read) from `host/entra/keycloak-app.sh`, with its client secret written straight to OpenBao
+  (`kv/core/keycloak`). Google is not configured yet. The bootstrap admin in the master realm is for
+  automation and emergencies only.
+- Cluster sign-in (2026-10-11): each k3s API server trusts the issuer through a drop-in
+  (`infra-local/host/k3s/oidc.yaml`: client `kubernetes`, username claim `email`, groups claim `groups`,
+  both prefixed `oidc:`), and `oidc:platform-admins` is bound to `cluster-admin`, `oidc:viewers` to
+  `view`. Each node needs the host alias `auth.core.home.cloudutsuk.com -> 172.30.0.1`, because the API
+  server resolves the issuer through the node, not CoreDNS. Done in `mon`.
 
 #### Considered options
 
@@ -1191,7 +1267,8 @@ cross-cluster routing and debugging ambiguous; published API ports widen the att
 
 #### Decision
 
-- `homelab` bridge `172.30.0.0/24`, gateway `172.30.0.1` (publishes DNS 53 and registry 443).
+- `homelab` bridge `172.30.0.0/24`, gateway `172.30.0.1` (publishes DNS 53 for the host and registry
+  and ingress 443; pods reach DNS another way, see ADR 0024).
 - Pod and service CIDRs: `core` 10.10/10.11, `platform` 10.20/10.21, `mon` 10.30/10.31, `ai`
   10.40/10.41, labs from 10.100 upward (allocated by the lab runner).
 - Traefik plus cert-manager TLS on every cluster; default-deny NetworkPolicies.
@@ -1199,17 +1276,32 @@ cross-cluster routing and debugging ambiguous; published API ports widen the att
   cluster's API listens only on the `homelab` gateway (`core` 6441, `platform` 6442, `mon` 6443, `ai`
   6444 on 172.30.0.1). Docker assigns container addresses from 172.30.0.128/25, leaving .2-.127 for
   fixed addresses.
+- Each long-lived cluster except `core` gets its own host address on the bridge for its ingress
+  (2026-10-11, with `mon`): `platform` 172.30.0.2, `mon` 172.30.0.3, `ai` 172.30.0.4. Only one load
+  balancer can publish `172.30.0.1:443`, and that's `core`'s. A systemd unit
+  (`infra-local/host/network`) adds the addresses to `br-homelab` at boot and after a Docker restart, and
+  `net.ipv4.ip_nonlocal_bind=1` lets Docker publish on them even if it starts first. Each cluster's
+  load balancer publishes 80/443 there, and its Traefik reports that address, so ExternalDNS points
+  `*.mon.home.cloudutsuk.com` at 172.30.0.3. The API ports stay on the gateway.
 
 #### Considered options
 
 1. **k3d defaults**: every cluster gets the same ranges.
 2. **A fixed plan** (chosen).
 
+For the other clusters' ingress:
+
+1. **SNI passthrough through `core`'s Traefik**: one address, but every UI depends on `core`'s ingress.
+2. **Another port on the gateway** (e.g. 8443): every URL carries the port.
+3. **One host address per cluster** (chosen): independent of `core`, at the cost of a host unit.
+
 #### Consequences
 
 - Good: Unambiguous addresses and routes.
 - Good: Small attack surface.
 - Bad: The lab runner must allocate ranges.
+- Bad: The per-cluster addresses are host configuration outside Docker; without the unit, those
+  clusters' ingresses are unreachable.
 
 #### Related
 
@@ -1357,6 +1449,26 @@ through a local cache. The host is arm64. Harbor's official images are amd64 onl
 - Nodes resolve the name through a k3d host alias to `172.30.0.1`. People log in to the UI through
   Keycloak. The k3d-managed plain-HTTP registry is dropped.
 
+- As built (2026-10-11): chart 0.1.125 (Zot 2.1.21) as a bootstrap release in `core` (ADR 0036), data
+  on `/srv/homelab/zot/data`, served at `https://registry.core.home.cloudutsuk.com` with a Let's Encrypt
+  certificate. Accounts `admin`, `puller` and `ci-pusher` come from `kv/core/zot`; External Secrets
+  builds the bcrypt htpasswd file, so plain passwords never reach Zot. On-demand sync mirrors
+  `docker.io`, `ghcr.io`, `quay.io`, `registry.k8s.io` and `nvcr.io` under `mirror/<registry>/`.
+  `http.compat: [docker2s2]` lets the Docker CLI push Docker-format manifests; BuildKit pushes OCI.
+- Anonymous pulls of `mirror/*` work for containerd (the k3d nodes), which asks for the manifest
+  directly. The Docker CLI first calls `/v2/`, which Zot answers with 401 without credentials, so people
+  pull with the `puller` account.
+- `registries.yaml` for the other clusters is one host file, `infra-local/host/k3s/registries.yaml`,
+  installed to `/srv/homelab/k3s/registries.yaml` and bind-mounted into each node, so a change needs a
+  `k3d cluster stop/start` of that cluster, not a new cluster (ADR 0006). It rewrites each upstream to `mirror/<registry>/`;
+  containerd falls back to the upstream when Zot is down. `core` itself has no mirror. Checked
+  2026-10-11: `mon` pulled its pause image through the mirror; `ci-pusher` pushed a test image that
+  `puller` could read and an anonymous client couldn't (401).
+
+- `charts/*` (2026-10-11): anonymous read like `mirror/*`, write by `ci-pusher` and `admin`. Third-party
+  charts that aren't published as OCI, or whose download fails from the DGX, are checked against their
+  index digest and pushed here (first: `charts/velero` 12.2.0 and `charts/velero-ui` 0.16.0, ADR 0039).
+
 #### Considered options
 
 1. **Harbor**: no arm64 images.
@@ -1415,6 +1527,391 @@ schema changes and bugs couple them, and backups and privacy are hard to reason 
 
 - [ADR 0016](#adr-0016)
 - [ADR 0028](#adr-0028)
+
+## ADR-0036: Bootstrap charts through the shared module's Helm layer; Argo CD for the rest
+{: #adr-0036 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `terragrunt-shared-module`, `homelab-gitops`</span>
+
+#### Context
+
+`core` boots first and must run OpenBao, External Secrets, cert-manager, PowerDNS, ExternalDNS and Zot
+before Argo CD or any other cluster exists (ADR 0025). Those releases need a tool other than Argo CD.
+The owner already installs platform charts with the Terragrunt shared module's Helm layer in other
+application repositories, and wants the same workflow here.
+
+#### Decision
+
+- Bootstrap charts are Terragrunt stacks in `infra-local/environments/k3d/homelab/helm/<cluster>/`, one
+  folder per release, applied with `entrypoint.py --cloud k3d --environment homelab --provider helm
+  --stack <cluster> --resource <release>`. `plan` comes first: only `plan` generates the stack file.
+- Releases use the shared `helm_release:` key with an explicit `release-external-secrets:` list. The
+  `external-secrets` and `cert-manager` keys keep their own units (secret stores; switching off the
+  module's Sectigo issuers). One release per folder, named after the folder, because the entrypoint
+  filters releases by that name.
+- Every release sets `shared_values: false`: the module's default values for well-known release names
+  target another platform's managed clusters (node pools, workload identity, image pins).
+- Charts come from OCI registries where they exist, with the version at least 14 days old and the digest
+  recorded in `resources.yaml`. Releases that hold only cluster-scoped objects live in `kube-system`,
+  because the module creates and owns every other release namespace.
+- Things without a chart (PowerDNS, ClusterIssuers, the ClusterSecretStore, CoreDNS and Traefik
+  settings) use the bjw-s `app-template` chart and its raw resources, not Terraform's
+  `kubernetes_manifest`.
+- Everything after bootstrap (apps, monitoring, the AI stack) is deployed by Argo CD from
+  `homelab-gitops` with app-of-apps (ADR 0007, 0008). Argo CD itself is the last bootstrap release.
+
+#### Considered options
+
+1. **Argo CD for everything**: Argo CD's own secrets and registry would depend on releases it deploys.
+2. **Helmfile or plain `helm` scripts**: a second workflow next to the Terragrunt one used everywhere
+   else, without the plan, state and policy checks.
+3. **Terraform `kubernetes_manifest` for custom resources**: fails on CRDs with deep optional schemas
+   (External Secrets v2) and needs the CRDs at plan time.
+4. **The shared module's Helm layer for bootstrap, Argo CD after** (chosen).
+
+#### Consequences
+
+- Good: the same plan/apply workflow, state backend and scans as every other `infra-*` repo.
+- Good: `core` can be rebuilt from `infra-local` alone, before anything else exists.
+- Bad: two delivery paths to keep apart; a component must not be managed by both.
+- Bad: chart downloads depend on upstream registries until Zot mirrors them (ADR 0034).
+
+#### Related
+
+- [ADR 0007](#adr-0007)
+- [ADR 0023](#adr-0023)
+- [ADR 0025](#adr-0025)
+- [ADR 0034](#adr-0034)
+
+## ADR-0037: Private remote access through Tailscale instead of Cloudflare Tunnel and Access
+{: #adr-0037 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `homelab-gitops`</span>
+
+#### Context
+
+ADR 0003 planned to publish `portal.`, `grafana.`, `argocd.` and `phoenix.cloudutsuk.com` through a
+Cloudflare Tunnel guarded by Cloudflare Access. Setting up the Cloudflare Zero Trust team asks for a
+payment method even on the free plan, and the owner doesn't want to give one (2026-10-11).
+
+Without remote access, the platform is usable only from a browser on the DGX itself: every service is
+on the `homelab` Docker bridge (`172.30.0.0/24`), and `home.cloudutsuk.com` resolves only on the DGX
+through split DNS (ADR 0024). Other machines on the home LAN can't reach it either.
+
+The platform has one user (the owner, with a phone and a laptop) and no page that anonymous visitors
+need. Every service already has an internal HTTPS name with a Let's Encrypt certificate
+(`*.home.cloudutsuk.com`), and Keycloak (ADR 0028) already handles sign-in for every UI.
+
+#### Decision
+
+- **Tailscale** (free Personal plan) gives the owner's devices private access; nothing is published on
+  the internet.
+- **The DGX is a subnet router.** `tailscaled` runs on the host, not in a cluster, because the bridge
+  is a host network. It advertises `172.30.0.0/24` (the clusters' published addresses `172.30.0.1`-`.4`
+  and the k3s API ports). The route is approved once in the admin console, and the DGX's key expiry is
+  switched off so the router doesn't drop out after 180 days.
+- **Split DNS.** The tailnet's DNS settings add `172.30.0.1` as a nameserver restricted to
+  `home.cloudutsuk.com`, so a phone or laptop resolves `grafana.mon.home.cloudutsuk.com` through
+  PowerDNS in `core` and gets the same Let's Encrypt certificate as the DGX. No new names, no
+  certificate changes.
+- **Access policy (tailnet policy file).** Only the owner's identity can reach the advertised range,
+  on 80/443 (UIs), 53 (DNS) and 6441-6444 (k3s APIs with OIDC sign-in, ADR 0028). The DGX node is
+  tagged (`tag:homelab`) and can't reach the owner's devices. Device approval is on.
+- **Sign-in stays in Keycloak.** Tailscale decides who can reach the network; Keycloak decides who can
+  use each app. The browser reaches `auth.core.home.cloudutsuk.com` over the tailnet, so Keycloak needs
+  no public name (`auth.cloudutsuk.com` from ADR 0028 is dropped).
+- **Fallback.** If Tailscale's coordination service is down, existing connections keep working; new
+  devices wait. On the home LAN, SSH to the DGX with a port-forward still works.
+- **Cloudflare stays for DNS and DNS-01 only** (ADR 0024). ADR 0003's DNS move is kept; its tunnel
+  and Access parts are replaced by this ADR once it's accepted.
+
+- As built (2026-10-11): the DGX (`tag:homelab`, key expiry off) advertises `172.30.0.0/24`, approved
+  by `autoApprovers`; split DNS `home.cloudutsuk.com -> 172.30.0.1`; policy in
+  `infra-local/host/tailscale/policy.hujson`, route set by `host/tailscale/setup.sh`. Checked from a
+  phone on mobile data: `https://bao.core.home.cloudutsuk.com` and `https://auth.core.home.cloudutsuk.com`
+  load with valid certificates.
+
+#### Considered options
+
+1. **Cloudflare Tunnel and Access (ADR 0003)**: needs a payment method for the Zero Trust team.
+2. **Cloudflare Tunnel without Access**: would publish admin UIs (Argo CD, Grafana, OpenBao) on the
+   internet with only the apps' own login in front.
+3. **Port forwarding on the home router plus a reverse proxy**: exposes the home IP; inbound ports.
+4. **Self-hosted WireGuard on the DGX**: free, but needs an inbound UDP port on the router and manual
+   key and DNS management per device.
+5. **Headscale (self-hosted Tailscale control server)**: no vendor account, but the control server
+   needs a public address, which brings back option 3's problem.
+6. **Tailscale free Personal plan** (chosen): no payment method, no inbound port, clients for every
+   platform, split DNS and per-identity policy built in.
+
+#### Consequences
+
+- Good: Nothing is published on the internet; the attack surface is the owner's devices.
+- Good: $0, no payment method, no inbound ports, no tunnel pods in `platform`.
+- Good: Internal names and certificates work unchanged from any device.
+- Good: `kubectl` with OIDC works from the laptop against every cluster.
+- Bad: Every device needs the Tailscale client; there's no browser-only access from a borrowed machine.
+- Bad: Tailscale (the company) becomes a dependency for remote access; local access doesn't depend on it.
+- Bad: The blog's planned Dashboard tab (Phase 3) can link only to pages that work for tailnet
+  devices; anonymous readers get nothing from it.
+- Bad: Plan terms can change (they did in April 2026); the subnet router counts as one tagged resource.
+
+#### Related
+
+- [ADR 0003](#adr-0003)
+- [ADR 0024](#adr-0024)
+- [ADR 0028](#adr-0028)
+- [ADR 0030](#adr-0030)
+
+## ADR-0038: Argo CD: installed by Terraform, everything else through an app-of-apps in homelab-gitops
+{: #adr-0038 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `homelab-gitops`</span>
+
+#### Context
+
+ADR 0007 puts one Argo CD in `platform` that manages every cluster, and ADR 0036 splits the work
+between the shared module's Helm layer (bootstrap charts) and Argo CD (the rest). Step 13 had to settle
+how Argo CD itself is installed and seeded, how it gets its credentials, how clusters are registered,
+and which add-ons it owns, given that External Secrets, cert-manager and ExternalDNS already run in
+`core` from Terraform and External Secrets runs in every cluster from Terraform. The owner chose an
+app-of-apps in `homelab-gitops` over the Terraform Argo CD application layer.
+
+#### Decision
+
+- **Install:** Argo CD (chart `argo-cd`, from Argo's OCI registry) is a Helm release in
+  `infra-local` (`helm/platform/argocd`). Terraform owns Argo CD itself; Argo CD doesn't manage its own
+  install. An upgrade is a chart version bump and a plan in `infra-local`.
+- **Seed:** a second release, `helm/platform/argocd-root`, creates the root Application
+  (`homelab-gitops/bootstrap`, automated sync with prune and self-heal) once Argo CD's CRDs exist. From
+  there, `bootstrap/` holds Applications for `appsets/` and, later, `clusters/<name>/`.
+- **Repository:** `homelab-gitops` is read over SSH with a read-only deploy key. The private key is
+  created by `infra-local/host/argocd/deploy-key.sh` straight into OpenBao (`kv/platform/argocd-repo`)
+  and reaches Argo CD through an ExternalSecret.
+- **Clusters:** `platform` is Argo CD's own (in-cluster). `mon` and `ai` each get an `argocd-manager`
+  service account with cluster-admin and a long-lived token (`helm/<cluster>/argocd-manager`);
+  `host/argocd/register-cluster.sh` copies the token, CA and API address (the homelab gateway) to
+  `kv/platform/argocd-clusters/<cluster>`, and an ExternalSecret builds Argo CD's cluster secret. Each
+  cluster secret carries `homelab/cluster` and `homelab/addons` labels.
+- **Add-ons:** ApplicationSets with a cluster generator (`homelab/addons=true`) install cert-manager,
+  ExternalDNS and a small per-cluster config chart (issuers, OpenBao-backed secrets) on `platform`,
+  `mon` and `ai`. External Secrets stays in the Terraform bootstrap layer everywhere, because Argo CD
+  itself depends on it for credentials. ExternalDNS in those clusters writes to PowerDNS in `core`
+  through its HTTPS API (`pdns-api.core.home.cloudutsuk.com`), each with its own TXT owner id; the API
+  key is copied per cluster (`kv/<cluster>/external-dns`), not into `kv/shared`, so future lab clusters
+  can't rewrite the zone.
+- **`core` isn't registered yet:** everything in it is Terraform-owned (ADR 0036), and a cluster-admin
+  token for the cluster that holds OpenBao and Keycloak is the largest blast radius on the platform.
+  It's registered when its first Argo CD app arrives.
+- **Sign-in:** Keycloak client `argocd` (public, PKCE, groups claim); `platform-admins` get
+  `role:admin`, `viewers` `role:readonly`, anyone else nothing. The local `admin` account stays as
+  break-glass (`argocd-initial-admin-secret`). Dex and notifications are off.
+- **Polling:** reconciliation every 180 s; no inbound webhook (ADR 0008).
+- As built (2026-10-11): everything tracks `main`. First sync: 11 Applications Synced and Healthy
+  (root, `appsets`, and cert-manager, ExternalDNS and `cluster-addons-config` on `platform`, `mon`
+  and `ai`). On the first sync the config app ran before ExternalDNS had created its namespace; the
+  sync retry settled it within minutes, so no sync waves were added.
+
+#### Considered options
+
+1. **Terraform installs Argo CD; app-of-apps in git seeds the rest** (chosen): one owner per object,
+   and the bootstrap order (OpenBao, External Secrets, then Argo CD) stays in one tool.
+2. **Argo CD manages itself after a one-off install:** fewer tools touch it, but a bad self-sync can
+   lock you out, and the credentials it needs come from releases Terraform owns anyway.
+3. **The Terraform Argo CD application layer** (the reference pattern's `argocd` provider): the owner
+   preferred keeping desired state in `homelab-gitops`, where CI writes image digests (ADR 0008).
+4. **Short-lived cluster tokens from OpenBao's Kubernetes secrets engine** (ADR 0029): the target, but
+   it needs a refresher; long-lived `argocd-manager` tokens are the v1 step.
+
+#### Consequences
+
+- Good: everything after bootstrap is reviewed and changed in `homelab-gitops`; adding a cluster is a
+  label plus a registration.
+- Good: no secret value lives in git or in Terraform state; deploy key, tokens and API keys sit in
+  OpenBao.
+- Bad: the `argocd-manager` tokens don't expire, and cluster-admin is broader than Argo CD needs.
+  Rotate by recreating the secret and re-running `register-cluster.sh`; replace with OpenBao-issued
+  tokens later (ADR 0029).
+- Bad: the PowerDNS API is now reachable from the homelab bridge (behind its API key and TLS).
+
+#### Related
+
+- [ADR 0007](#adr-0007)
+- [ADR 0008](#adr-0008)
+- [ADR 0023](#adr-0023)
+- [ADR 0024](#adr-0024)
+- [ADR 0028](#adr-0028)
+- [ADR 0029](#adr-0029)
+- [ADR 0036](#adr-0036)
+
+## ADR-0039: Backups with Velero: application dumps through file-system backup to Azure Blob
+{: #adr-0039 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `homelab-gitops`, `infra-azure`</span>
+
+#### Context
+
+ADR 0016 decided what to back up (every Postgres, the OpenBao raft snapshot, Zot's config) and planned a
+nightly age-encrypted upload to Cloudflare R2. R2 asks for a payment method, which the owner declined
+(2026-10-11, the same reason as ADR 0037), and the owner asked to evaluate Velero (velero.io) instead.
+
+What the platform actually holds (measured 2026-10-11):
+
+- No cluster has a PersistentVolume. Every stateful component mounts an inline `hostPath` under
+  `/srv/homelab` (OpenBao raft, `core-db`, PowerDNS SQLite, Zot), so recreating a cluster keeps the data
+  (ADR 0016).
+- A nightly set is under 1 MB today: OpenBao snapshot 57 KB, Keycloak dump about 250 KB compressed,
+  PowerDNS under 200 KB. `platform-db` and `ai-db` will add tens to a few hundred MB per year.
+- Everything else is rebuilt from git: clusters (`infra-local`), apps (Argo CD), images (Zot mirror),
+  Qdrant (re-ingest), metrics and logs.
+
+What Velero offers and where it doesn't fit as-is (Velero 1.18 docs):
+
+- It backs up Kubernetes objects to object storage and volume data through CSI snapshots or
+  **file-system backup** (FSB: the node-agent DaemonSet reads volumes under `/var/lib/kubelet/pods` and
+  uploads them with Kopia, deduplicated and encrypted with a repository password).
+- **"hostPath volumes are not supported"** by FSB, so it can't copy any of the data above as mounted.
+  `local` PVs and `emptyDir` are supported.
+- FSB copies live files, not a point-in-time image; a running Postgres or raft store copied that way is
+  only crash-consistent. Velero's answer is pre-backup hooks that run a command in a pod first.
+- Object backups of `Secret` objects would put plaintext secret values in the bucket.
+
+#### Decision
+
+- **Velero 1.18** (image v1.18.3, chart `vmware-tanzu/velero` 12.2.0, both at least 14 days old; images
+  are multi-arch with arm64) in `core`, `platform` and `ai`, with the node-agent for FSB. `mon` holds only
+  rebuildable telemetry and gets none.
+- **It's a bootstrap Helm release from `infra-local`** (`helm/<cluster>/velero`, ADR 0036), not an
+  Argo CD app: restoring `core` must not depend on `platform`.
+- **Data goes through dumps, not raw volumes.** Each cluster gets a small `backup-dumps` pod with an
+  `emptyDir`. Velero pre-backup hooks on it run the application-consistent dumps into that `emptyDir`
+  (`pg_dump -Fc` per database, `bao operator raft snapshot save`, Zot's config and the PowerDNS zone
+  export), and FSB uploads the `emptyDir`. The `hostPath` mounts stay as they are.
+- **Objects too, minus secrets.** The same nightly schedule backs up the cluster's objects with
+  `--exclude-resources secrets` (External Secrets recreates them from OpenBao). This gives a catalogue of
+  what ran and a way to restore objects that aren't in git.
+- **Target: an Azure Blob container** with the Azure plugin v1.14.3 (the release made alongside Velero
+  1.18.3), in a storage account of its own (not the Terraform state account), created by `infra-azure`
+  with soft delete and versioning on, and a lifecycle rule to the cool tier. Credentials: a storage
+  account key in OpenBao (`kv/<cluster>/velero`), delivered by External Secrets. Cost: cents a month.
+- **Schedules:** nightly, kept 30 days; a weekly one kept 12 weeks.
+- **Recovery kit, kept offline with the OpenBao unseal keys:** the storage account key and the Kopia
+  repository password. Restoring `core` needs them before OpenBao exists. This replaces ADR 0016's age
+  key: Kopia encrypts the dumps, and OpenBao's snapshot is already encrypted by its barrier.
+- **Watching it:** Velero's Prometheus metrics go to `mon` (Phase 2). Alerts fire when the last
+  successful backup per cluster is older than 26 hours, or a backup ends in error or with failed hooks.
+  A Velero dashboard goes in the Platform folder (ADR 0027).
+- **Restore test every quarter** (ADR 0016) into a throwaway k3d cluster: restore the dumps with Velero,
+  then load them (`pg_restore`, `bao operator raft snapshot restore`) and check Keycloak and a secret.
+
+- As built (2026-10-11), where it differs from the above:
+  - Storage: `infra-azure` stack `development/homelab-velero`, account `dvsthomelabbkp01` in `eastus` (the
+    policy's allowed regions), StorageV2 LRS with **Cool as the account's default tier** (the shared module
+    has no lifecycle-policy unit), versioning and 14-day soft delete, TLS 1.2, anonymous blob access off.
+    Public network access is on: the DGX reaches it over the internet, and every request needs the key.
+    Three soft-mandatory policy findings (private endpoint, tags on the container, a corporate `app-*` tag)
+    are documented in the stack and were applied with `--opa-override` by the owner.
+  - Releases per cluster: `velero` (server, node agent, CRDs) and `velero-config` (backup locations and
+    schedules as raw resources in `kube-system`). The module's Helm provider validates every rendered
+    object against the API first, so Velero's own kinds can only be applied once the CRDs exist.
+  - Charts come from Zot (`charts/velero`, `charts/velero-ui`): the checked `.tgz` files were pushed there
+    because Helm's Go client timed out on GitHub's release-asset host (ADR 0034 note).
+  - Dumps only in `core` (`backup-dumps`: Keycloak's database through a read-only `pg_read_all_data` role,
+    and the OpenBao snapshot through the pod's own Kubernetes login with a snapshot-only policy). PowerDNS's
+    zone and Zot's config are left out: ExternalDNS rewrites the records and the config is in git.
+    `platform` and `ai` hold no database yet, so they back up objects only.
+  - UI: otwld/velero-ui 0.10.3 in `platform` (namespace `velero-ui`) at
+    `https://velero.platform.home.cloudutsuk.com`, Keycloak sign-in only (client `velero-ui`; group
+    `platform-admins` manages, `viewers` read), the chart's own Roles instead of `cluster-admin`.
+    `platform`'s Velero has read-only locations for `core/` and `ai/`, so the one UI lists every cluster.
+    The chart's Role can read the `velero` namespace's secrets, which include the storage key.
+  - First run: `core` 714 objects plus 328 KB of dumps (both hooks OK), `platform` 732 objects, `ai`
+    backed up; Kopia uses our password, not Velero's default.
+
+#### Considered options
+
+1. **ADR 0016 as written (CronJob, age, R2)**: simplest, but R2 needs a payment method.
+2. **Velero FSB on the raw volumes**: not possible with `hostPath`. Moving to `local` PVs would make it
+   possible, but copies of a running database or raft store aren't trustworthy.
+3. **Velero with dump hooks into an `emptyDir`** (chosen): application-consistent data, Velero's
+   scheduling, retention, encryption, catalogue and restore workflow, and its metrics for alerting.
+4. **A plain CronJob with restic or rclone to the same bucket**: less machinery, but every piece
+   (retention, encryption, status, alerts) is ours to write.
+
+#### Consequences
+
+- Good: One tool and one restore workflow for every cluster, and later for labs with real PVCs.
+- Good: Encrypted, deduplicated, retained and monitored without custom scripts.
+- Good: No plaintext secrets in the bucket; $0 platform cost and no new payment method.
+- Bad: More moving parts than a CronJob: a node-agent per cluster, hooks, a Kopia repository.
+- Bad: Restoring data is two steps: Velero brings the dumps back, then each is loaded by hand (or by a
+  restore hook later).
+- Bad: Hook commands run inside the dump pod, so it needs the client tools (`pg_dump`, `bao`) and
+  short-lived credentials (a read-only Postgres role; an OpenBao token allowed only to take snapshots).
+- Bad, accepted: `mon` isn't backed up. Losing the DGX disk loses up to 15 days of metrics, logs and
+  traces; dashboards and alert rules come back from git.
+- Bad: FSB on k3d isn't documented; the spike must prove the node-agent works there (k3d nodes do mount
+  their root as shared, which mount propagation needs).
+
+#### Related
+
+- [ADR 0016](#adr-0016)
+- [ADR 0023](#adr-0023)
+- [ADR 0027](#adr-0027)
+- [ADR 0036](#adr-0036)
+- [ADR 0037](#adr-0037)
+
+## ADR-0040: A second, repo-scoped runner scale set for infra-local's IaC jobs
+{: #adr-0040 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+`infra-local`'s Terragrunt workflow (provisioned by the shared module, runner name from
+`config.yaml`) creates k3d clusters with the k3d CLI and installs Helm releases into every cluster.
+A job doing that needs the host's Docker daemon and API access to `core`, `platform`, `mon` and `ai`.
+ADR 0019 keeps the build runners ephemeral and without host access, and ADR 0008 keeps kubeconfigs
+away from GitHub. Giving the org-wide `homelab` scale set Docker and cluster access would hand both to
+every private repo's workflows.
+
+The org is on GitHub's free plan: it has only the Default runner group, so a runner group can't limit
+a scale set to selected repos. ARC can, though, register a scale set with a single repository.
+
+#### Decision
+
+- ARC in `platform` runs two runner scale sets from the same controller (chart 0.14.2):
+  - `homelab`: registered with the org, used by every private repo's build and test jobs.
+    Ephemeral pods, no host mounts, no kubeconfig. ADR 0019 applies unchanged.
+  - `homelab-iac`: registered with the `infra-local` repository only, at most one runner at a time.
+    It's the only runner with Docker access and with the cluster kubeconfigs (read from OpenBao). Still
+    ephemeral, one job per pod.
+- `infra-local`'s `config.yaml` names `homelab-iac` as its runner (`iac_runner`).
+- The Default runner group keeps "allow public repositories" off, so no public repo can use either set.
+
+#### Considered options
+
+1. **One scale set with host access for everything**: every private repo's workflow could reach the
+   Docker daemon, which is root on the DGX.
+2. **Plan-only IaC in CI, apply by hand**: safe, but drift and applies stay manual.
+3. **No IaC in CI**: the provisioned workflow would never run.
+4. **A second scale set registered with `infra-local` alone** (chosen).
+
+#### Consequences
+
+- Good: host-level access is limited to one repo, which only the owner pushes to.
+- Good: IaC plans and applies run from Git like everything else.
+- Bad: a compromised `infra-local` workflow is root on the DGX. Branch protection isn't available
+  for private repos on GitHub's free plan, so the guard is who can push: only the owner has write
+  access to `infra-local`, and the GitHub App never gets Contents write on it.
+- Bad: how the `homelab-iac` pod reaches Docker is still to be built (Phase 1 step 1b).
+
+#### Related
+
+- [ADR 0008](#adr-0008)
+- [ADR 0019](#adr-0019)
+- [ADR 0036](#adr-0036)
+- [ADR 0038](#adr-0038)
 
 {% endraw %}
 <!-- adr:end -->

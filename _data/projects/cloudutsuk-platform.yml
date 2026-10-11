@@ -6,13 +6,13 @@
 # phase, update the posts with what was actually built (replace TODO callouts, add screenshots and
 # diagrams), scaffold the next areas with scaffold.py --areas <ids>, sync the ADR log, and move
 # `status` from Planning to In progress to Live. Tenant/subscription IDs, Cloudflare account and
-# tunnel IDs, email allowlists and private repo URLs are deliberately left out (public repo).
+# tailnet names, email allowlists and private repo URLs are deliberately left out (public repo).
 name: Cloudutsuk Platform
 tag: Cloudutsuk Platform
 summary: 'A self-hosted control plane on an NVIDIA DGX Spark: one SSO-protected portal for every lab,
   cloud resource and its cost, with central OpenTelemetry monitoring, local CI/CD and GitOps, a RAG chatbot
   on a local LLM and an alert-driven SRE agent.'
-status: Planning
+status: In progress
 created: '2026-10-10'
 category: platform-engineering
 clouds: [azure, aws, gcp]
@@ -22,7 +22,7 @@ facts:
 - label: Stack
   value: Backstage, k3d, Argo CD, Karmada, OpenBao, Grafana LGTM, OpenTelemetry, OpenCost, LitmusChaos, vLLM, LiteLLM, KEDA, Qdrant
 - label: Hosting
-  value: NVIDIA DGX Spark at home, Cloudflare Tunnel + Access ($0 hosting)
+  value: NVIDIA DGX Spark at home, private access over Tailscale ($0 hosting)
 - label: Delivery
   value: GitHub Actions self-hosted runners, central Argo CD
 - label: Architecture

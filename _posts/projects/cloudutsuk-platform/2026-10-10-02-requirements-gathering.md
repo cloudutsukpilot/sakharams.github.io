@@ -31,7 +31,7 @@ memory. Those tensions shaped the non-functional requirements more than any feat
 
 | ID | Requirement |
 |---|---|
-| F1 | Sign in with Google or Entra ID; only allowlisted accounts get in |
+| F1 | Sign in with Entra ID (Google later) through Keycloak; only my devices reach the platform, over Tailscale |
 | F2 | List every resource on the DGX (k3d clusters, containers, GPU use), in Azure, AWS and GCP |
 | F3 | Show cost per resource, grouped by lab, repo and environment, with a "last synced" time |
 | F4 | Refresh inventory and cost every 6 hours, plus a manual "Sync now" |
@@ -94,8 +94,9 @@ proposed fix waiting for my approval.
 ## Acceptance criteria
 {: #acceptance-criteria }
 
-- **F1:** Given an account not on the allowlist, when it signs in, Cloudflare Access denies it, and so does
-  Backstage if the edge policy is bypassed.
+- **F1:** Given a Tailscale user who isn't me, when it tries any platform address, the tailnet policy
+  drops it; and given someone on my network without a Keycloak account in the `homelab` realm, every
+  tool's own sign-in refuses them.
 - **F3:** Given a resource tagged `lab=azure-private-endpoint-lab`, when costs sync, its cost appears under
   that lab within one sync cycle of the provider publishing it.
 - **F6:** Given a lab is deploying, when Deploy is clicked again, the second request is refused (per-lab lock).
@@ -185,7 +186,7 @@ The phases are in
 
 - [ ] F1–F16 reviewed and each mapped to a phase
 - [ ] Proposed NFR targets (99% portal, 3 s first token, 5 min RCA) confirmed or replaced
-- [ ] Every lab card has a `deploy:` block with its memory size
+- [x] Every lab card has a `deploy:` block with its memory size
 - [ ] TTL default for cloud labs agreed
 - [ ] Acceptance criteria turned into tests as each phase is built
 - [ ] Model licence recorded in ADR 0010

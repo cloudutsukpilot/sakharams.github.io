@@ -10,6 +10,8 @@
   from `diagrams:` in its data file (type, title, url, optional flow-anim `diagram` id and `format`).
   The Architecture Decisions tile appears only when _data/project_adrs/<project>.yml exists (written by
   scripts/sync_adrs.py) and links to the post with `project: <project_key>` and `project_adrs: true`.
+  The Lessons Learned tile appears only when _data/project_lessons/<project>.yml exists (written by hand,
+  checked by scripts/lessons.py) and links to the post with `project_lessons: true`.
   Created and checked by the cloudutsuk-project skill (.claude/skills/cloudutsuk-project/).
 -->
 {% assign framework = site.data.project_framework %}
@@ -21,7 +23,9 @@
 {% assign interview_post = page.posts | where: 'project', project_key | where: 'project_interview', true | first %}
 {% assign adr_log = site.data.project_adrs[project_key] %}
 {% assign adr_post = page.posts | where: 'project', project_key | where: 'project_adrs', true | first %}
-{% assign others = page.posts | where_exp: 'p', 'p.project != project_key or p.project_step == nil' | where_exp: 'p', 'p.project != project_key or p.project_interview != true' | where_exp: 'p', 'p.project != project_key or p.project_adrs != true' %}
+{% assign lessons_log = site.data.project_lessons[project_key] %}
+{% assign lessons_post = page.posts | where: 'project', project_key | where: 'project_lessons', true | first %}
+{% assign others = page.posts | where_exp: 'p', 'p.project != project_key or p.project_step == nil' | where_exp: 'p', 'p.project != project_key or p.project_interview != true' | where_exp: 'p', 'p.project != project_key or p.project_adrs != true' | where_exp: 'p', 'p.project != project_key or p.project_lessons != true' %}
 
 <div id="page-tag" class="project-index">
   <h1 class="ps-lg-2">
@@ -55,6 +59,7 @@
       <a href="#phase-{{ phase.id }}">{{ phase.title }}</a>
     {% endfor %}
     {% if adr_log %}<a href="#architecture-decisions">Architecture Decisions</a>{% endif %}
+    {% if lessons_log %}<a href="#lessons-learned">Lessons Learned</a>{% endif %}
     {% if interview %}<a href="#interview-prep">Interview Prep</a>{% endif %}
   </nav>
 
@@ -172,6 +177,34 @@
             {% for adr in adr_log.adrs %}{% if adr.status == 'proposed' %}
               <li><a href="{{ adr_post.url | relative_url }}#{{ adr.anchor }}">ADR-{{ adr.id }}</a> <span class="text-muted">{{ adr.title | truncate: 70 }}</span></li>
             {% endif %}{% endfor %}
+          </ul>
+        {% else %}
+          <p class="project-card-pending text-muted">Not published yet</p>
+        {% endif %}
+      </article>
+    </section>
+  {% endif %}
+
+  {% if lessons_log %}
+    {% assign lessons_recent = lessons_log.lessons | reverse %}
+    <section class="project-phase" id="lessons-learned">
+      <h2 class="project-phase-title">Lessons Learned</h2>
+      <article class="project-card project-card-wide{% unless lessons_post %} is-missing{% endunless %}">
+        <header class="project-card-head">
+          <i class="fas fa-lightbulb fa-fw text-muted" aria-hidden="true"></i>
+          {% if lessons_post %}
+            <a class="project-card-title" href="{{ lessons_post.url | relative_url }}">Lessons Learned</a>
+          {% else %}
+            <span class="project-card-title">Lessons Learned</span>
+          {% endif %}
+          <span class="project-card-count text-muted">{{ lessons_log.lessons | size }} lessons</span>
+        </header>
+        <p class="project-card-summary">Problems hit while building it, with the symptom, the cause, the fix and what to do next time. Newest first.</p>
+        {% if lessons_post %}
+          <ul class="project-topics project-topics-cols">
+            {% for l in lessons_recent limit: 6 %}
+              <li><a href="{{ lessons_post.url | relative_url }}#lesson-{{ l.id | downcase }}">{{ l.id }}</a> <span class="text-muted">{{ l.title | markdownify | strip_html | truncate: 70 }}</span></li>
+            {% endfor %}
           </ul>
         {% else %}
           <p class="project-card-pending text-muted">Not published yet</p>

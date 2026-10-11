@@ -15,8 +15,9 @@ image:
 
 The blog is a static site on GitHub Pages, and that one fact shapes this whole architecture. A login,
 a cost dashboard, one-click deploys and a chatbot all need a backend, and GitHub Pages can't run one. So
-the backend lives on the NVIDIA DGX Spark under my desk. The internet reaches it through an outbound-only
-Cloudflare Tunnel, and the blog only gets a link to it. Everything below follows from that choice. The
+the backend lives on the NVIDIA DGX Spark under my desk. Nothing on it is published on the internet: my
+own devices reach it over a private Tailscale network, and the blog only describes it. Everything below
+follows from that choice. The
 risk that matters most is that the whole platform shares one machine, and one pool of unified memory,
 with the GPU.
 
@@ -50,7 +51,7 @@ play to follow a packet through it:
 
 | Component | Runs in | Job |
 |---|---|---|
-| Cloudflare Access + Tunnel | Cloudflare edge, `cloudflared` ×2 in platform | Google / Entra ID SSO with an email allowlist; outbound-only path to the portal |
+| Tailscale | `tailscaled` on the DGX host (subnet router), the app on my phone and laptop | Private path to every cluster's address on the `homelab` bridge; split DNS for `home.cloudutsuk.com`; only my login is allowed in (ADR 0037) |
 | Backstage (`self-service-portal`) | platform | The portal: inventory and cost, labs, chat, Argo CD and Kubernetes views |
 | Inventory | platform (CronJob, 6 h + Sync now) | Pulls resources and cost from Azure, AWS, GCP and the DGX into Postgres |
 | Lab runner | DGX host (systemd), called from platform | Runs a lab's `make up` / `make down`, registers the cluster with Argo CD |
@@ -140,8 +141,19 @@ Outbound integrations are read-only by default:
 - Slack, for approvals.
 
 The lab registry isn't a new API. It's the lab cards already in this blog (`_data/labs/*.yml`). Each card
-gets a small `deploy:` block with allowlisted Make targets and an estimated memory size, so the blog and
-the portal read the same source.
+gets a small `deploy:` block, so the blog and the portal read the same source:
+
+```yaml
+deploy:
+  targets: {up: up, down: down, status: status}   # plain Make target names, run in repo.path
+  memory_gb: 4                                    # admission control reserves this much
+  ports: [8081, 3002]                             # host ports the lab publishes, checked for clashes
+  ttl_hours: 4                                    # cloud labs only: destroyed automatically at the TTL
+```
+
+The lab runner only accepts plain target names and an absolute `repo.path` under an allowed root, and
+skips any card that breaks those rules rather than failing. The learning-lab skill's `check.py` applies
+the same rules, so a card that passes there is one the portal can deploy.
 
 ## Data architecture and data models
 {: #data-architecture-and-data-models }
@@ -152,9 +164,9 @@ ownership in the diagram below honest, and it's why there are no foreign keys ac
 
 | Store | Cluster | Holds | Rebuildable? |
 |---|---|---|---|
-| Postgres `platform-db` | platform | Databases `backstage`, `inventory`, `labs`, `agent`, one owner role each | **No**: nightly `pg_dump` to R2 |
+| Postgres `platform-db` | platform | Databases `backstage`, `inventory`, `labs`, `agent`, one owner role each | **No**: nightly `pg_dump` through Velero to Azure Blob |
 | Postgres `ai-db` | ai | Schemas `rag` (ingest state, chat history) and `phoenix` (traces, evals) | Partly: `rag` rebuilds from git; chat history and evals are backed up |
-| Postgres `core-db` | core | Keycloak's realm, users' links to Google/Entra, groups | **No**: backed up with OpenBao's snapshot |
+| Postgres `core-db` | core | Keycloak's realm, users' links to Google/Entra, groups | **No**: nightly `pg_dump` through Velero, next to OpenBao's snapshot |
 | Qdrant | ai | Chunks of posts, lab cards and repos, with embeddings | Yes: re-ingest from git |
 | Redis | ai | Semantic cache entries keyed by the index version | Yes: it's a cache |
 | Zot | core | Container images, signatures, SBOMs | Yes: rebuild from git (mirror refills itself) |
@@ -412,14 +424,16 @@ hold accounts of its own. It brokers my **Google and Entra ID** logins and adds 
 
 There are still two gates for people, so one misconfiguration isn't enough to expose anything:
 
-1. **Cloudflare Access** sits in front of `portal.`, `grafana.`, `argocd.` and `phoenix.cloudutsuk.com`,
-   with Keycloak as its identity provider and an allowlist of my addresses.
+1. **Tailscale** decides who reaches the network at all. Only my Tailscale login can reach the
+   `homelab` bridge (`172.30.0.0/24`), and only on the ports the platform publishes: 80/443 for the
+   UIs, 53 for DNS and 6441-6444 for the Kubernetes APIs. Nothing is reachable from the internet.
 2. **Every tool signs you in again** through Keycloak OIDC: Backstage, Grafana, Argo CD, OpenBao and
    Phoenix. So does `kubectl` on every k3d cluster, through the k3s OIDC flags. Roles come from
    groups, so one group change applies everywhere.
 
-A direct Google login, limited to my own address, stays on Cloudflare Access as a **break-glass**
-route. If `core` is down, I can still get in to fix it.
+The **break-glass** route doesn't depend on Keycloak: if `core` is down, I can still SSH to the DGX
+over the tailnet (or from the home network) and fix it from there. If Tailscale itself is down, the
+platform keeps running; only access from outside the house waits.
 
 **ChaosCenter is the exception to the public hostnames.** A tool that can delete pods across the fleet
 isn't published through the tunnel at all. It's reached only from the home LAN at
@@ -456,9 +470,6 @@ Machine permissions stay least-privilege:
 | CI runners | Log in to OpenBao with GitHub OIDC; push to Zot with the `ci-pusher` key (only from `main`); commit image digests to `homelab-gitops` with a short-lived GitHub App token |
 | Clusters pulling images | Anonymous pulls of mirrored public images; a `zot-pull` secret from OpenBao (through External Secrets) for our own images, added to pods by a Kyverno policy |
 
-> **TODO:** Which email addresses (Google and Entra) go on the allowlist? Keep them in OpenBao, not in
-> this public post.
-{: .prompt-warning }
 
 ### Secrets: OpenBao and External Secrets
 
@@ -475,7 +486,6 @@ ExternalSecret objects in `homelab-gitops` say which OpenBao path each one comes
   - The lab runner uses an OpenBao agent with AppRole.
   - CI runners log in with GitHub's own OIDC token, so nothing is stored as a GitHub secret.
 - **What's stored:**
-  - the tunnel token
   - the OAuth clients
   - read-only cloud credentials (rotated every 90 days)
   - per-lab deploy credentials
@@ -486,7 +496,8 @@ ExternalSecret objects in `homelab-gitops` say which OpenBao path each one comes
   - the Cloudflare DNS-01 token
   - backup keys
 - **Unseal and backup.** After a reboot, OpenBao is unsealed from a root-only key file on the DGX. A
-  nightly snapshot goes to R2, encrypted, and the unseal keys have an offline copy.
+  nightly raft snapshot goes out with Velero's backup of `core`, encrypted, and the unseal keys have an
+  offline copy.
 
 ## Hosting and deployment model
 {: #hosting-and-deployment-model }
@@ -645,8 +656,10 @@ server for `home.cloudutsuk.com`, an internal-only zone that's never published i
   `grafana.mon.home.cloudutsuk.com` or `otel.lab-otel.home.cloudutsuk.com`. A lab's records disappear
   with the lab.
 - **Resolution.**
-  - Every cluster's CoreDNS forwards the zone to PowerDNS on the fixed gateway address of the
-    `homelab` network.
+  - Every cluster's CoreDNS forwards the zone to PowerDNS: in `core` to PowerDNS's own fixed service
+    address, in the other clusters to a separate port that `core` publishes on the gateway. Not the
+    gateway's port 53: inside every k3d node that address belongs to Docker's own resolver, which I only
+    found out by testing from a pod ([lesson L009](/posts/projects/cloudutsuk-platform/lessons-learned/#lesson-l009)).
   - The DGX uses split DNS in `systemd-resolved`, the same trick as the
     [Azure private endpoint lab](/tags/azure-private-endpoint-lab/).
 - **TLS.** Because the zone sits under a domain I own, cert-manager gets real Let's Encrypt
@@ -733,14 +746,13 @@ overridden with `--cluster-cidr` and `--service-cidr` when each cluster is creat
 
 | Path | Protocol and port | TLS |
 |---|---|---|
-| Browser → Cloudflare | HTTPS 443 | TLS 1.3, Cloudflare's edge certificate; Access checks the Keycloak login first |
-| cloudflared → Cloudflare | QUIC on UDP 7844 (HTTP/2 on TCP 7844 as fallback), outbound only | Tunnel encryption |
-| cloudflared → Traefik | HTTPS 443 | Let's Encrypt certificate for `*.platform.home.cloudutsuk.com`, origin name checked |
+| My device → DGX | WireGuard through Tailscale (direct UDP, or Tailscale's relays when NAT blocks it), outbound only on both ends | WireGuard encryption; the tailnet policy allows only my login |
+| DGX → a cluster | HTTPS 443 to the cluster's own bridge address (`core` .1, `platform` .2, `mon` .3, `ai` .4) | Let's Encrypt certificate for `*.<cluster>.home.cloudutsuk.com`, the same one the DGX sees |
 | Cluster → cluster | HTTPS 443 through each cluster's k3d load balancer and Traefik | `*.<cluster>.home.cloudutsuk.com`, plus a JWT (ADR 0029) |
-| → OpenBao, Keycloak | HTTPS 8200, 8443 | Let's Encrypt certificates in `core` |
+| → OpenBao, Keycloak | HTTPS 443 through `core`'s Traefik (`bao.core.home.cloudutsuk.com`) | Let's Encrypt certificates in `core` |
 | → Kubernetes API | HTTPS 6443 on the load balancer, never published to the LAN | k3s's own CA; short-lived tokens |
 | Collectors → mon | OTLP gRPC 4317 | TLS, plus OAuth2 client credentials |
-| Pods → internal DNS | DNS 53 to CoreDNS, forwarded to PowerDNS at `172.30.0.1:53` | Plain DNS, on the bridge only |
+| Pods → internal DNS | DNS 53 to CoreDNS, forwarded to PowerDNS (its service address in `core`, a separate gateway port from other clusters) | Plain DNS, on the bridge only |
 | OpenCost → Mimir | PromQL over HTTPS 443 to `mimir.mon.home.cloudutsuk.com`, from every cluster | Let's Encrypt certificate, plus OAuth2 client credentials like the collectors |
 | Inventory → OpenCost | HTTPS 443 to each cluster's OpenCost API, once a day | `*.<cluster>.home.cloudutsuk.com`, plus a JWT (ADR 0029) |
 | Karmada agents → Karmada API server | HTTPS 5443 (Karmada's default) on the `platform` load balancer, outbound from each member | Karmada's own CA; per-agent client certificates |
@@ -933,23 +945,29 @@ Elsewhere:
 
 One host can't be highly available, so I'm optimising for recovery and for knowing when it's down:
 
-- **Dead-man's switch.** Alertmanager's always-firing `Watchdog` pings an external free heartbeat
-  service. If the DGX, power or the ISP goes down, the pings stop and I get an alert, even though
-  monitoring died with the host.
+- **Dead-man's switch.** A systemd timer on the DGX pings healthchecks.io (free plan) every five minutes
+  while OpenBao in `core` answers healthy, and pings the check's failure URL with the reason when it
+  doesn't. If the DGX, power or the ISP goes down, the pings stop and I get an email, even though
+  monitoring died with the host. From Phase 2, Alertmanager's always-firing `Watchdog` pings it too.
 - **Isolation.** `mon` is a separate cluster that doesn't depend on Argo CD at runtime. Resource limits
   and PriorityClasses stop vLLM or a runaway lab starving it.
 - **Restart.** After a reboot, a systemd unit starts Docker, then `core`, then unseals OpenBao, then starts
   `mon`, `platform` and `ai`. External Secrets retries until OpenBao answers. Lab clusters stay down after a
   reboot.
-- **Remote access.** Two `cloudflared` replicas, so one pod crashing doesn't cut off access.
+- **Remote access.** Tailscale runs on the DGX host, not in a cluster, so remote access survives any
+  cluster failing; the boot unit checks it's up after a reboot.
 - **Degradation:**
   - Inventory shows the last known data with a "stale since" badge.
   - Chat falls back to search results when the LLM is down.
   - The agent posts its raw evidence when it can't reach the model.
-- **Backups.** Only Postgres and the secrets: a nightly encrypted `pg_dump` to the Cloudflare R2 free
-  tier. Everything else rebuilds from git. Targets are **RTO 1 hour, RPO 24 hours**, tested once a
-  quarter by rebuilding on an empty Docker.
-- **Chaos experiments.** The claims above (two `cloudflared` replicas, degradation, retries) are only
+- **Backups.** Only Postgres and the secrets, with Velero
+  ([ADR 0039](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0039)): before each
+  nightly backup, a hook in a small dump pod takes a `pg_dump` and an OpenBao snapshot; Velero uploads
+  them encrypted to an Azure Blob container, with each cluster's objects (minus Secrets). R2 was the
+  first plan, but it asks for a payment method. Everything else rebuilds from git. Targets are **RTO 1
+  hour, RPO 24 hours**, tested once a quarter by restoring into an empty cluster. A web UI at
+  `velero.platform.home.cloudutsuk.com` shows what was backed up, when, and how big it was.
+- **Chaos experiments.** The claims above (degradation, retries, recovery) are only
   true once they've been broken on purpose. LitmusChaos does that, below.
 
 ### Chaos engineering with LitmusChaos
@@ -977,7 +995,7 @@ is a container on the same DGX, drawing on the same memory as the GPU:
 | Targets | Lab clusters first. `platform`, `mon` and `ai` only from phase 2a's exit, one cluster at a time. `core` only in a planned game day, with the break-glass login ready |
 | Fault types | Pod-level only: pod-delete, container-kill, pod network latency and loss, pod CPU and memory hog inside the pod's own limits. **No node-level stress or node drain**: on k3d a "node" is the whole DGX |
 | Blast radius | One namespace per experiment; Litmus's annotation check, so only workloads labelled as chaos targets can be hit |
-| Who | Only `platform-admins`; ChaosCenter is LAN-only, never on the tunnel |
+| Who | Only `platform-admins`; ChaosCenter is reachable only from the LAN and the tailnet |
 | Memory | A running experiment counts against lab admission control (ADR 0017), like a temporary lab |
 | Abort | Stop the experiment in ChaosCenter, or set the ChaosEngine's `engineState: stop` |
 
@@ -1033,7 +1051,6 @@ The first experiments, each matched to a claim this post makes:
 
 | Experiment | Target | Claim it tests |
 |---|---|---|
-| pod-delete on `cloudflared` | platform | Two replicas mean one crash doesn't cut off remote access |
 | pod-delete on Backstage | platform | The portal recovers on its own; the PostSync smoke test passes again |
 | pod network loss to vLLM | ai | Chat falls back to search results when the model is down |
 | pod-delete on the inventory | platform | The portal shows the last data with a "stale since" badge |
@@ -1077,7 +1094,9 @@ the `ai` cluster for on-demand models is **ADR 0039**, proposed until phase 5.
 - [ ] Memory budget confirmed on the DGX with the chosen model loaded
 - [x] ADRs 0001–0035 written in `homelab-gitops` and synced to the blog (2026-10-11)
 - [x] The three new repos created through `infra-github` (2026-10-11)
-- [ ] Keycloak brokering Google and Entra, the tunnel and Access configured, and an email not on the allowlist is denied
+- [x] Internal names resolve on the DGX and from pods, and `bao.core.home.cloudutsuk.com` serves a Let's Encrypt certificate (2026-10-11)
+- [x] Keycloak brokering Entra ID, and `kubectl` signing in through it (`mon`, 2026-10-11); Google deferred
+- [x] My phone on mobile data reaches the internal UIs over Tailscale (2026-10-11); the laptop `kubectl` test and the "another Tailscale user is denied" test are deferred
 - [ ] A service call without a valid token is rejected
 - [ ] Backup and restore of Postgres tested once
 - [ ] ADR 0036 (LitmusChaos in `core`) merged in `homelab-gitops` and synced to the blog

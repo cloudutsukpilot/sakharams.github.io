@@ -320,3 +320,32 @@ details.project-iq.iq-has-tabs:not(.iq-show-all) > .iq-role::before {
 .adr-meta { font-size: 0.85rem; margin-left: 0.35rem; }
 .adr-log td:first-child a { font-variant-numeric: tabular-nums; }
 .adr-tile-counts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.25rem 0 0.5rem; }
+
+/* Lessons learned log (Lessons Learned post and index tile). */
+.lessons-log td:first-child a { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 0.25rem; }
+.lesson { margin: 2rem 0 0; scroll-margin-top: 4rem; }
+.lesson-title { font-size: 1.15rem; margin-bottom: 0.25rem; }
+.lesson-meta { font-size: 0.85rem; margin-bottom: 0.5rem; }
+.lesson-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--main-border-color, rgba(127, 127, 127, 0.3));
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+.lesson-body {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+
+  dt { font-weight: 600; }
+  dd { margin: 0; }
+  dd p { margin: 0; }
+  .lesson-takeaway { font-weight: 500; }
+}
+@media (max-width: 576px) {
+  .lesson-body { grid-template-columns: 1fr; }
+  .lesson-body dd { margin-bottom: 0.4rem; }
+}

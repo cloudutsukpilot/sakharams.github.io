@@ -23,7 +23,7 @@ modes:
   - {id: alert, label: "Simulate an alert"}
 nodes:
   - {id: user, label: "You", sub: "browser", x: 75, y: 70, w: 110, h: 56, shape: terminal, icon: user, icon_pos: corner, color: blue}
-  - {id: cf, label: "Cloudflare", sub: "Access + Tunnel", x: 310, y: 70, w: 150, h: 56, icon: globe, icon_pos: corner, color: teal}
+  - {id: cf, label: "Tailscale", sub: "private network", x: 310, y: 70, w: 150, h: 56, icon: lock, icon_pos: corner, color: teal}
   - {id: clouds, label: "Clouds", sub: "Azure AWS GCP", x: 530, y: 70, w: 130, h: 60, shape: cylinder, icon: cloud, icon_pos: corner, color: sky}
   - {id: blog, label: "Blog + repos", sub: "GitHub", x: 925, y: 70, w: 140, h: 60, shape: cylinder, icon: "devops/cicd/github-18.svg", icon_pos: corner, color: slate}
   - {id: slack, label: "Slack", sub: "approve/reject", x: 740, y: 70, w: 130, h: 56, icon: message, icon_pos: corner, color: pink}
@@ -49,8 +49,8 @@ nodes:
   - {id: gw, label: "Model gateway", sub: "LiteLLM", x: 530, y: 980, w: 150, h: 56, icon: balancer, icon_pos: corner, color: teal}
   - {id: llm, label: "vLLM chat", sub: "local model", x: 800, y: 980, w: 140, h: 56, icon: message, icon_pos: corner, color: violet}
 edges:
-  - {id: u_cf, from: user, to: cf, label: "SSO", proto: HTTPS, port: 443}
-  - {id: cf_bs, from: cf, to: bs, proto: HTTP, port: 7007, proto_at: [310, 122]}
+  - {id: u_cf, from: user, to: cf, label: "tailnet", proto: WireGuard, kind: stream}
+  - {id: cf_bs, from: cf, to: bs, proto: HTTPS, port: 443, proto_at: [310, 122]}
   - {id: bs_inv, from: bs, to: inv, exit: left, enter: right, proto: HTTP}
   - {id: inv_cl, from: inv, to: clouds, points: [[75, 207], [75, 150], [530, 150], [530, 100]], label: "every 6 h", proto: HTTPS, port: 443, proto_at: [430, 150]}
   - {id: inv_pg, from: inv, to: pg, proto: PostgreSQL, port: 5432}
@@ -80,13 +80,13 @@ edges:
   - {id: slack_argo, from: slack, to: argo, points: [[715, 98], [715, 207]], label: "PR"}
 steps:
   - title: You open the portal
-    text: "portal.cloudutsuk.com is served from the DGX Spark. The core cluster boots first: Keycloak for identity, OpenBao for secrets, PowerDNS for internal names."
+    text: "portal.platform.home.cloudutsuk.com is served from the DGX Spark and published nowhere on the internet. The core cluster boots first: Keycloak for identity, OpenBao for secrets, PowerDNS for internal names."
     lights: [user, blog, kc, core, dns, ci]
-  - title: SSO at the edge
-    text: "HTTPS on 443 reaches Cloudflare Access, which sends you to Keycloak; Keycloak brokers your Google or Entra ID login. The tunnel is outbound only."
+  - title: In through the tailnet
+    text: "Your phone or laptop joins the private Tailscale network over WireGuard. Only your login may reach the platform's addresses, and split DNS resolves home.cloudutsuk.com there. Nothing listens on the internet."
     edges: [u_cf]
   - title: Backstage signs you in
-    text: "The tunnel forwards to Backstage (7007), which signs you in again with Keycloak OIDC and maps your groups to roles, so one bad edge policy can't let anyone in."
+    text: "The DGX routes you to platform's Traefik on 443, then Backstage (7007), which signs you in with Keycloak OIDC (brokering Entra ID) and maps your groups to roles. Network access alone gets nobody in."
     edges: [cf_bs, kc_bs]
   - title: One view of everything
     text: "The Inventory plugin reads what the collector stored. Collectors run every 6 hours, or on demand with Sync now."
