@@ -402,3 +402,111 @@ lessons:
     fix: "None needed in the config: the kubelet keeps retrying, and the pods start once a sync completes. Kyverno's webhooks don't exist until its admission pod runs, and its policies only audit, so nothing was blocked meanwhile."
     lesson: "When Zot says an image is filtered out but the content rule clearly matches, look for \"Failed to copy layer\" just before it: that's the real error. Test the upstream blob host from the DGX with `curl` before changing the sync config."
     adrs: ["0034"]
+
+  - id: L038
+    date: 2026-10-12
+    step: "Phase 2, step 1: monitoring stack on mon"
+    title: "Mimir won't start as a non-root user until its activity log moves off the working directory"
+    tags: [mimir, kubernetes, security]
+    symptom: "Mimir exited at start-up with \"failed to create activity file: open ./metrics-activity.log: permission denied\" (error initialising module: activity-tracker), running as uid 1000 with a read-only root filesystem."
+    cause: "The activity tracker writes `metrics-activity.log` to the process's working directory by default, which isn't writable for a non-root user or a read-only root filesystem. Every data path in the config pointed at the data volume; this one isn't a storage setting, so it was easy to miss."
+    fix: "Set `activity_tracker.filepath: /data/metrics-activity.log`, on the same host folder as the rest of Mimir's data. Found in a local Docker smoke test before anything reached the cluster."
+    lesson: "Before deploying a Grafana store as non-root, grep its reference config for every `*path*` and `*dir*` default, not just the storage blocks, and run it once in Docker with the same uid and a read-only root."
+    adrs: ["0041"]
+
+  - id: L039
+    date: 2026-10-12
+    step: "Phase 2, step 1: monitoring stack on mon"
+    title: "Mimir's Alertmanager serves its API under the path of `external_url`, so a link to Grafana breaks it"
+    tags: [mimir, alertmanager, grafana]
+    symptom: "The ruler logged \"Error sending alerts ... bad response\" to `http://127.0.0.1:8080/alertmanager/api/v2/alerts`, Grafana's Alertmanager data source returned \"404 page not found\", and Watchdog never arrived, although every rule evaluated fine."
+    cause: "`alertmanager.external_url` was set to Grafana's alerting page so notifications would link there. Mimir uses that URL's path as the Alertmanager route prefix (it logs a warning that the prefix differs from `/alertmanager`), so the API moved to `/alerting/list/...` and the usual path 404'd."
+    fix: "Removed `alertmanager.external_url`. `ruler.external_url` (the link in each alert's generator URL) can point at Grafana, because it doesn't change any route."
+    lesson: "In Mimir, only set `alertmanager.external_url` to the URL Alertmanager is really served at. Read the start-up warnings: this one named the mismatch. Check Watchdog in Alertmanager as the last step of any alerting change."
+    adrs: ["0041"]
+
+  - id: L040
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "Argo CD's application controller runs out of memory when a big CRD set lands on every cluster"
+    tags: [argocd, kubernetes, memory]
+    symptom: "Twenty minutes after the monitoring pack's ApplicationSets were pushed, the new apps sat in \"Running\" with no progress and every other app stopped syncing. The application controller was in CrashLoopBackOff: OOMKilled at its 1Gi limit, 14 restarts."
+    cause: "The controller caches every resource of every managed cluster, CRD schemas included. The Prometheus Operator CRDs are some of the largest schemas around, and the pack put them, plus the OTel Operator's CRDs and two collectors, on three clusters at once. Steady state after the fix is about 1.1-1.3 GiB."
+    fix: "Raised the controller to 768Mi request and 2Gi limit in infra-local's Argo CD values and applied it. The first apply was killed by a 10-minute command timeout while Helm waited for the still-crashing pod, which left the release `pending-upgrade` and the state lease held: deleted the crashing pod so the StatefulSet rolled, deleted the pending release record, and re-applied with `--auto-release-lock`."
+    lesson: "Before adding an ApplicationSet that installs CRDs on every cluster, check the controller's memory headroom (`kubectl top`), because the cost multiplies by the number of clusters. Never wrap a Terragrunt apply in a short timeout: Helm's wait can outlast it, and an interrupted upgrade needs manual repair. A StatefulSet won't roll a pod that never becomes Ready; delete it."
+    adrs: ["0042"]
+
+  - id: L041
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "The OTel Operator refuses a target allocator on a collector in deployment mode"
+    tags: [opentelemetry, kubernetes]
+    symptom: "The monitoring pack's sync failed on every cluster: admission webhook \"vopentelemetrycollectorcreateupdatebeta.kb.io\" denied the request: the OpenTelemetry Collector mode is set to deployment, which does not support the target allocation deployment. Argo CD then kept retrying the old commit after the fix was pushed."
+    cause: "The target allocator hands scrape targets to stable collector identities, so the operator only allows it with statefulset (or daemonset) mode. A running sync operation retries its own revision, not the newest commit."
+    fix: "Set the cluster collector to `mode: statefulset`, then removed the stuck `operation` from each Application so the next sync used the new commit."
+    lesson: "Use statefulset mode for any OpenTelemetryCollector with `targetAllocator.enabled`. When Argo CD retries a failed sync after a fix is pushed, clear the operation instead of waiting out the backoff."
+    adrs: ["0042"]
+
+  - id: L042
+    date: 2026-10-12
+    step: "Phase 1, step 1b: IaC runner"
+    title: "A CI setup written for GitHub-hosted runners breaks three ways on an arm64 self-hosted runner"
+    tags: [github-actions, arc, python]
+    symptom: "Every Terragrunt plan job on the new `homelab-iac` runners failed in Setup Environment with 'pip: command not found' (exit 127), after Terraform and the other CLIs had installed fine. With that fixed, the next step failed: terragrunt and tflint gave 'Exec format error', and Terraform's wrapper said 'node: No such file or directory'."
+    cause: "`ghcr.io/actions/actions-runner` (Ubuntu 24.04) ships python3 3.12.3 without pip. The shared module skips `actions/setup-python` when python3's version already matches, so nothing installed pip. Ubuntu's system Python would refuse `pip install` anyway (PEP 668)."
+    fix: "The shared module's check now also requires `python3 -m pip`; otherwise setup-python installs its own Python into the runner's tool cache. Downloads now follow `uname -m`, the tool cache key includes the architecture, and the Terraform wrapper is off (nothing read its outputs)."
+    lesson: "On self-hosted runners, check for the tools a step actually calls, not just a version string. GitHub-hosted images hide gaps that the slim runner image exposes."
+    adrs: ["0040"]
+
+  - id: L043
+    date: 2026-10-12
+    step: "Phase 2, step 4: dashboards and alert rules as code"
+    title: "`or vector(0)` drops a cluster from multi-cluster recording rules"
+    tags: [prometheus, mimir, kubernetes-mixin]
+    symptom: "The API server dashboard showed write availability for platform and ai but \"No data\" for mon, although every input series existed for mon."
+    cause: "kubernetes-mixin's SLO rules write `sum by (cluster) (X or vector(0))`. `vector(0)` has no labels, so for a cluster with no samples of X (mon had no write 5xx errors at all) the fallback 0 can't match `cluster=\"mon\"` and the cluster drops out of the result. With one cluster per Prometheus that never shows; in one Mimir for every cluster it does."
+    fix: "The vendoring normaliser rewrites each `or vector(0)` to `or 0 * group by (cluster) (up{job=\"kube-apiserver\"})`, a 0 per cluster; 18 places. Also wrote vendored rules as YAML `|` blocks so such patches read as line diffs."
+    lesson: "When running single-cluster mixins against a multi-cluster store, grep their rules for `vector(0)` and `absent(` and make the fallbacks carry the cluster label. Check every dashboard per cluster (scripts/panel_check.py), not just the busiest one."
+
+  - id: L044
+    date: 2026-10-12
+    step: "Phase 1, step 2: BuildKit and the reusable build workflow"
+    title: "A newline from `jq -r` turned a working registry password into a 401"
+    tags: [github-actions, buildkit, zot]
+    symptom: "The first `main` build signed in to OpenBao, built the image and then failed the push: Zot answered every blob HEAD with 401 Unauthorized after its 5-second failed-login delay. The same account's password worked with curl from the host."
+    cause: "The workflow built the Docker config's `auth` value with `jq -r '\"\\(.username):\\(.password)\"' | base64`. `jq -r` ends its output with a newline, so the encoded credential was `user:password` plus a newline, which bcrypt rejects. `$(...)` strips trailing newlines, a pipe doesn't."
+    fix: "`jq -j` (no newline) before `base64 -w0`."
+    lesson: "When piping a secret into base64 or a hash, use `jq -j` or `printf %s`, never `jq -r` or `echo`. A 401 with the right password usually means extra bytes."
+    adrs: ["0043"]
+
+  - id: L045
+    date: 2026-10-12
+    step: "Phase 1, step 4: security gates in the reusable workflow"
+    title: "uv read the caller's pyproject.toml while installing the scanners"
+    tags: [github-actions, uv, python]
+    symptom: "The scanner install worked in homelab-gitops' own check but failed in the first homelab-services pull request: uv found no version of sse-starlette==3.5.0, although the hash-locked requirements file listed it."
+    cause: "The reusable workflow runs in the caller's checkout. uv picks up `pyproject.toml` from the working directory, and homelab-services' `[tool.uv] exclude-newer` date (2026-09-27) applied to the tool install too. sse-starlette 3.5.0 had been published a day later, so the cut-off filtered it out. It was also under two weeks old, so the lock itself was off by one day."
+    fix: "Install the tools with `UV_NO_CONFIG=1` and lock them with `--no-config` and an explicit `--exclude-newer <date>T00:00:00Z`."
+    lesson: "Anything a reusable workflow installs runs inside someone else's repo. Turn off project-level config discovery (uv, pip, npm, git) for tool installs, and test the workflow from a caller, not only from its own repo."
+    adrs: ["0032", "0044"]
+
+  - id: L046
+    date: 2026-10-12
+    step: "Phase 1, step 4b: runner image with the CI tools baked in"
+    title: "Installing 400 MB of scanners per job took longer than the scans"
+    tags: [github-actions, arc, supply-chain]
+    symptom: "With the gates in place, the tool install step took 2 to 7.5 minutes, while all the scans together took about 30 seconds."
+    cause: "Runner pods are ephemeral, so every job downloaded about 400 MB. GitHub's release CDN served some connections at about 100 KB/s and others at 15 MB/s; the same 19 MB file took 1 s or 135 s. Parallel downloads and retries on slow transfers helped, but the step still took 2 minutes or more."
+    fix: "Baked the pinned tools into our own runner image (`platform/actions-runner`), built and signed by the same reusable workflow and rolled out by digest by hand. The action uses the baked tools when their manifest matches, otherwise it installs them in the job. The tools step went to under a second, and a full gated hello-world build to about 70 s."
+    lesson: "Time the setup steps, not only the scans. On ephemeral runners anything the jobs keep downloading belongs in the runner image. Build that image through your own pipeline, and don't let a bot roll it out, or a bad image can stop the CI that would fix it."
+    adrs: ["0044"]
+
+  - id: L047
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "The shared module's Helm force_update default wipes Secrets that an app fills in at runtime"
+    tags: [helm, terraform, argocd]
+    symptom: "Hours after an Argo CD apply that only raised the controller's memory, the Argo CD UI failed with \"server.secretkey is missing\". argocd-secret had no data at all; its only field manager was terraform-provider-helm."
+    cause: "The shared Terragrunt module sets force_update = true on every Helm release by default, so Helm replaces objects instead of merging them. argocd-secret is rendered empty by the chart, and argocd-server writes server.secretkey and admin.password into it at first start; a forced upgrade replaced it with the empty copy. Syncing kept working (the controller doesn't read it); the UI and API broke once the server re-read the Secret."
+    fix: "Restarted argocd-server, which regenerates the missing keys (the break-glass password in argocd-initial-admin-secret still worked), and set force_update: false on the Argo CD release; the next upgrade kept all three keys. Then made false the shared module's default (28 places) and re-applied all 35 infra-local releases one at a time, each only after a plan that changed nothing but the flag; External Secrets' webhook certificate survived every upgrade."
+    lesson: "Any chart Secret that a controller fills in later (Argo CD's server key, External Secrets' webhook certificate, generated passwords) is lost on every forced Helm upgrade. Set force_update: false unless a release really needs replacement, and after applying a release check that the app still works, not just that Terraform finished."

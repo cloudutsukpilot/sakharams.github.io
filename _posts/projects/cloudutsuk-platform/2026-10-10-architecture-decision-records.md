@@ -373,6 +373,7 @@ credential that can change a cluster. The DGX has no inbound ports (ADR 0003).
 - [ADR 0032](#adr-0032)
 - [ADR 0033](#adr-0033)
 - [ADR 0034](#adr-0034)
+- [ADR 0043](#adr-0043): BuildKit, the OpenBao roles and the digest commit as built
 
 ## ADR-0009: A central mon cluster with Grafana LGTM and Alertmanager for every cluster
 {: #adr-0009 }
@@ -805,6 +806,7 @@ sits on the home network next to every cluster.
 - [ADR 0008](#adr-0008)
 - [ADR 0034](#adr-0034)
 - [ADR 0040](#adr-0040): the IaC-only scale set for `infra-local`
+- [ADR 0043](#adr-0043): the OpenBao roles as built (`main` bound to the reusable workflow, `pr` read-only)
 
 ## ADR-0020: Platform SLOs and burn-rate alerting
 {: #adr-0020 }
@@ -1369,6 +1371,30 @@ scanning) isn't free. Scanning must be free, open source and run on arm64.
   OPA deny; ZAP new high alerts. Reports are CI artifacts plus a PR comment; Trivy Operator feeds a
   Security dashboard.
 
+- Pipeline gates as built (2026-10-12, Phase 1 step 4): in the reusable `build-image.yaml`, on every
+  run including pull requests, before anything is pushed. Tools are pinned in `homelab-gitops/ci/tools`
+  and baked into the runner image (ADR 0044).
+  - Gitleaks scans the full history on every run (repos are small), not only the first.
+  - Semgrep CE uses the registry's `p/default` rules with metrics off; the rules aren't pinned. The gate
+    is severity HIGH or ERROR.
+  - Bandit runs on tracked `.py` files and gates on HIGH severity.
+  - Trivy `fs` (dependencies) and the image scan gate on HIGH or CRITICAL with a fixed version; `config`
+    gates on HIGH or CRITICAL.
+  - Checkov's open-source checks carry no severity, so any failed check blocks. `CKV_DOCKER_2`
+    (`HEALTHCHECK`) is skipped by default because Kubernetes uses probes; a repo's `.checkov.yaml`
+    replaces that default.
+  - Conftest runs the shared Dockerfile rules in `homelab-gitops/policies/conftest` (digest-pinned
+    bases, non-root final `USER`, no `ADD` of URLs, no `curl | sh`); any deny blocks.
+  - Hadolint gates on error or warning.
+  - The image is built into an OCI layout on the runner, scanned there, and the same bytes are pushed.
+  - Licences: reported (Trivy), not gated.
+  - Exceptions live in the caller's repo: `.gitleaksignore`, `# nosemgrep`, `# nosec`, `.trivyignore`,
+    `.checkov.yaml`, `.hadolint.yaml`.
+  - Reports are a `security-reports-<image>` artifact (30 days) and a gate table in the job summary,
+    not a PR comment: a comment would need `pull-requests: write` in every caller.
+  - A caller can narrow the SAST, dependency and IaC scans with `scan-path`. The runner image sets
+    `image-gate: report` (ADR 0044).
+
 #### Considered options
 
 1. **GitHub Advanced Security**: paid for private repos.
@@ -1386,6 +1412,7 @@ scanning) isn't free. Scanning must be free, open source and run on arm64.
 
 - [ADR 0031](#adr-0031)
 - [ADR 0033](#adr-0033)
+- [ADR 0044](#adr-0044)
 
 ## ADR-0033: Supply chain: Cosign signing with an OpenBao transit key and Kyverno admission
 {: #adr-0033 }
@@ -1406,6 +1433,21 @@ images should be pinned.
   root filesystem and resource limits; Pod Security "restricted" except for documented exceptions
   (such as the GPU device plugin).
 
+- Signing as built (2026-10-12, Phase 1 step 4a): transit key `cosign` (ECDSA P-256, not exportable)
+  in OpenBao. Only role `main`, which is bound to the reusable `build-image.yaml` (ADR 0043), may call
+  `transit/sign/cosign/*`; Cosign puts the hash in the path (`…/sha2-256`). Cosign v3.1.3 signs with
+  `--key hashivault://cosign`, no transparency log (`--tlog-upload=false --use-signing-config=false`;
+  the first flag is deprecated in v3 in favour of a signing-config file). It stores a Sigstore
+  bundle (v0.3) as an OCI referrer in Zot, with no `.sig` tag. The public key is
+  `homelab-gitops/apps/kyverno-policies/cosign.pub`; check with
+  `cosign verify --key cosign.pub --insecure-ignore-tlog <image>@<digest>`. Kyverno's `verifyImages`
+  (v1.19.1) still has to be checked against this bundle format (step 5).
+- SBOM attestation as built (2026-10-12, Phase 1 step 4): after signing, `cosign attest --type
+  cyclonedx` with the same key attaches Syft's CycloneDX SBOM of the pushed digest, also as an OCI
+  referrer. Check with `cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type
+  cyclonedx <image>@<digest>`. The image is scanned before it is pushed (ADR 0032), and crane pushes the
+  scanned OCI layout unchanged, so the signed digest is the scanned one.
+
 #### Considered options
 
 1. **No admission control**: anything pullable can run.
@@ -1423,6 +1465,7 @@ images should be pinned.
 
 - [ADR 0032](#adr-0032)
 - [ADR 0034](#adr-0034)
+- [ADR 0044](#adr-0044)
 
 ## ADR-0034: Zot in core as the only container registry
 {: #adr-0034 }
@@ -1468,6 +1511,15 @@ through a local cache. The host is arm64. Harbor's official images are amd64 onl
 - `charts/*` (2026-10-11): anonymous read like `mirror/*`, write by `ci-pusher` and `admin`. Third-party
   charts that aren't published as OCI, or whose download fails from the DGX, are checked against their
   index digest and pushed here (first: `charts/velero` 12.2.0 and `charts/velero-ui` 0.16.0, ADR 0039).
+
+- CI sign-in as built (2026-10-12, ADR 0043): JWT auth `github-actions/` in OpenBao. Role `main`
+  reads the `ci-pusher` key only for `homelab-gitops`' `build-image.yaml` at `refs/heads/main`. Role
+  `pr` reads the `puller` key. Both keys are copies in `kv/ci/`, so CI never reads `kv/core/zot`.
+
+- Cluster pulls as built (2026-10-12, Phase 1 step 3): the `puller` password is also copied to
+  `kv/shared/zot-pull`, which every cluster's store can read. Each app namespace gets a `zot-pull`
+  ExternalSecret (a dockerconfigjson template) and names it in `imagePullSecrets`. That stays until
+  the Kyverno mutate policy adds it automatically; first used by `apps/hello-world`.
 
 #### Considered options
 
@@ -1928,6 +1980,282 @@ a scale set to selected repos. ARC can, though, register a scale set with a sing
 - [ADR 0019](#adr-0019)
 - [ADR 0036](#adr-0036)
 - [ADR 0038](#adr-0038)
+
+## ADR-0041: Monitoring stack on mon: monolithic Mimir, Loki and Tempo, one OTLP gateway, rules from git
+{: #adr-0041 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-12 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+ADR 0009 puts Mimir, Loki, Tempo, Grafana and Alertmanager in `mon` behind an OTel gateway, with about
+15 days of retention on a host path and a 6-8 GB memory budget (`mon` is capped at 10 GB). It doesn't say
+how each piece is deployed, where the data lives, how rules reach the ruler, or how other clusters reach
+the gateway. The distributed charts run a dozen pods per store and need object storage; this is one host.
+Phase 2 also runs alongside Phase 1 (roadmap change, 2026-10-11): it uses only upstream charts through the
+Argo CD from Phase 0, no CI.
+
+#### Decision
+
+- **Argo CD from `clusters/mon/`** (child `cluster-mon` of the root app), namespace `monitoring`. Charts
+  come through Zot's ghcr.io mirror (ADR 0034), versions at least 14 days old (as ADR 0036 asks).
+- **Monolithic everything, one replica:** Mimir `-target=all,alertmanager` (bjw-s app-template, because
+  `mimir-distributed` has no monolithic mode), Loki `Monolithic` mode, Tempo single binary, Grafana,
+  and one gateway collector. Filesystem storage, 15 days retention in each store.
+- **Data on the host folders** `/srv/homelab/mon/{mimir,loki,tempo,grafana}` that infra-local mounts into
+  the node, so it outlives the cluster. Static PVs pre-bound to each chart's claim (class `mon-hostpath`,
+  no provisioner); Mimir mounts its folder as a hostPath. The folders are owned by uid 1000, so every pod
+  runs as 1000:1000. No CSI driver or extra storage tool: k3s's local-path provisioner would keep data
+  inside the node container, which a cluster rebuild deletes.
+- **Rules from git:** `alerts/` becomes one ConfigMap mounted as the ruler's local storage (tenant
+  `anonymous`, multi-tenancy off). The ruler re-reads it every minute; there's no rules API to drift from.
+- **Alertmanager** is Mimir's, with a fallback config that sends everything to a `null` receiver until
+  receivers (Slack, a dead man's switch for Watchdog) are chosen.
+- **One OTLP entry point:** every cluster sends OTLP/HTTP to `https://otlp.mon.home.cloudutsuk.com`
+  (Traefik, Let's Encrypt), inside `mon` also OTLP/gRPC. The gateway sets `cluster` from
+  `k8s.cluster.name` (ADR 0026) and forwards OTLP to Mimir (`/otlp`, metric suffixes on), Loki (`/otlp`)
+  and Tempo. A local smoke test (2026-10-12) showed `vllm:*` names, `_total` counters and `job` arriving
+  unchanged, so the vendored dashboards and rules match without translation.
+- **Grafana** signs in through Keycloak (confidential client `grafana`, ADR 0028): `platform-admins` are
+  Admin, `viewers` Viewer, others refused; local `admin` is break-glass (`kv/mon/grafana`). Data sources
+  and dashboards are provisioned; dashboards are read-only in the UI.
+
+#### Considered options
+
+1. **lgtm-distributed / mimir-distributed with MinIO**: production shape, but ~20 pods and object storage
+   for one host; over the memory budget.
+2. **grafana/otel-lgtm (all-in-one image)**: simplest, but one container for every store, Prometheus
+   instead of Mimir (no Mimir ruler/Alertmanager), and not configurable enough for retention or rules
+   from git.
+3. **Monolithic per store, data on host folders, rules from git** (chosen).
+4. **local-path or Longhorn for volumes**: dynamic, but local-path data lives in the node container and
+   Longhorn needs several nodes to be worth it.
+
+#### Consequences
+
+- Good: about 5 GB of limits for the whole stack; data survives `k3d cluster delete mon`.
+- Good: dashboards and rules change by commit only; the smoke-tested OTLP path needs no name mapping.
+- Bad: no redundancy; a `mon` restart is a monitoring gap (acceptable, ADR 0015).
+- Bad: the OTLP endpoint has no sender authentication yet; it's reachable only on the homelab bridge and
+  Tailscale. Authentication comes with the monitoring pack (Phase 2, step 3, ADR 0029).
+- Bad: filesystem storage can't be shared; moving to object storage later means a data migration.
+
+#### Related
+
+- [ADR 0009](#adr-0009)
+- [ADR 0026](#adr-0026)
+- [ADR 0027](#adr-0027)
+- [ADR 0028](#adr-0028)
+- [ADR 0034](#adr-0034)
+- [ADR 0036](#adr-0036)
+
+## ADR-0042: Monitoring pack: OTel Operator collectors per cluster, Prometheus job names for the mixins, a token per cluster
+{: #adr-0042 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-12 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+ADR 0026 decides what each cluster runs (the OpenTelemetry Operator, the Prometheus CRDs only, an agent
+DaemonSet and a cluster Deployment with the Target Allocator) and that every series carries `cluster`.
+It leaves open how the collectors are configured, which names the vendored mixins need (ADR 0027 selects
+by `job`), and how the gateway on `mon` (ADR 0041) knows who is sending. The gateway's Ingress is reachable
+from every k3d cluster, labs included, so anything on the homelab bridge could write into Mimir and Loki.
+
+#### Decision
+
+- **ApplicationSets** (`appsets/monitoring-pack.yaml`, clusters labelled `homelab/addons=true`) install
+  four apps per cluster in namespace `monitoring`: `prometheus-operator-crds`, `opentelemetry-operator`
+  (namespace `opentelemetry-operator`, webhook certificates from cert-manager), `kube-state-metrics`, and
+  the local chart `apps/monitoring-pack` with two `OpenTelemetryCollector`s, both on the contrib image
+  the gateway runs.
+- **agent** (DaemonSet): scrapes its own node's kubelet and cAdvisor in Prometheus format as jobs
+  `kubelet` and `cadvisor`, tails `/var/log/pods` (as root, read-only; the files are root 0640), and
+  receives app OTLP at `agent-collector.monitoring:4317/4318` with pod metadata added.
+- **cluster** (StatefulSet + Target Allocator; the operator refuses the allocator in deployment mode): jobs `kube-state-metrics` and `kube-apiserver`, every
+  ServiceMonitor and PodMonitor in the cluster, and Kubernetes events as logs.
+- **Names are the contract:** jobs match the selectors in `dashboards/mixins/*.libsonnet`; every signal
+  gets `k8s.cluster.name=<cluster>`, which the gateway turns into `cluster`. Histograms no dashboard or rule
+  reads are dropped at scrape time.
+- **A bearer token per cluster:** `infra-local host/monitoring/configure.sh` seeds `kv/mon/otlp-gateway`
+  (one key per cluster) and copies each into `kv/<cluster>/otlp`, the only path that cluster's store can
+  read. The gateway accepts that list of tokens on OTLP/gRPC and OTLP/HTTP and refuses anything else (401).
+  A lab gets its own token when it registers; revoking one cluster is deleting its key.
+- `mon` sends to the gateway's Service; the others to `https://otlp.mon.home.cloudutsuk.com`.
+
+#### Considered options
+
+1. **The opentelemetry-collector chart twice, no operator**: fewer moving parts, but no Target Allocator, so
+   ServiceMonitors that charts ship would be ignored (ADR 0026 wants them).
+2. **kube-prometheus-stack in each cluster with remote write**: the mixins' native home, but a Prometheus
+   per cluster (≈1 GB each) and a second telemetry path next to OTLP.
+3. **Operator collectors with Prometheus job names, per-cluster tokens** (chosen).
+4. **mTLS from each cluster**: stronger, but needs a CA and certificate rotation per cluster; a token in
+   OpenBao is enough on a private bridge.
+
+#### Consequences
+
+- Good: the vendored mixin dashboards and rules work unchanged; the drop-down lists every cluster.
+- Good: an unknown sender gets 401; a leaked token is one key to rotate.
+- Bad: the agent runs as root to read pod logs.
+- Bad: about 0.5 GB of requests per cluster (operator, kube-state-metrics, two collectors, allocator).
+- Bad: tokens are static until rotated by re-seeding (no expiry).
+
+#### Related
+
+- [ADR 0026](#adr-0026)
+- [ADR 0027](#adr-0027)
+- [ADR 0029](#adr-0029)
+- [ADR 0041](#adr-0041)
+
+## ADR-0043: CI build path: shared rootless BuildKit, OpenBao roles bound to the reusable workflow, digest commits by a GitHub App
+{: #adr-0043 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-12 · `homelab-gitops`, `infra-local`, `homelab-services`</span>
+
+#### Context
+
+ADR 0008 says `main` builds push to Zot with rootless BuildKit and commit the new digest to
+`homelab-gitops` with a short-lived GitHub App token. ADR 0019 and 0034 say CI gets its Zot key from
+OpenBao through GitHub OIDC, bound to `main`, and that pull requests never push. Phase 1 steps 1c, 2
+and 2a had to decide where BuildKit runs, what exactly an OpenBao role trusts, and how the digest
+reaches `homelab-gitops`. Every private repo in the org can run jobs on the `homelab` scale set, so
+"bound to `main`" alone would let any workflow on any repo's `main` read the push key.
+
+#### Decision
+
+- **BuildKit.** One rootless daemon, `moby/buildkit:v0.33.0-rootless`, in `platform` (`apps/buildkit`,
+  namespace `buildkit`). Jobs reach it with `docker buildx` and the remote driver; the runner image
+  already ships the Docker CLI and buildx, and no Docker daemon is involved. Its gRPC API has no
+  authentication, so a NetworkPolicy admits only pods in `arc-runners`. Registry credentials stay in
+  the job: buildx forwards them from the runner's Docker config for each build. The cache is an
+  `emptyDir` (25 GiB, garbage-collected at 20 GB).
+- **Rootless needs two exceptions.** Seccomp and AppArmor are `Unconfined` for the daemon's user
+  namespace, and `--oci-worker-no-process-sandbox` runs build steps without their own PID namespace,
+  because k3d's nested containers can't mount a new `/proc`. Kyverno's `pod-security-restricted`
+  reports the pod; it's the documented exception for that policy.
+- **OpenBao sign-in.** JWT auth at `github-actions/` trusts GitHub's OIDC issuer. Every role requires
+  audience `https://bao.core.home.cloudutsuk.com`, the org's numeric `repository_owner_id` (a deleted
+  org's name can be taken again) and `runner_environment: self-hosted`.
+  - `main` (policy `ci-main`: `kv/ci/zot-push`, `kv/ci/zot-pull`, `kv/ci/gitops-writer`) also needs
+    `ref: refs/heads/main` and `job_workflow_ref` equal to
+    `cloudutsukpilot/homelab-gitops/.github/workflows/build-image.yaml@refs/heads/main`. Only that
+    workflow's own steps get the push key and the writer App, whichever repo calls it. A caller
+    pinned to a SHA or branch, a pull request, or a hand-written workflow is refused.
+  - `pr` (policy `ci-pr`: `kv/ci/zot-pull`) is any self-hosted job in the org.
+  - Tokens last 15 minutes and each job revokes its token as soon as it has read the secret.
+- **`kv/ci/`** is a new top-level area that no cluster's External Secrets store can read. The Zot
+  passwords are copied there from `kv/core/zot` (`infra-local/host/openbao/configure-ci.sh`) so the
+  CI policies never see the `admin` password; rotating a Zot password means re-running that script.
+- **Digest commit.** A second GitHub App, `cloudutsuk-gitops-writer`, with Contents read/write and
+  installed on `homelab-gitops` only. Its key lives in `kv/ci/gitops-writer`. The workflow's
+  `promote` job signs the App JWT with openssl, asks for an installation token limited to
+  `homelab-gitops` and `contents: write`, and runs `kustomize edit set image` in the caller's
+  `gitops-path`. It pushes to `main` with up to five rebase retries, then revokes the token. Images
+  are referenced by digest; the `:<git-sha>` tag is only for people.
+
+- Build path update (2026-10-12, Phase 1 step 4): BuildKit no longer pushes. buildx exports an OCI
+  layout to the runner (with BuildKit's provenance attestation, `mode=min`). The gates scan it there,
+  and on `main` crane pushes that layout. The job checks that the pushed digest is BuildKit's. The
+  tools come from the runner image (ADR 0044).
+
+#### Considered options
+
+1. **BuildKit as a sidecar in every runner pod**: no shared cache, and the Unconfined exceptions would
+   cover every runner instead of one daemon.
+2. **Kaniko**: archived by Google in 2025; only a third-party fork is maintained.
+3. **mTLS between buildx and BuildKit**: the NetworkPolicy gives the same boundary without a
+   certificate to rotate; worth adding if anything else ever runs in `arc-runners`.
+4. **Bind the push role to `main` of selected repos**: every new service repo would need an OpenBao
+   change, and any workflow on those repos' `main` could still read the key.
+5. **`actions/create-github-app-token`**: needs the private key as an action input. The job's
+   openssl call keeps the key in a temporary file that is deleted right away.
+6. **Shared rootless BuildKit, roles bound to the reusable workflow, writer App** (chosen).
+
+#### Consequences
+
+- Good: No secrets in GitHub. Pull requests can't push, and other workflows can't push either.
+- Good: Every repo gets the same build, push and deploy path from a five-line caller.
+- Good: The shared cache makes rebuilds fast.
+- Bad: One BuildKit daemon is a shared component. A build step could in principle reach the daemon's
+  processes (no process sandbox), and every org repo's builds run there.
+- Bad: Callers must use `@main`. A breaking change to `build-image.yaml` reaches every repo at once.
+- Bad: Two copies of the Zot CI passwords, kept in step by a script.
+
+#### Related
+
+- [ADR 0008](#adr-0008)
+- [ADR 0019](#adr-0019)
+- [ADR 0033](#adr-0033)
+- [ADR 0034](#adr-0034)
+- [ADR 0040](#adr-0040)
+- [ADR 0044](#adr-0044)
+
+## ADR-0044: Own runner image with the CI tools baked in, rolled out by hand
+{: #adr-0044 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-12 · `homelab-gitops`, `homelab-services`</span>
+
+#### Context
+
+Phase 1 step 4 put ADR 0032's gates into `build-image.yaml`: Gitleaks, Semgrep, Bandit, Trivy,
+Checkov, Conftest and Hadolint, plus Syft, crane and Cosign for the image. The stock
+`actions-runner` image has none of them and no pip. Installing them in each job meant about 400 MB
+from GitHub releases and PyPI. GitHub's release CDN served some connections at about 100 KB/s, so the
+install step took 2 to 7.5 minutes while every scan together took about 30 seconds. Runner pods are
+ephemeral, so nothing carries over between jobs.
+
+#### Decision
+
+- **The tool set lives in `homelab-gitops/ci/tools`.** `tools.txt` lists each binary's URL and
+  sha256; `requirements/*.txt` are hash-locked Python requirements, one per scanner; `install.sh`
+  installs both onto `<prefix>/bin` and writes a digest of the set to `<prefix>/MANIFEST`. Every
+  version is at least two weeks old.
+- **The `homelab` scale set runs our own image**, `platform/actions-runner`: the stock
+  `actions-runner` image (pinned by digest) with `install.sh` run at build time into `/opt/ci-tools`
+  (`ci/runner-image`). `runner-image.yml` builds it with `build-image.yaml` like any service, so it
+  passes the same gates and is signed with an SBOM attestation. The pods pull it from Zot with a
+  `zot-pull` secret from `kv/shared/zot-pull`.
+- **The `security-tools` action keeps working without it.** It compares `/opt/ci-tools/MANIFEST`
+  with the digest of the `ci/tools` it was loaded with. On a match it uses the baked tools; otherwise
+  it runs `install.sh` in the job. A change to `ci/tools` works at once and gets fast again after the
+  next image rollout.
+- **Promotion is by hand.** No bot commit puts the new digest in `arc-runner-homelab.yaml`, because a
+  broken runner image would stop the CI that could fix it. Someone checks the signature, sets the
+  digest and runs one build on it (`ci/runner-image/README.md`).
+- **The image gate only reports for this image** (`image-gate: report`). The stock runner bundles
+  Node.js packages, runc and the Docker CLI, and the newest Gitleaks, Syft, Cosign and other tool
+  releases are built with Go versions that have known CVEs. On 2026-10-12 that was 255 HIGH or
+  CRITICAL findings with a fix that only upstream releases can apply. They stay in the run's summary
+  and reports. Every other image keeps `image-gate: enforce`.
+- `homelab-iac` keeps the stock image: its jobs don't run the gates.
+
+#### Considered options
+
+1. **Install in every job** (the first version): minutes per job, and a slow CDN connection makes
+   builds fail or crawl.
+2. **`actions/cache`**: still downloads from GitHub's cache service each job, and a cache miss is the
+   slow path again.
+3. **A tools artifact in Zot, pulled per job**: fast, but a second artifact to build, push and pin
+   next to the image the runner already pulls.
+4. **Own runner image with the tools baked in, manual rollout** (chosen).
+
+#### Consequences
+
+- Good: Gate jobs start in seconds: the tools step went from 2 to 7.5 minutes to under a second, and a
+  full hello-world build on `main`, gates, push, signing and deploy commit included, takes about 70 s.
+- Good: The runner image goes through the same build, scan and signing path as everything else.
+- Bad: The runner image is about 1 GB bigger (2.4 GB), and each new runner pod on a fresh node pulls it.
+- Bad: A new GitHub runner release or tool bump means a rebuild and a manual rollout. GitHub stops
+  accepting old runner versions after a while, so the base image needs regular bumps.
+- Bad: For this image, fixable CVEs in upstream components don't block the build.
+
+#### Related
+
+- [ADR 0019](#adr-0019)
+- [ADR 0032](#adr-0032)
+- [ADR 0033](#adr-0033)
+- [ADR 0043](#adr-0043)
 
 {% endraw %}
 <!-- adr:end -->

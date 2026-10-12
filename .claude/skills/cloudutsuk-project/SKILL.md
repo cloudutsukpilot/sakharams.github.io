@@ -354,6 +354,7 @@ affects are updated in the same piece of work:
 | A decision made, changed or reversed | An ADR in `homelab-gitops/docs/adr` (new, or superseding), then `sync_adrs.py <slug>` |
 | A step started or finished | Its row in *Phase N steps*; the roadmap table's status when a phase starts or ends |
 | Architecture, network, data flow, CI/CD, deployment | The area post section that describes it, its diagram, then `diagrams.py <slug> --write` |
+| A new or removed URL: an Ingress, IngressRoute or HTTPRoute, an app with a UI or API, a host container or published port, an outside account | The **Homelab links** page (infra-local `host/doctor`, http://127.0.0.1:4467): run `host/doctor/run.sh refresh` after the change is live (routes and published ports are found automatically). Anything it can't discover (a host container, a Grafana deep link, an endpoint without a route, an outside service) goes into `links.py`'s `TOOLS`, `MONITORING` or `EXTERNAL` list first. Check the new link shows green |
 | A problem that cost real time | A lesson (see below) |
 | A fact that resolves a TODO callout | Replace the callout with the fact |
 | A phase finished | The areas that phase gives facts for (scaffold them with `--areas` if missing), the card's `status` |

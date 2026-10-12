@@ -31,3 +31,9 @@ How to ask Claude Code:
 `cloudutsuk-image-common/` is the shared kit (post context, brand colours, fonts) used by all of them;
 see its [README](cloudutsuk-image-common/README.md). Brand colours for every category live in
 `cloudutsuk-image-common/brand.json` and are reused by the animations.
+
+**GitHub Copilot copy.** The diagram and image skills above (`cloudutsuk-diagram`, `cloudutsuk-flow-anim`,
+`cloudutsuk-image-*`) are combined into one Copilot skill,
+[.github/skills/diagrams-and-images/](../../.github/skills/diagrams-and-images/SKILL.md). It has its own
+copies of the scripts, fonts and brand kit, and adds a generic intake step (any system; asks the user
+for missing facts). When you change a script or workflow here, make the same change there.

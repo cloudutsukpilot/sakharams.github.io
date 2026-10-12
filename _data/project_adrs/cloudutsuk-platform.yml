@@ -42,3 +42,7 @@ adrs:
   - {id: "0038", title: "Argo CD: installed by Terraform, everything else through an app-of-apps in homelab-gitops", status: accepted, date: 2026-10-11, anchor: adr-0038, repos: [infra-local, homelab-gitops]}
   - {id: "0039", title: "Backups with Velero: application dumps through file-system backup to Azure Blob", status: accepted, date: 2026-10-11, anchor: adr-0039, repos: [infra-local, homelab-gitops, infra-azure]}
   - {id: "0040", title: "A second, repo-scoped runner scale set for infra-local's IaC jobs", status: accepted, date: 2026-10-11, anchor: adr-0040, repos: [homelab-gitops, infra-local]}
+  - {id: "0041", title: "Monitoring stack on mon: monolithic Mimir, Loki and Tempo, one OTLP gateway, rules from git", status: accepted, date: 2026-10-12, anchor: adr-0041, repos: [homelab-gitops, infra-local]}
+  - {id: "0042", title: "Monitoring pack: OTel Operator collectors per cluster, Prometheus job names for the mixins, a token per cluster", status: accepted, date: 2026-10-12, anchor: adr-0042, repos: [homelab-gitops, infra-local]}
+  - {id: "0043", title: "CI build path: shared rootless BuildKit, OpenBao roles bound to the reusable workflow, digest commits by a GitHub App", status: accepted, date: 2026-10-12, anchor: adr-0043, repos: [homelab-gitops, infra-local, homelab-services]}
+  - {id: "0044", title: "Own runner image with the CI tools baked in, rolled out by hand", status: accepted, date: 2026-10-12, anchor: adr-0044, repos: [homelab-gitops, homelab-services]}

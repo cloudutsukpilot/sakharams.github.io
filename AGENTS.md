@@ -76,6 +76,7 @@ Any htmlproofer failure fails the deploy. Triage locally with the
 | [.github/instructions/posts.instructions.md](.github/instructions/posts.instructions.md) | Auto-attached when editing `_posts/**/*.md`. |
 | [.github/prompts/new-post.prompt.md](.github/prompts/new-post.prompt.md) | Slash command `/new-post <title> [category]`. |
 | [.github/skills/htmlproofer-triage/SKILL.md](.github/skills/htmlproofer-triage/SKILL.md) | Slash command `/htmlproofer-triage` or on-demand when htmlproofer fails. |
+| [.github/skills/diagrams-and-images/SKILL.md](.github/skills/diagrams-and-images/SKILL.md) | Slash command `/diagrams-and-images`, or on demand: any diagram (explorable architecture map or step-through animation, for any system, asking for missing facts) and hero images. Combines the `.claude` diagram and image skills below; keep them in step. |
 | [.claude/skills/cloudutsuk-image-level-1/](.claude/skills/cloudutsuk-image-level-1/SKILL.md) | Hero image for a post — code-designed, on-brand, free (default). |
 | [.claude/skills/cloudutsuk-image-level-2/](.claude/skills/cloudutsuk-image-level-2/SKILL.md) | Hero image as a Three.js 3D render + brand overlay. |
 | [.claude/skills/cloudutsuk-image-level-3/](.claude/skills/cloudutsuk-image-level-3/SKILL.md) | Hero image via Cloudflare Flux (needs `.env`) + brand overlay. |
