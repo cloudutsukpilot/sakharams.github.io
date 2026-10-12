@@ -407,7 +407,8 @@ map, which shows the topics the knowledge base covers well and where it's thin.
 
 Phoenix and Grafana overlap a little, so each has a clear job:
 - **Grafana** in `mon` is where the AI stack is *operated*. It holds every dashboard and alert for the GPU, vLLM's queue and time to first token, the gateway, cache hit rate and ingest lag.
-- **Phoenix** is where answer *quality* is investigated. Use it when a reply is wrong, or to compare a chunking, prompt or model change with evals over a golden question set.
+- **Phoenix** is where answer *quality* is investigated. Use it when a reply is wrong, to see what was retrieved and what the model was given.
+- **DeepEval** in `homelab-services/evals/rag` is where answer quality is *gated*. It's a pytest suite that sends each golden question through rag-api, with no cache and no streaming, and a judge model called through the LiteLLM gateway scores the answer. Faithfulness and Answer Relevancy score the generator; Contextual Precision and Contextual Recall score the retriever. A chunking, prompt or model change that drops any score below its threshold fails the PR. Telemetry is off, and results stay on the platform (ADR 0041).
 
 Phoenix gets no alerts. Both receive the same OTel traces, and one trace ID links a slow request in
 Grafana to its readable version in Phoenix. Phoenix arrives with the RAG pipeline in phase 5.

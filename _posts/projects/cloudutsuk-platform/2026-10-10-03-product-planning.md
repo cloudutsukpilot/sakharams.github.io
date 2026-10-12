@@ -163,7 +163,8 @@ already runs and need no CI, so it depends on Phase 0 only.
 | 4 | `rag-api`: semantic cache, hybrid retrieval, citations | `homelab-services` | The same question asked twice hits the cache | Not started |
 | 5 | Chat plugin with citations and "View trace" | `self-service-portal` | The chat cites the new post and "View trace" opens its trace | Not started |
 | 6 | Arize Phoenix | `homelab-gitops` | Phoenix shows the full trace for a cache miss and a cache hit | Not started |
-| 7 | Golden question set for RAG evals | `homelab-services` | An eval run scores every golden question | Not started |
+| 7 | Golden question set for RAG evals | `homelab-services` | An eval run scores every golden question | In progress (2026-10-12: five seed questions in `evals/rag/golden`, validated on load; grows towards about 30 once rag-ingest indexes the sources) |
+| 7a | RAG eval harness on DeepEval (ADR 0041): golden questions through rag-api's eval mode, Faithfulness, Answer Relevancy, Contextual Precision and Contextual Recall with thresholds, judged through the LiteLLM gateway, telemetry off | `homelab-services` | `deepeval test run evals/rag/quality` scores every golden question against the live rag-api, and a PR touching `rag-*` runs it | In progress (2026-10-12: harness, metrics and unit tests in `evals/rag`; waits on steps 1 and 4 for a live run, and on the CI job) |
 | 8 | `rag-chat` data-flow diagram | this blog | It's drawn and in the Diagrams lane | Not started |
 | 9 | Phase 5 exit: ADRs synced, playbook updated, roadmap ticked | this blog | M5's exit check passes | Not started |
 
