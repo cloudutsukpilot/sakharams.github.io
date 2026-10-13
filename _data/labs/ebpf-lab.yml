@@ -2,10 +2,10 @@
 # Created by the cloudutsuk-learning-lab skill. `experiments` drive the experiment cards in part 6,
 # the index tiles and scripts/capture.cjs. `brief` is the author's request, not rendered.
 #
-# Lab contract v2 (homelab Phase 2, step 5): the lab cluster joins the `homelab` network, declares
-# `deploy` (ADR 0017) and bundles no LGTM. Telemetry goes to the platform's collectors and the mon
-# cluster. Shots on `grafana:` URLs wait for mon's Grafana (Phase 2, being deployed 2026-10-11);
-# until then capture them with --only on the other experiments.
+# Lab contract v2 (homelab Phase 2, steps 5 and 6): the lab cluster joins the `homelab` network, declares
+# `deploy` (ADR 0017) and bundles no LGTM. `make up` registers it with the platform (infra-local
+# host/labs/lab.sh), whose monitoring pack sends metrics and logs to mon; OBI sends its traces and RED
+# metrics straight to mon's gateway. Every mon query is filtered on cluster lab-ebpf (checked 2026-10-14).
 name: eBPF Lab
 tag: eBPF Lab
 summary: "Swap a k3d cluster's networking for Cilium and watch every flow in Hubble, get RED metrics
@@ -25,7 +25,8 @@ platform:
   observability: "Hubble, Tetragon, Falco + Falcosidekick UI, OpenTelemetry eBPF Instrumentation → homelab mon cluster"
   cost: free-local
 deploy:              # lab contract v2 (ADR 0017): what the lab runner checks before `make up`
-  memory_gb: 6
+  targets: {up: up, down: down, status: status}
+  memory_gb: 7       # the lab's stack plus the monitoring pack and cert-manager (about 1 GB)
   ports: [6450, 8091, 8092, 8093]
 facts:
   - {label: Stack, value: "Cilium 1.20, Hubble, Tetragon 1.7, Falco 0.45, OBI 0.13, k3s 1.35, Go, Redis"}
@@ -116,13 +117,13 @@ experiments:
     verify: make verify-obi-red-metrics
     look_for:
       - signal: metrics
-        where: "Grafana (mon) › Explore › Prometheus"
-        query: 'sum by (http_route) (rate(http_server_request_duration_seconds_count{k8s_namespace_name="demo"}[1m]))'
+        where: "Grafana (mon) › Explore › Mimir"
+        query: 'sum by (http_route) (rate(http_server_request_duration_seconds_count{cluster="lab-ebpf", job=~"demo/.*"}[1m]))'
         expect: "/api/visits, /api/items and /healthz with their request rates, and db_client_operation_duration_seconds for the Redis INCR."
     shots:
       - name: red
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22prometheus%22%7D%2C%22expr%22%3A%22sum%20by%20(http_route)%20(rate(http_server_request_duration_seconds_count%7Bk8s_namespace_name%3D%5C%22demo%5C%22%7D%5B1m%5D))%22%2C%22legendFormat%22%3A%22%7B%7Bhttp_route%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${from}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22mimir%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22mimir%22%7D%2C%22expr%22%3A%22sum%20by%20%28http_route%29%20%28rate%28http_server_request_duration_seconds_count%7Bcluster%3D%5C%22lab-ebpf%5C%22%2C%20job%3D~%5C%22demo%2F.%2A%5C%22%7D%5B1m%5D%29%29%22%2C%22legendFormat%22%3A%22%7B%7Bhttp_route%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bfrom%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
         selector: 'section[data-testid="data-testid Panel header Graph"]'
         wide: true
         alt: "Request rate per route for the demo app, produced by eBPF instrumentation"
@@ -141,12 +142,12 @@ experiments:
     look_for:
       - signal: traces
         where: "Grafana (mon) › Explore › Tempo"
-        query: '{ resource.k8s.namespace.name = "demo" && name = "GET /api/visits" }'
+        query: '{ resource.k8s.cluster.name = "lab-ebpf" && resource.k8s.namespace.name = "demo" && name = "GET /api/visits" }'
         expect: "One trace: web's server span, the api's GET /api/visits server span and a Redis INCR client span under it."
     shots:
       - name: waterfall
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.namespace.name%20%3D%20%5C%22demo%5C%22%20%26%26%20name%20%3D%20%5C%22GET%20%2Fapi%2Fvisits%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${start}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.cluster.name%20%3D%20%5C%22lab-ebpf%5C%22%20%26%26%20resource.k8s.namespace.name%20%3D%20%5C%22demo%5C%22%20%26%26%20name%20%3D%20%5C%22GET%20%2Fapi%2Fvisits%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
         steps:
           - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
           - {wait_for_text: "Service & Operation"}
@@ -197,7 +198,7 @@ experiments:
         expect: "A CRITICAL Network tool in demo pod event: Falco saw it but couldn't stop it."
       - signal: logs
         where: "make tetragon-events (Grafana Loki once the platform collector runs)"
-        query: '{k8s_namespace_name="kube-system", k8s_container_name="export-stdout"} |= "SIGKILL"'
+        query: '{k8s_cluster_name="lab-ebpf", k8s_namespace_name="kube-system", k8s_container_name="export-stdout"} |= "SIGKILL"'
         expect: "process_kprobe __arm64_sys_execve with action SIGKILL and policy block-network-tools, then process_exit with signal SIGKILL; wget exits 137."
     shots:
       - name: falco
@@ -209,7 +210,7 @@ experiments:
         caption: "Falco reports the download attempt; Tetragon already killed it."
       - name: tetragon
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bk8s_container_name%3D%5C%22export-stdout%5C%22%7D%20%7C%3D%20%5C%22SIGKILL%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${start}%22%2C%22to%22%3A%22${to}%22%7D%7D%7D"
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bk8s_container_name%3D%5C%22export-stdout%5C%22%7D%20%7C%3D%20%5C%22SIGKILL%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
         selector: 'section[data-testid="data-testid Panel header Logs"]'
         wide: true
         alt: "Tetragon process_kprobe event with action SIGKILL for wget in Grafana Loki"

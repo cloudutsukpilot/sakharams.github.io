@@ -205,11 +205,40 @@ what they'll run on:
   cert-manager and ExternalDNS the same way on `platform`, `mon` and `ai`.
 - **The same image path:** every node pulls public images through the Zot mirror from one shared
   `registries.yaml`.
-- **Labs** join the same network and send telemetry to `mon` from Phase 2 (lab contract v2), instead of
+- **Labs** join the same network and send telemetry to `mon` (lab contract v2, below), instead of
   each lab bundling its own Grafana stack.
 
 The deliberate exception is `core`: Argo CD doesn't manage it, so it keeps working when `platform` is
 down ([ADR 0038](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0038)).
+
+### Lab contract v2
+{: #lab-contract-v2 }
+
+A hands-on lab is a short-lived k3d cluster that its own repo's `make up` creates and `make down`
+deletes. Until Phase 2, every lab also ran its own Grafana, Loki, Tempo and Prometheus. The contract
+v2 (Phase 2 step 5) is what a lab does to use the platform's monitoring instead, and what the platform
+does in return:
+
+| The lab | The platform |
+|---|---|
+| Creates its cluster on the shared `homelab` Docker network, named `lab-<short>` | A host script registers the cluster with Argo CD, labelled for labs |
+| Keeps its own pod and service ranges, one pair per lab from 10.100 up, so two labs can run side by side | Argo CD installs only cert-manager and the monitoring pack there: the OpenTelemetry Operator, the agent and cluster collectors, kube-state-metrics |
+| Lists every host port it publishes, the Kubernetes API's included, and the memory it needs, in its card's `deploy:` block | The lab runner refuses a deploy that clashes on a port or would leave the host short of memory ([ADR 0017](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0017)) |
+| Pulls public images through the Zot mirror and resolves the internal zone through PowerDNS | Same mirror and DNS as every other cluster |
+| Sends its apps' OTLP to the in-cluster agent collector | The collectors label everything with the cluster's name and forward it to `mon` with the shared `labs` token |
+| Ships its dashboards as JSON in its repo | They're loaded into `mon`'s Grafana, folder Labs, at registration and removed when the lab leaves |
+| Leaves the platform first in `make down`, then deletes the cluster | Argo CD stops managing the cluster before it disappears |
+
+Every query in a lab's dashboards and checks filters on its cluster, because `mon` holds every
+cluster's signals: `cluster` on metrics, `k8s_cluster_name` on logs, `resource.k8s.cluster.name` on
+traces. The screenshot tooling and the labs' `verify` targets read `mon`'s Grafana with a read-only
+service-account token, since Grafana there needs a Keycloak sign-in.
+
+As built (2026-10-14): the eBPF lab runs on it, and its metrics, logs and traces reach `mon`. A lab
+scaffolded from the learning-lab skill's new template went from `make up` to its first verified
+metric in `mon` in about 8 minutes, most of it the monitoring pack's first install. Its `make down`
+left nothing behind in Argo CD or Grafana. A lab that has to run without the homelab still uses the
+v1 template, with its own Grafana stack.
 
 ## Capacity and quota planning
 {: #capacity-and-quota-planning }

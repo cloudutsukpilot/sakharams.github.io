@@ -70,26 +70,27 @@ gives up:
 
 | Shortcut | Where | Why it's fine here | Why it isn't in production |
 |---|---|---|---|
-| All storage in `emptyDir` | `lgtm.yaml` | Restart = clean slate | You lose every trace, log and metric on a pod restart |
-| One container for Tempo, Loki, Prometheus and Grafana | `grafana/otel-lgtm` | One image, one port | No scaling, no retention control, no HA |
-| Anonymous admin in Grafana | otel-lgtm default | No login on a laptop | Anyone who can reach port 3002 can change anything |
-| `/grafana-api/*` proxied by nginx | `nginx.conf` | Lets the page show its own telemetry | Exposes read access to all logs, traces and metrics to anyone who can load the site |
-| OTLP receivers with no auth or TLS | Collector config | Cluster-internal only | Anything in the cluster could send (or flood) telemetry |
+| One shared backend (`mon`) for every homelab cluster | Collector exporter, `resource/cluster` | No storage to run inside the lab | Every query needs the lab's cluster filter, and one noisy lab can crowd the others |
+| One OTLP token shared by every lab | Secret `observability/otlp-token` | Labs come and go without platform changes | Revoking it cuts off every lab at once, and a lab could claim another lab's cluster name |
+| `/grafana-api/*` proxied by nginx with a Viewer token | `nginx.conf`, Secret `demo/grafana-proxy` | Lets the page show its own telemetry; the site is on localhost only | Read access to every homelab cluster's logs, traces and metrics for anyone who can load the site |
+| OTLP receivers with no auth or TLS | Collector config | Cluster-internal only (the hop to `mon` uses TLS and a token) | Anything in the cluster could send (or flood) telemetry |
 | `parentbased_always_on` sampling | Python Dockerfiles | Every trace is kept, so experiments are repeatable | At real traffic volumes, storing 100% of traces gets expensive |
 | One replica of everything, one node | manifests, `cluster.yaml` | Simple and cheap | Any pod restart is an outage (experiment 6 is that outage) |
 | Redis without persistence, SQLite in `/tmp` | `api-backend.yaml` | The data is one seeded row | Real data needs a real database and backups |
 | No alerting | none configured | You are watching the screen | Nobody watches the screen at 3 a.m. |
 
-None of these are bugs. They are the reason the lab starts with one command and fits on a laptop.
+None of these are bugs. They are the reason the lab starts with one command on the homelab.
 
 ## Taking It to Production
 {: #taking-it-to-production }
 
 If this were a real service, these are the changes I'd make first, in roughly this order:
 
-1. **Separate, durable backends.** Replace `grafana/otel-lgtm` with Loki, Tempo and Mimir (or managed
-   equivalents) with object storage and retention policies. The applications don't change at all: they
-   only know the Collector's address, which is the point of having one.
+1. **Separate, durable backends.** Replace a bundled all-in-one backend with Loki, Tempo and Mimir (or
+   managed equivalents) with object storage and retention policies. The applications don't change at
+   all: they only know the Collector's address, which is the point of having one. This lab has taken
+   that step: until 2026-10-14 it bundled `grafana/otel-lgtm`, and moving to the homelab's `mon` cluster
+   changed the Collector's exporter and nothing in the API or backend.
 2. **Two Collector tiers.** Keep a DaemonSet agent per node for logs and local OTLP, and add a gateway
    Deployment that does the heavy work (tail-based sampling, filtering, routing to backends) and can
    scale independently.
@@ -110,8 +111,10 @@ If this were a real service, these are the changes I'd make first, in roughly th
 make down
 ```
 
-That runs `k3d cluster delete otel-demo`, which removes the cluster container, every pod, and all
-the telemetry stored in the LGTM `emptyDir` volumes. The images you built stay in your local Docker
+That first runs `lab.sh unregister lab-otel`, which takes the cluster out of Argo CD, removes the lab's
+dashboard from `mon` and revokes its Grafana token, then `k3d cluster delete lab-otel`, which removes
+the cluster container and every pod. The telemetry it sent stays in `mon` until `mon`'s 15-day
+retention ages it out. The images you built stay in your local Docker
 image cache; remove them with `docker image rm static-site:dev trace-lab-api:dev trace-lab-backend:dev`
 if you want the space back. `make up` brings everything back from scratch.
 
@@ -142,15 +145,18 @@ Each of these needs only a small change, and each produces a signal you can pred
 <summary>If you replaced grafana/otel-lgtm with separate Tempo, Loki and Mimir services, what would change in the API and backend?</summary>
 
 Nothing. They export to the Collector. Only the Collector's exporter configuration would point
-somewhere new.
+somewhere new. That's exactly what happened when this lab moved from `grafana/otel-lgtm` to the
+homelab's `mon` cluster.
 
 </details>
 
 <details markdown="1">
 <summary>Why is the <code>/grafana-api/</code> proxy a security problem outside a laptop?</summary>
 
-It lets anyone who can load the site query Loki, Tempo and Prometheus through nginx, without any
-Grafana login. Logs and traces often contain user data, internal hostnames and error details.
+It lets anyone who can load the site query Loki, Tempo and Mimir through nginx, with nginx's Viewer
+token and no Grafana login of their own. Since the lab moved to `mon`, that's every homelab cluster's
+data, not just the lab's. Logs and traces often contain user data, internal hostnames and error
+details. That's why the site listens on 127.0.0.1 only.
 
 </details>
 

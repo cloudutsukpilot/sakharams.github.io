@@ -39,12 +39,14 @@ otel-static-site-k3d/
     api/Dockerfile            python:3.12-slim + opentelemetry-instrument
     backend/main.py           FastAPI: GET /data, Redis cache-aside over SQLite
     backend/Dockerfile        same base, Redis auto-instrumentation disabled (added by hand instead)
-  k3d/cluster.yaml            one k3s server; host ports 8081 → ingress, 3002 → Grafana
+  k3d/cluster.yaml            lab-otel: one k3s server on the homelab network; 127.0.0.1:8081 → ingress
   k8s/
     app/                      static-site (nginx + exporter sidecar), api, backend, redis, ingress
     traefik/                  HelmChartConfig: Traefik tracing + OTLP metrics
-    observability/            grafana/otel-lgtm, Collector DaemonSet + config, the dashboard
-  scripts/signal.sh           asks Grafana whether a metric, log or trace has arrived
+    observability/            Collector DaemonSet + config (exports to the homelab's mon cluster)
+    dns/                      CoreDNS forwarding for the homelab's internal zone
+  dashboards/static-site.json the dashboard, loaded into mon's Grafana (folder Labs)
+  scripts/signal.sh           asks mon's Grafana whether a metric, log or trace has arrived
 ```
 
 ## The Application

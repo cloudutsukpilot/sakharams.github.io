@@ -8,9 +8,13 @@
         predict, where to look, the verify target), so the repo and the posts never disagree.
 
 Usage (from the blog repo root):
-  python3 lab_repo.py new  --lab <slug> [--dest PATH] [--template k3d-lgtm] [--cluster NAME]
+  python3 lab_repo.py new  --lab <slug> [--dest PATH] [--template k3d-platform] [--cluster NAME]
                            [--app NAME] [--app-ns NS] [--service NAME] [--site-port 8081]
-                           [--grafana-port 3002] [--dry-run] [--force]
+                           [--api-port 6452] [--range 104] [--grafana-port 3002] [--dry-run] [--force]
+
+Templates: k3d-platform (default, lab contract v2: joins the homelab platform, signals to mon; needs
+--api-port and --range, a free pod/service pair from 10.100 up) and k3d-lgtm (v1: a self-contained
+lab with its own Grafana stack, for labs meant to run anywhere; needs --grafana-port).
   python3 lab_repo.py sync --lab <slug> [--dest PATH]
 """
 import argparse
@@ -52,22 +56,32 @@ def cmd_new(args):
     if not src.is_dir():
         sys.exit(f"unknown template {args.template!r}; have: {', '.join(p.name for p in TEMPLATES.iterdir())}")
     app = args.app or "app"
+    v2 = args.template == "k3d-platform"
+    if v2 and (args.range < 100 or args.range > 252 or args.range % 2):
+        sys.exit("--range must be an even number from 100 to 252: pods 10.<range>, services 10.<range+1>")
+    short = args.lab[: -len("-lab")] if args.lab.endswith("-lab") else args.lab
+    default_cluster = (f"lab-{short}" if v2 else args.lab)[:20].strip("-")
     values = {
         "__SLUG__": args.lab,
         "__NAME__": card.get("name", args.lab),
         "__SUMMARY__": str(card.get("summary", "")).strip(),
         "__REPO__": dest.name,
-        "__CLUSTER__": args.cluster or args.lab[:20].strip("-"),
+        "__CLUSTER__": args.cluster or default_cluster,
         "__APP_NS__": args.app_ns,
         "__APP__": app,
         "__SERVICE__": args.service or f"{args.lab}-{app}",
         "__SITE_PORT__": str(args.site_port),
         "__GRAFANA_PORT__": str(args.grafana_port),
+        "__API_PORT__": str(args.api_port),
+        "__POD_OCTET__": str(args.range),
+        "__SVC_OCTET__": str(args.range + 1),
         "__INDEX_URL__": f"{SITE}/tags/{args.lab}/",
     }
     written = kept = 0
     for f in sorted(p for p in src.rglob("*") if p.is_file()):
         rel = f.relative_to(src)
+        for k in sorted(values, key=len, reverse=True):  # placeholders in file names too
+            rel = Path(str(rel).replace(k, values[k]))
         out = dest / rel
         if out.exists() and not args.force:
             print(f"keep   {rel}")
@@ -85,14 +99,22 @@ def cmd_new(args):
         out.chmod(f.stat().st_mode)
         print(f"write  {rel}")
         written += 1
-    for label, port in (("site", args.site_port), ("grafana", args.grafana_port)):
+    ports = (("site", args.site_port), ("api", args.api_port)) if v2 else \
+        (("site", args.site_port), ("grafana", args.grafana_port))
+    for label, port in ports:
         if port_in_use(port):
             print(f"WARN   host port {port} ({label}) is in use now; another lab may own it. "
                   f"Pick a free one (--{label}-port) or stop the other cluster before `make up`.")
     print(f"\n{written} written, {kept} kept → {dest}")
-    print("Next: write app/ (code + Dockerfile), adjust k8s/app/app.yaml, the collector config and "
-          "dashboard.json, add exp-*/verify-* targets, then `lab_repo.py sync`. Set capture.urls in the "
-          f"card to http://localhost:{args.site_port} and http://localhost:{args.grafana_port}.")
+    if v2:
+        print("Next: write app/ (code + Dockerfile), adjust k8s/app/app.yaml and dashboards/*.json, add "
+              "exp-*/verify-* targets, then `lab_repo.py sync`. In the card: deploy.ports "
+              f"[{args.site_port}, {args.api_port}] and deploy.memory_gb; capture.urls app: "
+              f"http://127.0.0.1:{args.site_port}, grafana: https://grafana.mon.home.cloudutsuk.com.")
+    else:
+        print("Next: write app/ (code + Dockerfile), adjust k8s/app/app.yaml, the collector config and "
+              "dashboard.json, add exp-*/verify-* targets, then `lab_repo.py sync`. Set capture.urls in the "
+              f"card to http://localhost:{args.site_port} and http://localhost:{args.grafana_port}.")
 
 
 def md_inline(text):
@@ -149,13 +171,15 @@ def main():
     n = sub.add_parser("new")
     n.add_argument("--lab", required=True)
     n.add_argument("--dest")
-    n.add_argument("--template", default="k3d-lgtm")
+    n.add_argument("--template", default="k3d-platform")
     n.add_argument("--cluster")
     n.add_argument("--app")
     n.add_argument("--app-ns", default="lab")
     n.add_argument("--service")
     n.add_argument("--site-port", type=int, default=8081)
     n.add_argument("--grafana-port", type=int, default=3002)
+    n.add_argument("--api-port", type=int, default=6452, help="k3d-platform: host port of the lab's Kubernetes API")
+    n.add_argument("--range", type=int, default=104, help="k3d-platform: pods 10.<range>.0.0/16, services 10.<range+1>.0.0/16")
     n.add_argument("--dry-run", action="store_true")
     n.add_argument("--force", action="store_true")
     s = sub.add_parser("sync")

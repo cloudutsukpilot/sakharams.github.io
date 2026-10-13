@@ -28,7 +28,7 @@ nodes:
   - { id: TE, label: "Tempo", sub: "traces", x: 720, y: 318, w: 130, h: 56, shape: cylinder, icon: chart }
   - { id: LO, label: "Loki", sub: "logs", x: 720, y: 410, w: 130, h: 56, shape: cylinder, icon: "devops/monitoring/loki-18.svg" }
   - { id: PR, label: "Prometheus", sub: "metrics", x: 720, y: 502, w: 130, h: 56, shape: cylinder, icon: "devops/monitoring/prometheus-18.svg", icon_pos: corner }
-  - { id: GR, label: "Grafana", sub: ":3002", x: 905, y: 410, w: 130, h: 56, shape: terminal, icon: "devops/monitoring/grafana-18.svg" }
+  - { id: GR, label: "Grafana", sub: "on mon", x: 905, y: 410, w: 130, h: 56, shape: terminal, icon: "devops/monitoring/grafana-18.svg" }
 
 edges:
   - { id: BR_TR, from: BR, to: TR }
@@ -84,7 +84,7 @@ steps:
     text: "The Collector scrapes the nginx exporter every 15 s and tails JSON log lines from the pod log files."
   - edges: [COL_TE, COL_LO, COL_PR]
     title: One pipeline per signal
-    text: "Traces go to Tempo, logs to Loki, metrics to Prometheus, all inside the grafana/otel-lgtm container."
+    text: "Traces go to Tempo, logs to Loki, metrics to Mimir, all in the homelab's mon cluster, tagged with the lab's cluster, lab-otel."
   - edges: [TE_GR, LO_GR, PR_GR]
     title: One place to look
     text: "Grafana queries all three. The shared trace ID is what lets you jump from a log line to its trace."

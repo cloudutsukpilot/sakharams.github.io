@@ -2,8 +2,8 @@
 name: cloudutsuk-learning-lab
 description: >-
   Create a hands-on learning lab on the Cloudutsuk blog (this Jekyll repo): from a topic, build a
-  runnable lab repo (application code, k3d cluster, OpenTelemetry Collector + Grafana LGTM by default,
-  a provisioned dashboard, a Makefile with one target per experiment), run it, perform each experiment
+  runnable lab repo (application code, a k3d cluster that joins the homelab platform and sends its
+  signals to the platform's Grafana (lab contract v2) by default, a dashboard, a Makefile with one target per experiment), run it, perform each experiment
   and capture REAL dashboard screenshots and animated WebP timelapses with headless Chromium, then write
   a 7-part post series (overview and architecture, write the code, set up infrastructure, deploy,
   monitor, experiments, understand and review) under _posts/labs/<slug>/ with a lab index on
@@ -22,7 +22,7 @@ It is two things kept in sync:
 
 | Piece | Where | Made by |
 |---|---|---|
-| Lab repo (code, cluster, observability, Makefile, EXPERIMENTS.md) | its own repo, e.g. `~/gitrepos/<area>/<lab>` | `lab_repo.py new` from `templates/k3d-lgtm/`, then you |
+| Lab repo (code, cluster, observability, Makefile, EXPERIMENTS.md) | its own repo, e.g. `~/gitrepos/<area>/<lab>` | `lab_repo.py new` from `templates/k3d-platform/` (contract v2), then you |
 | Parts and topics (7 parts, shared by every lab) | [_data/lab_framework.yml](../../../_data/lab_framework.yml) | Fixed |
 | Lab card + experiments (the single source for posts, index, capture, EXPERIMENTS.md) | `_data/labs/<slug>.yml` | `scaffold.py card`, then you |
 | Screenshots | `assets/img/labs/<slug>/<exp>-<shot>.webp` | `capture.cjs` (never by hand) |
@@ -50,17 +50,19 @@ is the smaller first version of that lab. Build Explore URLs with `scripts/explo
 - **Topic** and what the reader should understand at the end (2–4 outcomes).
 - **Name and tag** (default tag = name; no `, [ ] : # { }`).
 - **Lab repo**: a new path (default `~/gitrepos/<area>/<slug>`) or an existing demo repo to adapt.
-- **Level** (Beginner/Intermediate/Advanced) and **platform**. Default: local k3d + OTel Collector +
-  Grafana LGTM. The topic may need something else (compose, another backend, a cloud service); see
-  [references/lab-anatomy.md](references/lab-anatomy.md#when-the-platform-is-not-k3d--lgtm).
+- **Level** (Beginner/Intermediate/Advanced) and **platform**. Default: a k3d cluster on lab contract
+  v2: it joins the homelab platform, and its metrics, logs and traces go to mon's Grafana
+  ([references/lab-anatomy.md](references/lab-anatomy.md#lab-contract-v2-the-default)). The topic may need
+  something else (compose, another backend, a cloud service, a lab that must run without the homelab);
+  see [references/lab-anatomy.md](references/lab-anatomy.md#when-the-platform-is-not-k3d).
 
 Ask only for what's missing, in **one** AskUserQuestion call. For a cloud platform, also ask for the
 go-ahead to create billable resources; without it, build and write everything but don't run it.
 
 Then check: `ls _data/labs _data/projects _posts/labs 2>/dev/null`, `k3d cluster list` (which host
-ports are taken), and whether the lab repo path exists. An existing card means **update**: read the
+ports and pod/service ranges are taken), and whether the lab repo path exists. An existing card means **update**: read the
 card, the posts and the repo, and only add what's missing. Confirm the plan in one line: tag, slug,
-repo path, ports, experiment list.
+repo path, ports and range, experiment list.
 
 ## 2. Design the experiments first
 
@@ -70,8 +72,8 @@ python3 $S/scaffold.py card --name "<Name>" [--tag "<Tag>"] --summary "<1-2 sent
 
 Fill in `_data/labs/<slug>.yml`: `lab_category` (an id from `_data/lab_catalog.yml`; add a category
 there only if none fits), level, duration, platform, endpoints/`capture.urls` (the lab's own
-ports), the `deploy:` block (Make targets, `memory_gb` from `docker stats` once the lab runs, every
-published host port, `ttl_hours` for cloud labs; `repo.path` must be absolute) that the platform's lab
+ports, and `grafana: https://grafana.mon.home.cloudutsuk.com`), the `deploy:` block (Make targets, `memory_gb` from `docker stats` once the lab runs, every
+published host port including the API port, `ttl_hours` for cloud labs; `repo.path` must be absolute) that the platform's lab
 runner reads so the portal can deploy the lab, and **3–7 experiments**. Before writing shots, read the "Gotchas" in
 references/experiments.md (search lag, lazy panels, stale dashboards, probe noise). Design them following [references/experiments.md](references/experiments.md):
 each with `goal`, `signals`, `action` (`say` + `run` and/or `browser`), `predict`, `wait`, `verify`,
@@ -84,15 +86,15 @@ New repo:
 
 ```bash
 python3 $S/lab_repo.py new --lab <slug> [--dest PATH] --app <name> --app-ns <ns> \
-  --site-port <port> --grafana-port <port>
+  --site-port <port> --api-port <port> --range <even number from 100>
 ```
 
 Then, following [references/lab-anatomy.md](references/lab-anatomy.md):
 
 1. Write `app/` (code + Dockerfile) and the instrumentation the topic is about.
-2. Adapt `k8s/app/app.yaml`, the collector config (log path, scrape targets, pipelines) and
-   `dashboard.json` (one plainly titled panel per thing an experiment asks the reader to look at;
-   stable panel ids).
+2. Adapt `k8s/app/app.yaml` (OTLP to `agent-collector.monitoring:4318`) and `dashboards/<slug>.json`
+   (one plainly titled panel per thing an experiment asks the reader to look at; stable panel ids;
+   every query filtered on the lab's cluster).
 3. Add `exp-<id>` and `verify-<id>` targets (verify via `scripts/signal.sh`). Replace `exp-example`.
 4. `python3 $S/lab_repo.py sync --lab <slug>` to write EXPERIMENTS.md. Fill README's diagram.
 
@@ -103,12 +105,15 @@ first. If someone else has uncommitted work there, stop and ask before touching 
 ## 4. Run it
 
 ```bash
-cd <repo> && make up && make status        # first run pulls ~2 GB for LGTM
+cd <repo> && make up && make status        # first run about 8 minutes, most of it the monitoring pack
 make exp-<id> && sleep <wait> && make verify-<id>   # each experiment by hand once
 ```
 
-Fix the lab until every experiment's verify passes by hand. Check that Grafana serves the dashboard in
-the repo (`curl -s localhost:<port>/api/dashboards/uid/<uid>`): an old `lgtm` pod can hold a stale copy. Open Grafana yourself (or with a quick
+Fix the lab until every experiment's verify passes by hand. `make verify-*` and `capture.cjs` need
+`~/.config/homelab/grafana-labs-token` (infra-local `host/monitoring/labs-grafana-token.sh`). Check that
+mon's Grafana serves the dashboard in the repo (`curl -s -H "Authorization: Bearer $(cat
+~/.config/homelab/grafana-labs-token)" https://grafana.mon.home.cloudutsuk.com/api/dashboards/uid/<uid>`);
+re-run `make monitoring` after changing it. Open Grafana yourself (or with a quick
 Playwright screenshot) and check each panel shows the effect before automating it. Ask the author to
 commit the lab repo (or commit it if they asked you to); captures record the revision and flag `-dirty`.
 

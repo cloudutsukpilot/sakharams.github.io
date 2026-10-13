@@ -173,6 +173,12 @@ compiles plugins into the app, so it isn't a base image with runtime plugins.
   `plugins/chat`, plus the Argo CD and Kubernetes plugins.
 - Plugin backends call the `homelab-services` APIs with service tokens (ADR 0029).
 - The app is built into its own arm64 image by CI and deployed by Argo CD like any other app.
+- Image as built (2026-10-13, Phase 3 step 1): Backstage 1.55.2. A multi-stage Dockerfile installs,
+  type-checks and bundles inside the build (node 24.21.0, pinned by digest), so the shared
+  `build-image.yaml` builds it from a clean checkout like any other image. The runtime stage is the
+  slim image, runs as uid 1000 with a read-only root, and drops npm. The portal's `test` job (tsc,
+  lint, Prettier, unit tests) runs first. Deployed as `apps/portal` in `homelab-gitops`, with the
+  homelab's settings in a ConfigMap loaded after the image's own config files.
 
 #### Considered options
 
@@ -722,6 +728,10 @@ forgotten cloud lab keeps billing; a double click could deploy the same lab twic
   environment, own process group, job timeout). State is in SQLite until `platform-db` exists, then
   Postgres through the same database URL. Cloud labs are destroyed automatically at the TTL.
 
+- Lab contract v2 (2026-10-14, Phase 2 step 5): `deploy.ports` lists every host port the lab's k3d
+  cluster publishes, its Kubernetes API port included; the blog's `check.py` fails a card that misses
+  one, because two clusters can't bind the same host port.
+
 #### Considered options
 
 1. **First come, first served**: a lab can starve the LLM or monitoring.
@@ -1141,6 +1151,13 @@ Dashboards built by hand in the UI are lost on rebuild and drift between version
   Security from Phase 3a).
 - Alert rules (kubernetes and node mixins, GPU, vLLM, databases, OpenBao sealed, cert expiry,
   ExternalSecret failures, Argo CD drift, Watchdog) live in `alerts/` and load into the Mimir ruler.
+- As built (2026-10-13, Phase 2 steps 4 and 4a): Kubernetes, Fleet, AI and Platform folders, 30
+  dashboards. Platform holds Argo CD, External Secrets, Kyverno, Traefik and cert-manager (upstream, at
+  the versions that run) and two written here (Velero backups, OpenTelemetry collectors). 195 rules: the
+  two mixins, cert-manager-mixin, GPU, vLLM, blackbox, Watchdog and the platform alerts above, except
+  databases, which come with the first database's monitoring. `scripts/panel_check.py` runs every panel
+  per cluster; panels that are empty by design are listed with the reason. Data, Apps, SLOs and cost
+  folders arrive with their components.
 
 #### Considered options
 
@@ -1285,6 +1302,12 @@ cross-cluster routing and debugging ambiguous; published API ports widen the att
   `net.ipv4.ip_nonlocal_bind=1` lets Docker publish on them even if it starts first. Each cluster's
   load balancer publishes 80/443 there, and its Traefik reports that address, so ExternalDNS points
   `*.mon.home.cloudutsuk.com` at 172.30.0.3. The API ports stay on the gateway.
+
+- Labs as built (2026-10-14, lab contract v2): a lab's pod and service ranges are a fixed pair in its
+  own `k3d/cluster.yaml` (eBPF 10.100/10.101, OpenTelemetry 10.102/10.103, new labs from 10.104),
+  chosen when the lab is scaffolded, not allocated by the lab runner: `make up` creates the cluster
+  from that file. Each lab's API listens on 127.0.0.1 on its own port (6450 up); Argo CD reaches it on
+  the server node's `homelab` address.
 
 #### Considered options
 
@@ -1611,6 +1634,11 @@ schema changes and bugs couple them, and backups and privacy are hard to reason 
 - Only Keycloak stores email addresses; everything else keeps an opaque user ID. Deleting a user is a
   Keycloak change plus deleting their chat history.
 - The ER diagram and ownership table are in the playbook's Technical Architecture post.
+- `platform-db` as built (2026-10-13, Phase 3 step 1): Postgres 17.10 in `platform`, deployed by Argo
+  CD (`homelab-gitops` `apps/platform-db`), data on the host through a static PV. Only `backstage`
+  exists so far; Backstage keeps each plugin in its own schema inside it (`pluginDivisionMode:
+  schema`) instead of creating a database per plugin. The other databases are added with their
+  services. Velero's pre-backup hook dumps every database (`pg_dump -Fc`) for the nightly backup.
 
 #### Considered options
 
@@ -2057,14 +2085,19 @@ Argo CD from Phase 0, no CI.
   runs as 1000:1000. No CSI driver or extra storage tool: k3s's local-path provisioner would keep data
   inside the node container, which a cluster rebuild deletes.
 - **Rules from git:** `alerts/` becomes one ConfigMap mounted as the ruler's local storage (tenant
-  `anonymous`, multi-tenancy off). The ruler re-reads it every minute; there's no rules API to drift from.
-- **Alertmanager** is Mimir's, with a fallback config that sends everything to a `null` receiver until
-  receivers (Slack, a dead man's switch for Watchdog) are chosen.
+  `anonymous`, multi-tenancy off). The ruler re-reads it every minute (`ruler.poll_interval: 1m`; Mimir's
+  default is 10 minutes); there's no rules API to drift from.
+- **Alertmanager** is Mimir's. Its fallback config is the `mimir-alertmanager` Secret, which External
+  Secrets renders from `kv/mon/alertmanager` (infra-local `host/monitoring/alerting.sh`): warnings and
+  critical alerts to a Slack channel, Watchdog every minute to a healthchecks.io check that emails when
+  the pings stop (a dead man's switch), severity `none` and `info` nowhere. Mimir reads it at startup.
 - **One OTLP entry point:** every cluster sends OTLP/HTTP to `https://otlp.mon.home.cloudutsuk.com`
   (Traefik, Let's Encrypt), inside `mon` also OTLP/gRPC. The gateway sets `cluster` from
   `k8s.cluster.name` (ADR 0026) and forwards OTLP to Mimir (`/otlp`, metric suffixes on), Loki (`/otlp`)
   and Tempo. A local smoke test (2026-10-12) showed `vllm:*` names, `_total` counters and `job` arriving
-  unchanged, so the vendored dashboards and rules match without translation.
+  unchanged, so the vendored dashboards and rules match without translation. One exception: a counter
+  exposed without `_total` gains it (`certmanager_controller_sync_call_count_total`), so the dashboard
+  import renames those few.
 - **Grafana** signs in through Keycloak (confidential client `grafana`, ADR 0028): `platform-admins` are
   Admin, `viewers` Viewer, others refused; local `admin` is break-glass (`kv/mon/grafana`). Data sources
   and dashboards are provisioned; dashboards are read-only in the UI.
@@ -2131,6 +2164,12 @@ from every k3d cluster, labs included, so anything on the homelab bridge could w
   read. The gateway accepts that list of tokens on OTLP/gRPC and OTLP/HTTP and refuses anything else (401).
   A lab gets its own token when it registers; revoking one cluster is deleting its key.
 - `mon` sends to the gateway's Service; the others to `https://otlp.mon.home.cloudutsuk.com`.
+
+- Labs as built (2026-10-14, lab contract v2): labs share one `labs` token instead of one each. They
+  have no External Secrets, and they come and go too often for a token per lab to be worth managing;
+  `infra-local host/labs/lab.sh register` copies it into the lab, and rotating it means re-registering
+  the running labs. Labs are selected by `homelab/addons=monitoring` and get only cert-manager and the
+  monitoring pack (no issuers, policies or ExternalDNS), with the operator's NetworkPolicies off.
 
 #### Considered options
 

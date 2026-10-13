@@ -587,3 +587,144 @@ lessons:
     fix: "Added a `test` job (Ruff and pytest from `uv.lock`) to the service's workflow and made the image job need it. A throwaway pull request with a broken assertion failed in 13 seconds and the image job never started."
     lesson: "A gate isn't real until you've watched it fail. For every row of a testing or security matrix, find the job that runs it and make it go red once on purpose."
     adrs: ["0031"]
+
+  - id: L055
+    date: 2026-10-13
+    step: "Phase 3, step 1: the portal image through CI"
+    title: "A Backstage upgrade failed on a patch file nobody had"
+    tags: [backstage, yarn, dependencies]
+    symptom: "Bumping Backstage from 1.53.0 to 1.55.2 stopped in `yarn install` with ENOENT on `.yarn/patches/got-npm-11.8.2-c1eb105458.patch`. The repo has no such file and no dependency on `got`, and none of the 63 direct Backstage dependencies referred to a patch."
+    cause: "`@yarnpkg/core` 4.9.2, pulled in by the Backstage CLI, was published with its own monorepo's `patch:` reference to `got` in its dependencies. That path only exists in yarn's repository, so no project can install it. Every 4.x before it asked for a plain `^11.7.0`."
+    fix: "Found the package by grepping yarn's metadata cache (`~/.yarn/berry/metadata`) for the patch name, then pinned `@yarnpkg/core` to 4.9.1 in the root `resolutions`."
+    lesson: "When an install fails on a dependency you never declared, search the package manager's cached registry metadata for the odd string. It names the transitive package in seconds, where reading dependency trees takes much longer."
+    adrs: ["0004"]
+
+  - id: L056
+    date: 2026-10-13
+    step: "Phase 3, step 1: the portal image through CI"
+    title: "The portal image couldn't read its own /app"
+    tags: [backstage, docker, containers]
+    symptom: "The first multi-stage portal image built cleanly, then failed at start with `Cannot find module '/app/packages/backend'`. Inside it, even `ls /app` as the node user gave Permission denied."
+    cause: "Backstage's backend bundle is a tarball whose top-level `./` entry is mode 700, from the temporary directory it was built in. Extracting it applies that mode to `/app` itself. Backstage's own Dockerfile extracts as the node user into a directory node owns, so mode 700 still lets the app read it. Ours extracted as root, which left `/app` as `drwx------ root` for a process running as uid 1000."
+    fix: "Extract with `tar xzf bundle.tar.gz --no-overwrite-dir`, which leaves `/app` as `WORKDIR` made it (755). The files stay root-owned and read-only to the app, which suits a read-only root filesystem."
+    lesson: "When the user that unpacks files differs from the user that runs the app, check the archive's top-level entry with `tar tv`. A 700 directory is harmless to its owner and fatal to everyone else."
+    adrs: ["0004"]
+
+  - id: L057
+    date: 2026-10-13
+    step: "Phase 2, step 4: the Platform dashboard folder"
+    title: "Upstream dashboards asked for counter names Mimir never stored"
+    tags: [observability, mimir, opentelemetry, grafana]
+    symptom: "After vendoring the External Secrets and cert-manager dashboards, several panels were empty while the metrics were clearly being scraped. `externalsecret_sync_calls_error` and `certmanager_controller_sync_call_count` didn't exist in Mimir at all."
+    cause: "Metrics travel from the scrape to Mimir as OTLP, and Mimir's OTLP ingest with metric suffixes on appends `_total` to every counter. Most exporters already name counters `_total`, so the earlier smoke test looked lossless; these two projects expose counters without it, so Mimir stored `..._count_total` and `..._error_total`."
+    fix: "The dashboard import renames the affected counters in dashboards and vendored alerts (`COUNTER_RENAMES` in `scripts/dashboards.py`), and a check lists every metric a dashboard queries that Mimir doesn't have."
+    lesson: "On an OTLP path into a Prometheus-style store, compare the metric names a dashboard asks for with the store's name list before reading its panels. A counter without `_total` changes name on the way."
+    adrs: ["0041", "0027"]
+
+  - id: L058
+    date: 2026-10-13
+    step: "Phase 2, step 4: platform alerts"
+    title: "New alert rules sat unloaded for ten minutes"
+    tags: [observability, mimir, alerting]
+    symptom: "The new rule files were in the mounted ConfigMap and the ruler's storage API listed them, but the rules API still showed the old 178 rules. Ten minutes later all 194 appeared at once."
+    cause: "Mimir's ruler re-syncs its rule storage every `ruler.poll_interval`, 10 minutes by default. The comment in our config, and ADR 0041, said every minute; nobody had timed it, because earlier rule changes had all come with a restart."
+    fix: "Set `ruler.poll_interval: 1m` and corrected the ADR. The next rule (VLLMNotServing) loaded within a minute."
+    lesson: "When a doc says how fast something reloads, time it once. 'It re-reads every minute' was a guess, and it only failed the first time nothing else restarted."
+    adrs: ["0041"]
+
+  - id: L059
+    date: 2026-10-13
+    step: "Phase 2, step 4a: the AI folder and vLLM alerts"
+    title: "An `up == 0` alert went quiet when the model server disappeared"
+    tags: [observability, alerting, vllm, kubernetes]
+    symptom: "The vLLM pod couldn't start for 15 minutes. VLLMTargetDown fired, then resolved at 08:21, while the model still wasn't serving: I had deleted the stuck pod to retry its image pull, and the new one hadn't started."
+    cause: "`up{job=~\"vllm.*\"} == 0` needs a scrape target. A pod that is stuck but exists stays a target, so `up` is 0; once the pod is gone there's no target and no `up` series, and the alert sees nothing wrong. A stopped model server is exactly that case."
+    fix: "Added VLLMNotServing: a vLLM Deployment that should have replicas but has had none available for 10 minutes, from kube-state-metrics. It fired at 08:19 during the same outage, reached Slack and resolved when the pod became ready. VLLMTargetDown stays for a server that is up but not answering."
+    lesson: "Alert on what should exist, not only on what reports itself broken. A down target and a missing target need different rules."
+    adrs: ["0027", "0026"]
+
+  - id: L060
+    date: 2026-10-13
+    step: "Phase 2, step 4a: the embeddings model in ai"
+    title: "The first pull of a 22 GB image timed out while the mirror copied it"
+    tags: [registry, zot, containers, vllm]
+    symptom: "The vLLM pod sat in ErrImagePull and ImagePullBackOff with `failed to resolve reference ... context canceled` on the manifest request to Zot. A manual `crictl pull` failed the same way."
+    cause: "Zot's on-demand mirror answers the first request for an image only after copying the whole image from upstream, here about 20 GB from nvcr.io at about 18 MiB/s. The kubelet and crictl gave up on the manifest request long before that. The copy carried on in the background."
+    fix: "Waited for Zot to finish (its `index.json` for the repository appears), then deleted the pod. The next pull, all from Zot, took 1 minute 44 seconds."
+    lesson: "Pre-sync very large images into the mirror before the first deploy, or expect a backoff loop on day one. For the chat model's image, sync it ahead of the Phase 5 deploy."
+    adrs: ["0034", "0010"]
+
+  - id: L061
+    date: 2026-10-13
+    step: "Phase 2, step 4: the Platform dashboard folder"
+    title: "Another session's commit carried my half-finished work"
+    tags: [git, process]
+    symptom: "My Platform-folder commit held 6 files instead of about 20. The dashboards, scripts and vendored alerts were already on `main`, in another session's commit titled 'Adding self service portal'."
+    cause: "Two sessions worked in the same checkout of homelab-gitops. The other one staged everything (`git add -A`) and committed while my files were written but not yet checked, so unreviewed work reached `main` under the wrong message."
+    fix: "Nothing broke: the files were the finished versions, and `dashboards.py --check` passed on `main`. Each session now stages by path and commits as soon as a check passes."
+    lesson: "In a checkout another session also uses, stage files by path, never with `-A` or `.`, and keep the time between writing and committing short."
+
+  - id: L062
+    date: 2026-10-13
+    step: "Phase 3, step 2: Keycloak sign-in for the portal"
+    title: "The deployed portal had only one plugin, and nothing said so"
+    tags: [backstage, docker, frontend]
+    symptom: "After the first real sign-in, the portal showed \"Error in extension 'nav-content:app'; caused by NotImplementedError: No implementation available for apiRef{plugin.notifications.service}\" and had no Settings page, so no way to sign out. The smoke test had passed on every deploy, and local runs were fine."
+    cause: "Backstage's new frontend system installs plugins it discovers at build time, from `app.packages: all` in app-config.yaml. The image's build stage copied the source but not app-config.yaml, so the build found no setting, discovered nothing, and only Catalog (named in App.tsx) was installed. The plugins' code was still in the bundle, which made the bundle look right. The custom sidebar then asked for the notifications API that no plugin had registered."
+    fix: "Copied the config files into the build stage, and made the build fail if the discovered-plugins list in the bundle is empty. A headless Chromium run of the image showed the full sidebar and Sign Out under Settings."
+    lesson: "A build that reads config needs the config in its context: check what each Docker stage copies, not only what the app needs at run time. And a smoke test over HTTP can't see a frontend that renders an error; load the page in a headless browser at least once per change to the build."
+    adrs: ["0004"]
+
+  - id: L063
+    date: 2026-10-14
+    step: "Phase 2, step 6: the eBPF lab joins the platform"
+    title: "The OpenTelemetry Operator crash-looped on Cilium because of its own NetworkPolicy"
+    tags: [kubernetes, cilium, opentelemetry, networking]
+    symptom: "On lab-ebpf, the first lab to get the monitoring pack, the operator timed out on its first API call (`dial tcp 10.101.0.1:443: i/o timeout`) and crash-looped, so its webhook had no endpoints and the collectors couldn't be created. The same chart ran fine on platform, mon and ai."
+    cause: "The operator's `operator.networkpolicy` feature gate writes a NetworkPolicy for itself that allows egress to the API server by the node's IP. Cilium, the lab's CNI, enforces NetworkPolicies but sees the API server as the `kube-apiserver` entity, not that address, so the rule never matched. k3s's default networking on the long-lived clusters matches by IP, which is why only the lab broke."
+    fix: "Labs (homelab/addons=monitoring) get both of the operator's NetworkPolicy gates off, through the ApplicationSet's templatePatch, and the policy left behind was deleted once."
+    lesson: "A component that writes its own NetworkPolicy assumes how your CNI matches addresses. Test an add-on on every CNI it will meet before calling it cluster-agnostic."
+    adrs: ["0042"]
+
+  - id: L064
+    date: 2026-10-14
+    step: "Phase 2, step 5: labs in the monitoring ApplicationSets"
+    title: "A templatePatch on valuesObject broke the whole ApplicationSet"
+    tags: [argocd, gitops]
+    symptom: "After adding a per-label templatePatch to the opentelemetry-operator ApplicationSet, it reported ErrorOccurred: `unable to find api field in struct RawExtension for the json field \"manager\"`, and stopped updating its apps on every cluster, not only the lab."
+    cause: "Argo CD stores `helm.valuesObject` as raw JSON, so a strategic merge patch can't descend into it. Rendering the patch fails for every generated app, and the ApplicationSet stops reconciling all of them."
+    fix: "The patch sets `helm.parameters` (a typed list it can merge) instead, for the operator's feature gates and the monitoring pack's token source. Checked with the ApplicationSet's conditions before and after."
+    lesson: "After changing an ApplicationSet, read its status conditions, not just the apps you meant to change. One bad template stops the set for every cluster."
+    adrs: ["0042"]
+
+  - id: L065
+    date: 2026-10-14
+    step: "Phase 2, step 6: the eBPF lab joins the platform"
+    title: "A host-network pod in a k3d lab could reach neither a Service nor mon's names"
+    tags: [kubernetes, cilium, dns, k3d, opentelemetry]
+    symptom: "OBI, which must run on the host network for trace-context propagation, couldn't send to the monitoring pack's agent: its Service IP timed out, host ports on the agent were refused, and sending straight to the gateway failed with `lookup otlp.mon.home.cloudutsuk.com on 172.30.0.1:53: no such host`."
+    cause: "In nested k3d with Cilium's kube-proxy replacement, host-network sockets get no Service or host-port translation. And inside a k3d node, 172.30.0.1:53 is Docker's resolver, which doesn't know the internal zone; PowerDNS answers on port 1053, which resolv.conf can't name. A pod on the pod network has neither problem."
+    fix: "OBI sends straight to mon's gateway with the labs token, `cluster_name` set in its Kubernetes enricher, and a host alias for the gateway at mon's fixed ingress address (ADR 0030). Its traces and RED metrics reached Tempo and Mimir under cluster lab-ebpf. The agent's host ports were reverted."
+    lesson: "Host networking opts a pod out of cluster DNS and Service routing. Before choosing an endpoint for a host-network sender, test from a host-network pod on that cluster, not from a normal one."
+    adrs: ["0024", "0042"]
+
+  - id: L066
+    date: 2026-10-14
+    step: "Phase 2, step 6: the OpenTelemetry lab moves to mon"
+    title: "nginx refused a valid Let's Encrypt certificate at its default verify depth"
+    tags: [nginx, tls]
+    symptom: "The Trace Lab page's proxy to mon's Grafana returned 502, with `upstream SSL certificate verify error: (20:unable to get local issuer certificate)` in nginx's log, although SNI was on and the CA bundle was mounted."
+    cause: "`proxy_ssl_verify_depth` defaults to 1, and a Let's Encrypt chain needs 2 (leaf, intermediate, root). With verification on, nginx stopped before it reached the trusted root."
+    fix: "Added `proxy_ssl_verify_depth 3` to the proxy settings the Makefile writes into Secret demo/grafana-proxy. All four `/grafana-api/` routes then returned 200."
+    lesson: "Turning on `proxy_ssl_verify` in nginx also needs `proxy_ssl_verify_depth`; the default only works for certificates signed directly by a root."
+
+  - id: L067
+    date: 2026-10-14
+    step: "Phase 2, step 6: the OpenTelemetry lab moves to mon"
+    title: "Queries that were right in a lab's own LGTM were wrong in a shared store"
+    tags: [observability, mimir, promql, labs]
+    symptom: "Moving the OpenTelemetry lab to mon, its dashboard, Trace Lab page, verify targets, card and posts all queried `traefik_entrypoint_requests_total{service_name=...}`. In mon that label doesn't exist, and every cluster has the metric."
+    cause: "The bundled grafana/otel-lgtm kept `service_name` as a metric label and held one cluster's data. Mimir's OTLP ingest turns `service.name` into `job`, and mon holds every cluster, so an unfiltered query sums the whole homelab."
+    fix: "Every query got the lab's cluster filter (`cluster`, `k8s_cluster_name`, `resource.k8s.cluster.name`) and PromQL uses `job`, rewritten by one script across the card's queries and Explore URLs, then the dashboard, page, Makefile and posts. All six verify targets passed against mon."
+    lesson: "When a lab moves to a shared backend, its queries move with it. Grep every place a query lives (dashboards, pages, scripts, posts, encoded URLs) and run each one against the new store."
+    adrs: ["0041", "0017"]

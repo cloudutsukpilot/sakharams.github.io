@@ -4,7 +4,7 @@ title: "OpenTelemetry End to End: Set Up the Infrastructure"
 date: 2026-10-08 00:03:00 +0530
 categories: [labs, opentelemetry-lab]
 tags: [Labs, OpenTelemetry Lab, OpenTelemetry, Observability, Grafana, Kubernetes]
-description: "The k3d cluster, the app manifests, Traefik's OTLP settings and the OpenTelemetry Collector pipelines that feed Grafana LGTM."
+description: "The k3d cluster on the homelab network, the app manifests, Traefik's OTLP settings and the OpenTelemetry Collector pipelines that feed the homelab's mon cluster."
 lab: opentelemetry-lab
 lab_part: 3
 image:
@@ -29,20 +29,41 @@ Grafana can query.
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: otel-demo
+  name: lab-otel
 servers: 1
 agents: 0
+image: rancher/k3s:v1.35.5-k3s1
+network: homelab
+kubeAPI:
+  hostIP: 127.0.0.1
+  hostPort: "6451"
 ports:
-  - port: 8081:80          # site, via the bundled Traefik ingress
+  - port: 127.0.0.1:8081:80      # site, via the bundled Traefik ingress
     nodeFilters: [loadbalancer]
-  - port: 3002:30030       # Grafana, via NodePort
-    nodeFilters: [server:0]
+volumes:
+  - volume: /srv/homelab/k3s/registries.yaml:/etc/rancher/k3s/registries.yaml
+    nodeFilters: [server:*]
+options:
+  k3s:
+    extraArgs:
+      - arg: --cluster-cidr=10.102.0.0/16
+        nodeFilters: [server:*]
+      - arg: --service-cidr=10.103.0.0/16
+        nodeFilters: [server:*]
+      - arg: --cluster-dns=10.103.0.10
+        nodeFilters: [server:*]
 ```
 
 One k3s server and no agents: a single-node cluster is enough, and it keeps the Collector DaemonSet
-at exactly one pod. The two port mappings are the only way in from your laptop. `8081` goes to k3d's
-load balancer, which forwards to Traefik on port 80; `3002` goes straight to Grafana's NodePort
-`30030` on the server node.
+at exactly one pod. The cluster follows the homelab's lab contract v2:
+
+- **`network: homelab`.** The cluster joins the Docker network every homelab cluster shares, so the
+  platform's Argo CD can reach its API and its pods can reach the `mon` cluster.
+- **Its own CIDR pair.** Pods get `10.102.0.0/16` and Services `10.103.0.0/16`, so they never overlap
+  another cluster's on the shared network.
+- **The registry mirror.** `registries.yaml` sends public image pulls through the homelab's Zot mirror.
+- **Ports on localhost only.** `8081` goes to k3d's load balancer, which forwards to Traefik on port 80;
+  the API is on `6451`. There is no Grafana port any more: Grafana is in `mon`.
 
 The mappings are baked in when the cluster is created, which is why `make cluster` is a no-op for an
 existing cluster:
@@ -51,6 +72,44 @@ existing cluster:
 cluster: ## Create the k3d cluster (no-op if it already exists)
 	@k3d cluster list $(CLUSTER) >/dev/null 2>&1 || k3d cluster create --config k3d/cluster.yaml
 ```
+
+Pods resolve the homelab's internal names (`*.mon.home.cloudutsuk.com`) through one CoreDNS
+addition, applied by `make dns`. Inside a k3d node the usual resolver doesn't know the internal zone,
+so CoreDNS forwards just that zone to the homelab's PowerDNS:
+
+```yaml
+# k8s/dns/coredns-custom.yaml (data)
+home.server: |
+  home.cloudutsuk.com:53 {
+    errors
+    cache 30
+    forward . 172.30.0.1:1053
+  }
+```
+
+## Joining the Platform
+{: #joining-the-platform }
+
+`make monitoring` runs the homelab's registration script, then hands the lab its two tokens:
+
+```makefile
+monitoring: ## Join the homelab platform: monitoring pack, OTLP token, dashboard, Trace Lab token
+	$(HOMELAB_INFRA)/host/labs/lab.sh register $(CLUSTER) dashboards
+	# ...copies the OTLP token into observability/otlp-token and writes demo/grafana-proxy
+```
+
+`lab.sh register lab-otel dashboards` does four things:
+
+1. Registers the cluster with the platform's Argo CD (label `homelab/addons=monitoring`), which
+   installs cert-manager and the **monitoring pack**: OpenTelemetry collectors for the cluster's own
+   Kubernetes metrics and every pod's raw logs, and kube-state-metrics.
+2. Puts the shared labs OTLP token in Secret `monitoring/otlp-token`.
+3. Loads every JSON file in `dashboards/` into `mon`'s Grafana, folder **Labs**.
+4. Waits until the monitoring pack is healthy.
+
+The Makefile then copies the OTLP token for the lab's own Collector, and asks `lab.sh grafana-token`
+for a read-only Grafana token for the Trace Lab page (see below). `make down` runs
+`lab.sh unregister` first, which removes all of it.
 
 ## Application Manifests
 {: #application-manifests }
@@ -116,9 +175,9 @@ there are no `traefik_*` metrics, and the reverse. The lab turns on both.
 ## Observability Stack
 {: #observability-stack }
 
-The `observability` namespace has two workloads: the Collector (a DaemonSet running
-`otel/opentelemetry-collector-contrib:0.162.0`) and `grafana/otel-lgtm:0.35.0`. Step through what
-happens inside the Collector:
+The `observability` namespace has one workload, the Collector (a DaemonSet running
+`otel/opentelemetry-collector-contrib:0.162.0`). There is no storage or Grafana in the lab: the
+Collector sends everything to the homelab's `mon` cluster. Step through what happens inside it:
 
 {% include flow-anim.html id="labs/opentelemetry-lab/collector-pipeline" %}
 
@@ -171,28 +230,38 @@ Three details make the lab work:
   rather than just mention one.
 - **Five pipelines, one exporter.** `traces` and `metrics` take OTLP (and the scrape); `logs` takes
   OTLP; `logs/nginx` and `logs/api` take the two file readers, each with a `resource` processor that
-  inserts `service.name` (a file has no idea which service wrote it). All five send to one `otlp_grpc`
-  exporter at `lgtm.observability.svc.cluster.local:4317`.
-
-**Grafana LGTM and the dashboard.** The LGTM Deployment stores everything in `emptyDir` volumes and
-mounts the dashboard from a ConfigMap that Kustomize generates from two files:
+  inserts `service.name` (a file has no idea which service wrote it). All five also run
+  `resource/cluster` and send to one exporter, the homelab's gateway:
 
 ```yaml
-# k8s/observability/kustomization.yaml
-configMapGenerator:
-  - name: static-site-dashboard
-    files:
-      - static-site-dashboard.json
-      - static-site-dashboard-provider.yaml
-  - name: otel-collector-config
-    files:
-      - config.yaml=otel-collector-config.yaml
-generatorOptions:
-  disableNameSuffixHash: true
+processors:
+  resource/cluster:
+    attributes:
+      - key: k8s.cluster.name
+        value: lab-otel
+        action: upsert
+
+exporters:
+  otlp_http/mon:
+    endpoint: https://otlp.mon.home.cloudutsuk.com
+    headers:
+      Authorization: "Bearer ${env:OTLP_TOKEN}"   # Secret observability/otlp-token
 ```
 
-The provider file tells Grafana to load the JSON at startup into a **Static Site** folder, so the
-dashboard exists the moment Grafana is ready, with no clicking around.
+`mon` holds every homelab cluster's data, and the gateway turns `k8s.cluster.name` into a `cluster`
+label. So every query in this lab filters on the lab: `cluster="lab-otel"` in PromQL (where the
+service name becomes the `job` label), `k8s_cluster_name="lab-otel"` in LogQL and
+`resource.k8s.cluster.name = "lab-otel"` in TraceQL.
+
+**The dashboard.** `dashboards/static-site.json` is a plain Grafana dashboard whose queries use `mon`'s
+data sources (`mimir`, `loki`, `tempo`) and the lab's cluster filter. `lab.sh register` loads it into
+`mon`'s Grafana as **OpenTelemetry lab: static site signals** in the **Labs** folder, so it's there as
+soon as the lab is up, and removes it when the lab goes.
+
+**The Trace Lab proxy.** The page's **This request in Grafana** panel calls `/grafana-api/loki/`,
+`/grafana-api/tempo/` and `/grafana-api/prometheus/` on the site itself. nginx forwards those to
+`mon`'s Grafana data source API and adds a Viewer token from Secret `demo/grafana-proxy`, so the browser
+never sees it. That token can query data but change nothing, and the site listens on localhost only.
 
 ## Ports and Endpoints
 {: #ports-and-endpoints }
@@ -201,11 +270,12 @@ dashboard exists the moment Grafana is ready, with no clicking around.
 |---|---|---|
 | <http://localhost:8081/> | The page | k3d load balancer → Traefik → `static-site` Service |
 | <http://localhost:8081/api/demo> | The API (JSON with `trace_id`) | Traefik → `api` Service (Ingress path `/api`) |
-| <http://localhost:3002/> | Grafana (anonymous admin, local only) | NodePort `30030` on the `grafana` Service |
+| <https://grafana.mon.home.cloudutsuk.com/d/lab-otel-signals> | The lab's dashboard in the homelab's Grafana (Keycloak sign-in) | the `mon` cluster |
 | `otel-collector.observability.svc:4317` / `:4318` | OTLP gRPC / HTTP into the Collector | ClusterIP Service |
 | `/v1/traces` on the site | The browser's OTLP endpoint, proxied by nginx to `:4318` | nginx location |
 | `static-site.demo.svc:9113/metrics` | nginx metrics in Prometheus format | exporter sidecar |
-| `lgtm.observability.svc:4317` | OTLP into Tempo, Loki and Prometheus | ClusterIP Service |
+| `https://otlp.mon.home.cloudutsuk.com` | OTLP into `mon` (Tempo, Loki, Mimir), labs token | the homelab's gateway |
+| `/grafana-api/*` on the site | Read-only queries to `mon`'s Grafana, for the Trace Lab page | nginx locations |
 
 ## Check Your Understanding
 {: #check-your-understanding }
@@ -230,8 +300,8 @@ copying IDs by hand.
 <details markdown="1">
 <summary>If you changed the site's host port from 8081 to 9090 in cluster.yaml, what else must you do?</summary>
 
-Recreate the cluster (`make down && make up`), because k3d applies port mappings only at creation.
-That also deletes the observability data.
+Recreate the cluster (`make rebuild`), because k3d applies port mappings only at creation, and change
+`deploy.ports` on the lab card so the lab runner knows. The telemetry already in `mon` stays.
 
 </details>
 

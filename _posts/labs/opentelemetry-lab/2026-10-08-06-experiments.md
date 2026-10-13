@@ -239,7 +239,7 @@ record's own trace context before it reaches Loki
 ([Part 3](/posts/labs/opentelemetry-lab/03-set-up-infrastructure/#observability-stack)).
 
 The page does the jump itself. After the click it queries Loki for
-`{service_name="state-site-api"} | json | trace_id="<id>"`, then fetches the trace from Tempo by the
+`{service_name="state-site-api", k8s_cluster_name="lab-otel"} | json | trace_id="<id>"`, then fetches the trace from Tempo by the
 same ID, through nginx's read-only `/grafana-api/` proxy. It has to retry, because the log line and
 the spans arrive separately; the screenshot needed a 20-second wait and a **Refresh data** click before
 the backend's spans were all there.

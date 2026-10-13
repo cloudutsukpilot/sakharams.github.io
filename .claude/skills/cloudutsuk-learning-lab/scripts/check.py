@@ -13,7 +13,11 @@ Errors (exit 1):
   deploy    a `deploy:` block the lab runner would skip: repo.path not absolute, bad target names,
             targets the Makefile lacks, bad memory_gb, ports or ttl_hours (mirrors
             homelab-services/services/lab-runner/src/lab_runner/cards.py)
-Notes: no `deploy:` block (the portal can't deploy the lab), parts not written, no architecture animation, orphan screenshots, word counts, TODO callouts,
+  contract  a k3d lab on lab contract v2 (k3d/cluster.yaml on network `homelab`) whose deploy.ports
+            misses a published host port (the API port included), or whose Makefile never runs
+            infra-local host/labs/lab.sh register and unregister
+Notes: a k3d lab still on contract v1 (own network and Grafana), capture.urls grafana not pointing at
+mon's Grafana on a v2 lab, no `deploy:` block (the portal can't deploy the lab), parts not written, no architecture animation, orphan screenshots, word counts, TODO callouts,
 phrases that read as machine-written.
 
 Usage (from the repo root):
@@ -237,6 +241,47 @@ def check_repo(card, exps, errors, notes, deploy_targets=()):
             notes.append(f"lab repo has no {doc}")
 
 
+MON_GRAFANA = "https://grafana.mon.home.cloudutsuk.com"
+
+
+def check_contract(card, errors, notes):
+    """Lab contract v2 (homelab Phase 2 step 5), judged from the lab repo's k3d/cluster.yaml."""
+    repo = (card.get("repo") or {}).get("path")
+    k3d = Path(str(repo or "")).expanduser() / "k3d" / "cluster.yaml"
+    if not repo or not k3d.exists():
+        return
+    try:
+        cfg = yaml.safe_load(k3d.read_text()) or {}
+    except yaml.YAMLError as e:
+        errors.append(f"contract: {k3d} is not valid YAML ({e})")
+        return
+    if cfg.get("network") != "homelab":
+        notes.append("contract: k3d lab on contract v1 (its own network and Grafana); v2 joins the homelab "
+                      "platform (template k3d-platform, references/lab-anatomy.md)")
+        return
+    published = set()
+    api = str((cfg.get("kubeAPI") or {}).get("hostPort") or "")
+    if api.isdigit():
+        published.add(int(api))
+    for entry in cfg.get("ports") or []:
+        parts = str(entry.get("port", "")).split(":")
+        if len(parts) >= 2 and parts[-2].isdigit():
+            published.add(int(parts[-2]))
+    declared = set((card.get("deploy") or {}).get("ports") or [])
+    missing = sorted(published - declared)
+    if missing:
+        errors.append(f"contract: host ports {missing} published by {k3d.name} are missing from deploy.ports "
+                      "(the lab runner checks them for clashes)")
+    makefile = k3d.parent.parent / "Makefile"
+    text = makefile.read_text() if makefile.exists() else ""
+    for action in ("register", "unregister"):
+        if not re.search(rf"host/labs/lab\.sh\s+{action}\b", text):
+            errors.append(f"contract: the Makefile never runs infra-local host/labs/lab.sh {action}")
+    grafana = str(((card.get("capture") or {}).get("urls") or {}).get("grafana") or "")
+    if grafana and not grafana.startswith(MON_GRAFANA):
+        notes.append(f"contract: capture.urls.grafana is {grafana!r}; a v2 lab's dashboards are on {MON_GRAFANA}")
+
+
 def check_post(path, part, slug, tag, exps, closing, errors, notes, allow_scaffold):
     rel = path.relative_to(ROOT)
     fm, body = split_front_matter(path.read_text())
@@ -319,6 +364,7 @@ def main():
     exps = check_card(card, args.slug, errors, notes)
     check_shots(card, args.slug, exps, errors, notes, args.allow_missing_shots)
     check_repo(card, exps, errors, notes, check_deploy(card, errors, notes))
+    check_contract(card, errors, notes)
 
     parts = framework["parts"]
     if args.parts:

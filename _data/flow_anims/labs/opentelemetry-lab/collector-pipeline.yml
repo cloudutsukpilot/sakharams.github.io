@@ -20,8 +20,8 @@ nodes:
   - { id: ML, label: "memory_limiter", sub: "200 MiB cap", x: 370, y: 235, w: 160, h: 56 }
   - { id: RES, label: "resource", sub: "service.name", x: 535, y: 345, w: 140, h: 56, icon: server, icon_pos: corner }
   - { id: BAT, label: "batch", x: 690, y: 235, w: 120, h: 56, icon: function }
-  - { id: EXP, label: "otlp_grpc", sub: "lgtm:4317", x: 888, y: 235, w: 160, h: 56, icon: chart }
-  - { id: LGTM, label: "otel-lgtm", sub: "Tempo Loki Prom", x: 888, y: 370, w: 160, h: 66, shape: cylinder, icon: "devops/monitoring/loki-18.svg", icon_pos: corner }
+  - { id: EXP, label: "otlp_http/mon", sub: "labs token", x: 888, y: 235, w: 160, h: 56, icon: chart }
+  - { id: LGTM, label: "mon gateway", sub: "Tempo Loki Mimir", x: 888, y: 370, w: 160, h: 66, shape: cylinder, icon: "devops/monitoring/loki-18.svg", icon_pos: corner }
 
 edges:
   - { id: OTLP_ML, from: OTLP, to: ML }
@@ -32,7 +32,7 @@ edges:
   - { id: ML_RES, from: ML, to: RES, points: [[370, 263], [370, 345], [465, 345]], label: "logs", label_at: [384, 318] }
   - { id: RES_BAT, from: RES, to: BAT, points: [[605, 345], [690, 345], [690, 263]] }
   - { id: BAT_EXP, from: BAT, to: EXP }
-  - { id: EXP_LGTM, from: EXP, to: LGTM, label: "OTLP gRPC", label_at: [902, 300] }
+  - { id: EXP_LGTM, from: EXP, to: LGTM, label: "OTLP HTTPS", label_at: [902, 300] }
 
 steps:
   - lights: [OTLP, NGL, APL, SCR]
@@ -52,7 +52,7 @@ steps:
     text: "batch groups records into larger sends, which is cheaper and kinder to the backend than one request per span."
   - edges: [BAT_EXP]
     title: One exporter for everything
-    text: "All five pipelines share one otlp_grpc exporter pointing at the lgtm Service."
+    text: "All five pipelines share one otlp_http exporter pointing at the homelab's gateway on mon, after resource/cluster stamps k8s.cluster.name=lab-otel."
   - edges: [EXP_LGTM]
     title: Stored by signal
-    text: "Inside the otel-lgtm container, traces land in Tempo, logs in Loki and metrics in the Prometheus-compatible store."
+    text: "On mon, traces land in Tempo, logs in Loki and metrics in Mimir, next to every other homelab cluster's."

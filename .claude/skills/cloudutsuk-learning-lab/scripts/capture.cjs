@@ -29,6 +29,9 @@
  * up in the next experiment's "before" shot.
  * Exit code 1 if preflight, an action, a verify or any shot failed.
  *
+ * Grafana on mon (lab contract v2): when capture.urls points there, every request to that origin carries
+ * the read-only lab-tools token from ~/.config/homelab/grafana-labs-token (LABS_GRAFANA_TOKEN_FILE).
+ *
  * Needs playwright-core + Chromium (run ../../cloudutsuk-flow-anim/scripts/setup.sh once), ffmpeg
  * with libwebp, and python3 with PyYAML (used to read the card).
  */
@@ -259,6 +262,19 @@ async function main() {
     colorScheme: cap.color_scheme || 'dark',
     deviceScaleFactor: 1,
   });
+  // Lab contract v2: labs use the platform's Grafana on mon, which needs a sign-in. The read-only
+  // `lab-tools` token (infra-local host/monitoring/labs-grafana-token.sh) goes only to that origin.
+  const MON_GRAFANA = 'https://grafana.mon.home.cloudutsuk.com';
+  const grafanaTokenFile = process.env.LABS_GRAFANA_TOKEN_FILE || path.join(os.homedir(), '.config/homelab/grafana-labs-token');
+  if (Object.values(cap.urls || {}).some((u) => String(u).startsWith(MON_GRAFANA))) {
+    if (!fs.existsSync(grafanaTokenFile)) {
+      console.error(`capture.urls points at ${MON_GRAFANA}, but ${grafanaTokenFile} is missing: run infra-local host/monitoring/labs-grafana-token.sh`);
+      process.exit(1);
+    }
+    const grafanaToken = fs.readFileSync(grafanaTokenFile, 'utf8').trim();
+    await ctx.route(`${MON_GRAFANA}/**`, (route) =>
+      route.continue({ headers: { ...route.request().headers(), authorization: `Bearer ${grafanaToken}` } }));
+  }
 
   const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
   try {
