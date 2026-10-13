@@ -510,3 +510,80 @@ lessons:
     cause: "The shared Terragrunt module sets force_update = true on every Helm release by default, so Helm replaces objects instead of merging them. argocd-secret is rendered empty by the chart, and argocd-server writes server.secretkey and admin.password into it at first start; a forced upgrade replaced it with the empty copy. Syncing kept working (the controller doesn't read it); the UI and API broke once the server re-read the Secret."
     fix: "Restarted argocd-server, which regenerates the missing keys (the break-glass password in argocd-initial-admin-secret still worked), and set force_update: false on the Argo CD release; the next upgrade kept all three keys. Then made false the shared module's default (28 places) and re-applied all 35 infra-local releases one at a time, each only after a plan that changed nothing but the flag; External Secrets' webhook certificate survived every upgrade."
     lesson: "Any chart Secret that a controller fills in later (Argo CD's server key, External Secrets' webhook certificate, generated passwords) is lost on every forced Helm upgrade. Set force_update: false unless a release really needs replacement, and after applying a release check that the app still works, not just that Terraform finished."
+
+  - id: L048
+    date: 2026-10-12
+    step: "Phase 1, step 5: Kyverno and the image signature policy"
+    title: "Kyverno looked for an amd64 image in our arm64-only index"
+    tags: [kyverno, cosign, buildkit, arm64]
+    symptom: "The new signature policy reported an error, not a pass or fail, for hello-world: `no child with platform linux/amd64 in index`. Cosign verified the same digest fine from the host."
+    cause: "BuildKit's default provenance attestation wraps every image in an OCI index (the arm64 image plus an attestation manifest). Verifying an index makes Kyverno resolve it to a platform, and the library it uses defaults to linux/amd64, not the node's architecture. Our images have only arm64."
+    fix: "Build with `--provenance=false`, so every image is a single manifest and the signed digest is the one the pod runs; rebuilt hello-world and the runner image. The signed SBOM attestation stays."
+    lesson: "On an arm64-only platform, check what tools assume when they meet an image index. A single-architecture image doesn't need an index, and an index can hide such defaults until a policy turns them into errors."
+    adrs: ["0033", "0043"]
+
+  - id: L049
+    date: 2026-10-12
+    step: "Phase 1, step 6: PostSync smoke tests"
+    title: "Argo CD kept retrying the broken commit and ignored the fix"
+    tags: [argocd, gitops, testing]
+    symptom: "After a smoke test failed a sync, a revert was pushed, but the app stayed on the broken commit. Argo CD reported retry 5 of 10 for the old revision and kept the app OutOfSync with the fix."
+    cause: "An automated sync that fails is retried with the revision it started with, and no new sync starts while that operation runs. With 10 retries and backoff up to 10 minutes, a broken commit could hold the app for about an hour."
+    fix: "`syncPolicy.retry.refresh: true` (Argo CD 3.x): each retry syncs the latest commit. With it, a retry deployed the fix about a minute after it was pushed. The first time, the stuck operation was ended with `argocd app terminate-op`."
+    lesson: "When a sync can fail on purpose (hooks, smoke tests), set `retry.refresh` so a fix isn't queued behind retries of the broken commit, and test the recovery path, not only the failure."
+    adrs: ["0031"]
+
+  - id: L050
+    date: 2026-10-12
+    step: "Phase 1, step 5: Kyverno and the image signature policy"
+    title: "An empty label map kept Kyverno OutOfSync forever"
+    tags: [argocd, helm, kyverno]
+    symptom: "The three Kyverno apps synced successfully but stayed OutOfSync. The diff was `labels: {}` on 11 policies.kyverno.io CRDs, and an ignoreDifferences rule for empty maps cleared the CLI diff but not the controller's status."
+    cause: "The kyverno-api subchart renders `labels: {}` and `annotations: {}` when given none. Server-side apply drops empty maps, so the live CRDs never have them and the desired state always differs."
+    fix: "Gave the subchart a real label and annotation (`kyverno-api.labels`, `kyverno-api.annotations`) instead of ignoring the difference; all three apps went Synced."
+    lesson: "A permanent OutOfSync after a successful sync is usually an empty map or a defaulted field. Prefer making the rendered manifest match what the server stores over ignore rules, which the controller and the CLI may apply differently."
+    adrs: ["0033"]
+
+  - id: L051
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "Clean policy reports, yet admission ignored every exception"
+    tags: [kyverno, admission, ci]
+    symptom: "With all seven policies switched to Deny, the PolicyReports on all three clusters showed the excepted workloads as skipped and nothing failing. The next CI job never started: ARC's controller logged a denial of the runner pod for a read-only root, exactly what the runners' exception covers."
+    cause: "Kyverno's Helm chart ships with `features.policyExceptions.enabled: false`, so the admission controller runs with `--enablePolicyException=false`. The reports controller evaluated the CEL policies' exceptions anyway, so background results looked right while admission ignored them."
+    fix: "Turned the feature on in the Kyverno ApplicationSet, limited to the `kyverno` namespace (`policyExceptions: {enabled: true, namespace: kyverno}`). The waiting runner pod was admitted and the job ran; server-side dry runs then showed each exception admitting its workload and still denying look-alikes."
+    lesson: "Prove an exception at admission (a server-side dry run of the real pod), not from reports. Background scans and the admission webhook can run with different settings. Runner pods only appear when a job is queued, so test them before switching to Deny."
+    adrs: ["0033"]
+
+  - id: L052
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "Running pods reported digests no upstream registry has"
+    tags: [zot, registry, supply-chain]
+    symptom: "Pinning the add-ons by digest, the image digests in the pods' status didn't match the upstream index digest for the same tag for 9 of 20 images, nor their arm64 child. All 9 were images published as Docker-format manifest lists."
+    cause: "Zot's on-demand mirror stores a tag pulled through it as an OCI index, which converts Docker-format manifests and so changes the digests. The layers are identical. Pulling by the upstream digest works too: Zot fetches and keeps that manifest as published."
+    fix: "Pinned every image by the digest of its upstream index (`docker buildx imagetools inspect`), the same digest any other registry or mirror serves, after checking the arm64 children carry the same layers."
+    lesson: "Take pin digests from the source registry, not from `kubectl get pod`. Behind a converting mirror the running digest is the mirror's own, and a pin to it fails anywhere else."
+    adrs: ["0033", "0034"]
+
+  - id: L053
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "A routine restart put Mimir into an OOM loop"
+    tags: [mimir, monitoring, kubernetes]
+    symptom: "After moving Mimir's data from a hostPath volume to a PV (same host folder), the pod restarted, became Ready, then was OOMKilled at its 2Gi limit again and again: 9 restarts in 40 minutes, about 45 minutes without metrics on mon."
+    cause: "On start the ingester replays its write-ahead log while every cluster's collectors resend the samples they buffered during the downtime. That peak is well above the ~1.3Gi Mimir uses in steady state. The StatefulSet then didn't roll out the raised limit, because it doesn't replace a pod that never became Ready."
+    fix: "Raised the memory limit to 3Gi and deleted the pod so the StatefulSet recreated it with the new spec. It came up Ready with no restarts."
+    lesson: "Size a stateful store's memory limit for its restart, not its steady state: catching up after downtime costs the most. For a StatefulSet stuck on a crash-looping pod, delete the pod after fixing the spec."
+    adrs: ["0041"]
+
+  - id: L054
+    date: 2026-10-13
+    step: "Phase 1, step 4c: unit tests in the pull request gate"
+    title: "The service had tests, and no CI job ever ran them"
+    tags: [ci, testing, github-actions]
+    symptom: "Writing the CI/CD post's testing matrix, the row for unit tests had no workflow step to point at. hello-world had pytest tests from day one, and every build had been green, but none of them ran the tests."
+    cause: "The reusable build workflow was built around the security gates and the image. The service's workflow only called it, and the testing ADR described tests on every PR, so it read as done."
+    fix: "Added a `test` job (Ruff and pytest from `uv.lock`) to the service's workflow and made the image job need it. A throwaway pull request with a broken assertion failed in 13 seconds and the image job never started."
+    lesson: "A gate isn't real until you've watched it fail. For every row of a testing or security matrix, find the job that runs it and make it go red once on purpose."
+    adrs: ["0031"]

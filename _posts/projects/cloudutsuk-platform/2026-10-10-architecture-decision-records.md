@@ -1333,6 +1333,28 @@ UI, an LLM and load-sensitive components on one box.
 - On change: `vllm bench serve`, Phoenix evals over a golden set of about 30 questions, sre-agent
   evals from lab experiments. Chaos Mesh in a lab cluster later.
 
+- Unit tests as built (2026-10-13, Phase 1 step 4c): each service's workflow in `homelab-services` has a
+  `test` job (Ruff lint and format check, pytest, from `uv.lock`, on the `homelab` runners) that the
+  image job `needs`, so a failure stops the run before the reusable build workflow starts. The tests
+  stay in the caller rather than in `build-image.yaml` because each stack tests differently (pytest
+  now, Jest for the portal). Until then hello-world had tests that no CI job ran. Testcontainers come
+  with the lab runner (Phase 3), the first service with a database; Schemathesis with Phase 3a.
+- PostSync smoke tests as built (2026-10-12, Phase 1 step 6): a Job in the app's folder with
+  `argocd.argoproj.io/hook: PostSync` and `hook-delete-policy: BeforeHookCreation` (the last run's Job
+  and log stay until the next sync). hello-world's (`apps/hello-world/smoke-test.yaml`) uses a pinned
+  curl image and checks `/readyz`, `/` and that `revision` is a commit SHA. It is written to pass every
+  Kyverno policy, including the ones still in Audit.
+  - A failing test fails the sync operation, not the app's health. Argo CD shows the failed hook and
+    retries; there is no automatic rollback, because Argo CD can't roll back an app with automated
+    sync. The rollback is a `git revert` (or the next good digest commit).
+  - Apps with a smoke test set `syncPolicy.retry.refresh: true`. Without it, Argo CD retried the
+    broken revision for up to an hour and ignored the fix commit. With it, the next retry synced the
+    fix about a minute after it was pushed.
+  - A hook doesn't count in Argo CD's diff, so adding or changing only the test doesn't trigger a
+    sync; it runs with the next real change (normally the next digest commit) or a manual sync.
+  - Tested by pointing the Service at a wrong port: the Deployment stayed Healthy, the smoke test
+    failed (`FAIL: GET /readyz`) and the sync failed.
+
 #### Considered options
 
 1. **Unit tests only**: misses integration, API contract and load issues.
@@ -1348,6 +1370,7 @@ UI, an LLM and load-sensitive components on one box.
 
 - [ADR 0020](#adr-0020)
 - [ADR 0032](#adr-0032)
+- [ADR 0043](#adr-0043)
 
 ## ADR-0032: Security scanning in the pipeline
 {: #adr-0032 }
@@ -1447,6 +1470,31 @@ images should be pinned.
   referrer. Check with `cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type
   cyclonedx <image>@<digest>`. The image is scanned before it is pushed (ADR 0032), and crane pushes the
   scanned OCI layout unchanged, so the signed digest is the scanned one.
+- Admission as built (2026-10-12, Phase 1 step 5): Kyverno 1.19.1 (chart 3.9.1) on platform, mon and
+  ai, with CEL `ValidatingPolicy` and `ImageValidatingPolicy` resources (`apps/kyverno-policies`).
+  - `verify-image-signatures` checks the Cosign signature and the signed CycloneDX SBOM attestation
+    of every `platform/*` and `labs/*` image against `cosign.pub`, with the transparency log off. It
+    reads Cosign v3's bundle referrers from Zot with a `zot-pull` secret in the `kyverno` namespace.
+    Tested: signed with SBOM admitted, unsigned denied, signed without SBOM denied.
+  - Kyverno resolves an image index to linux/amd64, which our arm64 images don't have, so the
+    verification errored. `build-image.yaml` now builds without BuildKit's provenance attestation, and
+    every image is a single manifest.
+  - Deny: `disallow-latest-tag`, `restrict-image-registries` and `verify-image-signatures`.
+- As built (2026-10-13, Phase 1 step 5a): all seven policies deny on platform, mon and ai.
+  - Every add-on now meets them through its chart values, in homelab-gitops and in infra-local's
+    releases. Public images are pinned by the digest of their upstream index; Zot converts Docker-format
+    manifest lists to OCI when it mirrors a tag, so the digest a running pod reports can differ while
+    the layers are the same. Restricted security contexts, read-only roots (emptyDirs for scratch) and
+    requests with a memory limit apply everywhere, Helm hook jobs included. Argo CD's Redis comes from
+    Docker Hub through Zot, and Mimir's data reaches the pod through a PV instead of a hostPath.
+  - Four written exceptions (`PolicyException`s in `templates/exceptions.yaml`, only in the `kyverno`
+    namespace): rootless BuildKit (Pod Security, ADR 0043), the log-tailing agent collector (Pod
+    Security: root, hostPath), Velero's node agent (Pod Security and read-only root) and the Actions
+    runners' writable home (read-only root).
+  - Kyverno's chart ships with PolicyExceptions off. Background reports still honour them, so the
+    reports were clean while admission denied the runner pods. `features.policyExceptions` is now on.
+  - `failurePolicy` is Ignore (one admission replica), so a pod created while Kyverno is down isn't
+    checked at admission. An evaluation error, such as an unreadable signature, denies.
 
 #### Considered options
 
@@ -1460,6 +1508,7 @@ images should be pinned.
 - Good: The signing key never leaves OpenBao.
 - Bad: About 0.3 GB per cluster for Kyverno.
 - Bad: Exceptions must be maintained.
+- Bad: Every new chart needs digests, security contexts and resources set before it can run.
 
 #### Related
 
@@ -2132,8 +2181,9 @@ reaches `homelab-gitops`. Every private repo in the org can run jobs on the `hom
   `emptyDir` (25 GiB, garbage-collected at 20 GB).
 - **Rootless needs two exceptions.** Seccomp and AppArmor are `Unconfined` for the daemon's user
   namespace, and `--oci-worker-no-process-sandbox` runs build steps without their own PID namespace,
-  because k3d's nested containers can't mount a new `/proc`. Kyverno's `pod-security-restricted`
-  reports the pod; it's the documented exception for that policy.
+  because k3d's nested containers can't mount a new `/proc`. That's the `buildkitd-rootless`
+  exception to Kyverno's `pod-security-restricted` (ADR 0033). The root filesystem is read-only
+  (2026-10-13): rootlesskit's state, `/run/user/1000` and `/tmp` are emptyDirs.
 - **OpenBao sign-in.** JWT auth at `github-actions/` trusts GitHub's OIDC issuer. Every role requires
   audience `https://bao.core.home.cloudutsuk.com`, the org's numeric `repository_owner_id` (a deleted
   org's name can be taken again) and `runner_environment: self-hosted`.
@@ -2155,7 +2205,8 @@ reaches `homelab-gitops`. Every private repo in the org can run jobs on the `hom
   are referenced by digest; the `:<git-sha>` tag is only for people.
 
 - Build path update (2026-10-12, Phase 1 step 4): BuildKit no longer pushes. buildx exports an OCI
-  layout to the runner (with BuildKit's provenance attestation, `mode=min`). The gates scan it there,
+  layout to the runner (with BuildKit's provenance attestation, `mode=min`, until step 5 dropped it: a
+  provenance index makes Kyverno look for a linux/amd64 image; ADR 0033). The gates scan it there,
   and on `main` crane pushes that layout. The job checks that the pushed digest is BuildKit's. The
   tools come from the runner image (ADR 0044).
 

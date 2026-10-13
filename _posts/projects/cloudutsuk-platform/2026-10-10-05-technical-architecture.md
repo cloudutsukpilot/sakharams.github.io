@@ -678,19 +678,17 @@ agent on every cluster, including each new lab cluster.
 ### Commit to deploy
 {: #commit-to-deploy }
 
-Every change takes the same path, and every security and test gate sits on it. Tick *Simulate a
-failing scan* to see what happens when a gate fails: nothing gets built, so nothing can be deployed.
+Every change takes the same path, and every security and test gate sits on it:
+- **Every PR and `main` run:** Ruff and pytest, then Gitleaks, Semgrep and Bandit, Trivy (dependencies,
+  IaC and the image), Checkov, Conftest and Hadolint. Any failure stops the run before an image exists.
+- **On `main`:** the scanned image is pushed to Zot, signed and SBOM-attested with a key in OpenBao,
+  and its digest is committed to `homelab-gitops`.
+- **Every deploy:** Kyverno's signature and pod policies at admission, and a PostSync smoke test.
+- **Every night (Phase 3a):** Playwright, OWASP ZAP and a Locust load run against what's deployed.
 
-{% include flow-anim.html id="projects/cloudutsuk-platform/commit-to-deploy" %}
-
-The gates in short:
-- **Every PR:** Gitleaks, Semgrep + Bandit, Trivy (dependencies and IaC), Checkov + Conftest, Hadolint,
-  tests and an image scan.
-- **Every deploy:** a Kyverno signature check and a PostSync smoke test.
-- **Every night:** Playwright, OWASP ZAP and a Locust load run against what's actually deployed.
-
-The full matrix of tools, triggers and severity thresholds belongs in the CI/CD and Quality Assurance
-posts, which get written when phase 1 runs. Until then it's in ADRs 0031–0033.
+The animated diagram, the full testing and security matrix with tools, triggers and thresholds, and the
+measured timings are in
+[CI/CD and Release Management](/posts/projects/cloudutsuk-platform/12-cicd-and-release-management/#build-automation).
 
 ### GitHub, the registry and the local clusters
 

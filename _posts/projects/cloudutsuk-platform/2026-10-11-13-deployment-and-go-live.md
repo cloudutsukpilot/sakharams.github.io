@@ -46,6 +46,24 @@ Deferred checks aren't failures, but they're written down with a reason in the
 [Phase 0 steps](/posts/projects/cloudutsuk-platform/03-product-planning/#phase-0-steps), so they don't
 quietly turn into "done".
 
+Phase 1's ran on 2026-10-13. Its milestone, M1, is one sentence: a commit to a hello-world service
+ends with an Argo CD app Synced and Healthy on the new SHA.
+
+| Check | Result |
+|---|---|
+| M1: a commit to hello-world ends Synced and Healthy on its SHA, smoke test passing | Pass: pushed 21:44:27 UTC, digest committed 1 min 45 s later, Healthy and serving that SHA at 8 min 25 s |
+| A failing unit test stops the run before the image is built | Pass (throwaway PR: test failed in 13 s, image job skipped) |
+| A commit that breaks the security gates builds nothing | Pass (2026-10-12: six gates blocked it) |
+| `main` images are signed and SBOM-attested; Kyverno admits them and refuses unsigned ones | Pass (dry runs on all three clusters) |
+| All seven Kyverno policies deny on `platform`, `mon` and `ai`; no failing reports | Pass (0 failures, four written exceptions) |
+| A job runs on the `homelab` runners under Deny | Pass |
+| A job runs on the `homelab-iac` runners | Pass on 2026-10-12; since step 5a only a dry run of its pod (admitted) |
+| A failing smoke test fails the sync, and a revert recovers | Pass (2026-10-12, step 6) |
+| Argo CD: every app Synced and Healthy (45) | 44 of 45: `monitoring-base` is Degraded because its Alertmanager secret was never seeded in OpenBao (Phase 2, not a Phase 1 regression) |
+
+The details of the pipeline are in
+[CI/CD and Release Management](/posts/projects/cloudutsuk-platform/12-cicd-and-release-management/).
+
 ## Go-live checklist
 {: #go-live-checklist }
 
