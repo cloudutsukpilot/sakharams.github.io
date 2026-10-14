@@ -728,6 +728,12 @@ forgotten cloud lab keeps billing; a double click could deploy the same lab twic
   environment, own process group, job timeout). State is in SQLite until `platform-db` exists, then
   Postgres through the same database URL. Cloud labs are destroyed automatically at the TTL.
 
+- Installed (2026-10-14, Phase 3 step 4): the runner is a systemd service on the DGX (`lab-runner`,
+  `172.30.0.1:8095`), records in SQLite for now; its token is in OpenBao `kv/platform/lab-runner` and
+  the portal reads it through External Secrets. Argo CD registration is the lab's own `make up` and
+  `make down` (lab contract v2), not the runner's. M3 passed from the portal with the OpenTelemetry lab:
+  deploy in 8 min 48 s, destroy in 2 s. The runner only knows labs it started; reconciling labs started
+  by hand through their `status` target is a follow-up.
 - Lab contract v2 (2026-10-14, Phase 2 step 5): `deploy.ports` lists every host port the lab's k3d
   cluster publishes, its Kubernetes API port included; the blog's `check.py` fails a card that misses
   one, because two clusters can't bind the same host port.

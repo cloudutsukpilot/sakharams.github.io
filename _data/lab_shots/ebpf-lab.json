@@ -1,0 +1,101 @@
+{
+  "cilium-cni-service-map.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-13T21:02:46.642Z",
+    "verify": "ok",
+    "experiment": "cilium-cni",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "falco-shell-events.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-13T21:20:35.829Z",
+    "verify": "ok",
+    "experiment": "falco-shell",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "identity-policy-flows.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-13T21:03:27.018Z",
+    "verify": "ok",
+    "experiment": "identity-policy",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "obi-red-metrics-dashboard.webp": {
+    "w": 1440,
+    "h": 1340,
+    "animated": false,
+    "captured": "2026-10-13T21:30:40.103Z",
+    "verify": "ok",
+    "experiment": "obi-red-metrics",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "obi-red-metrics-red.webp": {
+    "w": 700,
+    "h": 296,
+    "animated": false,
+    "captured": "2026-10-13T21:30:40.103Z",
+    "verify": "ok",
+    "experiment": "obi-red-metrics",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "obi-traces-split.webp": {
+    "w": 1408,
+    "h": 676,
+    "animated": false,
+    "captured": "2026-10-13T21:32:15.529Z",
+    "verify": "ok",
+    "experiment": "obi-traces",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "obi-traces-waterfall.webp": {
+    "w": 1408,
+    "h": 676,
+    "animated": false,
+    "captured": "2026-10-13T21:32:15.529Z",
+    "verify": "ok",
+    "experiment": "obi-traces",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "rebuild-persists-after.webp": {
+    "w": 1440,
+    "h": 900,
+    "animated": false,
+    "captured": "2026-10-13T21:45:23.159Z",
+    "verify": "ok",
+    "experiment": "rebuild-persists",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "rebuild-persists-before.webp": {
+    "w": 1440,
+    "h": 900,
+    "animated": false,
+    "captured": "2026-10-13T21:45:23.159Z",
+    "verify": "ok",
+    "experiment": "rebuild-persists",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "tetragon-enforce-falco.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-13T21:21:17.802Z",
+    "verify": "ok",
+    "experiment": "tetragon-enforce",
+    "repo_rev": "f42b2b2-dirty"
+  },
+  "tetragon-enforce-tetragon.webp": {
+    "w": 700,
+    "h": 372,
+    "animated": false,
+    "captured": "2026-10-13T21:21:17.802Z",
+    "verify": "ok",
+    "experiment": "tetragon-enforce",
+    "repo_rev": "f42b2b2-dirty"
+  }
+}

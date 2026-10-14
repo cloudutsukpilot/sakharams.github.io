@@ -100,6 +100,9 @@ experiments:
         url: "hubble:/?namespace=demo"
         steps:
           - {wait_for_text: "redis"}
+          - {click_text: "Any verdict"}
+          - {click_text: "Dropped"}
+          - {wait_for_text: "dropped"}
         viewport: {width: 1440, height: 1000}
         wide: true
         alt: "Hubble UI for namespace demo with the web to redis edge shown as dropped and dropped flows in the table"
@@ -113,49 +116,75 @@ experiments:
       say: "Send traffic, then read the HTTP and Redis metrics OBI produced."
       run: make exp-obi-red-metrics
     predict: "The API has no OpenTelemetry, no metrics library, nothing. Where can OBI get the route name /api/visits from?"
-    wait: 30
+    wait: 90    # OBI exports metrics every 60 s, then Mimir needs a sample or two for rate()
     verify: make verify-obi-red-metrics
     look_for:
       - signal: metrics
-        where: "Grafana (mon) › Explore › Mimir"
-        query: 'sum by (http_route) (rate(http_server_request_duration_seconds_count{cluster="lab-ebpf", job=~"demo/.*"}[1m]))'
+        where: "Grafana (mon) › Dashboards › Labs › eBPF lab › Requests per route (or Explore, as an Editor)"
+        query: 'sum by (http_route) (rate(http_server_request_duration_seconds_count{cluster="lab-ebpf", job=~"demo/.*"}[3m]))'
         expect: "/api/visits, /api/items and /healthz with their request rates, and db_client_operation_duration_seconds for the Redis INCR."
+      - signal: metrics
+        where: "Grafana (mon) › Dashboards › Labs › eBPF lab"
+        query: "Requests per route, Latency p95, Responses by status code, Redis operations"
+        expect: "All four OBI panels move with the burst; Redis shows INCR at the /api/visits rate."
     shots:
       - name: red
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22mimir%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22mimir%22%7D%2C%22expr%22%3A%22sum%20by%20%28http_route%29%20%28rate%28http_server_request_duration_seconds_count%7Bcluster%3D%5C%22lab-ebpf%5C%22%2C%20job%3D~%5C%22demo%2F.%2A%5C%22%7D%5B1m%5D%29%29%22%2C%22legendFormat%22%3A%22%7B%7Bhttp_route%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bfrom%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
-        selector: 'section[data-testid="data-testid Panel header Graph"]'
+        url: "grafana:/d/ebpf-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-1"]'
         wide: true
         alt: "Request rate per route for the demo app, produced by eBPF instrumentation"
         caption: "Per-route request rate for a service with no metrics code."
+      - name: dashboard
+        phase: after
+        url: "grafana:/d/ebpf-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        viewport: {width: 1440, height: 1340}
+        wide: true
+        alt: "The eBPF lab dashboard in mon's Grafana: OBI request, latency, status and Redis panels, the OBI trace table, Tetragon events and Falco alerts"
+        caption: "The lab's dashboard in mon after the traffic burst."
 
   - id: obi-traces
     title: A trace across web, api and redis
-    goal: "Follow one request through nginx, the Go API and Redis as a single trace, joined by trace context that OBI injects on the wire."
+    goal: "Follow requests through nginx, the Go API and Redis as traces that OBI builds from the kernel, and find out when its trace context joins them into one trace and when it doesn't."
     signals: [traces]
     action:
-      say: "Click Count a visit on the app once."
+      say: "Send six visits, three seconds apart, so the two api pods (one per node) both serve some."
       run: make exp-obi-traces
-    predict: "Nobody propagates a traceparent header in this code. Will the nginx span and the API span end up in the same trace?"
+    predict: "Nobody propagates a traceparent header in this code. Will web's span and the api's span end up in the same trace, whichever api pod answers?"
     wait: 60
     verify: make verify-obi-traces
     look_for:
       - signal: traces
-        where: "Grafana (mon) › Explore › Tempo"
-        query: '{ resource.k8s.cluster.name = "lab-ebpf" && resource.k8s.namespace.name = "demo" && name = "GET /api/visits" }'
-        expect: "One trace: web's server span, the api's GET /api/visits server span and a Redis INCR client span under it."
+        where: "Grafana (mon) › Dashboards › Labs › eBPF lab › Traces for GET /api/visits, then Trace waterfall"
+        query: '{ resource.k8s.cluster.name = "lab-ebpf" && resource.service.name = "web" } >> { resource.service.name = "api" }'
+        expect: "Joined traces: demo/web GET /api/visits with demo/api's GET /api/visits and its INCR under it, when web and that api pod share a node."
+      - signal: traces
+        where: "Same panel, the rows whose Service is api"
+        query: '{ resource.k8s.cluster.name = "lab-ebpf" && trace:rootService = "api" && trace:rootName = "GET /api/visits" }'
+        expect: "Split traces: demo/api as the root, with INCR and demo/redis's own INCR span, for requests that crossed to the api pod on the other node."
     shots:
       - name: waterfall
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.cluster.name%20%3D%20%5C%22lab-ebpf%5C%22%20%26%26%20resource.k8s.namespace.name%20%3D%20%5C%22demo%5C%22%20%26%26%20name%20%3D%20%5C%22GET%20%2Fapi%2Fvisits%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        url: "grafana:/d/ebpf-lab/?orgId=1&kiosk&from=${start}&to=${to}&var-trace=${trace_id}"   # trace_id: printed by make verify-obi-traces
         steps:
-          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
           - {wait_for_text: "Service & Operation"}
-        selector: 'section[data-testid="data-testid Panel header Trace"]'
-        viewport: {width: 2100, height: 1300}
+          - {wait: 2000}
+        selector: '[data-viz-panel-key="panel-8"]'
+        viewport: {width: 1440, height: 2100}
         wide: true
-        alt: "Tempo waterfall of one visit: nginx, the Go API and a Redis INCR span, all from eBPF"
-        caption: "One request, three processes, zero lines of tracing code."
+        alt: "Trace waterfall of one visit: demo/web GET /api/visits with demo/api GET /api/visits and its Redis INCR client span nested under it"
+        caption: "Joined: web and the api pod on the same node, one trace, no tracing code."
+      - name: split
+        phase: after
+        url: "grafana:/d/ebpf-lab/?orgId=1&kiosk&from=${start}&to=${to}&var-trace=${split_id}"
+        steps:
+          - {wait_for_text: "Service & Operation"}
+          - {wait: 2000}
+        selector: '[data-viz-panel-key="panel-8"]'
+        viewport: {width: 1440, height: 2100}
+        wide: true
+        alt: "Trace waterfall rooted at demo/api GET /api/visits with an INCR client span and a demo/redis INCR server span, no web span"
+        caption: "Split: the request crossed nodes, so the api started a trace of its own."
 
   - id: falco-shell
     title: Catch a shell in a container
@@ -172,10 +201,20 @@ experiments:
         where: "Falcosidekick UI › Events"
         query: 'rule = "Shell in demo pod"'
         expect: "A WARNING with the command line, uid 101, pod web-… and namespace demo, resolved from k3s's containerd."
+      - signal: logs
+        where: "Grafana (mon) › Dashboards › Labs › eBPF lab › Falco alerts from the lab rules"
+        query: '{k8s_cluster_name="lab-ebpf", k8s_namespace_name="falco", k8s_container_name="falco"} |= "ebpf_lab"'
+        expect: "The same alert as a log line, kept in mon with the rest of the lab's signals."
     shots:
       - name: events
         phase: after
         url: "falco:/"
+        steps:
+          - {fill: ['input[required][type="text"]', "admin"]}    # the chart's default UI login; the port is bound to 127.0.0.1
+          - {fill: ['input[type="password"]', "admin"]}
+          - {click: 'button:has-text("Login")'}
+          - {click_text: "EVENTS"}
+          - {wait_for_text: "Shell in demo pod"}
         viewport: {width: 1440, height: 1000}
         wide: true
         alt: "Falcosidekick UI dashboard with the Shell in demo pod event from the web pod"
@@ -183,37 +222,44 @@ experiments:
 
   - id: tetragon-enforce
     title: Kill a download before it starts
-    goal: "Apply a Tetragon policy that SIGKILLs wget, curl and nc in demo pods at the execve syscall, run wget, and compare Tetragon stopping it with Falco reporting it."
+    goal: "Apply a Tetragon policy that SIGKILLs any process in a demo pod that calls execve() for wget, curl or nc, run wget, and compare what Tetragon and Falco each record."
     signals: [events, logs]
     action:
       say: "Apply the Tetragon policy, then run wget from the web pod."
       run: make exp-tetragon-enforce
-    predict: "Falco and Tetragon both see the same execve. Which one can stop wget, and how far does wget get?"
+    predict: "In experiment 2, Falco raised a CRITICAL Network tool alert for nc. Will it raise one for wget now that Tetragon guards execve()?"
     wait: 10
     verify: make verify-tetragon-enforce
     look_for:
       - signal: events
         where: "Falcosidekick UI › Events"
-        query: 'rule = "Network tool in demo pod"'
-        expect: "A CRITICAL Network tool in demo pod event: Falco saw it but couldn't stop it."
+        query: 'rule = "Shell in demo pod" or rule = "Network tool in demo pod"'
+        expect: "Only Shell in demo pod for the sh -c wget command. No Network tool alert for wget: it never started. The CRITICAL one in the list is experiment 2's nc."
       - signal: logs
-        where: "make tetragon-events (Grafana Loki once the platform collector runs)"
-        query: '{k8s_cluster_name="lab-ebpf", k8s_namespace_name="kube-system", k8s_container_name="export-stdout"} |= "SIGKILL"'
-        expect: "process_kprobe __arm64_sys_execve with action SIGKILL and policy block-network-tools, then process_exit with signal SIGKILL; wget exits 137."
+        where: "Grafana (mon) › Dashboards › Labs › eBPF lab › Tetragon process events (or make tetragon-events)"
+        query: '{k8s_cluster_name="lab-ebpf", k8s_container_name="export-stdout"} |= "SIGKILL"'
+        expect: "The shell's exec, then KPROBE_ACTION_SIGKILL on __arm64_sys_execve for /bin/sh with policy block-network-tools, then that sh exiting with SIGKILL; the command prints wget exit=137."
     shots:
       - name: falco
         phase: after
         url: "falco:/"
+        steps:
+          - {fill: ['input[required][type="text"]', "admin"]}    # the chart's default UI login; the port is bound to 127.0.0.1
+          - {fill: ['input[type="password"]', "admin"]}
+          - {click: 'button:has-text("Login")'}
+          - {click_text: "EVENTS"}
+          - {wait_for_text: "wget"}
         viewport: {width: 1440, height: 1000}
         wide: true
-        alt: "Falcosidekick UI with a critical Network tool in demo pod event for wget in the web pod"
-        caption: "Falco reports the download attempt; Tetragon already killed it."
+        alt: "Falcosidekick UI events: Shell in demo pod warnings for the sh -c wget command and no Network tool alert for wget"
+        caption: "Falco saw the shell, not wget: Tetragon killed it inside execve()."
       - name: tetragon
         phase: after
-        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bk8s_container_name%3D%5C%22export-stdout%5C%22%7D%20%7C%3D%20%5C%22SIGKILL%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
-        selector: 'section[data-testid="data-testid Panel header Logs"]'
+        url: "grafana:/d/ebpf-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-6"]'
+        viewport: {width: 1440, height: 1900}   # panel 6 is below the fold; Grafana renders only visible panels
         wide: true
-        alt: "Tetragon process_kprobe event with action SIGKILL for wget in Grafana Loki"
+        alt: "Tetragon process events panel in Grafana: the shell's exec, KPROBE_ACTION_SIGKILL on execve with policy block-network-tools, and the shell exiting with SIGKILL"
         caption: "Tetragon's event: the execve that never completed."
 
   - id: rebuild-persists

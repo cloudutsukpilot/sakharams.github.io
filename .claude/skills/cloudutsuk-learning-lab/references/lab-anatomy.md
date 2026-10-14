@@ -24,7 +24,10 @@ its own observability stack. What a lab must do, and what the platform does for 
 Tools for the author, not the lab: `lab.sh` lives in `infra-local` (`~/gitrepos/iac/infra-local`, or
 `HOMELAB_INFRA`). mon's Grafana needs a sign-in, so `capture.cjs` and `scripts/signal.sh` send the
 read-only `lab-tools` token from `~/.config/homelab/grafana-labs-token` (infra-local
-`host/monitoring/labs-grafana-token.sh`). A lab that needs a token inside the cluster (a page that
+`host/monitoring/labs-grafana-token.sh`). The token is a Viewer, and Grafana sends Viewers away from
+Explore, so shots go on dashboards, not Explore URLs: show a trace in a dashboard panel driven by a
+variable, and let the experiment's `verify` print `capture-token: <name>=<value>` (e.g. a trace ID it
+found) for the after-shots to use as `${<name>}` in their URLs. A lab that needs a token inside the cluster (a page that
 queries Grafana) gets its own with `lab.sh grafana-token <cluster>`.
 
 Two exceptions found while moving the existing labs (2026-10-14):

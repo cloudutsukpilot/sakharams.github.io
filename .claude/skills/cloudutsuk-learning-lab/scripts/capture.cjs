@@ -19,6 +19,8 @@
  * `steps` (clicks before the shot, e.g. open a trace), `viewport` ({width, height} for tall panels),
  * `window` (this shot's own look-back for ${from}, e.g. 4m),
  * `full_page`, `scale` (output width) and, for `during` shots, `timelapse: {seconds, every, fps, reload}`.
+ * A verify that prints `capture-token: <name>=<value>` adds ${<name>} for that experiment's after shots
+ * (e.g. the trace ID it found, for a dashboard's trace panel: Grafana Viewers can't open Explore).
  *
  * Output:
  *   assets/img/labs/<slug>/<exp id>-<shot name>.webp   (animated WebP for timelapses, via ffmpeg)
@@ -325,6 +327,9 @@ async function main() {
       }
       await Promise.all(during);
       if (exp.verify && !args['skip-actions']) er.verify = await sh(exp.verify, 'verify');
+      // A verify may print `capture-token: <name>=<value>` (e.g. the trace ID it found) for after shots'
+      // URLs (${<name>}): Grafana Viewers can't open Explore, so a trace is shown in a dashboard panel.
+      for (const m of ((er.verify && er.verify.tail) || '').matchAll(/^capture-token: (\w+)=(\S+)$/gm)) tokens[m[1]] = m[2];
       for (const s of by('after')) await shoot(ctx, exp, s, tokens, shots);
 
       const verify = er.verify ? (er.verify.code === 0 ? 'ok' : 'failed') : 'none';
