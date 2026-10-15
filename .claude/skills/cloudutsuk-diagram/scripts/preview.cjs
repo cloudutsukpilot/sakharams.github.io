@@ -164,6 +164,11 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await leaf.click();
         await page.waitForTimeout(800);
         check(await page.$eval(`${sel} .dgm-panel`, (p) => !p.hidden && p.textContent.length > 20), 'clicking a component opens its detail panel');
+        const facts = await page.$eval(`${sel} .dgm-panel`, (p) => p.querySelector('.dgm-facts') && {
+          lead: !!p.querySelector('.dgm-lead')?.textContent.trim(), how: !!p.querySelector('.dgm-how'),
+          reach: !!p.querySelector('.dgm-links, .dgm-api'), badge: p.querySelector('.dgm-status')?.textContent || '' });
+        if (facts) check(facts.lead && facts.how && facts.reach, `the panel shows a lead sentence, how it works and a link or API${facts.badge ? ` (badge: ${facts.badge})` : ''}`);
+        else note('the clicked component has no `facts`');
         await fig.screenshot({ path: path.join(args.out, 'panel.png') });
         await page.click(`${sel} .dgm-panel-close`);
       } else note('no detail component in view at level 1');

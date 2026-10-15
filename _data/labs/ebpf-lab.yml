@@ -31,10 +31,10 @@ deploy:              # lab contract v2 (ADR 0017): what the lab runner checks be
 facts:
   - {label: Stack, value: "Cilium 1.20, Hubble, Tetragon 1.7, Falco 0.45, OBI 0.13, k3s 1.35, Go, Redis"}
   - {label: Storage, value: "static local PVs bound to PVCs, no hostPath; data survives make rebuild"}
-endpoints:
-  app: http://127.0.0.1:8091
-  hubble: http://127.0.0.1:8092
-  falco: http://127.0.0.1:8093
+endpoints:            # through the labs gateway, from any tailnet device (ADR 0045); on the DGX also 127.0.0.1:8091-8093
+  app: https://web.ebpf.labs.home.cloudutsuk.com
+  hubble: https://hubble-ui.ebpf.labs.home.cloudutsuk.com/?namespace=demo
+  falco: https://falco-falcosidekick-ui.ebpf.labs.home.cloudutsuk.com
   grafana: https://grafana.mon.home.cloudutsuk.com
 capture:
   urls:
@@ -228,7 +228,7 @@ experiments:
       say: "Apply the Tetragon policy, then run wget from the web pod."
       run: make exp-tetragon-enforce
     predict: "In experiment 2, Falco raised a CRITICAL Network tool alert for nc. Will it raise one for wget now that Tetragon guards execve()?"
-    wait: 10
+    wait: 25    # Loki gets the four Tetragon lines over several seconds
     verify: make verify-tetragon-enforce
     look_for:
       - signal: events

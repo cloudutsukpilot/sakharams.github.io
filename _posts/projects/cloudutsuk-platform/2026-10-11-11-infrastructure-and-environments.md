@@ -227,6 +227,7 @@ does in return:
 | Pulls public images through the Zot mirror and resolves the internal zone through PowerDNS | Same mirror and DNS as every other cluster |
 | Sends its apps' OTLP to the in-cluster agent collector | The collectors label everything with the cluster's name and forward it to `mon` with the shared `labs` token |
 | Ships its dashboards as JSON in its repo | They're loaded into `mon`'s Grafana, folder Labs, at registration and removed when the lab leaves |
+| Publishes its UIs as NodePort Services on localhost ports | A labs gateway gives each one a name and a certificate on the tailnet, such as `https://hubble-ui.ebpf.labs.home.cloudutsuk.com` ([ADR 0045](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0045)) |
 | Leaves the platform first in `make down`, then deletes the cluster | Argo CD stops managing the cluster before it disappears |
 
 Every query in a lab's dashboards and checks filters on its cluster, because `mon` holds every
@@ -249,7 +250,7 @@ Memory is the only quota that matters on this box. The DGX doubles as my desktop
 
 | Consumer | Budget |
 |---|---|
-| Chat model (vLLM, starting size) | ~30 GB |
+| Chat model (vLLM, starting size) | ~30 GB planned; ~21 GB as built (gpt-oss-20b, ADR 0046) |
 | Embeddings, gateway, RAG stack | ~7 to 11 GB |
 | `core`, `platform`, `mon` | ~16 to 21 GB |
 | Lab clusters, in total | ~10 GB |
@@ -262,8 +263,14 @@ labs need admission control in the lab runner rather than good intentions.
 
 Disk isn't a constraint (3.3 TB free), and the cloud side is cents a month for backups.
 
-> **TODO:** Confirm the memory budget on the DGX with the chosen chat model loaded (Phase 5), and set
-> the lab runner's admission limit from that measurement.
+> **Measured 2026-10-15, chat model loaded (Phase 5 step 1).** gpt-oss-20b in a 0.17 slice: host
+> `MemAvailable` fell by about 22 GB when it loaded, and with it running the DGX had 26 GB available. That
+> was with the embeddings model, every long-lived cluster, the eBPF lab and the desktop running. Free
+> memory is well below the 81 GB this plan assumed, which is why the chat slice started smaller.
+{: .prompt-info }
+
+> **TODO:** Set the lab runner's admission limit from this measurement, once the rest of Phase 5 (Qdrant,
+> Redis, the RAG services, Phoenix) is running and measured.
 {: .prompt-warning }
 
 ## Checklist

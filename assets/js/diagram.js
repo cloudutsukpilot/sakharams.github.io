@@ -2,8 +2,9 @@
  * Explorable diagrams (_includes/diagram.html, data in _data/diagrams/<post folders>/<name>.yml).
  *
  * A diagram is a tree of components. Level 0 shows the top-level components; each level expands one
- * more layer; clicking a component expands or collapses just that one. Leaves can carry `detail`
- * (Markdown) and `config` (a snippet), shown in a side panel. Layout is automatic (ELK layered,
+ * more layer; clicking a component expands or collapses just that one. Components can carry `facts`
+ * (what, how, when, where, why, url, api), `detail` (Markdown) and `config` (a snippet), shown in a
+ * side panel. Layout is automatic (ELK layered,
  * left to right, wrapping top to bottom); the canvas pans and zooms like a map. Arrows attach to the
  * deepest components they connect; when a group is collapsed they are redrawn to it and merged.
  * Arrows carry a protocol pill, a colour per communication kind, continuous dots for streams (both
@@ -162,6 +163,14 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+  // A component's panel, by importance: a status badge (`status`, `phase`), `where` and `when` as chips,
+  // a `summary` lead sentence (what it is and why it's here), `how` it works, `url` as link buttons and
+  // `api` as copyable lines. `url` takes a string, a list, or a map of button label to address; `api`
+  // takes a string or a list (Markdown; a bare address or one `code` span gets a Copy button).
+  const FACTS = ['summary', 'how', 'where', 'when', 'url', 'api'];
+  const STATUS = { built: 'Built', planned: 'Planned', deferred: 'Deferred', external: 'External' };
+  const hasInfo = (n) => !!(n.detail || n.config || n.facts);
+
   // Small, safe Markdown: paragraphs, lists, **bold**, *italic*, `code`, [links](url). HTML is escaped.
   function markdown(src) {
     const inline = (t) =>
@@ -297,6 +306,8 @@
         return { ...e, id: e.id || `e${i}`, kind: kindOf(e), viewList: vl, mainFlow: !vl.length || !!e.main };
       });
       this.edgeById = new Map(this.edges.map((e) => [e.id, e]));
+      // Planned and deferred components get the warn tone unless they set their own.
+      for (const n of this.nodes.values()) if (!n.tone && (n.status === 'planned' || n.status === 'deferred')) n.tone = 'warn';
       // Colours: explicit, tone, icon role, else by top-level position.
       let ci = 0;
       const colour = (n, inherited) => {
@@ -883,8 +894,8 @@
     }
 
     drawLeaf(n, s) {
-      const g = make('g', { class: 'dgm-node' + (n.tone ? ' dgm-tone' : '') + (n.kids.length ? ' is-collapsible' : '') + (n.detail || n.config ? ' has-detail' : ''), tabindex: 0, role: 'button', style: `--dgm-c: ${n.c}`, 'data-id': n.id }, this.nodeLayer);
-      const label = n.kids.length ? `${n.label}: expand` : n.detail || n.config ? `${n.label}: details` : n.label;
+      const g = make('g', { class: 'dgm-node' + (n.tone ? ' dgm-tone' : '') + (n.kids.length ? ' is-collapsible' : '') + (hasInfo(n) ? ' has-detail' : ''), tabindex: 0, role: 'button', style: `--dgm-c: ${n.c}`, 'data-id': n.id }, this.nodeLayer);
+      const label = n.kids.length ? `${n.label}: expand` : hasInfo(n) ? `${n.label}: details` : n.label;
       g.setAttribute('aria-label', label);
       const cx = s.w / 2;
       const cy = 6 + DISC / 2;
@@ -906,7 +917,7 @@
         const b = make('g', { class: 'dgm-badge', transform: `translate(${cx + DISC / 2 - 2}, ${cy - DISC / 2 + 4})` }, g);
         make('circle', { r: 9 }, b);
         make('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, b).textContent = '+';
-      } else if (n.detail || n.config) {
+      } else if (hasInfo(n)) {
         const b = make('g', { class: 'dgm-badge dgm-badge-info', transform: `translate(${cx + DISC / 2 - 2}, ${cy - DISC / 2 + 4})` }, g);
         make('circle', { r: 8 }, b);
         make('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, b).textContent = 'i';
@@ -954,7 +965,7 @@
           this.toggle(n.id);
         }
       });
-      if (n.detail || n.config) {
+      if (hasInfo(n)) {
         const info = make('g', { class: 'dgm-toggle dgm-info', transform: 'translate(0,0)' }, g);
         make('circle', { r: 10 }, info);
         make('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, info).textContent = 'i';
@@ -1135,9 +1146,12 @@
       const body = this.panel.querySelector('.dgm-panel-body');
       const crumbs = this.ancestorsOf(n.id).reverse().map((a) => esc(a.label));
       const links = this.edges.filter((e) => e.from === n.id || e.to === n.id);
-      let h = `<div class="dgm-crumbs">${crumbs.join(' › ')}</div><h4 style="--dgm-c:${n.c}">${esc(n.label)}</h4>`;
-      if (n.sub) h += `<div class="dgm-panel-sub">${esc(n.sub)}</div>`;
-      if (n.detail) h += `<div class="dgm-md">${markdown(n.detail)}</div>`;
+      const badge = STATUS[n.status] ? `<span class="dgm-status dgm-status-${n.status}">${STATUS[n.status]}${n.phase != null ? ` · phase ${esc(n.phase)}` : ''}</span>` : '';
+      let h = `<div class="dgm-crumbs">${crumbs.join(' › ')}</div><div class="dgm-panel-head"><h4 style="--dgm-c:${n.c}">${esc(n.label)}</h4>${badge}</div>`;
+      // With facts, the badge and chips carry what the canvas sub-label says, so it is not repeated.
+      if (n.sub && !n.facts) h += `<div class="dgm-panel-sub">${esc(n.sub)}</div>`;
+      if (n.facts) h += this.factsHTML(n.facts);
+      if (n.detail) h += `<div class="dgm-md${n.facts ? ' dgm-notes' : ''}">${markdown(n.detail)}</div>`;
       if (n.config) {
         const cfg = typeof n.config === 'string' ? { code: n.config } : n.config;
         h += `<div class="dgm-config"><div class="dgm-config-head"><span>${esc(cfg.title || cfg.lang || 'config')}</span><button type="button" class="dgm-copy">Copy</button></div><pre><code>${esc(cfg.code || '')}</code></pre></div>`;
@@ -1152,6 +1166,7 @@
         h += '</ul></div>';
       }
       body.innerHTML = h;
+      body.querySelectorAll('.dgm-copy-api').forEach((b) => b.addEventListener('click', () => navigator.clipboard?.writeText(b.dataset.copy).then(() => (b.textContent = 'Copied'))));
       body.querySelector('.dgm-copy')?.addEventListener('click', (ev) => {
         const code = body.querySelector('.dgm-config code').textContent;
         navigator.clipboard?.writeText(code).then(() => (ev.target.textContent = 'Copied'));
@@ -1159,6 +1174,33 @@
       this.panel.hidden = false;
       this.root.classList.add('has-panel');
       this.focusOn([n.id], true);
+    }
+    factsHTML(f) {
+      const list = (v) => [].concat(v ?? []).filter((x) => x != null && String(x).trim()).map((x) => String(x).trim());
+      const isUrl = (t) => /^https?:\/\/\S+$/.test(t);
+      const inline = (t) => markdown(t).replace(/^<p>|<\/p>$/g, '');
+      let h = '';
+      const chips = [['where', 'Where'], ['when', 'When']].filter(([k]) => list(f[k]).length);
+      if (chips.length) h += `<div class="dgm-chips">${chips.map(([k, t]) => `<span class="dgm-chip dgm-chip-${k}" title="${t}"><b>${t}</b> ${inline(list(f[k]).join(' · '))}</span>`).join('')}</div>`;
+      if (list(f.summary).length) h += `<div class="dgm-lead">${markdown(list(f.summary).join(' '))}</div>`;
+      if (list(f.how).length) h += `<div class="dgm-how"><div class="dgm-sec">How it works</div>${markdown(list(f.how).join('\n'))}</div>`;
+      // Links: a map gives each button its label; a bare address is labelled by its host.
+      const urls = f.url && typeof f.url === 'object' && !Array.isArray(f.url) ? Object.entries(f.url) : list(f.url).map((u) => [null, u]);
+      const btns = urls.map(([label, u]) => {
+        u = String(u).trim();
+        if (!isUrl(u)) return `<span class="dgm-link-note">${inline(u)}</span>`;
+        const name = label || u.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        return `<a class="dgm-btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(name)} <span aria-hidden="true">↗</span></a>`;
+      });
+      if (btns.length) h += `<div class="dgm-links">${btns.join('')}</div>`;
+      const apis = list(f.api);
+      if (apis.length) {
+        h += `<div class="dgm-api"><div class="dgm-sec">API</div><ul>${apis.map((a) => {
+          const code = isUrl(a) ? a : (a.match(/^`([^`]+)`$/) || [])[1];
+          return `<li>${isUrl(a) ? `<code>${esc(a)}</code>` : inline(a)}${code ? `<button type="button" class="dgm-copy-api" data-copy="${esc(code)}" aria-label="Copy">Copy</button>` : ''}</li>`;
+        }).join('')}</ul></div>`;
+      }
+      return h ? `<div class="dgm-facts">${h}</div>` : '';
     }
     openEdgePanel(v) {
       const body = this.panel.querySelector('.dgm-panel-body');

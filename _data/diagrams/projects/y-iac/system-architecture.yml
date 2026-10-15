@@ -23,54 +23,77 @@ nodes:
     sub: >-
       author + reviewer
     icon: user
-    detail: >-
-      Writes YAML in an infra-* consumer repo, reviews the plan summary on the pull request and approves the
-      apply in a GitHub environment. Never writes HCL.
+    status: built
+    facts:
+      summary: Changes infrastructure by editing YAML and approving reviewed plans, never by writing HCL.
+      how: Edits YAML in an `infra-*` repo, reviews the plan summary on the pull request, approves the apply in a GitHub
+        environment.
+      where: an infra-* consumer repo
+      api: '`python entrypoint.py --cloud <cloud> --environment <env> --stack <stack> --terragrunt plan`'
 
   - id: github
     label: GitHub
     sub: >-
       repos + Actions
     icon: devops/cicd/github-18.svg
-    detail: >-
-      Two kinds of repository and one execution path. Y-IaC holds the modules, the CLI and the reusable
-      workflows; each infra-* consumer holds only YAML and calls those workflows at a pinned ref.
+    status: external
+    facts:
+      summary: Holds the shared platform and every consumer, and runs every plan and apply.
+      how: Y-IaC holds the modules, the CLI and the reusable workflows; each `infra-*` consumer holds only YAML and calls
+        them at a pinned ref.
+      where: github.com
+      url:
+        GitHub: https://github.com
     children:
       - id: consumer
         label: infra-* consumer
         sub: >-
           YAML only
         icon: git
-        detail: >-
-          A consumer such as `infra-aws` or `infra-github`. It contains no Terraform and no Terragrunt logic,
-          only YAML, an 86-line `entrypoint.py` stub and a generated `root.hcl` it never edits.
+        status: built
+        facts:
+          summary: 'One consumer repo per platform (such as `infra-aws`): only YAML, so teams never touch Terraform.'
+          how: YAML plus an 86-line `entrypoint.py` stub and a generated `root.hcl` it never edits.
+          where: e.g. infra-aws, infra-github
+          api: '`environments/<cloud>/<environment>/<stack>/`'
         children:
           - id: res-yaml
             label: resources.yaml
             sub: >-
               per stack
             icon: file
-            detail: >-
-              What the stack wants, one entry per resource (or split into category files). Read by the CLI's
-              validation and stack generator, and directly by the unit templates. Lives under
-              `environments/<cloud>/<environment>/<stack>/`.
+            status: built
+            facts:
+              summary: 'What a stack wants, one entry per resource: the only file most changes touch.'
+              how: Read by the CLI's validation and stack generator, and directly by the unit templates; can be split into category
+                files.
+              where: environments/<cloud>/<env>/<stack>/
+              when: every plan and apply
+              api: '`environments/<cloud>/<environment>/<stack>/resources.yaml`'
           - id: common-vars
             label: common_vars.yaml
             sub: >-
               environment + stack
             icon: file
-            detail: >-
-              Account, providers, tags, subscriptions and gate settings for an environment; a stack-level
-              file can override it. The CLI merges both into `.terragrunt-stack/common_vars.yaml`.
+            status: built
+            facts:
+              summary: Account, providers, tags, subscriptions and gate settings, shared by every stack in an environment.
+              how: An environment file, optionally overridden per stack; the CLI merges both into `.terragrunt-stack/common_vars.yaml`.
+              where: environment + stack level
+              api: '`environments/<cloud>/<environment>/common_vars.yaml`'
           - id: config-yaml
             label: config.yaml
             sub: >-
               backend + workflow
             icon: gear
-            detail: >-
-              The consumer's backend entry (matched on the repo folder name) and its `workflow` block, which
-              names the shared repo, the runner and the Y-IaC ref (`iac_shared_module_ref`). That ref is the
-              release mechanism.
+            status: built
+            facts:
+              summary: The consumer's backend and workflow settings, including the Y-IaC ref that is the release mechanism.
+              how: The backend entry is matched on the repo folder name; the `workflow` block names the shared repo, the runner
+                and `iac_shared_module_ref`.
+              where: consumer repo root
+              when: read on every run
+              api: '`config.yaml` → `workflow.iac_shared_module_ref`'
             config:
               title: config.yaml workflow block (CI/CD and Release Management post)
               lang: yaml
@@ -85,464 +108,681 @@ nodes:
             sub: >-
               consumer workflow
             icon: devops/cicd/githubactions-18.svg
-            detail: >-
-              Generated from `template/terragrunt-cicd.yaml` by bootstrap. Runs on a pull request or push to
-              `main` that touches `environments/**`, on a manual run, and on the weekly cron `0 6 * * 0`. Every job
-              calls a reusable workflow in Y-IaC.
+            status: built
+            facts:
+              summary: The consumer's CI entry point; every job in it calls a reusable workflow in Y-IaC.
+              how: Generated from `template/terragrunt-cicd.yaml` by bootstrap; triggers on `environments/**` changes.
+              where: .github/workflows/terragrunt-cicd.yaml
+              when: PR, push to main, manual, Sundays 06:00 UTC
+              api: '`.github/workflows/terragrunt-cicd.yaml` (cron `0 6 * * 0`)'
       - id: yiac
         label: Y-IaC repo
         sub: >-
           shared platform
         icon: git
-        detail: >-
-          The shared repository every consumer executes. It isn't deployed anywhere; a bug in its shared path
-          is a bug in every consumer, so consumers pin a ref.
+        status: built
+        facts:
+          summary: The shared repository every consumer executes; a bug in it is a bug in every consumer, so they pin a ref.
+          how: Modules, the CLI, unit templates, the config catalog and reusable workflows; it isn't deployed anywhere.
+          where: GitHub, private repo
+          when: checked out on every run
+          api: Checked out as `./terragrunt_shared_module` at `iac_shared_module_ref`
         children:
           - id: cli-src
             label: CLI package
             sub: >-
               src/<org>_iac/
             icon: programming/python.svg
-            detail: >-
-              The Python 3.12 CLI that parses, bootstraps, validates, authenticates, dispatches, generates and
-              reports. Checked out into `./terragrunt_shared_module` in CI, or a sibling checkout on a laptop.
+            status: built
+            facts:
+              summary: The Python 3.12 CLI behind every run, from a laptop or CI.
+              how: Parses, bootstraps, validates, authenticates, dispatches, generates and reports.
+              where: src/<org>_iac/
+              api: '`src/<org>_iac/` (via the consumer''s `entrypoint.py`)'
           - id: modules
             label: Terraform modules
             sub: >-
               146 cloud, 29 provider
             icon: devops/iac/terraform.svg
-            detail: >-
-              The actual resources, under `cloud/<cloud>/terraform/<type>/` and
-              `providers/<provider>/terraform/<type>/`. Checked per module by `tools/validate_terraform_module.py`
-              (fmt, init, schema, validate, TFLint, docs).
+            status: built
+            facts:
+              summary: 'The actual resources: 146 cloud and 29 provider modules, checked one by one.'
+              how: Terraform modules validated by `tools/validate_terraform_module.py` (fmt, init, schema, validate, TFLint, docs).
+              where: cloud/<cloud>/terraform/<type>/
+              api:
+              - '`cloud/<cloud>/terraform/<type>/`'
+              - '`providers/<provider>/terraform/<type>/`'
           - id: unit-templates
             label: Unit templates
             sub: >-
               terragrunt.hcl per type
             icon: file
-            detail: '`cloud/<cloud>/terragrunt/<type>/terragrunt.hcl` maps YAML entries to module inputs. They read
-              `resources.yaml` directly and find variables with `find_in_parent_folders("common_vars.yaml")`.'
+            status: built
+            facts:
+              summary: Map YAML entries to module inputs, one template per resource type.
+              how: Read `resources.yaml` directly and find variables with `find_in_parent_folders("common_vars.yaml")`.
+              where: cloud/<cloud>/terragrunt/<type>/
+              api: '`cloud/<cloud>/terragrunt/<type>/terragrunt.hcl`'
           - id: config-catalog
             label: Config catalog
             sub: >-
               config/
             icon: gear
-            detail: >-
-              Provider versions (`config/providers.yaml`), backends, OPA, Trivy, Wiz, Infracost, Jira and the
-              error catalog.
+            status: built
+            facts:
+              summary: One place for provider versions, backends and the settings of every gate.
+              how: YAML for providers, backends, OPA, Trivy, Wiz, Infracost, Jira and the error catalog.
+              where: config/
+              api: '`config/providers.yaml` · `config/opa/` · `config/trivy/`'
       - id: actions
         label: GitHub Actions
         sub: >-
           reusable workflows
         icon: devops/cicd/githubactions-18.svg
-        detail: >-
-          Reusable workflows in Y-IaC's `.github/workflows/`. Consumers call them by ref and never copy them
-          (ADR 007).
+        status: built
+        facts:
+          summary: The reusable workflows consumers call by ref and never copy (ADR 007).
+          how: Plan, summary, approval, apply, Jira link and the drift loop, all in Y-IaC's `.github/workflows/`.
+          where: Y-IaC .github/workflows/
+          api: '`uses: <org>/<y-iac>/.github/workflows/<name>.yaml@<ref>`'
         children:
           - id: pipeline
             label: PR and push
             sub: >-
               plan, approve, apply
             icon: rocket
-            detail: >-
-              The jobs a pull request or a push to `main` runs, all calling reusable workflows in Y-IaC.
+            status: built
+            facts:
+              summary: 'What a pull request or a push to main runs: plan, review, approve, apply.'
+              how: detect-changes, then a plan matrix, a summary, an environment approval and the apply, each a reusable workflow.
+              when: PR and push to main
+              api: '`terragrunt-ci` · `terragrunt-summary-report` · `terragrunt-cd`'
             children:
               - id: detect
                 label: detect-changes
                 icon: search
-                detail: >-
-                  Maps changed files to a matrix of cloud, environment and stack. If no stack changed, nothing
-                  else runs.
+                status: built
+                facts:
+                  summary: Runs only the stacks a change touches; if none changed, nothing else runs.
+                  how: Maps changed files to a matrix of cloud, environment and stack.
+                  when: every PR and push
+                  api: '`.github/workflows/detect-changes.yaml`'
               - id: plan-wf
                 label: terragrunt-ci
                 sub: >-
                   plan matrix
                 icon: code
-                detail: >-
-                  Checks Y-IaC out at the consumer's ref and runs the CLI with `plan` for each changed stack,
-                  gates included. Also used for the plan after an apply and by the drift scan.
+                status: built
+                facts:
+                  summary: Plans each changed stack with the gates, so reviewers see the real diff and every finding.
+                  how: Checks Y-IaC out at the consumer's ref and runs the CLI with `plan`; also reused after an apply and by the
+                    drift scan.
+                  when: every PR, after apply, drift scan
+                  api: '`.github/workflows/terragrunt-ci.yaml`'
               - id: summary-wf
                 label: Summary report
                 sub: >-
                   terragrunt-summary-report
                 icon: chart
-                detail: >-
-                  Renders plan results, gate outcomes and the add/change/destroy counts per unit into one job
-                  summary for the reviewer.
+                status: built
+                facts:
+                  summary: 'One page for the reviewer: plan results, gate outcomes and add/change/destroy counts per unit.'
+                  how: Renders the per-stack results into the job summary.
+                  when: after the plan matrix
+                  api: '`.github/workflows/terragrunt-summary-report.yaml`'
               - id: env-approval
                 label: Environment approval
                 sub: >-
                   required reviewers
                 icon: check
-                detail: >-
-                  GitHub environment protection on the apply job, with required reviewers per environment
-                  (for cloudutsukpilot, declared in `infra-github`). Applies run one stack at a time
-                  (`max-parallel: 1`).
+                status: built
+                facts:
+                  summary: A required human approval before any apply, per environment.
+                  how: GitHub environment protection with required reviewers (declared in `infra-github` for cloudutsukpilot); applies
+                    run one stack at a time.
+                  when: before every apply
+                  api: 'GitHub environments · `max-parallel: 1`'
               - id: apply-wf
                 label: terragrunt-cd
                 sub: >-
                   apply
                 icon: rocket
-                detail: >-
-                  Runs on push to `main` after plan and summary succeed and an approver releases it. Same CLI,
-                  same `root.hcl`, same modules; only the action changes, so what was reviewed is what runs.
+                status: built
+                facts:
+                  summary: 'Applies exactly what was reviewed: same CLI, same `root.hcl`, same modules, only the action changes.'
+                  how: Runs on push to main after the plan and summary succeed and an approver releases it.
+                  when: push to main, after approval
+                  api: '`.github/workflows/terragrunt-cd.yaml`'
               - id: jira-webhook
                 label: GitHub to Jira webhook
                 sub: >-
                   github-jira-webhook
                 icon: bolt
-                detail: >-
-                  Runs after a PR plan (on open) and after an apply on `main`, linking the change to its Jira
-                  ticket.
+                status: built
+                facts:
+                  summary: Links every change to its Jira ticket.
+                  how: Posts to Jira after a PR plan (on open) and after an apply on main.
+                  when: PR opened · apply on main
+                  api: '`.github/workflows/github-jira-webhook.yaml`'
           - id: drift
             label: Drift workflows
             sub: >-
               weekly scan
             icon: clock
-            detail: >-
-              The drift loop. The template's comment says "Daily", but the cron `0 6 * * 0` is weekly,
-              Sundays at 06:00 UTC.
+            status: built
+            facts:
+              summary: 'The drift loop: finds where the cloud no longer matches the YAML on main and opens a ticket.'
+              how: Scan, analyze, then a Teams message and a Jira ticket.
+              when: Sundays 06:00 UTC
+              api: cron `0 6 * * 0`
+            detail: The template's comment says "Daily", but the cron is weekly.
             children:
               - id: drift-scan
                 label: Scheduled drift scan
                 sub: >-
                   iac-scheduled-drift-scan
                 icon: clock
-                detail: >-
-                  Plans every stack in the consumer with the same CLI and gates. A plan with changes means the
-                  cloud no longer matches the YAML on `main`.
+                status: built
+                facts:
+                  summary: Plans every stack on a schedule; a plan with changes means drift.
+                  how: The same CLI and gates as a pull request, across every stack in the consumer.
+                  when: Sundays 06:00 UTC
+                  api: '`.github/workflows/iac-scheduled-drift-scan.yaml`'
               - id: drift-analyze
                 label: Drift analyze
                 sub: >-
                   iac-drift-detection-analyze
                 icon: search
-                detail: >-
-                  Counts stacks with changes and stacks that failed to plan; its outputs feed both the Teams
-                  message and the Jira ticket.
+                status: built
+                facts:
+                  summary: Counts drifted and failed stacks, feeding both the Teams message and the Jira ticket.
+                  how: Reads the scan's plan results and sets outputs.
+                  when: after the drift scan
+                  api: '`.github/workflows/iac-drift-detection-analyze.yaml`'
               - id: teams-notify
                 label: Teams notification
                 sub: >-
                   iac-teams-notification
                 icon: message
-                detail: >-
-                  Sent when drift is found or stacks fail to plan. If it fails, the notification job fails;
-                  applies are unaffected.
+                status: built
+                facts:
+                  summary: Tells the team about drift or stacks that failed to plan.
+                  how: Posts to a Teams webhook; if it fails, only the notification job fails, never an apply.
+                  when: when drift or failures are found
+                  api: '`.github/workflows/iac-teams-notification.yaml`'
               - id: jira-ticket
                 label: Jira drift ticket
                 sub: >-
                   iac-jira-drift-ticket
                 icon: bell
-                detail: >-
-                  One ticket per repository (`IaC Drift: <owner>/<repo>`, label `iac-drift`). An open ticket
-                  gets a comment instead of a duplicate, a fingerprint marker suppresses unchanged drift, and
-                  priority rises on destroys or failed stacks.
+                status: built
+                facts:
+                  summary: One drift ticket per repository, so drift is tracked, not just announced.
+                  how: 'Opens `IaC Drift: <owner>/<repo>` (label `iac-drift`) or comments on the open one; a fingerprint suppresses
+                    unchanged drift; priority rises on destroys or failures.'
+                  when: when drift is found
+                  api: '`.github/workflows/iac-jira-drift-ticket.yaml`'
           - id: artifacts
             label: Workflow artifacts
             sub: >-
               7 days
             icon: package
-            detail: >-
-              Plan files and plan JSON per unit, Wiz and Trivy reports, kept with `retention-days: 7`. Right for
-              raw plans with sensitive diffs; too short as audit evidence, so summaries should be exported.
+            status: built
+            facts:
+              summary: Plan files, plan JSON and scanner reports per unit, for review and debugging.
+              how: 'Uploaded by the workflows with `retention-days: 7`.'
+              where: GitHub Actions artifacts
+              when: kept 7 days
+              api: Actions run → Artifacts
+            detail: 'Right for raw plans with sensitive diffs, too short as audit evidence: export the summaries.'
           - id: gh-secrets
             label: GitHub secrets
             sub: "secrets: inherit"
             icon: key
             views: [security]
-            detail: >-
-              The CI service principal and tool credentials (`ARM_*`, `BACKEND_*`, `GH_TOKEN`, `WIZ_*`,
-              `JIRA_*`), passed from the consumer workflow with `secrets: inherit`. Long-lived today; the
-              recommendation is OIDC federated credentials per consumer repo and environment.
+            status: built
+            facts:
+              summary: 'The CI credentials every run needs: the service principal and tool tokens.'
+              how: '`ARM_*`, `BACKEND_*`, `GH_TOKEN`, `WIZ_*`, `JIRA_*`, passed from the consumer workflow with `secrets: inherit`.'
+              where: GitHub repo and environment secrets
+              api: '`secrets: inherit`'
+            detail: Long-lived today; the recommendation is OIDC federated credentials per consumer repo and environment.
 
   - id: runner
     label: Laptop or CI runner
     sub: >-
       one process tree
     icon: laptop
-    detail: >-
-      The same CLI runs on a laptop and on a GitHub Actions runner (`ubuntu-latest` for the cloudutsukpilot
-      consumers). GitHub-hosted runners can't reach private endpoints; those consumers need a self-hosted runner.
+    status: built
+    facts:
+      summary: 'Where a run happens: the same CLI on a laptop or a GitHub Actions runner.'
+      how: 'One process tree: the Python CLI, then the generated Terragrunt stack, Terraform and the gates.'
+      where: laptop or ubuntu-latest
+      when: every plan and apply
+      api: '`python entrypoint.py --cloud <cloud> --environment <env> --stack <stack> --terragrunt plan`'
+    detail: GitHub-hosted runners can't reach private endpoints; those consumers need a self-hosted runner.
     children:
       - id: cli
         label: Python CLI
         sub: >-
           entrypoint.py
         icon: programming/python.svg
-        detail: 'Part 1 of a run: stub, bootstrap, parse and validate, export and authenticate, then generate the
-          stack. Validation runs before authentication, so a typo never reaches a cloud login.'
+        status: built
+        facts:
+          summary: 'Part 1 of a run: everything before Terragrunt, with validation before any cloud login.'
+          how: Stub, bootstrap, parse and validate, export and authenticate, then generate the stack.
+          where: runner process
+          api: '`entrypoint.py`'
         children:
           - id: stub
             label: entrypoint.py stub
             sub: >-
               identical in every consumer
             icon: terminal
-            detail: >-
-              Finds the shared module, puts `src/` on `sys.path` and calls the CLI. Installs PyYAML and
-              python-dotenv if missing; falls back to `python/lib/` for consumers that haven't re-synced.
+            status: built
+            facts:
+              summary: Finds the shared module and starts the CLI, identically in every consumer.
+              how: Puts `src/` on `sys.path`, installs PyYAML and python-dotenv if missing, falls back to `python/lib/` for unsynced
+                consumers.
+              where: consumer root
+              api: '`entrypoint.py` (86 lines)'
           - id: bootstrap
             label: Bootstrap
             sub: >-
               bootstrap/sync.py
             icon: package
-            detail: >-
-              When the shared module's content hash changes, syncs the needed parts into the consumer and
-              writes the stub, `root.hcl`, `terragrunt-cicd.yaml`, the Taskfile and `.gitignore`.
+            status: built
+            facts:
+              summary: Keeps every consumer's generated files in step with the shared module.
+              how: When the module's content hash changes, writes the stub, `root.hcl`, `terragrunt-cicd.yaml`, the Taskfile and
+                `.gitignore`.
+              when: when the module hash changes
+              api: '`bootstrap/sync.py`'
           - id: validate
             label: Parse + validate
             sub: >-
               cli/arg_validation.py
             icon: check
-            detail: >-
-              Parses argv (`cli/parser.py`, `dispatch.py`), then checks paths, provider and stack combinations,
-              target account, the repo-to-subscription guardrail and a lint of `resources.yaml` for duplicates.
-              Reads `common_vars.yaml` and `resources.yaml`; exports `TARGET_ACCOUNT`.
+            status: built
+            facts:
+              summary: Catches mistakes before any cloud login, so a typo never reaches a cloud.
+              how: Checks paths, provider and stack combinations, the target account, the repo-to-subscription guardrail and duplicates
+                in `resources.yaml`.
+              when: every run, first
+              api: '`cli/arg_validation.py` · `cli/parser.py` · `dispatch.py`'
           - id: auth
             label: Export + authenticate
             sub: >-
               environment/handler.py
             icon: key
-            detail: '`cli/env_export.py` exports `CLOUD`, `ENVIRONMENT`, `STACK` and gate and lock variables; the
-              environment handler resolves backend and deployment credentials (`ARM_*`, `BACKEND_*`) from
-              `config.yaml`, `.env`, the CLI login or CI secrets.'
+            status: built
+            facts:
+              summary: Resolves who the run acts as, from the same sources on a laptop or in CI.
+              how: Exports `CLOUD`, `ENVIRONMENT`, `STACK` and gate variables; resolves `ARM_*` / `BACKEND_*` from `config.yaml`,
+                `.env`, the CLI login or CI secrets.
+              when: after validation
+              api: '`cli/env_export.py` · `environment/handler.py`'
           - id: generate
             label: Stack generator
             sub: >-
               generators/
             icon: code
-            detail: '`stack_generator.py` turns `resources.yaml` into `terragrunt.stack.hcl`, one unit per resource
-              type; `common_vars_merge.py` writes the merged variables; `dependency_graph.py` orders units into
-              execution waves.'
+            status: built
+            facts:
+              summary: Turns YAML into a Terragrunt stack, one unit per resource type, in dependency order.
+              how: Writes `terragrunt.stack.hcl`, the merged `common_vars.yaml`, and execution waves from the dependency graph.
+              when: every run
+              api: '`generators/stack_generator.py` · `common_vars_merge.py` · `dependency_graph.py`'
           - id: redaction
             label: Redaction
             sub: >-
               reporting/redaction.py
             icon: shield
-            detail: >-
-              Scrubs secrets from plan JSON before Wiz, Trivy, OPA or artifact upload. Its own docstring says
-              the `.terragrunt-cache/` and the binary plan are not protected.
+            status: built
+            facts:
+              summary: Scrubs secrets from plan JSON before any scanner or upload sees it.
+              how: Redacts sensitive values in the plan JSON passed to Wiz, Trivy, OPA and artifacts.
+              when: before gates and upload
+              api: '`reporting/redaction.py`'
+            detail: Its own docstring says `.terragrunt-cache/` and the binary plan are not protected.
           - id: reports
             label: Reports + logs
             sub: >-
               reporting/
             icon: chart
-            detail: >-
-              The log processor shortens Terragrunt output (`[.terragrunt-stack/azurerm_windows_virtual_machine]`
-              becomes `[azwvm]`); the reporters write per-unit add/change/destroy tables, the error report and the
-              final report.
+            status: built
+            facts:
+              summary: 'Readable output: short unit names, per-unit change tables, error and final reports.'
+              how: The log processor shortens Terragrunt output (`[azwvm]`); reporters write add/change/destroy tables.
+              when: end of every run
+              api: '`reporting/`'
       - id: stack
         label: Terragrunt stack
         sub: >-
           generated
         icon: cluster
-        detail: 'Part 2 of a run: generated files, reproducible and ignored by Git, so the same YAML and ref always
-          give the same stack.'
+        status: built
+        facts:
+          summary: 'Part 2 of a run: generated, reproducible files, so the same YAML and ref always give the same stack.'
+          how: '`terragrunt.stack.hcl` expands into units that share `root.hcl` and the merged variables; ignored by Git.'
+          where: .terragrunt-stack/
+          api: '`terragrunt stack generate`'
         children:
           - id: stack-hcl
             label: terragrunt.stack.hcl
             icon: file
-            detail: >-
-              Written by the stack generator; `terragrunt stack generate` expands it into one unit per resource
-              type. A stack with 40 key vaults is still one unit.
+            status: built
+            facts:
+              summary: 'The stack definition: one unit per resource type, however many resources (40 key vaults is one unit).'
+              how: Written by the stack generator, then expanded by Terragrunt.
+              where: stack folder
+              api: '`terragrunt.stack.hcl`'
           - id: units
             label: Generated units
             sub: >-
               .terragrunt-stack/<type>/
             icon: package
-            detail: >-
-              One `terragrunt.hcl` per resource type, copied from the unit templates, each with its own state
-              file. Units with no dependency between them run in parallel within a wave.
+            status: built
+            facts:
+              summary: One Terragrunt unit per resource type, each with its own state, run in parallel waves.
+              how: Copied from the unit templates; units with no dependency between them run in parallel within a wave.
+              where: .terragrunt-stack/<type>/
+              api: '`.terragrunt-stack/<type>/terragrunt.hcl`'
           - id: merged-vars
             label: Merged common_vars
             sub: >-
               .terragrunt-stack/
             icon: file
-            detail: >-
-              Searching upward from `.terragrunt-stack/<unit>/`, the first `common_vars.yaml` is this one. Writing
-              the merge here is what makes stack-level overrides work; without it the plan silently uses the
-              environment file.
+            status: built
+            facts:
+              summary: Makes stack-level overrides work; without it a plan silently uses the environment file.
+              how: It is the first `common_vars.yaml` found searching upward from each unit.
+              where: .terragrunt-stack/
+              api: '`.terragrunt-stack/common_vars.yaml`'
           - id: root-hcl
             label: root.hcl
             sub: >-
               provider.tf, backend.tf
             icon: file
-            detail: >-
-              Included by every unit. Picks the backend from `config.yaml`, provider versions from
-              `config/providers.yaml`, credentials from environment variables only, and generates `provider.tf`,
-              `backend.tf` and `.tflint.hcl`. Retries transient errors 3 times, 30 s apart.
+            status: built
+            facts:
+              summary: 'The one include every unit shares: backend, provider versions and credentials from the environment only.'
+              how: Generates `provider.tf`, `backend.tf` and `.tflint.hcl`; retries transient errors 3 times, 30 s apart.
+              where: consumer root (generated)
+              api: '`root.hcl`'
       - id: terraform
         label: Terraform + providers
         sub: >-
           per unit
         icon: devops/iac/terraform.svg
-        detail: >-
-          Runs per unit against the shared module source, with a plugin cache (`TERRAFORM_PLUGIN_CACHE_DIR`) so
-          providers download once per runner. State key `<key>/<cloud>/<unit path>/terraform.tfstate`.
+        status: built
+        facts:
+          summary: Plans and applies each unit, downloading providers once per runner.
+          how: Runs per unit against the shared module source with `TERRAFORM_PLUGIN_CACHE_DIR`.
+          where: runner, per unit
+          api: State key `<key>/<cloud>/<unit path>/terraform.tfstate`
       - id: gates
         label: Plan gates
         sub: >-
           policy, security, cost
         icon: shield
-        detail: >-
-          Each gate can be advisory, soft-mandatory or mandatory (ADR 005), and all run on the same redacted
-          plan JSON before anyone is asked to approve.
+        status: built
+        facts:
+          summary: Policy, security and cost checks on every plan, before anyone is asked to approve (ADR 005).
+          how: All run on the same redacted plan JSON; each is advisory, soft-mandatory or mandatory.
+          when: every plan
+          api: Gate settings in `common_vars.yaml` and `config/`
         children:
           - id: opa
             label: OPA
             sub: >-
               10 policies
             icon: shield
-            detail: >-
-              Policies across Azure, global and Zscaler packages, including tags, naming, regions, VM SKUs and
-              storage exposure (`storage_encryption.rego`, `network_security.rego`, `region_restrictions.rego`).
+            status: built
+            facts:
+              summary: Ten policies for tags, naming, regions, VM SKUs and storage exposure.
+              how: Rego across Azure, global and Zscaler packages, run against the plan JSON.
+              when: every plan
+              api: '`config/opa/` (e.g. `storage_encryption.rego`, `region_restrictions.rego`)'
           - id: trivy
             label: Trivy
             sub: >-
               misconfig + secrets
             icon: search
-            detail: >-
-              Scans the redacted plan JSON for misconfigurations and the working directory for secrets.
-              Chosen with `iac_scanner` (`wiz`, `trivy`, `both` or `none`).
+            status: built
+            facts:
+              summary: Finds misconfigurations in the plan and secrets in the working directory.
+              how: Scans the redacted plan JSON and the workspace; chosen with `iac_scanner`.
+              when: every plan
+              api: '`iac_scanner: trivy | both`'
           - id: wiz-cli
             label: Wiz CLI
             sub: >-
               iac_scanner
             icon: shield
-            detail: >-
-              Installed by `setup-environment` (defaults to latest when unpinned). With a missing binary or
-              credentials it warns and skips, which silently turns a mandatory gate into no gate.
+            status: built
+            facts:
+              summary: Wiz's IaC scan of the plan, as an alternative or addition to Trivy.
+              how: Installed by `setup-environment` (latest when unpinned); calls the Wiz service with `WIZ_*` credentials.
+              when: every plan when selected
+              api: '`iac_scanner: wiz | both`'
+            detail: With a missing binary or credentials it warns and skips, which silently turns a mandatory gate into no gate.
           - id: infracost
             label: Infracost
             sub: >-
               off by default
             icon: chart
-            detail: >-
-              Puts a monthly cost delta on the plan summary. Wired in but disabled by default; the
-              recommendation is to enable it in advisory mode for every consumer.
+            status: deferred
+            facts:
+              summary: A monthly cost delta on the plan summary; wired in but off by default.
+              how: Calls the Infracost API with a key when enabled; the recommendation is advisory mode everywhere.
+              when: off by default
+              url:
+                Infracost: https://www.infracost.io
+              api: '`config/infracost/`'
           - id: tflint
             label: TFLint hook
             sub: >-
               before init + plan
             icon: check
-            detail: >-
-              Runs through a `root.hcl` hook before every `init` and `plan`, and skips with a warning if TFLint
-              isn't installed.
+            status: built
+            facts:
+              summary: Lints every unit before `init` and `plan`.
+              how: A `root.hcl` hook; skips with a warning if TFLint isn't installed.
+              when: before init and plan
+              api: '`.tflint.hcl` (generated by `root.hcl`)'
       - id: local-creds
         label: .env or az login
         sub: >-
           laptop identity
         icon: key
         views: [security]
-        detail: >-
-          On a laptop the default is the engineer's Azure CLI login; with `--use-service-principal`, a service
-          principal from the git-ignored `.env` (`ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_TENANT_ID`).
+        status: built
+        facts:
+          summary: The engineer's identity when running from a laptop.
+          how: The Azure CLI login by default; with `--use-service-principal`, a service principal from the git-ignored `.env`.
+          where: laptop
+          api: '`az login` · `.env` (`ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_TENANT_ID`)'
 
   - id: state
     label: Remote state
     sub: >-
       one file per unit
     icon: database
-    detail: >-
-      The only durable data. Per-repo backend from `config.yaml` (ADR 001), so units lock independently and a
-      partial apply leaves other units' state untouched.
+    status: built
+    facts:
+      summary: 'The only durable data: one state file per unit, so units lock independently (ADR 001).'
+      how: A per-repo backend from `config.yaml`; a partial apply leaves other units' state untouched.
+      when: read and locked on every run
+      api: '`<key>/<cloud>/<unit path>/terraform.tfstate`'
     children:
       - id: blob
         label: Azure Blob
         sub: >-
           most consumers
         icon: cloud/azure/services/blob-storage.svg
-        detail: >-
-          Encrypted by default, with blob versioning enabled and a rehearsed state restore.
+        status: external
+        facts:
+          summary: State for most consumers, encrypted with versioning and a rehearsed restore.
+          how: Azure Storage backend; blob versioning enabled.
+          where: Azure Storage
+          url:
+            Azure portal: https://portal.azure.com
+          api: '`backend: azurerm`'
       - id: s3
         label: S3
         sub: >-
           infra-aws
         icon: cloud/aws/services/s3.svg
-        detail: >-
-          The template sets `encrypt = true`; `infra-aws` uses S3 native locking (`use_lockfile: true`). Bucket
-          versioning should be enabled to the Azure standard.
+        status: external
+        facts:
+          summary: State for `infra-aws`, with S3 native locking.
+          how: '`encrypt = true` and `use_lockfile: true`; bucket versioning should match the Azure standard.'
+          where: AWS S3
+          url:
+            AWS console: https://console.aws.amazon.com/s3/
+          api: '`backend: s3`'
       - id: gcs
         label: GCS
         icon: cloud/gcp/services/cloud-storage.svg
-        detail: >-
-          Supported backend type; encrypted by default.
+        status: external
+        facts:
+          summary: Supported state backend for GCP, encrypted by default.
+          how: GCS bucket backend with ADC credentials.
+          where: Google Cloud Storage
+          url:
+            GCP console: https://console.cloud.google.com/storage
+          api: '`backend: gcs`'
 
   - id: targets
     label: Targets
     sub: >-
       clouds + SaaS
     icon: cloud
-    detail: >-
-      Where infrastructure is created. All outbound HTTPS from the runner; transient errors are retried by
-      `root.hcl`.
+    status: external
+    facts:
+      summary: 'Where infrastructure is created: clouds and SaaS providers.'
+      how: All outbound HTTPS from the runner; transient errors are retried by `root.hcl`.
+      api: Provider APIs over HTTPS 443
     children:
       - id: azure
         label: Azure
         sub: >-
           most consumers
         icon: cloud/azure/azure-18.svg
-        detail: >-
-          Subscriptions for most consumers. One aliased `azurerm` provider per subscription in
-          `common_vars.subscriptions`, in `data_only` or `resource` mode.
+        status: external
+        facts:
+          summary: Subscriptions for most consumers.
+          how: One aliased `azurerm` provider per subscription in `common_vars.subscriptions`, in `data_only` or `resource`
+            mode.
+          url:
+            Azure portal: https://portal.azure.com
+          api: Azure Resource Manager (`azurerm`)
       - id: aws
         label: AWS
         sub: >-
           infra-aws
         icon: cloud/aws/amazonwebservices-18.svg
-        detail: >-
-          Used by `infra-aws`; its hello-world stack is a ready-made canary.
+        status: external
+        facts:
+          summary: Used by `infra-aws`; its hello-world stack is a ready-made canary.
+          how: The `aws` provider with the account from `common_vars.yaml`.
+          url:
+            AWS console: https://console.aws.amazon.com
+          api: AWS APIs (`aws` provider)
       - id: gcp
         label: GCP
         icon: cloud/gcp/googlecloudplatform-18.svg
-        detail: >-
-          Supported cloud, with GCS as its state backend and ADC credentials.
+        status: external
+        facts:
+          summary: A supported cloud, with GCS state and ADC credentials.
+          how: The `google` provider with Application Default Credentials.
+          url:
+            GCP console: https://console.cloud.google.com
+          api: Google Cloud APIs (`google` provider)
       - id: saas
         label: SaaS providers
         sub: >-
           GitHub, JFrog, Grafana, ZPA
         icon: api
-        detail: >-
-          The provider families under `providers/`, including GitHub (`GH_TOKEN`, used by `infra-github`),
-          JFrog, Grafana, Zscaler ZPA, ArgoCD, Helm, Kubernetes and Atlas. Tokens and URLs come from the environment.
+        status: external
+        facts:
+          summary: 'SaaS managed the same way as clouds: GitHub, JFrog, Grafana, Zscaler ZPA, ArgoCD, Helm, Kubernetes, Atlas.'
+          how: Provider modules under `providers/`; tokens and URLs come from the environment (`GH_TOKEN` for `infra-github`).
+          api: '`providers/<provider>/terraform/<type>/`'
 
   - id: external
     label: External services
     sub: >-
       registry, gates, alerts
     icon: globe
-    detail: >-
-      Services a run or a workflow calls besides the targets. All outbound HTTPS.
+    status: external
+    facts:
+      summary: 'Services a run or workflow calls besides the targets: the registry, the gates and the alerts.'
+      how: All outbound HTTPS.
+      api: HTTPS 443
     children:
       - id: tf-registry
         label: Terraform registry
         sub: >-
           providers
         icon: package
-        detail: >-
-          Providers are downloaded at `init`. If it fails, init fails; the plugin cache helps.
+        status: external
+        facts:
+          summary: Where providers come from at `init`; if it's down, init fails.
+          how: Downloads providers once per runner thanks to the plugin cache.
+          when: every init
+          url:
+            Registry: https://registry.terraform.io
+          api: https://registry.terraform.io
       - id: wiz-svc
         label: Wiz service
         icon: shield
-        detail: >-
-          Called by the Wiz CLI with `WIZ_CLIENT_ID` and `WIZ_CLIENT_SECRET`.
+        status: external
+        facts:
+          summary: Wiz's backend for the IaC scan.
+          how: Called by the Wiz CLI with `WIZ_CLIENT_ID` and `WIZ_CLIENT_SECRET`.
+          when: every plan when Wiz is selected
+          url:
+            Wiz: https://app.wiz.io
+          api: Wiz API (via the Wiz CLI)
       - id: infracost-api
         label: Infracost API
         icon: chart
-        detail: >-
-          Called with an API key when the cost gate is enabled.
+        status: external
+        facts:
+          summary: Prices the plan when the cost gate is enabled.
+          how: Called with an API key.
+          when: only when enabled
+          url:
+            Infracost: https://www.infracost.io
+          api: Infracost pricing API
       - id: teams
         label: Microsoft Teams
         sub: >-
           webhook
         icon: message
-        detail: >-
-          Receives drift and failed-plan messages through a webhook URL.
+        status: external
+        facts:
+          summary: Where the team hears about drift and failed plans.
+          how: An incoming webhook URL.
+          when: when drift or failures are found
+          url:
+            Teams: https://teams.microsoft.com
+          api: Incoming webhook
       - id: jira
         label: Jira
         sub: >-
           REST API
         icon: bell
-        detail: '`/rest/api/2` and `/rest/agile/1.0`, with `JIRA_USERNAME`, `JIRA_API_TOKEN` and `JIRA_URL`. Holds the
-          drift tickets and the change links from the webhook.'
+        status: external
+        facts:
+          summary: Holds the drift tickets and links every change to its ticket.
+          how: REST with `JIRA_USERNAME`, `JIRA_API_TOKEN` and `JIRA_URL`.
+          when: drift found · PR opened · apply
+          api:
+          - '`/rest/api/2`'
+          - '`/rest/agile/1.0`'
 
 edges:
   # Change → plan (main, CI/CD)

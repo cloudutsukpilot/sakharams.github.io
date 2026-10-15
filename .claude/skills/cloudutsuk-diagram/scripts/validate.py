@@ -35,6 +35,15 @@ CARDS = set(re.findall(r"^    (\w+): \{ title:", block("CARDS"), re.M))
 TONES = {"fail", "ok", "warn"}
 DIRECTIONS = {"right", "down", "left", "up"}
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+# A component's panel (const FACTS and STATUS in diagram.js): `summary` and `how` are required, plus a `url` or an
+# `api`; `where` and `when` are optional short chips. `status` (and `phase`) sit on the component itself.
+FACT_KEYS = re.findall(r"'(\w+)'", (re.search(r"const FACTS = (\[.*?\]);", SRC) or [None, ""])[1]) or [
+    "summary", "how", "where", "when", "url", "api"]
+STATUSES = set(re.findall(r"(\w+): '", (re.search(r"const STATUS = (\{.*?\});", SRC) or [None, ""])[1])) or {
+    "built", "planned", "deferred", "external"}
+FACT_REQUIRED = ["summary", "how"]
+FACT_LIMITS = {"summary": 200, "how": 280, "where": 60, "when": 60}
+OLD_FACTS = {"what": "summary", "why": "summary"}
 
 
 def proto_kind(e):
@@ -92,13 +101,55 @@ def validate(data, path):
                 E(f"`{nid}`: config needs `code`")
             elif len(str(code).splitlines()) > 80:
                 W(f"`{nid}`: config is {len(str(code).splitlines())} lines; show the relevant part")
-        if not n.get("children") and not n.get("detail") and not n.get("config"):
-            W(f"`{nid}`: a leaf without `detail` gives readers nothing when clicked")
+        facts = n.get("facts")
+        status = n.get("status")
+        if status is not None and status not in STATUSES:
+            E(f"`{nid}`: status must be one of {sorted(STATUSES)}")
+        if n.get("phase") is not None and status not in ("planned", "deferred"):
+            W(f"`{nid}`: `phase` only shows with status planned or deferred")
+        if status is None and not n.get("children"):
+            no_status.append(nid)
+        if facts is None:
+            no_facts.append(nid)
+        elif not isinstance(facts, dict):
+            E(f"`{nid}`: facts must be a mapping of {', '.join(FACT_KEYS)}")
+        else:
+            for k in facts:
+                if k in OLD_FACTS:
+                    E(f"`{nid}`: fact `{k}` was merged into `{OLD_FACTS[k]}` (one lead sentence: what it is and why it's here)")
+                elif k not in FACT_KEYS:
+                    E(f"`{nid}`: unknown fact `{k}` (use {', '.join(FACT_KEYS)})")
+            missing = [k for k in FACT_REQUIRED if not str(facts.get(k) or "").strip()]
+            if missing:
+                W(f"`{nid}`: facts lack {', '.join(missing)}")
+            if not (facts.get("url") or facts.get("api")):
+                W(f"`{nid}`: facts need a `url` or an `api` (say what reaches it when it has no address of its own)")
+            for k, lim in FACT_LIMITS.items():
+                v = facts.get(k)
+                text = " ".join(map(str, v)) if isinstance(v, list) else str(v or "")
+                if len(text) > lim:
+                    W(f"`{nid}`: `{k}` is {len(text)} chars; keep it under ~{lim}" + (" (it shows as a chip)" if k in ("where", "when") else ""))
+            url = facts.get("url")
+            if isinstance(url, dict):
+                for label, u in url.items():
+                    if not re.match(r"https?://", str(u)):
+                        E(f"`{nid}`: url `{label}` must be an http(s) address (use a list item for a note)")
+                    if len(str(label)) > 24:
+                        W(f"`{nid}`: url label `{label}` is long; it is a button")
+        if not n.get("children") and not n.get("detail") and not n.get("config") and not facts:
+            W(f"`{nid}`: a leaf without `facts` or `detail` gives readers nothing when clicked")
         for c in n.get("children") or []:
             walk(c, nid, d + 1)
 
+    no_facts, no_status = [], []
     for n in data["nodes"]:
         walk(n, None, 0)
+    if no_facts:
+        shown = ", ".join(f"`{x}`" for x in no_facts[:8]) + (f" and {len(no_facts) - 8} more" if len(no_facts) > 8 else "")
+        W(f"{len(no_facts)} component(s) without `facts` (summary, how, url/api; where, when): {shown}")
+    if no_status:
+        shown = ", ".join(f"`{x}`" for x in no_status[:8]) + (f" and {len(no_status) - 8} more" if len(no_status) > 8 else "")
+        W(f"{len(no_status)} leaf component(s) without `status` (built, planned, deferred, external): {shown}")
 
     def ancestors(i):
         out = []

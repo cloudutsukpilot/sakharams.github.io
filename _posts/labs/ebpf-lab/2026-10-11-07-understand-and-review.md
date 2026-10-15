@@ -7,6 +7,9 @@ tags: [Labs, eBPF Lab, eBPF, Cilium, Hubble, Tetragon, Falco, OpenTelemetry, Kub
 description: "What the experiments proved, where this setup stops, and what production would change (eBPF Lab lab)."
 lab: ebpf-lab
 lab_part: 7
+image:
+  path: /assets/img/labs/ebpf-lab/07-understand-and-review.webp
+  alt: "eBPF Lab: Understand and Review - Labs hero image"
 ---
 
 You've now seen each eBPF tool do its job, and two of them do less than their configuration promised.
@@ -131,9 +134,9 @@ What it keeps:
 ## Go Further
 {: #go-further }
 
-1. **Find where the cross-node INCR time goes.** Experiment 4 showed INCR at 9.74 ms when the API pod and
-   Redis were on different nodes and 0.42 ms on the same node. Pin both API pods to the agent node, then
-   to the server node, and compare
+1. **Find where the INCR time goes.** Experiment 4's traces show INCR, one in-memory increment, taking
+   almost 10 ms, and in another run 0.42 ms. Pin both API pods to the server node (Redis's node), then
+   to the agent node, and compare
    `histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{cluster="lab-ebpf"}[5m])))`.
    Look at Hubble's flows for the DNS lookup and TCP handshake that each new connection makes.
 2. **Make every trace whole.** Delete one API pod and scale to one replica on web's node; run

@@ -7,6 +7,9 @@ tags: [Labs, eBPF Lab, eBPF, Cilium, Hubble, Tetragon, Falco, OpenTelemetry, Kub
 description: "The cluster, the app manifests and the observability stack that receives the signals (eBPF Lab lab)."
 lab: ebpf-lab
 lab_part: 3
+image:
+  path: /assets/img/labs/ebpf-lab/03-set-up-infrastructure.webp
+  alt: "eBPF Lab: Set Up the Infrastructure - Labs hero image"
 ---
 
 Running eBPF tools inside k3d means running them inside Docker containers that share one kernel with

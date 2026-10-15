@@ -449,6 +449,8 @@ everything else.
   BAAI/bge-small crashed in this vLLM build; bge-m3 is untested.
 - **Still to choose:** the first chat model and its licence, from the candidates above, in Phase 5,
   recorded as its own ADR.
+- **Chosen (2026-10-15, Phase 5 step 1):** gpt-oss-20b, Apache 2.0, in a smaller slice than planned
+  above, because the host had far less free memory than this ADR budgeted ([ADR 0046](#adr-0046)).
 
 #### Considered options
 
@@ -468,6 +470,7 @@ everything else.
 #### Related
 
 - [ADR 0022](#adr-0022)
+- [ADR 0046](#adr-0046)
 
 ## ADR-0011: Qdrant for vectors and Redis (RedisVL) for the semantic cache
 {: #adr-0011 }
@@ -919,6 +922,12 @@ same box don't add capacity.
   RuntimeClass and the node advertises 4 time-sliced `nvidia.com/gpu`. The image tag ends in a hash of
   its build files, because a stale image once hid behind an unchanged tag (lesson L027). The cluster's
   memory cap (16 GB) covers only CPU-side memory: GPU allocations aren't charged to the container.
+- As built (2026-10-15, Phase 5 steps 1 and 2): LiteLLM v1.103.1 in namespace `litellm`, at
+  `https://llm.ai.home.cloudutsuk.com` (tailnet only), serving `gpt-oss-20b` (ADR 0046) and
+  `qwen3-embedding-0.6b` from the `models` namespace; the model list is only in git. Its keys and spend
+  live in `ai-db` (Postgres 17, namespace `ai-db`), which Phoenix will share. Qdrant 1.19.1 (`qdrant`) and
+  Redis 8.10.2 (`redis-cache`) run next to it, each with its own key or password from OpenBao and a
+  NetworkPolicy that admits only the RAG namespace.
 - The SRE agent stays in `platform` so it can report when `ai` is down.
 - Scaling path: tune the single instance (batching, FP8/FP4, prefix caching) and lean on the cache;
   give each extra model a fixed memory slice, loading rarely used ones on demand; add a second box or
@@ -1252,7 +1261,10 @@ position alone mustn't grant access.
 - App to app (Backstage, sre-agent, RAG tools to inventory, RAG API, lab runner): Keycloak client
   credentials, 5-minute JWTs with `aud=<service>` and role claims, checked against Keycloak's JWKS.
 - Callers to the LiteLLM gateway: JWT if the free edition supports it (checked in Phase 0), otherwise
-  one virtual key per client with budgets.
+  one virtual key per client with budgets. **Checked (2026-10-15, Phase 5 step 1):** it doesn't; LiteLLM
+  v1.103.1 refuses `enable_jwt_auth` without an Enterprise licence. Every caller gets a virtual key limited
+  to its models, created with the master key and kept in OpenBao `kv/ai/litellm-clients`; the master key
+  is used by no service.
 - Alertmanager to sre-agent and OTel collectors to `mon` and Phoenix: OAuth2 client credentials.
 - sre-agent, lab runner and Argo CD to cluster APIs: short-lived ServiceAccount tokens from OpenBao's
   Kubernetes secrets engine (15 minutes for the agent, read-only).
@@ -1309,6 +1321,8 @@ cross-cluster routing and debugging ambiguous; published API ports widen the att
   load balancer publishes 80/443 there, and its Traefik reports that address, so ExternalDNS points
   `*.mon.home.cloudutsuk.com` at 172.30.0.3. The API ports stay on the gateway.
 
+- Labs gateway (2026-10-15, ADR 0045): `172.30.0.5` on the bridge is the labs gateway's address; every lab
+  UI is reached by name through it (`*.labs.home.cloudutsuk.com`).
 - Labs as built (2026-10-14, lab contract v2): a lab's pod and service ranges are a fixed pair in its
   own `k3d/cluster.yaml` (eBPF 10.100/10.101, OpenTelemetry 10.102/10.103, new labs from 10.104),
   chosen when the lab is scaffolded, not allocated by the lab runner: `make up` creates the cluster
@@ -2352,6 +2366,125 @@ ephemeral, so nothing carries over between jobs.
 - [ADR 0032](#adr-0032)
 - [ADR 0033](#adr-0033)
 - [ADR 0043](#adr-0043)
+
+## ADR-0045: Lab UIs by name through one labs gateway on the host
+{: #adr-0045 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-15 · `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Labs (lab contract v2) publish their UIs on `127.0.0.1` host ports, mapped to NodePorts. That keeps
+default logins off the network and needs no DNS or certificates, but the links only work on the DGX
+itself: from a laptop on the tailnet, the portal's and the link page's lab links are dead, while every
+long-lived cluster's UI works by name. Labs come and go many times a day, often with a different node
+address each time, and labs that replace Traefik (the eBPF lab runs Cilium without it) have no ingress
+to hang a name on.
+
+#### Decision
+
+- **One gateway for all labs:** Traefik on the host (`infra-local host/labs-gateway`), on the `homelab`
+  Docker network and on its own bridge address, `172.30.0.5`, which Tailscale routes like the clusters'
+  `.2`-`.4` (ADR 0030, 0037).
+- **One DNS record:** `*.labs.home.cloudutsuk.com -> 172.30.0.5` in PowerDNS, created once. A DNS
+  wildcard answers for every name below it, so registering a lab never touches DNS.
+- **Names from the cluster:** `infra-local host/labs/lab.sh register` writes one route file per lab:
+  `<service>.<lab>.labs.home.cloudutsuk.com` for each Service the lab publishes as a NodePort (to its
+  server node on the homelab network), and `<lab>.labs.home.cloudutsuk.com` for the lab's own ingress
+  when its load balancer proxies port 80. `<lab>` is the cluster name without `lab-`. `unregister`
+  removes the file; Traefik watches the folder.
+- **Certificates:** Let's Encrypt through a Cloudflare DNS-01 challenge with the token cert-manager
+  already uses, one certificate per lab for `<lab>.labs…` and `*.<lab>.labs…` (a wildcard covers one
+  label), kept in the gateway's state and reused when the lab comes back.
+- Labs keep their `127.0.0.1` ports for use on the DGX; nothing in a lab's config changes.
+
+#### Considered options
+
+1. **A bridge address, DNS records and a certificate per lab:** the long-lived clusters' pattern. Labs
+   would need ExternalDNS and an issuer (the monitoring-only add-on set gives them neither), and a host
+   address per lab, which needs root each time.
+2. **Publish lab ports on a bridge address instead of 127.0.0.1:** reachable, but by address and port,
+   without names or TLS.
+3. **One host gateway with a wildcard record** (chosen): no per-lab DNS, root or cluster add-ons; names
+   follow Services, so a lab gets them without declaring anything.
+
+#### Consequences
+
+- Good: every lab UI opens by name with a valid certificate from any tailnet device, and the portal and
+  link page can link to it.
+- Good: labs need no new add-ons, records or root access; a rebuilt lab gets its routes back from
+  `make up`.
+- Bad: lab UIs with default logins (the Falcosidekick UI) become reachable from the tailnet, not only
+  the DGX; they need real logins or a sign-in in front.
+- Bad: one more host container to run and monitor; if it's down, labs still work on localhost.
+- Bad: each new lab name is a Let's Encrypt order (a few seconds, well inside the rate limits).
+
+#### Related
+
+- [ADR 0017](#adr-0017)
+- [ADR 0024](#adr-0024)
+- [ADR 0030](#adr-0030)
+- [ADR 0037](#adr-0037)
+
+## ADR-0046: First chat model: gpt-oss-20b (Apache 2.0) in a 0.17 slice of the GB10
+{: #adr-0046 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-15 · `homelab-gitops`</span>
+
+#### Context
+
+ADR 0010 left the first chat model and its licence to Phase 5, from two candidates: gpt-oss-20b and
+Qwen3-30B-A3B, served by vLLM 0.24 (`nvcr.io/nvidia/vllm:26.07-py3`) in the `ai` cluster, next to the
+embeddings model (0.1 slice, about 12 GB). Every model's memory comes out of the DGX's one 121 GB unified
+pool, which the desktop, the other clusters and the labs share. ADR 0010 planned for about 81 GB free; on
+2026-10-15 the host had 39 GB available (labs running, a long-lived Jekyll server holding 22 GB), so the
+memory a model needs decides more than its benchmark scores.
+
+The callers are the RAG chat (answers grounded in retrieved posts, with citations) and, in Phase 6, the SRE
+agent, which needs tool calls.
+
+#### Decision
+
+- **gpt-oss-20b** (OpenAI, Apache 2.0, 21B parameters with 3.6B active per token, MoE). It ships in MXFP4,
+  about 13 GB of weights, and vLLM 0.24 runs it on the GB10 (compute capability 12.1) with its Marlin MXFP4
+  MoE kernel and Triton attention. A restart with the weights cached is ready in about 2.5 minutes.
+- Its tokenizer (Harmony) needs two vocab files, which the image would download on the first request
+  into a cache under `/root` that the non-root pod can't use; an init container puts them on the models
+  claim (lesson L069).
+- **`--gpu-memory-utilization 0.17`** (about 21 GB), not ADR 0010's 0.25 start. Measured on 2026-10-15
+  with `--max-model-len 32768`: weights 13.8 GiB, CUDA graphs about 1 GiB, and a KV cache of 2.78 GiB
+  (113,900 tokens), which is 3.5 requests at the full 32k context and about 15 RAG-sized (8k) ones at a
+  time. At 0.15 the cache was 1.53 GiB (62,581 tokens, fewer than two full requests). At 0.2 vLLM
+  reported 15.36 GiB, far more than the platform needs. Raise the slice only when the AI / vLLM
+  dashboard shows the KV cache full or requests preempted under real traffic, and the host has the room.
+- Served as `gpt-oss-20b` behind LiteLLM (ADR 0022), with OpenAI-format tool calls
+  (`--tool-call-parser openai`) and the reasoning split off into `reasoning_content`
+  (`--reasoning-parser openai_gptoss`), so answers carry only the answer.
+- Licence: Apache 2.0 allows use, change and redistribution, including commercially; the only duty that
+  applies here is keeping the licence and notices if the weights are passed on, which this platform doesn't.
+
+#### Considered options
+
+1. **Qwen3-30B-A3B in FP8** (Apache 2.0): stronger on some reasoning benchmarks, but about 31 GB of weights
+   alone, so a 0.3 to 0.35 slice before any KV cache: more than the host had free.
+2. **Qwen3-30B-A3B in a 4-bit quantisation** (AWQ or GPTQ): fits, but a community quantisation, untested on
+   this vLLM build and GPU.
+3. **gpt-oss-20b** (chosen): the smallest memory need of the candidates, an official quantisation from the
+   model's authors, native tool calling, and it runs on this vLLM build and GPU (tested 2026-10-15).
+
+#### Consequences
+
+- Good: about 21 GB for the chat model, leaving room for the rest of Phase 5 at today's free memory.
+- Good: tool calls are ready for the SRE agent without a second model.
+- Bad: it reasons before it answers, which costs tokens and time on simple questions; `reasoning_effort`
+  (low, medium, high) per request is the control, and rag-api should send `low` by default.
+- Bad: 32k tokens of context per request, less than the model's 128k, to keep the slice small.
+- Bad: its knowledge is general; everything platform-specific has to come from retrieval.
+
+#### Related
+
+- [ADR 0010](#adr-0010)
+- [ADR 0022](#adr-0022)
 
 {% endraw %}
 <!-- adr:end -->

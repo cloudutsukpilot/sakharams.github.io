@@ -728,3 +728,25 @@ lessons:
     fix: "Every query got the lab's cluster filter (`cluster`, `k8s_cluster_name`, `resource.k8s.cluster.name`) and PromQL uses `job`, rewritten by one script across the card's queries and Explore URLs, then the dashboard, page, Makefile and posts. All six verify targets passed against mon."
     lesson: "When a lab moves to a shared backend, its queries move with it. Grep every place a query lives (dashboards, pages, scripts, posts, encoded URLs) and run each one against the new store."
     adrs: ["0041", "0017"]
+
+  - id: L068
+    date: 2026-10-14
+    step: "Phase 3: platform operations (found while updating the doctor link page)"
+    title: "DNS over UDP filled core's load balancer, and took its HTTPS and API with it"
+    tags: [k3d, nginx, dns, networking]
+    symptom: "A refresh of the doctor link page showed core's Keycloak, PowerDNS and Zot red. Lookups for the internal zone timed out, TLS connections to core dropped with SSL_ERROR_SYSCALL, and `kubectl --context k3d-core` failed with EOF. `docker logs k3d-core-serverlb` had 483 \"1029 worker_connections are not enough\" alerts in 2 minutes, all for UDP 53. The core node itself answered normally when reached directly."
+    cause: "k3d v5.9.0's load balancer is nginx, rendered by confd from a template that proxies every port, UDP included, with `proxy_timeout 600` and no `proxy_responses`. nginx therefore kept each DNS query's UDP session (two connections, client and upstream) open for up to 10 minutes, so under one query a second filled all 1029 connections of a worker. HTTPS and the API share them. The container's open-file limit of 1024 also capped it below the setting. Load had grown with more clusters, labs and probes, and the failure came and went with it."
+    fix: "A host script, `host/k3s/lb-udp.sh`, patches each load balancer's confd template: UDP servers get `proxy_responses 1` and `proxy_timeout 10s`, TCP keeps 600 s, and `worker_rlimit_nofile 16384`, with 4096 connections. It writes confd's watched values file so nginx is checked and reloaded gracefully, retrying because confd can read the file mid-rewrite. The boot unit runs it, because a recreated load balancer comes back with k3d's defaults. Afterwards 9000 DNS queries at 300 a second were all answered with no connection alerts."
+    lesson: "When you proxy DNS over UDP through nginx, set `proxy_responses 1`: without it every query is a session that lives until the idle timeout, and connections run out at a trivial query rate. And look at what shares the proxy: here a DNS problem looked like Keycloak, OpenBao and the registry all failing at once."
+    adrs: ["0024", "0030"]
+
+  - id: L069
+    date: 2026-10-15
+    step: "Phase 5, step 1"
+    title: "gpt-oss loaded fine, then failed every request on a missing tokenizer file"
+    tags: [vllm, gpt-oss, kubernetes, security-context]
+    symptom: "vLLM 0.24 loaded gpt-oss-20b, reported its KV cache and \"Application startup complete\", and passed its health checks. Every chat request then returned HTTP 500: \"error downloading or loading vocab file: failed to download or load vocab file\". The same pod could download the file with Python."
+    cause: "gpt-oss's chat format (Harmony) loads the o200k_base tokenizer file on the first chat request, not at start, so health checks and the startup log can't catch a failure. NVIDIA's image points its tokenizer caches at /root/.cache, which the pod's uid 1000 can't read or write (mode 700). Pointing Harmony's own cache variable at a writable folder didn't help: its downloader still failed, with no more detail than that message."
+    fix: "An init container fetches o200k_base and cl100k_base once onto the models claim, checked against the SHA-256 hashes tiktoken pins, and `TIKTOKEN_ENCODINGS_BASE` makes Harmony load them from there without downloading. Chat, reasoning and tool calls then worked."
+    lesson: "A model server that's ready isn't necessarily able to answer. Make one real request part of the deploy check, and with a non-root, read-only pod, look for anything the image downloads on first use and supply it ahead of time."
+    adrs: ["0046", "0010"]

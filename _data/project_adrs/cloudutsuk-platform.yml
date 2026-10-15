@@ -46,3 +46,5 @@ adrs:
   - {id: "0042", title: "Monitoring pack: OTel Operator collectors per cluster, Prometheus job names for the mixins, a token per cluster", status: accepted, date: 2026-10-12, anchor: adr-0042, repos: [homelab-gitops, infra-local]}
   - {id: "0043", title: "CI build path: shared rootless BuildKit, OpenBao roles bound to the reusable workflow, digest commits by a GitHub App", status: accepted, date: 2026-10-12, anchor: adr-0043, repos: [homelab-gitops, infra-local, homelab-services]}
   - {id: "0044", title: "Own runner image with the CI tools baked in, rolled out by hand", status: accepted, date: 2026-10-12, anchor: adr-0044, repos: [homelab-gitops, homelab-services]}
+  - {id: "0045", title: "Lab UIs by name through one labs gateway on the host", status: accepted, date: 2026-10-15, anchor: adr-0045, repos: [infra-local, sakharams.github.io]}
+  - {id: "0046", title: "First chat model: gpt-oss-20b (Apache 2.0) in a 0.17 slice of the GB10", status: proposed, date: 2026-10-15, anchor: adr-0046, repos: [homelab-gitops]}

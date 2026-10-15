@@ -3,8 +3,8 @@ name: cloudutsuk-diagram
 description: >-
   Create an explorable, interactive architecture diagram for the Cloudutsuk blog (this Jekyll repo):
   components nest in levels of detail (level 0 overview, then each level opens one more layer; click a
-  component to expand or collapse it), the deepest components show an explanation or configuration in a
-  side panel, the canvas pans and zooms like a map, components are icons (built-in or real tool logos),
+  component to expand or collapse it), every component's side panel shows its status, a lead sentence, how
+  it works, where and when, link buttons and its API (plus notes or configuration), the canvas pans and zooms like a map, components are icons (built-in or real tool logos),
   layout is automatic (ELK, left to right then top to bottom), and arrows carry protocol:port pills,
   communication-kind colours, continuous moving dots for streams (both ways for WebSocket) and hover
   cards that animate the handshake or exchange (TLS, TCP, WebSocket, SSE, gRPC, Kafka, AMQP, MQTT,
@@ -23,7 +23,7 @@ Status and roadmap: [PLAN.md](PLAN.md). Engine: [assets/js/diagram.js](../../../
 (model, levels, ELK layout, SVG, pan/zoom, panel, protocol cards, tour, geo),
 [_includes/diagram.html](../../../_includes/diagram.html), [_sass/diagram.scss](../../../_sass/diagram.scss).
 Reference diagram: [_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml](../../../_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml)
-(57 components, 5 levels, 41 arrows, 8 use cases). Do not edit the engine for one
+(111 components with status and facts, 5 levels, 109 arrows, 15 use cases). Do not edit the engine for one
 diagram. `SKILL=.claude/skills/cloudutsuk-diagram`, run from the repo root.
 
 ## Inputs
@@ -47,10 +47,44 @@ components. Rules:
 - Group by **where things run** first (edge, clusters, external SaaS), then by **purpose** (portal,
   RAG, model serving). A group with 2 to 7 children reads best. If a level would show more than about
   45 components, add an intermediate group.
-- Every leaf has a `detail` (1 to 4 sentences of Markdown: what it does, what it owns, anything a
-  reader would ask). Add `config` only when the post or the repo gives the real snippet; copy it
-  exactly and say where it comes from in `title`.
-- Groups can have `detail` too (shown with the ⓘ button on the open frame).
+- **Every component has `status` and `facts`, leaves and groups alike, whenever you generate or update
+  a diagram.** The side panel is laid out by importance: the name with a status badge, `where` and
+  `when` as small chips, a lead sentence, "How it works", link buttons, then the API. The validator
+  warns about any component without facts and any leaf without a status. Write from the reader's point
+  of view, from the post or the repo, never invented. Example (Argo CD):
+
+  ```yaml
+  - id: argocd
+    label: Argo CD
+    status: built                 # built | planned | deferred | external; planned/deferred add `phase: 1a`
+    facts:
+      summary: "Deploys every cluster except core from git, so every change is a reviewed commit."
+      how: "Polls `homelab-gitops` every 3 minutes and applies through each cluster's API; ApplicationSets
+        pick clusters by label."
+      where: "platform · ns `argocd`"
+      when: "always on · 3-min poll"
+      url: {Argo CD: https://argocd.platform.home.cloudutsuk.com}
+      api: "`argocd-server.argocd:443`"
+  ```
+
+  | Key | Shows as | Rules |
+  |---|---|---|
+  | `status` (+ `phase`) | Badge next to the name | `built`, `planned`, `deferred` (amber on the canvas, no `tone` needed) or `external` (someone else's service). `phase` only with planned or deferred |
+  | `summary` | The lead sentence | Required. What it is **and** why it's here, in one sentence, under ~200 characters. Don't restate the name ("Google Cloud.") |
+  | `how` | "How it works" | Required. Mechanism, protocol, auth, what it owns; 1 or 2 sentences, under ~280 characters |
+  | `where` | Chip | Optional, under ~60 characters: cluster · namespace, host:port, region. Leave it out when the group already says it |
+  | `when` | Chip | Optional, under ~60 characters: "always on", "every 6 h", "on deploy". Planned status goes in the badge, not here |
+  | `url` | Link buttons | What a person opens: a map of short button label to address (`{Console: https://…}`), or a bare address (labelled by its host). A non-address string shows as a note |
+  | `api` | Lines with Copy | What a program calls: a string or a list of Markdown; a bare address or a single `code` span gets a Copy button |
+
+  Give at least one of `url` and `api`; a component without an address of its own says what reaches it
+  instead ("None of its own: `kubectl` against the platform API"). Use the real hostnames and ports
+  from the repos (Ingress hosts, Service names, the doctor's link list); for something planned, prefix
+  "Planned:". Leave out an optional fact rather than pad it. A group's facts describe the group.
+- `detail` is optional extra notes under the facts (numbers, caveats, as-built differences, 1 to 4
+  sentences); don't repeat the facts in it. Add `config` only when the post or the repo gives the real
+  snippet; copy it exactly and say where it comes from in `title`.
+- Groups show their panel with the ⓘ button on the open frame.
 - `direction: down` on a group stacks its children top to bottom. Use it when a group would otherwise
   be a very wide row (for example a host with 6 or more clusters).
 
@@ -208,7 +242,7 @@ pkill -f "http.serve[r] 4123"
 ```
 
 Checked: layout at every level with no overlapping components, expand on click, the protocol card on
-hover, the detail panel, zoom, the start level (ignoring an old URL parameter), the tour, no script errors, no foreign styling and no
+hover, the detail panel (status badge, chips, lead sentence, how it works, link buttons, API), zoom, the start level (ignoring an old URL parameter), the tour, no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
 deepest level, `card.png`, `panel.png`, `tour.png` and `step-next.png`. Then run htmlproofer on the same folder.
 
@@ -226,7 +260,7 @@ read. Never commit.
 | `direction` | Root flow (default `right`); per group `direction: down` |
 | `wrap`, `aspect` | `wrap: true` wraps a long single chain into rows (ELK MULTI_EDGE) |
 | `min_zoom` | Opening zoom floor (default 0.62): large diagrams open at a readable zoom on their start |
-| `nodes` | Tree: `{id, label, sub?, icon?, color?, tone?, detail?, config?, direction?, views?, children?}`. `views`: shown only in those view tabs. `id`: lowercase, digits, `-` and `_` (appears in URLs). `icon`: built-in name or a logo path under `assets/img/icons/` (`scripts/enrich.py --find <word>` in the flow-anim skill lists logos). `config`: `{title, lang, code}` |
+| `nodes` | Tree: `{id, label, sub?, icon?, color?, tone?, status, phase?, facts, detail?, config?, direction?, views?, children?}`. `status`: built, planned, deferred or external. `facts`: `{summary, how, where?, when?, url?, api?}` (step 1). `views`: shown only in those view tabs. `id`: lowercase, digits, `-` and `_` (appears in URLs). `icon`: built-in name or a logo path under `assets/img/icons/` (`scripts/enrich.py --find <word>` in the flow-anim skill lists logos). `config`: `{title, lang, code}` |
 | `views` | Tabs for cross-cutting connections: `[{id, label, icon?}]`; the main view (`Main flows`) is always first and `Show all` (id `*`, built in) last; don't define a view with id `*` |
 | `edges` | `{id, from, to, why, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `detail`: an extra technical note (auth, token lifetime) |
 | `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |

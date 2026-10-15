@@ -115,9 +115,11 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 > accepted. The details are under [Scalability](#scalability-and-performance-strategy).
 {: .prompt-info }
 
-> **TODO:** Which chat model goes first: gpt-oss-20b, Qwen3-30B-A3B or something else, and under which
-> licence? It's chosen in Phase 5 within the ~30 GB slice and recorded as its own ADR.
-{: .prompt-warning }
+> **Chat model, chosen 2026-10-15 (ADR 0046).** gpt-oss-20b, under Apache 2.0. Its MXFP4 weights take
+> 13.8 GiB, so it runs in a slice of about 21 GB rather than the ~30 GB planned. Qwen3-30B-A3B in FP8
+> needs about 31 GB for its weights alone, more than the DGX had free that day. Callers reach it through
+> LiteLLM as `gpt-oss-20b`, with OpenAI-style tool calls for the SRE agent.
+{: .prompt-info }
 
 ## API and integration architecture
 {: #api-and-integration-architecture }

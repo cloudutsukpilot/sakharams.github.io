@@ -7,6 +7,9 @@ tags: [Labs, eBPF Lab, eBPF, Cilium, Hubble, Tetragon, Falco, OpenTelemetry, Kub
 description: "Perform an action, predict the signal, then check the dashboard and explain what changed (eBPF Lab lab)."
 lab: ebpf-lab
 lab_part: 6
+image:
+  path: /assets/img/labs/ebpf-lab/06-experiments.webp
+  alt: "eBPF Lab: Experiments - Labs hero image"
 ---
 
 Seven experiments, from "see that it works" to "delete the cluster". Each is one `make` target, a
@@ -30,9 +33,10 @@ The loop is the same each time:
 4. Look where the card says, then run `make verify-<id>`: it exits 0 only if the expected signal exists.
 5. Explain what you saw, then compare with the sections under each card.
 
-Every screenshot here was captured in the early hours of 2026-10-14 (India time; the screenshot manifest records UTC, 2026-10-13) by the blog's capture script, which runs the same
-`exp-` and `verify-` targets and only keeps a shot when the verify passed. Experiments 1 to 6 ran on one
-cluster; Experiment 7 then rebuilt it.
+Every screenshot here was captured on 2026-10-14, from lab revision `c948ded`, by the blog's capture
+script, which runs the same `exp-` and `verify-` targets and only keeps a shot when the verify passed.
+Experiments 1 to 5 ran on one cluster and Experiment 7 then rebuilt it; Experiment 6's shots were retaken
+afterwards, on the rebuilt cluster, with a longer wait.
 
 ## Experiment 1: See every flow without kube-proxy
 {: #exp-cilium-cni }
@@ -42,9 +46,10 @@ cluster; Experiment 7 then rebuilt it.
 ### What the screenshots show
 
 Hubble's service map for namespace `demo` is drawn from packets alone: **world** (the host, through
-the NodePort) → **web** on 8080/TCP → two **api** boxes on 8080/TCP → **redis** on 6379/TCP. The two
-api boxes are the two pods, one per node. The header shows 54.8 flows/s across 2/2 nodes, and the flow
-table below lists `world → web 8080 forwarded` and `web → api 8080 forwarded` rows, all from the burst.
+the NodePort) → **web** on 8080/TCP → **api** on 8080/TCP → **redis** on 6379/TCP. The header shows
+53.0 flows/s across 2/2 nodes, and the flow table below lists `world → web 8080 forwarded` and
+`web → api 8080 forwarded` rows at 16:09:05, all from the burst. (In some runs the map draws the two api
+pods as two boxes; here it grouped them.)
 
 The `hubble observe` side of the card shows the answer to "on which node?". In the rebuilt cluster, four
 visits in a row gave:
@@ -86,23 +91,24 @@ also records it.
 
 ### What the screenshots show
 
-With the verdict filter set to **Dropped**, the map shrinks to one edge: **web → redis 6379/TCP**. The
-table has six rows, all `web demo → redis demo 6379 dropped`, at 02:33:12–02:33:14. The action's own
-output, in the terminal, shows both halves of the result:
+With the verdict filter set to **Dropped**, the map shrinks to one edge, drawn red: **web → redis
+6379/TCP**. The table has six rows, all `web demo → redis demo 6379 dropped`, at 16:09:54–16:09:56. The
+action's own output, in the terminal, shows both halves of the result:
 
 ```console
 web->redis blocked
 app via api->redis: ok
 ```
 
-And the verify target found the drop with its reason:
+And the verify target finds the drop with its reason (this line is from an earlier run of the same
+experiment; identities are assigned per cluster):
 
 ```console
 demo/web-57fbb6bb9f-bq4v6:33095 (ID:19920) <> demo/redis-bcc8fb84b-8cwqc:6379 (ID:33229) Policy denied DROPPED (TCP Flags: SYN)
 ```
 
 To the prediction: Cilium told the pods apart by numeric security identities, not by IP address. In
-that cluster web was identity 19920 and redis 33229; the api pods had one of their own.
+the run that line comes from, web was identity 19920 and redis 33229; the api pods had one of their own.
 
 ### Why it happens
 
@@ -135,9 +141,9 @@ the only command in the whole run that triggered Falco's **Network tool in demo 
 
 ### What the screenshots show
 
-The **Requests per route (OBI)** panel shows the burst as a block: `demo/api` and `demo/web` for both
-`/api/visits` and `/api/items` rise from zero to about 0.5 req/s each, averaged over the 3-minute
-window, then fall back. Underneath, two flat lines never move: `demo/api /healthz` at 0.4 req/s and
+The **Requests per route (OBI)** panel shows the burst arriving at about 16:11: `demo/api` and
+`demo/web` for both `/api/visits` and `/api/items` rise from zero to about 0.5 req/s each, averaged over
+the 3-minute window. Underneath, two flat lines never move: `demo/api /healthz` at 0.4 req/s and
 `demo/web /healthz` at 0.2 req/s, the readiness probes.
 
 The full dashboard (in [Part 5](/posts/labs/ebpf-lab/05-monitor/#open-the-dashboard)) fills in the rest of
@@ -171,17 +177,19 @@ windows, showed the previous burst and three empty panels.
 
 The two waterfalls are two kinds of trace from the same six visits.
 
-The **joined** one, `2d1fb875…`, starts at 03:01:15 and takes 11.53 ms: **demo/web GET /api/visits**
-(11.53 ms) → *processing* → a **GET /api/visits** client span (11.05 ms) → **demo/api GET /api/visits**
-(10.85 ms) → *processing* → **INCR** (9.74 ms). Eight spans, two services. web's call to the API and the
-API's own handling are one trace.
+The **joined** one, `2b57de8a…`, starts at 16:12:47.793 and takes 11.23 ms: **demo/web GET
+/api/visits** (11.23 ms) → *processing* → a **GET /api/visits** client span (10.79 ms) → **demo/api GET
+/api/visits** (10.62 ms) → *processing* → **INCR** (9.84 ms) → **demo/redis INCR** (9.64 ms). Nine spans,
+three services: web's call, the API's handling and Redis's own server-side span are one trace.
 
-The **split** one, `b2308700…`, starts at 03:01:06 and takes 1.91 ms: its root is **demo/api GET
-/api/visits** (1.91 ms) → *processing* → **INCR** (417 µs) → **demo/redis INCR** (243 µs). There's no web
-span at all, but there's one this joined trace lacks: Redis's own server-side span.
+The **split** one, `01a9f3ae…`, starts at 16:12:44.774 and takes 10.94 ms: its root is **demo/api GET
+/api/visits** (10.94 ms) → *processing* → **INCR** (9.76 ms). Four spans, one service. No web span above
+it, and no Redis span below it.
 
-So the answer to the prediction is "sometimes". To find out when, I sent six visits three seconds
-apart and looked up every trace they produced, with the node and pod of each span:
+So the answer to the prediction is "sometimes". In this cluster web, Redis and one API pod ran on the
+server node and the other API pod on the agent node. In an earlier run, before a rebuild placed the pods
+differently, I sent six visits three seconds apart and looked up every trace they produced, with the
+node of each span:
 
 | Visit | Traces | Spans by service and node |
 |---|---|---|
@@ -193,8 +201,10 @@ apart and looked up every trace they produced, with the node and pod of each spa
 | 6 | 1 | web + api, both on agent-0 (8) |
 
 Every time web and the api pod were on the same node, they shared a trace; every time the request crossed
-nodes, it split. The same rule holds one hop further: redis ran on server-0, so its span joined only the
-traces whose api pod was on server-0 too.
+nodes, it split. The same rule holds one hop further: Redis's span joins a trace only when the api pod
+that called it is on Redis's node. The screenshots show both halves of that: the joined trace has the
+Redis span (everything on the server node); the split trace, from the API pod on the agent node, has
+none.
 
 ### Why it happens
 
@@ -205,11 +215,11 @@ In this lab it didn't arrive at the other node, so the API on the far side start
 pin down which part of the cross-node path loses it (OBI's injection, Cilium's VXLAN datapath or the
 nested k3d setup); the observable rule is reliable enough to design around.
 
-The INCR durations are worth a second look too: 9.74 ms in the joined trace (the api pod on agent-0
-calling redis on server-0) and 417 µs in the split one (both on server-0). The
+The INCR durations are worth a second look too. In both screenshots INCR takes almost 10 ms, for a
+single in-memory increment; in the earlier run one took 417 µs. The
 `{ name = "INCR" && duration > 5ms }` query in [Part 5](/posts/labs/ebpf-lab/05-monitor/#explore-queries)
-finds the slow ones. I haven't measured which part of the cross-node call takes the time; it's a good
-next experiment ([Go Further](/posts/labs/ebpf-lab/07-understand-and-review/#go-further)).
+finds the slow ones. I haven't measured where that time goes; it's a good next experiment
+([Go Further](/posts/labs/ebpf-lab/07-understand-and-review/#go-further)).
 
 `make verify-obi-traces` uses the two TraceQL queries from the card, so it passes only when both kinds
 exist, and hands both trace IDs to the screenshots through the dashboard's **Trace** variable.
@@ -222,13 +232,15 @@ exist, and hands both trace IDs to the screenshots through the dashboard's **Tra
 ### What the screenshots show
 
 The Falcosidekick UI's Events page has the alert at the top: **Warning**, rule **Shell in demo pod**,
-source `syscall`, hostname `k3d-lab-ebpf-agent-0`, at 02:50:20.215. Its fields carry the command line
-`sh -c id; cat /etc/hostname`, `user.uid` 101, `k8s.pod.name` `web-57fbb6bb9f-bq4v6`, `k8s.ns.name`
+source `syscall`, hostname `k3d-lab-ebpf-server-0`, at 16:14:08.473. Its fields carry the command line
+`sh -c id; cat /etc/hostname`, `user.uid` 101, `k8s.pod.name` `web-57fbb6bb9f-zcggd`, `k8s.ns.name`
 `demo`, `container.image.repository` `docker.io/ebpf-lab/web`, and the tags `ebpf_lab`,
 `mitre_execution` and `shell`. Falco couldn't fill in `user.name` (`<NA>`) or the parent process.
 
-The counters in the header are the other lesson: 37,111 events in total, 36,196 of them Critical, almost
-all from Falco's stock rules firing on processes elsewhere on the host.
+The counters in the header are the other lesson: 37,255 events in total, 36,229 of them Critical, almost
+all from Falco's stock rules firing on processes elsewhere on the host. The next row down is one of them:
+a stock *Redirect STDOUT/STDIN to Network Connection in Container* notice for an `httpd` process with no
+pod at all.
 
 To the prediction: the stock rule *Terminal shell in container* needs a TTY, and `kubectl exec` without
 `-t` has none. The lab's rule matches on what's left: a shell process (`proc.name in (sh, bash, ash,
@@ -259,17 +271,22 @@ wget exit=137
 Killed
 ```
 
-The Tetragon panel has four events at 02:51:04.788 (the panel lists them newest first; here they are in the order they happened):
+The Tetragon panel has four events at 16:29:42.440 (the panel lists them newest first; here they are in the order they happened):
 
-1. `exec /bin/sh -c "wget -q -T 3 -O /dev/null http://api:8080/healthz; echo "wget exit=$?"" pod=web-57fbb6bb9f-bq4v6 uid=101`
-2. `KPROBE_ACTION_SIGKILL __arm64_sys_execve /bin/sh pod=web-57fbb6bb9f-bq4v6 policy=block-network-tools`
+1. `exec /bin/sh -c "wget -q -T 3 -O /dev/null http://api:8080/healthz; echo "wget exit=$?"" pod=web-57fbb6bb9f-cckxh uid=101`
+2. `KPROBE_ACTION_SIGKILL __arm64_sys_execve /bin/sh pod=web-57fbb6bb9f-cckxh policy=block-network-tools`
 3. `exit /bin/sh signal=SIGKILL`
 4. `exit /bin/sh signal=` (no signal)
 
 Falco's screenshot is the answer to the prediction. It has two **Warning: Shell in demo pod** events
-for the `sh -c wget …` command, at 02:51:04.113 and .114, one with `parent=sh` and one with `parent=<NA>`.
-There is **no** *Network tool in demo pod* alert for `wget`. The only Critical alert from the lab's rules
-in the whole run is the `nc` from [Experiment 2](#exp-identity-policy), before any Tetragon policy existed.
+for the `sh -c wget …` command, at 16:29:42.006 and .007, one with `parent=sh` and one with `parent=<NA>`.
+There is **no** *Network tool in demo pod* alert for `wget`. The lab's *Network tool* rule fired only for
+the `nc` in [Experiment 2](#exp-identity-policy) (16:09:54, visible in the dashboard's Falco panel in
+[Part 5](/posts/labs/ebpf-lab/05-monitor/#open-the-dashboard)), before any Tetragon policy existed.
+
+The first attempt at this capture used a 10-second wait, and the Tetragon panel showed only the kill and
+the child's SIGKILL exit; the exec and the parent's exit reached Loki a few seconds later. The experiment
+now waits 25 seconds.
 
 ### Why it happens
 
@@ -319,14 +336,14 @@ found Experiment 2's `nc` alert. It now checks for the shell alert with `wget` i
 
 ### What the screenshots show
 
-Before: the page shows **7116** visits, served by `api-5df5d59bd7-s7rpm`. After the rebuild: **7121**,
-served by `api-5df5d59bd7-vss5p`, a pod name from the new cluster. The count went on instead of
+Before: the page shows **7254** visits, served by `api-5df5d59bd7-vss5p`. After the rebuild: **7259**,
+served by `api-5df5d59bd7-fwvrs`, a pod name from the new cluster. The count went on instead of
 starting at 1.
 
 The five visits in between are all accounted for: `exp-rebuild-persists` counts one before the rebuild
-(7117) and one after (7118), the verify counts one (7119), and the two page loads (the experiment's
-browser step and the after-shot) count one each, because the page itself calls `/api/visits`. The
-rebuild, `make down` and `make up` together, took 747 seconds.
+and one after, the verify counts one, and the two page loads (the experiment's browser step and the
+after-shot) count one each, because the page itself calls `/api/visits`. The rebuild, `make down` and
+`make up` together, took about 12 minutes.
 
 ### Why it happens
 

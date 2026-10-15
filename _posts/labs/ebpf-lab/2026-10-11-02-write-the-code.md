@@ -7,6 +7,9 @@ tags: [Labs, eBPF Lab, eBPF, Cilium, Hubble, Tetragon, Falco, OpenTelemetry, Kub
 description: "The application and its instrumentation, file by file (eBPF Lab lab)."
 lab: ebpf-lab
 lab_part: 2
+image:
+  path: /assets/img/labs/ebpf-lab/02-write-the-code.webp
+  alt: "eBPF Lab: Write the Code - Labs hero image"
 ---
 
 The app in this lab is short on purpose: one nginx config, one HTML page and about a hundred lines of

@@ -693,6 +693,159 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   margin: 0.5rem 0;
 }
 
+// Component facts: status badge, where/when chips, lead sentence, how it works, links, API.
+.dgm-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  padding-right: 1.4rem; // room for the close button
+}
+
+.dgm-status {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--dgm-s) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dgm-s) 14%, transparent);
+  color: var(--dgm-s);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dgm-status-built {
+  --dgm-s: #16a34a;
+}
+
+.dgm-status-planned {
+  --dgm-s: #d97706;
+}
+
+.dgm-status-deferred {
+  --dgm-s: #64748b;
+}
+
+.dgm-status-external {
+  --dgm-s: #2563eb;
+}
+
+.dgm-facts {
+  margin: 0.55rem 0 0.4rem;
+}
+
+.dgm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.55rem;
+}
+
+.dgm-chip {
+  max-width: 100%;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.4rem;
+  background: var(--dgm-soft);
+  font-size: 0.76rem;
+  line-height: 1.5;
+
+  b {
+    margin-right: 0.15rem;
+    color: var(--dgm-muted);
+    font-weight: 600;
+  }
+
+  code {
+    font-size: 0.72rem;
+  }
+}
+
+.dgm-lead p {
+  margin: 0 0 0.6rem;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.dgm-sec {
+  margin: 0.2rem 0 0.15rem;
+  color: var(--dgm-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dgm-how p {
+  margin: 0 0 0.6rem;
+}
+
+.dgm-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.1rem 0 0.6rem;
+}
+
+.dgm-btn {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.45rem;
+  background: var(--main-bg);
+  font-size: 0.8rem;
+  text-decoration: none !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--dgm-c, currentColor);
+  }
+}
+
+.dgm-link-note {
+  font-size: 0.8rem;
+  color: var(--dgm-muted);
+}
+
+.dgm-api {
+  margin-bottom: 0.5rem;
+
+  ul {
+    margin: 0;
+    padding: 0 !important; // the theme's `.content ul` padding outranks this selector
+  }
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.1rem 0;
+    list-style: none;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    flex: none;
+    margin-left: auto;
+    padding: 0 0.35rem;
+    border: 1px solid var(--dgm-border);
+    border-radius: 0.3rem;
+    background: var(--main-bg);
+    color: var(--dgm-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+  }
+}
+
+.dgm-notes {
+  padding-top: 0.2rem;
+  border-top: 1px dashed var(--dgm-border);
+  color: var(--dgm-muted);
+  font-size: 0.85rem;
+}
+
 .dgm-config {
   margin: 0.6rem 0;
   border: 1px solid var(--dgm-border);
