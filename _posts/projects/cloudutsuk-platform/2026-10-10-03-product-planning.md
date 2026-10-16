@@ -4,7 +4,7 @@ title: "Cloudutsuk Platform: Product Planning"
 date: 2026-10-10 00:03:00 +0530
 categories: [projects, cloudutsuk-platform]
 tags: [Projects, Cloudutsuk Platform, Planning, Roadmap]
-description: "Seven phases for the Cloudutsuk Platform, each ending usable: foundation, GitOps and CI/CD, monitoring, portal and labs, cost, local LLM and RAG, alert agent."
+description: "Seven phases for the Cloudutsuk Platform, each ending usable: foundation, GitOps and CI/CD, monitoring, portal and labs, cost, local LLM and RAG, alert agent and agent board."
 project: cloudutsuk-platform
 project_step: 3
 image:
@@ -40,7 +40,7 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 | 3. Portal + labs | Backstage custom image through CI, SSO, Labs plugin, lab runner, `deploy:` blocks, Dashboard tab on the blog | 1, 2 | In progress (started 2026-10-13, alongside Phase 2) |
 | 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, OpenCost on every k3d cluster with custom DGX prices, Inventory & Cost plugin, budget alerts | 2, 3 | Not started |
 | 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; KEDA scaling on-demand models to zero when idle; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | In progress (started 2026-10-15) |
-| 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 | Not started |
+| 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos); Paperclip as the agent control plane in `platform` (a task board for agents, on `platform-db`, behind Keycloak, models only through the LiteLLM gateway, code changes only as PRs) | 2, 2a, 5 | Not started |
 
 ### Phase steps
 {: #phase-steps }
@@ -181,6 +181,14 @@ already runs and need no CI, so it depends on Phase 0 only.
 | 3 | RAG and `mon` tools for the agent | `sre-agent` | An RCA cites the right lab doc and the metrics behind it | Not started |
 | 4 | Eval suite built from lab experiments | `sre-agent` | The evals pass | Not started |
 | 5 | Alert-agent incident diagram | this blog | It's drawn and in the Diagrams lane | Not started |
+| 5a | Paperclip spike on the DGX: the upstream arm64 image against a throwaway Postgres 17, run as uid 1000 with a read-only root, an OpenCode agent on LiteLLM with a test virtual key, memory and image size measured | `homelab-services` (the plan in `docs/paperclip-plan.md`) | One small task is finished by an agent on `gpt-oss-20b` (or the need for a hosted model is written down), and the answers are in the plan and the ADR draft | Not started |
+| 5b | ADR for Paperclip: `platform` cluster, our own signed image, `platform-db`, Keycloak in front through oauth2-proxy (Paperclip has no OIDC sign-in), LiteLLM-only models, a PR-only GitHub App, agents inside the pod with no cluster access | `homelab-gitops`, this blog | The ADR is accepted and synced to the blog | Not started |
+| 5c | `platform/paperclip` image: a thin image on the pinned upstream digest (at least 14 days old) with the agent CLIs and the OTel packages at pinned versions, built by `build-image.yaml` | `homelab-services`, `homelab-gitops` | A `main` build pushes a signed image with its SBOM to Zot and commits the digest to `apps/paperclip` | Not started |
+| 5d | Paperclip's database and secrets: database `paperclip` and its owner role in `platform-db`, auth, signing and master keys in OpenBao, a Keycloak client `paperclip`, the master key in the offline recovery kit | `homelab-gitops`, `infra-local` | The ExternalSecrets report `SecretSynced` and the role can sign in to its database | Not started |
+| 5e | Paperclip in `platform` through Argo CD (`apps/paperclip`, group `platform`): one pod, non-root, read-only root, no ServiceAccount token, an egress NetworkPolicy, an Ingress on the tailnet behind oauth2-proxy for `platform-admins`, open sign-up off | `homelab-gitops` | The app is Synced and Healthy, passes every Kyverno policy with no new exception, and only a `platform-admins` member reaches the board, with a valid certificate | Not started |
+| 5f | Paperclip's first agents: a LiteLLM virtual key `paperclip` with a budget, a GitHub App limited to pull requests on a test repo, an engineer agent on OpenCode and a reviewer stage on its project | `homelab-gitops`, `infra-local`, GitHub | An agent picks up a task from the board and opens a PR on the test repo through LiteLLM; the run, its cost and the approval show in Paperclip; a push to `main` is refused | Not started |
+| 5g | Paperclip's operations: traces to `mon`, alerts on a pod that isn't ready and a failing `/api/health`, its database in the nightly dump, its tile on the Homelab links page | `homelab-gitops`, `infra-local` | Its traces show in Tempo, stopping the pod fires an alert, last night's dump holds the `paperclip` database, and the tile is green | Not started |
+| 5h | The sre-agent as a Paperclip employee (HTTP adapter): Alertmanager still calls the agent directly (ADR 0014); the agent files its RCA and proposed `homelab-gitops` PR as a Paperclip task with an approval stage | `sre-agent`, `homelab-gitops` | An injected lab fault ends as a Paperclip task with the RCA, waiting for my approval | Not started |
 | 6 | Phase 6 exit: ADRs synced, playbook updated, card moved to Live | this blog | M6's exit check passes | Not started |
 
 ## MVP definition
@@ -215,7 +223,7 @@ Each phase ends with the same exit steps:
 | M3 MVP | Deploy and Destroy from the portal create and delete a cluster and register it in Argo CD |
 | M4 Cost | Portal cost matches each provider's console within a day; a `lab`-tagged resource rolls up under its lab; every k3d cluster's OpenCost reports, and a lab's DGX cost and cloud cost show together |
 | M5 Chat | A new post is cited after "Re-index now"; the same question again hits the cache |
-| M6 Agent | An injected lab fault produces an RCA in Slack that cites the right doc; evals pass |
+| M6 Agent | An injected lab fault produces an RCA in Slack that cites the right doc; evals pass; the same RCA waits for approval as a task on the Paperclip board, and an agent's PR from the board reaches GitHub only through review |
 
 > **TODO:** Target dates per milestone. Dates aren't set yet; add them once phase 0 shows how fast the
 > work goes.
@@ -236,7 +244,7 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
 | Inventory + cost | `homelab-services`, `homelab-gitops` | Azure collector; AWS collector; GCP billing export; DGX power estimate; OpenCost in the monitoring pack with custom DGX prices; daily OpenCost allocation into `COST_DAILY` |
 | RAG + chat | `homelab-services`, `homelab-gitops` | Incremental ingest; semantic cache; Chat plugin with citations; KEDA ScaledObject for each on-demand model |
-| Alert agent | `sre-agent` | Alertmanager webhook; RAG tool; eval cases from lab experiments |
+| Alert agent | `sre-agent`, `homelab-services`, `homelab-gitops` | Alertmanager webhook; RAG tool; eval cases from lab experiments; Paperclip image, app and first agents; the sre-agent as a Paperclip employee |
 | Later (deferred) | a new lab repo, then `infra-local` | Cilium on k3d as a lab first; the long-lived clusters only if the lab passes ([why deferred](/posts/projects/cloudutsuk-platform/05-technical-architecture/#cilium-considered-deferred)) |
 | Playbook | this blog | Area posts per phase; ADR sync; diagrams |
 
@@ -286,6 +294,9 @@ and my evenings.
 | Karmada duplicates what Argo CD already does and costs ~2.5 GB | Medium | Two tools to learn and debug for the same fan-out | Narrow role (shared add-ons only); a trial with an exit check; ApplicationSets stay as the fallback; first to go if memory is tight |
 | Self-hosted runners abused | Low | Code execution on the DGX | Private repos only; ephemeral runners |
 | Prompt injection through logs reaches the agent | Medium | A bad change proposed | Read-only RBAC; approval for every change; fixes as PRs |
+| Paperclip's agents run code inside its pod, with the secrets bound to them | Medium | A leaked key or an unwanted change | No cluster credentials, an egress allow-list, a GitHub App that can only open PRs, approval stages, budgets in Paperclip below the LiteLLM key's |
+| Paperclip changes upstream several times a day | High | Upgrades break its migrations | Pin a digest at least 14 days old, bump on purpose, dump `platform-db` before each bump; rollback is the old digest and a restore |
+| `gpt-oss-20b` is too weak for coding agents | Medium | Agents finish little | The step 5a spike decides; a hosted model goes behind LiteLLM as another backend |
 | Scope creep | High | Nothing ships | MVP is phases 0–3; new ideas go to the backlog via change control |
 
 ## Change-control process
@@ -316,6 +327,7 @@ There's one decider, so this stays light:
 - [ ] ADR for OpenCost on every k3d cluster written in `homelab-gitops` and synced
 - [ ] ADR for KEDA (on-demand models in `ai`) written in `homelab-gitops` and synced
 - [ ] ADR for Karmada written in `homelab-gitops`, and accepted or dropped after the phase 1a trial
+- [ ] ADR for Paperclip written in `homelab-gitops` after the Phase 6 step 5a spike, and synced
 - [ ] This post and the project card status updated at the end of every phase
 
 {% include project-nav.html %}
