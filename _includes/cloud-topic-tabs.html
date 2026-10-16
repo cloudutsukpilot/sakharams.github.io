@@ -1,0 +1,57 @@
+{%- comment -%}
+  AWS | Azure | Google Cloud tabs for one sub-topic of a cloud category overview post.
+  Usage: {% include cloud-topic-tabs.html cat="compute" topic="vms" %}
+  Data: _data/cloud_topics/<cat>.yml → topics[].{id, title, aws, azure, gcp}. Each provider is a list of
+  services ({ref | name, summary, optional post, icon}) or a `note:` string when it has no equivalent.
+  `ref` names a service in _data/cloud_compare.yml (any category), which supplies its post link and
+  official icon; `name` overrides the label. Tabs are CSS-only radio buttons (no JS); icons are CSS
+  backgrounds so refactor-content.html doesn't wrap them in popup links.
+{%- endcomment -%}
+{%- assign cc = site.data.cloud_compare -%}
+{%- assign topic = site.data.cloud_topics[include.cat].topics | where: "id", include.topic | first -%}
+{%- capture gid -%}cct-{{ include.cat }}-{{ include.topic }}{%- endcapture -%}
+<div class="cct" role="group" aria-label="{{ topic.title }}: compare providers">
+{%- for prov in cc.providers -%}
+<input type="radio" class="cct-in cct-in-{{ prov.id }}" name="{{ gid }}" id="{{ gid }}-{{ prov.id }}"{% if forloop.first %} checked{% endif %}>
+{%- endfor -%}
+<div class="cct-bar">
+{%- for prov in cc.providers -%}
+<label class="cct-l cct-l-{{ prov.id }}" for="{{ gid }}-{{ prov.id }}"><span class="cct-logo" style="background-image:url('{{ prov.logo | relative_url }}')" aria-hidden="true"></span>{{ prov.title }}</label>
+{%- endfor -%}
+</div>
+<div class="cct-panels">
+{%- for prov in cc.providers -%}
+{%- assign entry = topic[prov.id] -%}
+<div class="cct-p cct-p-{{ prov.id }}">
+{%- if entry.note -%}
+<p class="cct-note">{{ entry.note | markdownify | remove: '<p>' | remove: '</p>' | strip }}</p>
+{%- else -%}
+{%- for svc in entry -%}
+{%- assign hit = nil -%}
+{%- if svc.ref -%}
+{%- for c in cc.categories -%}
+{%- assign hit = c[prov.id] | where: "name", svc.ref | first -%}
+{%- if hit -%}{%- break -%}{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- assign post_path = svc.post | default: hit.post -%}
+{%- assign p = nil -%}
+{%- if post_path -%}{%- assign p = site.posts | where: "path", post_path | first -%}{%- endif -%}
+{%- assign icon_key = svc.icon | default: hit.icon -%}
+<div class="cct-svc">
+{%- if icon_key -%}
+<span class="cct-icon" style="background-image:url('{{ '/assets/img/icons/cloud/' | append: prov.id | append: '/services/' | append: icon_key | append: '.svg' | relative_url }}')" aria-hidden="true"></span>
+{%- else -%}
+<span class="cct-icon cct-icon-generic" aria-hidden="true"><i class="fas fa-cube"></i></span>
+{%- endif -%}
+<div class="cct-body">
+<p class="cct-name">{% if p %}<a href="{{ p.url | relative_url }}">{{ svc.name | default: svc.ref }}</a>{% else %}{{ svc.name | default: svc.ref }}{% endif %}{% if p.placeholder %} <span class="cc-soon">Soon</span>{% endif %}</p>
+<div class="cct-sum">{{ svc.summary | markdownify }}</div>
+</div>
+</div>
+{%- endfor -%}
+{%- endif -%}
+</div>
+{%- endfor -%}
+</div>
+</div>

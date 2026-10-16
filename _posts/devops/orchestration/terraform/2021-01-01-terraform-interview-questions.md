@@ -5,6 +5,10 @@ categories: [devops, orchestration, terraform]
 tags: [DevOps, Orchestration, Terraform, Interview Questions]
 image: /assets/img/devops/orchestration/terraform/terraform-posts.jpg
 description: Terraform Interview Questions
+interview_domain: devops
+interview_topic: Terraform
+interview_sections:
+  Scenario-based (Production): { level: advanced }
 ---
 
 
@@ -17,7 +21,7 @@ description: Terraform Interview Questions
 | 5. Provisioners | 11. Secrets|
 | 6. State | 12. Production |
 
-| [Beginner](#beginner) | [Intermediate](#intermediate) | [Advanced](#advanced) |
+| [Beginner](#beginner) | [Intermediate](#intermediate) | [Advanced](#advanced) | [Scenarios: Advanced](#scenarios-advanced) |
 
 ### Beginner
 
@@ -200,3 +204,86 @@ description: Terraform Interview Questions
     ```hcl
     terraform import module.iam.aws_iam_user.user[0] john
     ```
+
+### Scenarios: Advanced
+
+Senior level: production IaC where a wrong `apply` causes an outage.
+
+1. Terraform apply is failing due to drift, but the infrastructure is currently live and critical. How do you fix it without causing downtime?
+
+    **Scenario:** someone hot-fixed production in the console, another tool changed some resources, or a resource was created by hand. Now `terraform apply` fails ("already exists", conflicting changes) or the plan wants to revert or replace live, business-critical resources. The interviewer wants a safe, reversible process: freeze, back up, understand every difference, decide the direction of each fix, and only then make in-place changes.
+
+    **Step-by-step answer:**
+
+    1. **Freeze changes.** Pause the pipeline and any auto-apply for this stack and tell the team. Nobody runs `apply -auto-approve` until the drift is understood.
+    2. **Back up.** `terraform state pull > pre-drift-fix.tfstate`, make sure the backend has versioning on, and snapshot any data-bearing resource the plan touches (databases, volumes).
+    3. **See the drift on its own.** `terraform plan -refresh-only` shows how reality differs from state, without mixing in config changes. Then `terraform plan -out=tfplan` shows what Terraform would do about it.
+    4. **Classify each difference:**
+       - A *legitimate hotfix* (a larger instance, a new security group rule added during an incident): keep it
+       - An *accidental or unauthorised* change: revert it
+       - An attribute *owned by another system* (ASG desired capacity, tags added by policy, autoscaled node counts): stop Terraform from managing it
+       - A resource *created outside Terraform*: bring it under management
+       - A resource *deleted outside Terraform*: decide whether to re-create it or drop it from code
+    5. **Fix the code, not the infrastructure, wherever possible:**
+       - Keep the hotfix → change the code to match reality until the plan shows no change for that resource
+       - Externally owned attributes → `lifecycle { ignore_changes = [...] }`
+       - Created by hand → `import` block (Terraform 1.5+) or `terraform import`
+       - No longer managed here → `removed` block (Terraform 1.7+) or `terraform state rm`
+       - Accept reality into state without changing infrastructure → `terraform apply -refresh-only`
+    6. **Apply only in-place changes.** Read the saved plan line by line. Anything marked `forces replacement` or `must be replaced` on a critical resource is a stop sign: find another route (a `moved` block, `create_before_destroy`, a blue/green replacement in a maintenance window). Use `-target` only to isolate an urgent fix, never as the normal workflow. Rehearse on a non-production copy if the change is risky.
+    7. **Verify.** `terraform plan` must report "No changes", and the service's health checks and SLO dashboards stay green.
+    8. **Prevent recurrence.** Scheduled drift detection (`terraform plan -detailed-exitcode` in CI; exit code 2 means drift) with alerts; read-only console access for humans, plus an audited break-glass role; small state files per stack to limit the blast radius; `prevent_destroy` and cloud-side deletion protection on critical resources.
+
+    ```hcl
+    # Bring a hand-made resource under management
+    import {
+      to = aws_security_group_rule.hotfix_https
+      id = "sg-0abc123_ingress_tcp_443_443_10.0.0.0/16"
+    }
+
+    # Let the autoscaler own capacity
+    resource "aws_autoscaling_group" "web" {
+      # ...
+      lifecycle {
+        ignore_changes  = [desired_capacity]
+        prevent_destroy = true
+      }
+    }
+    ```
+
+    ```sh
+    terraform state pull > pre-drift-fix.tfstate
+    terraform plan -refresh-only
+    terraform plan -out=tfplan && terraform show tfplan | grep -E 'forces replacement|must be replaced|destroy'
+    terraform apply tfplan
+    ```
+
+### Scenario-based (Production)
+
+1. Terraform wants to destroy something critical. What do you do?
+
+    - Stop and don't apply. Read why: `# forces replacement` (immutable attribute) or a plain destroy
+    - Common causes: resource renamed or moved into a module (use a `moved` block / `terraform state mv`), `count` index shift (switch to `for_each`), provider upgrade changing defaults, removed from config, wrong workspace/backend/var file
+    - Back up first: `terraform state pull`, DB snapshot
+    - Fix in code: `moved`, `import`, `removed` block (drop from state without destroying), `ignore_changes` for externally managed attributes
+    - Guardrails: `prevent_destroy`, cloud-side deletion protection/locks, policy-as-code (OPA/Sentinel) blocking deletes in CI, `plan -out` reviewed before apply
+
+2. Terraform wants to recreate 40 production resources. Nobody changed the code. What happened?
+
+    - Provider version drifted: loose version constraints, `.terraform.lock.hcl` not committed
+    - Module source unpinned (`ref=main`); different Terraform version
+    - Data source returning a new value (e.g., "latest" AMI → all instances replaced)
+    - Variable values changed outside code: tfvars, `TF_VAR_*`, pipeline inputs
+    - Input list reordered, shifting `count` indices
+    - Wrong state/workspace/backend; manual console changes to immutable attributes
+    - `depends_on` on a data source deferring reads to apply time ("known after apply")
+    - Diagnose: find `forces replacement` lines, diff the lock file, check `terraform version` and backend state versions
+
+3. Terraform `remote_state` backend suddenly times out. What's your recovery and damage-containment strategy?
+
+    - Don't force anything yet. Check backend health, network/VPN/proxy/private endpoint, expired credentials, throttling
+    - Freeze pipelines for that stack so nobody applies in parallel
+    - Stale lock: confirm no apply is running, then `terraform force-unlock <LOCK_ID>`
+    - Apply interrupted mid-write: Terraform saves `errored.tfstate` locally, so `terraform state push` it; or restore the previous version from backend versioning (S3 versioning)
+    - Run `terraform plan` to reconcile state with reality before any apply
+    - Containment: smaller state files per stack (smaller blast radius), lock-age alerts, versioned backups, consumers using `terraform_remote_state` read-only

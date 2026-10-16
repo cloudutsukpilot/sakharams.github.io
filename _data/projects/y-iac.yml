@@ -1,0 +1,84 @@
+# Project playbook card for /tags/y-iac/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company name, internal consumer repo names, subscription names and IDs, storage accounts and
+# vendor tenant IDs are deliberately left out (public repo). The Python package is written as
+# `src/<org>_iac/` for the same reason.
+name: Y-IaC
+tag: Y-IaC
+summary: A shared Terraform and Terragrunt module platform with a YAML-driven Python CLI and reusable
+  GitHub Actions, so every infra-* repo describes resources in YAML and gets validated, policy-gated plans.
+status: Live
+created: '2026-10-05'
+category: platform-engineering
+clouds: [azure, aws, gcp]
+facts:
+- label: Type
+  value: Shared IaC module platform
+- label: Stack
+  value: Terraform, Terragrunt stacks, Python 3.12 CLI, YAML, HCL
+- label: Hosting
+  value: GitHub (shared repo); Azure, AWS, GCP and SaaS providers (targets)
+- label: Delivery
+  value: Reusable GitHub Actions, PR plan, approved apply
+- label: Catalog
+  value: 175 modules (146 cloud, 29 provider)
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/y-iac/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture", url: /posts/projects/y-iac/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/y-iac/system-architecture, format: animated}
+- {type: sequence, title: "Part 1: how the Python CLI prepares a run", url: /posts/projects/y-iac/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/y-iac/python-cli-flow, format: animated}
+- {type: sequence, title: "Part 2: inside one generated Terragrunt unit", url: /posts/projects/y-iac/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/y-iac/terragrunt-unit-flow, format: animated}
+- {type: cicd, title: "Consumer CI/CD pipeline", url: /posts/projects/y-iac/12-cicd-and-release-management/#deployment-automation, diagram: projects/y-iac/cicd-pipeline, format: animated}
+- {type: observability, title: "Drift detection loop", url: /posts/projects/y-iac/14-operations-and-observability/#alerting-and-escalation, diagram: projects/y-iac/drift-loop, format: animated}
+brief: |
+  Author's request: "Please create a new project for terragrunt shared module repo and name it as
+  y-iac (or if you can suggest anything better). Please refer to the attached document for more
+  information on the y-iac project and also refer to the terragrunt_shared_module repo as well as
+  infra-* repo in the same folder which are consuming repositories. I also need to create an animated
+  diagram which shows the flow of the python code as it processes the yaml files, env var, root.hcl,
+  terraform providers, and so on, which will provide a better understanding of how it works."
+
+  Name: Y-IaC. The infra-aws consumer already sets `iac_shared_repo: y-iac` in its config.yaml.
+
+  Source material: the author's "Project Readiness and Delivery Guide" for the shared module (an
+  18-section planning baseline, summarised here), a read-only look at the terragrunt_shared_module repo,
+  and the infra-aws and infra-github consumers (infra-azure and infra-gcp are still empty).
+
+  From the guide: an internal IaC platform and shared module repository. Users are platform engineers,
+  infrastructure contributors, application/platform teams, CI/CD maintainers and support teams. Core
+  tech: Terraform, Terragrunt, Python 3.12+, YAML, HCL, GitHub Actions, OPA, Trivy/Wiz, Infracost,
+  Ansible, optional Diagrams. Consumers reference or synchronize shared modules and run them through
+  entrypoint.py and Terragrunt workflows. Providers: Azure, AWS, GCP, Entra, GitHub, Helm, Kubernetes,
+  ArgoCD, Grafana, JFrog, Zscaler and others. This repo is the source of truth; shared code is never
+  patched in consumer copies. Consumer YAML (config.yaml, common_vars.yaml, resources.yaml) is turned
+  into generated Terragrunt configuration. State: local for development, Azure Blob for configured
+  consumers, templates for S3 and GCS. Quality: Python tests, module validation, formatting, linting,
+  policy gates, security scanning, cost analysis, compatibility checks, drift detection. Scope,
+  consumer-owned vs shared concerns, success measures, risk-based priority order (state safety and
+  security first, convenience last), MVP, six milestones (Foundation, Consumer scale, Module maturity,
+  Governance maturity, Operational maturity, Continuous improvement), and a list of open decisions
+  (version ranges, compatibility matrix, owners and SLOs, gate enforcement levels, state backup and DR,
+  versioning and deprecation policy, identity patterns, evidence retention, provider lifecycle,
+  dashboards and KPI baselines). The guide gives no named owners, team size, dates, budgets or targets.
+
+  Code findings (read-only): bootstrap entrypoint.py stub is identical in every consumer and delegates
+  to src/<org>_iac/cli/app.py; package areas bootstrap, cli, config, core, environment, generators,
+  handlers (terragrunt, statelock, ansible), reporting, validation. template/root.hcl reads
+  common_vars.yaml, config.yaml (repo first, shared fallback) and config/providers.yaml, and generates
+  provider.tf and backend.tf (local, azurerm, s3, gcs). StackGenerator writes one terragrunt.stack.hcl
+  unit per resource type; common_vars are merged into .terragrunt-stack/common_vars.yaml. Plan gates:
+  OPA, Trivy or Wiz (iac_scanner), Infracost. Stale state-lock release is opt-in (AUTO_RELEASE_LOCK,
+  LOCK_MIN_AGE_MINUTES). 146 cloud modules + 29 provider modules, 10 OPA rego files, 34 test files
+  (~1,100 tests), 16 workflow files, 19 backend entries in the shared config.yaml. The consumer
+  terragrunt-cicd.yaml template chains detect-changes, plan, summary report, approved apply,
+  plan-after-apply, scheduled drift scan, Teams notification and Jira drift ticket.
+
+  Author's answers to the open questions (2026-10-05): Ownership, support and on-call: all managed by the
+  DevOps team. Targets, baselines, SLOs, milestone dates: "use your best estimates" (written as
+  estimates or proposed targets in the posts). Security and compliance: "use the best answers or values"
+  (written as recommendations). State and DR: versioning is on in Azure Blob storage and a restore has
+  been rehearsed. Environment questions were answered from the code instead: local-setup.sh supports
+  WSL and Ubuntu/Debian only; a sandbox backend exists in the shared config.yaml; no inspected consumer
+  uses Atlas; test coverage measured at 81%.

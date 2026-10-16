@@ -1,0 +1,59 @@
+# Animated flow for _posts/architect/system-design/2025-04-01-system-design-building-blocks.md, section "30. Idempotency"
+# (include id: architect/system-design/idempotency-key).
+title: "Idempotency key: a retry never charges twice"
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 320]
+grid: {x0: 110, y0: 120, dx: 195, dy: 140, w: 150, h: 60}
+
+nodes:
+  - {id: C, label: "Client", sub: "Idempotency-Key", col: 0, row: 0, shape: terminal, icon: user, icon_pos: corner}
+  - {id: A, label: "Payment API", sub: "POST /payments", col: 1, row: 0, icon: api, icon_pos: corner}
+  - {id: K, label: "Key\nseen?", col: 2, row: 0, w: 110, h: 84, shape: diamond}
+  - {id: P, label: "Charge card", sub: "exactly once", col: 3, row: 0}
+  - {id: S, label: "Save response\nunder key", col: 4, row: 0, w: 140, h: 66, shape: cylinder}
+  - {id: R, label: "Return stored\nresponse", col: 2, row: 1, w: 150, tone: ok}
+
+edges:
+  - {id: CA, from: C, to: A}
+  - {id: AK, from: A, to: K}
+  - {id: KP, from: K, to: P, label: "no"}
+  - {id: PS, from: P, to: S}
+  - {id: SC, from: S, to: C, exit: top, enter: top, offset: 45, label: "201 Created", tone: ok}
+  - {id: KR, from: K, to: R, label: "yes", tone: ok, label_at: [524, 200]}
+  - {id: RC, from: R, to: C, exit: left, enter: bottom, label: "same 201, no new charge", tone: ok}
+
+modes:
+  - {id: first, label: "First request"}
+  - {id: retry, label: "Simulate a retry with the same key"}
+
+steps:
+  - lights: [C]
+    title: "Generate a key"
+    text: "Before paying, the client creates a unique key (a UUID) for this one payment and keeps it for any retries."
+  - edges: [CA]
+    title: "Send it with the request"
+    text: "POST /payments carries the key in an Idempotency-Key header, alongside the amount and card details."
+  - edges: [AK]
+    title: "Check the key"
+    text: "The API looks the key up in a store such as Redis or a database table with a unique constraint."
+  - edges: [KP]
+    when: first
+    title: "New key: do the work"
+    text: "No record exists, so this is a genuinely new request. The card is charged."
+  - edges: [PS]
+    when: first
+    title: "Save the outcome"
+    text: "The response is stored under the key, with an expiry such as 24 hours, before it's returned."
+  - edges: [SC]
+    when: first
+    title: "Respond"
+    text: "The client gets 201 Created. If this response is lost to a timeout, the client simply retries with the same key."
+  - edges: [KR]
+    when: retry
+    title: "Known key: skip the work"
+    text: "The first attempt already charged the card and saved its response. The API does not charge again."
+  - edges: [RC]
+    when: retry
+    title: "Replay the stored response"
+    text: "The client gets exactly the response the first attempt produced, so retrying is always safe."

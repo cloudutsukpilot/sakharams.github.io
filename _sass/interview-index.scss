@@ -1,0 +1,555 @@
+// Interview question index on the tag page named in _data/interview_index.yml
+// (_includes/interview-index.html): domains → topic sections → difficulty cards. Also the question
+// cards _plugins/interview_index.rb builds inside interview posts (further down).
+// Colors derive from Chirpy's theme variables, so light and dark mode both work.
+
+// One color per difficulty, shared by index cards, filter buttons and the cards inside posts.
+.iq-level-beginner { --iq-level-color: #22c55e; }
+.iq-level-intermediate { --iq-level-color: #38bdf8; }
+.iq-level-advanced { --iq-level-color: #f59e0b; }
+.iq-level-expert { --iq-level-color: #f43f5e; }
+
+// Keep a deep-linked question clear of Chirpy's sticky topbar.
+.iq-anchor {
+  scroll-margin-top: 4.5rem;
+}
+
+.interview-index {
+  --iq-accent: #38bdf8;
+  --iq-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --iq-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+  --iq-soft: color-mix(in srgb, var(--heading-color) 6%, var(--main-bg));
+
+  [hidden] { display: none !important; }
+}
+
+.iq-hero {
+  margin: 0.5rem 0 1.25rem;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--iq-line);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, #38bdf8 16%, transparent), transparent 55%),
+    radial-gradient(circle at 0 100%, color-mix(in srgb, #f43f5e 10%, transparent), transparent 50%),
+    var(--iq-card);
+
+  h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.9rem;
+  }
+}
+
+.iq-hero-stats {
+  margin: 0 0 0.5rem;
+  color: var(--text-muted-color, inherit);
+
+  strong { color: var(--heading-color); }
+}
+
+.iq-summary {
+  margin: 0;
+  max-width: 46rem;
+  font-size: 1rem;
+}
+
+// Domain chips: jump links, one per domain.
+.iq-domain-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.iq-domain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--iq-line);
+  border-radius: 2rem;
+  background: var(--iq-card);
+  color: var(--heading-color) !important;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    border-color: var(--iq-accent);
+    transform: translateY(-1px);
+  }
+
+  &.is-empty { opacity: 0.55; }
+}
+
+.iq-chip-count,
+.iq-count {
+  padding: 0 0.5rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--iq-accent) 18%, transparent);
+  color: var(--heading-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+// Search + level + kind filters.
+.iq-controls {
+  position: sticky;
+  top: 3.5rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 -0.25rem 1.5rem;
+  padding: 0.6rem 0.25rem;
+  background: var(--main-bg);
+  border-bottom: 1px solid var(--iq-line);
+}
+
+.iq-search {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--iq-line);
+  border-radius: 2rem;
+  background: var(--iq-card);
+  color: var(--text-color);
+}
+
+.iq-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--iq-line);
+    border-radius: 2rem;
+    background: transparent;
+    color: var(--text-color);
+    font-size: 0.82rem;
+
+    &:hover { border-color: var(--iq-level-color, var(--iq-accent)); }
+
+    &.is-active {
+      border-color: var(--iq-level-color, var(--iq-accent));
+      background: color-mix(in srgb, var(--iq-level-color, var(--iq-accent)) 18%, transparent);
+      color: var(--heading-color);
+      font-weight: 600;
+    }
+  }
+
+  .iq-dot::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--iq-level-color);
+  }
+}
+
+.iq-empty {
+  margin: 1rem 0;
+}
+
+// Domain section.
+.iq-domain {
+  margin: 0 0 2.5rem;
+  scroll-margin-top: 7.5rem;
+
+  &.is-empty .iq-domain-head { opacity: 0.6; }
+}
+
+.iq-domain-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--iq-line);
+
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  p {
+    margin: 0.15rem 0 0;
+    font-size: 0.92rem;
+    color: var(--text-muted-color, inherit);
+  }
+}
+
+.iq-domain-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--iq-accent) 16%, transparent);
+  color: var(--heading-color);
+  font-size: 1.15rem;
+}
+
+.iq-soon {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed var(--iq-line);
+  border-radius: 0.7rem;
+  text-align: center;
+}
+
+// Topic section inside a domain.
+.iq-topic {
+  margin: 0 0 1.6rem;
+  scroll-margin-top: 7.5rem;
+}
+
+.iq-topic-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.7rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+}
+
+.iq-topic-posts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+// Difficulty cards.
+.iq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.85rem;
+}
+
+.iq-level-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--iq-line);
+  border-top: 4px solid var(--iq-level-color);
+  border-radius: 0.75rem;
+  background: var(--iq-card);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--iq-level-color) 20%, transparent);
+  }
+
+  // Scenario cards get a tinted header so they read apart from concept cards.
+  &.is-scenario > header {
+    background: color-mix(in srgb, var(--iq-level-color) 10%, transparent);
+  }
+
+  > header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: 0.7rem 0.9rem 0.6rem;
+    border-bottom: 1px solid var(--iq-line);
+    border-radius: 0.6rem 0.6rem 0 0;
+
+    h4 {
+      grid-column: 1;
+      margin: 0.1rem 0 0;
+      font-size: 1.1rem;
+      color: var(--heading-color);
+    }
+  }
+}
+
+.iq-lc-kind {
+  grid-column: 1;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--iq-level-color);
+}
+
+.iq-lc-count {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.4rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--iq-level-color) 20%, transparent);
+  color: var(--heading-color);
+  font-weight: 700;
+}
+
+.iq-lc-list {
+  flex: 1;
+  margin: 0;
+  padding: 0.6rem 0.9rem 0.6rem 2.2rem;
+
+  > li {
+    padding: 0.2rem 0;
+    font-size: 0.88rem;
+    line-height: 1.4;
+
+    &::marker {
+      color: var(--iq-level-color);
+      font-weight: 700;
+    }
+  }
+}
+
+.interview-index.js:not(.is-searching) .iq-level-card:not(.is-expanded) .iq-extra {
+  display: none;
+}
+
+.interview-index.is-searching .iq-lc-more {
+  display: none;
+}
+
+.iq-lc-more {
+  margin: 0 0.9rem 0.8rem;
+  padding: 0.25rem 0;
+  border: 0;
+  border-top: 1px dashed var(--iq-line);
+  background: transparent;
+  color: var(--link-color, var(--iq-accent));
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+
+  &:hover { text-decoration: underline; }
+}
+
+// Question cards in interview posts: _plugins/interview_index.rb turns each numbered question into a
+// <details class="iq-card"> (summary = question, body = answer) or, with no answer, a plain card.
+// The left border and the level pill take their color from the section's difficulty.
+.iq-card {
+  --iq-level-color: #a78bfa;
+  --iq-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+
+  margin: 0 0 0.75rem;
+  border: 1px solid var(--iq-line);
+  border-left: 4px solid var(--iq-level-color);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+  transition: box-shadow 0.15s ease;
+
+  &.iq-level-beginner { --iq-level-color: #22c55e; }
+  &.iq-level-intermediate { --iq-level-color: #38bdf8; }
+  &.iq-level-advanced { --iq-level-color: #f59e0b; }
+  &.iq-level-expert { --iq-level-color: #f43f5e; }
+
+  &:hover,
+  &:target {
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--iq-level-color) 22%, transparent);
+  }
+
+  > summary,
+  > .iq-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.8rem 1rem;
+    color: var(--heading-color);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  > summary {
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+
+    // Chevron that turns when the card opens.
+    &::after {
+      content: "";
+      flex: none;
+      width: 0.55rem;
+      height: 0.55rem;
+      margin: 0.45rem 0.2rem 0 0;
+      border-right: 2px solid currentcolor;
+      border-bottom: 2px solid currentcolor;
+      opacity: 0.55;
+      transform: rotate(-45deg);
+      transition: transform 0.15s ease;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--iq-level-color);
+      outline-offset: 2px;
+      border-radius: 0.5rem;
+    }
+  }
+
+  &[open] > summary {
+    border-bottom: 1px dashed var(--iq-line);
+
+    &::after { transform: rotate(45deg); }
+  }
+
+  > .iq-head { cursor: default; }
+}
+
+// Answer body of a card that has one.
+details.iq-card {
+  > :not(summary) {
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+
+  > :nth-child(2) { margin-top: 0.9rem; }
+  > :last-child { margin-bottom: 1rem; }
+}
+
+.iq-num {
+  flex: none;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.4rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--iq-level-color) 20%, transparent);
+  color: var(--heading-color);
+  font-size: 0.85rem;
+  line-height: 1.75rem;
+  text-align: center;
+}
+
+.iq-q {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  strong { font-weight: inherit; }
+}
+
+.iq-level {
+  flex: none;
+  margin-top: 0.15rem;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--iq-level-color);
+  border-radius: 1rem;
+  color: var(--iq-level-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  @media (max-width: 575px) { display: none; }
+}
+
+.iq-post-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1.25rem;
+  font-size: 0.85rem;
+
+  button {
+    padding: 0.2rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--heading-color) 18%, transparent);
+    border-radius: 1rem;
+    background: transparent;
+    color: var(--text-color);
+
+    &:hover { border-color: #38bdf8; }
+  }
+}
+
+// Topic × difficulty tiles at the top of an interview post (_includes/interview-tiles.html).
+.iq-tiles {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0 2rem;
+}
+
+.iq-tiles-topic {
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--heading-color) 14%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+}
+
+.iq-tiles-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  color: var(--heading-color) !important;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none !important;
+
+  &:hover { text-decoration: underline !important; }
+}
+
+.iq-tiles-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+
+  @media (max-width: 575px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.iq-tile {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.1rem 0.4rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--iq-level-color) 45%, transparent);
+  border-top: 4px solid var(--iq-level-color);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--iq-level-color) 8%, var(--main-bg));
+  color: var(--text-color) !important;
+  text-decoration: none !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--iq-level-color) 25%, transparent);
+  }
+}
+
+.iq-tile-level {
+  color: var(--heading-color);
+  font-weight: 700;
+}
+
+.iq-tile-count {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: grid;
+  place-items: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--iq-level-color) 22%, transparent);
+  color: var(--heading-color);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.iq-tile-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted-color, inherit);
+}

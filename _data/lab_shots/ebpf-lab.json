@@ -1,0 +1,101 @@
+{
+  "cilium-cni-service-map.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-14T10:39:29.098Z",
+    "verify": "ok",
+    "experiment": "cilium-cni",
+    "repo_rev": "c948ded"
+  },
+  "falco-shell-events.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-14T10:44:24.605Z",
+    "verify": "ok",
+    "experiment": "falco-shell",
+    "repo_rev": "c948ded"
+  },
+  "identity-policy-flows.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-14T10:40:08.028Z",
+    "verify": "ok",
+    "experiment": "identity-policy",
+    "repo_rev": "c948ded"
+  },
+  "obi-red-metrics-dashboard.webp": {
+    "w": 1440,
+    "h": 1340,
+    "animated": false,
+    "captured": "2026-10-14T10:42:12.688Z",
+    "verify": "ok",
+    "experiment": "obi-red-metrics",
+    "repo_rev": "c948ded"
+  },
+  "obi-red-metrics-red.webp": {
+    "w": 700,
+    "h": 296,
+    "animated": false,
+    "captured": "2026-10-14T10:42:12.688Z",
+    "verify": "ok",
+    "experiment": "obi-red-metrics",
+    "repo_rev": "c948ded"
+  },
+  "obi-traces-split.webp": {
+    "w": 1408,
+    "h": 676,
+    "animated": false,
+    "captured": "2026-10-14T10:43:48.378Z",
+    "verify": "ok",
+    "experiment": "obi-traces",
+    "repo_rev": "c948ded"
+  },
+  "obi-traces-waterfall.webp": {
+    "w": 1408,
+    "h": 676,
+    "animated": false,
+    "captured": "2026-10-14T10:43:48.378Z",
+    "verify": "ok",
+    "experiment": "obi-traces",
+    "repo_rev": "c948ded"
+  },
+  "rebuild-persists-after.webp": {
+    "w": 1440,
+    "h": 900,
+    "animated": false,
+    "captured": "2026-10-14T10:58:18.459Z",
+    "verify": "ok",
+    "experiment": "rebuild-persists",
+    "repo_rev": "c948ded"
+  },
+  "rebuild-persists-before.webp": {
+    "w": 1440,
+    "h": 900,
+    "animated": false,
+    "captured": "2026-10-14T10:58:18.459Z",
+    "verify": "ok",
+    "experiment": "rebuild-persists",
+    "repo_rev": "c948ded"
+  },
+  "tetragon-enforce-falco.webp": {
+    "w": 1440,
+    "h": 1000,
+    "animated": false,
+    "captured": "2026-10-14T11:00:10.037Z",
+    "verify": "ok",
+    "experiment": "tetragon-enforce",
+    "repo_rev": "c948ded"
+  },
+  "tetragon-enforce-tetragon.webp": {
+    "w": 700,
+    "h": 372,
+    "animated": false,
+    "captured": "2026-10-14T11:00:10.037Z",
+    "verify": "ok",
+    "experiment": "tetragon-enforce",
+    "repo_rev": "c948ded"
+  }
+}

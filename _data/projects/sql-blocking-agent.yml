@@ -1,0 +1,77 @@
+# Project playbook card for /tags/sql-blocking-agent/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company name, GitHub org, SMTP host, storage account, Platform One hostnames and server names are
+# deliberately left out (public repo).
+name: SQL Blocking Agent
+tag: SQL Blocking Agent
+summary: An agentic SQL Server blocking-chain responder. Deterministic detection and safety gates
+  decide what is allowed, Pydantic AI on Azure AI Foundry explains what happened, and a human
+  approves any KILL.
+status: Live
+created: '2026-10-05'
+category: ai-automation
+clouds: [azure]
+facts:
+- label: Type
+  value: Agentic AI incident responder for SQL Server
+- label: Stack
+  value: Python, Pydantic AI, pyodbc, FastAPI, optional Temporal
+- label: LLM
+  value: Azure AI Foundry (gpt-5-mini default), keyless auth
+- label: Hosting
+  value: AKS via Helm and Argo CD; loop mode, single replica
+- label: Mode
+  value: Production in dry-run; KILLs need human approval
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/sql-blocking-agent/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: user-journey, title: "Human approval flow", url: /posts/projects/sql-blocking-agent/04-user-experience-and-design/#user-flows, diagram: projects/sql-blocking-agent/approval-flow, format: animated}
+- {type: system-context, title: "System architecture", url: /posts/projects/sql-blocking-agent/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/sql-blocking-agent/system-architecture, format: animated}
+- {type: other, title: "Governance gates", url: /posts/projects/sql-blocking-agent/06-security-and-privacy/#threat-modeling, diagram: projects/sql-blocking-agent/governance-gates, format: animated}
+- {type: cicd, title: "CI/CD and promotion", url: /posts/projects/sql-blocking-agent/12-cicd-and-release-management/#deployment-automation, diagram: projects/sql-blocking-agent/cicd-pipeline, format: animated}
+- {type: other, title: "Real-kill rollout", url: /posts/projects/sql-blocking-agent/13-deployment-and-go-live/#deployment-runbook, diagram: projects/sql-blocking-agent/real-kill-rollout, format: animated}
+brief: |
+  Author's request: "Please check the repo gitrepos/agentic-ai/agent-pydantic-sql-blocking and create
+  a project referring to the existing docs available in the docs folder in that repo. Please review and
+  ask any questions for clarification."
+
+  Author's answers (2026-10-05):
+  - Production state: live, dry-run only (no real KILLs in production yet).
+  - Hosting: AKS + Helm + Argo CD (the Helm design record is current; Azure Container Apps was the
+    earlier recommended path in the deployment guide).
+  - Runtime: loop mode with the SQL Server AgentConfigDB / AgentLogDB stores; approval via the local
+    approval API / approve.py.
+  - Team: built by the DevOps team in collaboration with the database team. This was the first project
+    towards agentic AI implementation in the platform engineering org.
+
+  Source material: the repo's docs (index, ARCHITECTURE, END_TO_END_PROCESS, WHY_PYDANTIC_AI,
+  DEPLOYMENT_MIGRATION, HELM_CHARTS, TROUBLESHOOTING, ENGINEER_GUIDE, ENGINEER_ONBOARDING_GUIDE,
+  DURABLE_AGENT, TEMPORAL_INTEGRATION_PLAN/IMPLEMENTATION, live_run_analysis_20260710_second,
+  migrate-conn-string) and a read-only look at the code.
+
+  Key facts from docs and code: polls sys.dm_exec_requests per server (default 15 s); deterministic
+  detection walks the blocking chain to the head blocker; three LLM agents only (Analyzer with 7-angle
+  diagnostics, Determination, RCA) via Pydantic AI structured outputs with retries; deterministic hard
+  gates R1, R2, R3, R6, R9, R10, R11, R12, R13 (exclusion windows) and LLM-decided R4, R5, R7, R8 informed
+  by six Microsoft KB blocking scenarios; decisions KILL / ALERT_ONLY / SKIP; at most one analyzer retry;
+  incident cooldown; human approval with timeout = no kill; KILL issued on an autocommit connection with
+  @@TRANCOUNT checks, then validated (CONFIRMED_GONE / ROLLING_BACK / STILL_PRESENT, chain cleared).
+  RCA reports rendered to HTML/Markdown, uploaded to Azure Blob, emailed via SMTP; audit tables
+  BlockingEventLog, KillAuditLog, RCASnapshotLog, IncidentCooldown; config tables TargetServers,
+  ProtectedLogins, ExclusionWindows, refreshed every minute. Auth to Foundry with DefaultAzureCredential.
+  Migrated from LangChain/LangGraph to Pydantic AI. Optional Temporal durable mode with Platform One
+  HITL (not in production). PostgreSQL migration documented but out of scope. versions.yaml:
+  development 1.0.34, production 1.0.6. 231 commits since 2026-06-18; 240 unit tests in 32 files plus a
+  live e2e kill harness. Live run 2026-07-10: 3 LLM requests per analyzed cycle, ~9.6k tokens for one
+  analyzed incident. Helm chart: replicaCount 1, REQUIRE_HUMAN_APPROVAL=true, chart default DRY_RUN
+  "false" (code default true). Open items in the Helm record: no leader lock (single replica only),
+  approval API has no authentication (ingress must stay private), no poller heartbeat, metrics/alerting
+  choices open. CI: build/scan/push and Helm chart publishing, release bump and image retag, promote
+  workflow, PR preview environments. Docs published to Backstage TechDocs.
+
+  Author's follow-up answers (2026-10-05): development runs real kills; the Azure resources around the
+  agent are managed as code with Y-IaC; the SonarQube workflow runs the unit tests; DBAs don't need to
+  approve from a phone (they work from email and Teams). Not yet answered: SQL Server versions, current
+  test pass rate and coverage, backup coverage of AgentConfigDB/AgentLogDB, DBA review of banner/report.

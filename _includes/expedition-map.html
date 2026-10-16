@@ -1,0 +1,70 @@
+{% comment %}
+  Expedition Map: interactive map of the blog (country = topic, state = subtopic).
+  Data comes from _plugins/expedition_map.rb (site.data.expedition_atlas), configured in
+  _data/expedition_map.yml. The Atlas below is the server-rendered index; it works without
+  JavaScript and on small screens, and assets/js/expedition-map.js reads it to draw the map.
+{% endcomment %}
+{% assign atlas = site.data.expedition_atlas %}
+<style>
+  /* The post's cover image is for the home-page card; on the map page the map comes first. */
+  article .preview-img { display: none; }
+</style>
+<div id="expedition-map" class="xm">
+<div class="xm-viewer">
+<div class="xm-header">
+<p class="xm-stats">
+<span><strong>{{ atlas.posts }}</strong> posts</span>
+<span><strong>{{ atlas.countries.size }}</strong> countries</span>
+<span><strong>{{ atlas.states }}</strong> states</span>
+</p>
+<label class="xm-search">
+<i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+<input type="search" placeholder="Search the map…" aria-label="Search posts on the map" autocomplete="off">
+</label>
+</div>
+<div class="xm-stage" hidden>
+<div class="xm-map">
+<svg viewBox="0 0 1000 560" role="group" aria-label="Map of blog topics"></svg>
+<button type="button" class="xm-back" hidden><i class="fas fa-earth-americas" aria-hidden="true"></i> World view</button>
+<button type="button" class="xm-fs-btn" aria-label="View map fullscreen" title="Fullscreen"><i class="fas fa-expand" aria-hidden="true"></i></button>
+<div class="xm-tooltip" role="status" hidden></div>
+<p class="xm-loading">Charting the map…</p>
+</div>
+<aside class="xm-guide" aria-live="polite" aria-label="Travel guide"></aside>
+</div>
+</div>
+<nav class="xm-passport" aria-label="Countries">
+{% for country in atlas.countries %}
+<a href="#atlas-{{ country.id }}" data-country="{{ country.id }}" style="--xm-color: {{ country.color }}">
+<i class="{{ country.icon }}" aria-hidden="true"></i>{{ country.name }}<span>{{ country.count }}</span>
+</a>
+{% endfor %}
+</nav>
+<section class="xm-atlas" aria-labelledby="xm-atlas-title">
+<h2 id="xm-atlas-title">Atlas</h2>
+{% for country in atlas.countries %}
+<details class="xm-country" id="atlas-{{ country.id }}" data-id="{{ country.id }}" data-name="{{ country.name | escape }}" data-icon="{{ country.icon }}" data-color="{{ country.color }}" style="--xm-color: {{ country.color }}">
+<summary><i class="{{ country.icon }}" aria-hidden="true"></i><span class="xm-name">{{ country.name }}</span><span class="xm-count">{{ country.count }} posts · {{ country.states.size }} states</span></summary>
+<div class="xm-states">
+{% for state in country.states %}
+<details class="xm-state" data-id="{{ state.id }}" data-name="{{ state.name | escape }}" data-url="{{ state.url }}">
+<summary><span class="xm-name">{{ state.name }}</span><span class="xm-count">{{ state.count }}</span></summary>
+<ul>
+{% for post in state.posts %}
+<li data-district="{{ post.district | escape }}"><a href="{{ post.url | relative_url }}">{{ post.title }}</a><time datetime="{{ post.date }}">{{ post.date }}</time></li>
+{% endfor %}
+</ul>
+<a class="xm-browse" href="{{ state.url }}">Browse the {{ state.name }} category <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+</details>
+{% endfor %}
+</div>
+</details>
+{% endfor %}
+</section>
+</div>
+<script defer src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3-weighted-voronoi@1/build/d3-weighted-voronoi.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3-voronoi-map@2/build/d3-voronoi-map.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3-voronoi-treemap@1/build/d3-voronoi-treemap.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script defer src="{{ '/assets/js/expedition-map.js' | relative_url }}"></script>

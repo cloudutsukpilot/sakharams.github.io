@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-websocket.md
+# (include id: communication/api/websocket-chat-fanout). Handshake, then a chat message from
+# client A to client B connected to a different server, through a pub/sub backplane.
+title: WebSocket handshake and chat fan-out
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 220]
+grid: {x0: 90, y0: 70, dx: 164, dy: 0, w: 136, h: 56}
+
+nodes:
+  - {id: A, label: "Client A", col: 0, row: 0, w: 90, h: 72, shape: circle}
+  - {id: L, label: "Load\nbalancer", col: 1, row: 0, icon: balancer}
+  - {id: S1, label: "WS server 1", sub: "holds A", col: 2, row: 0, icon: server, icon_pos: corner}
+  - {id: R, label: "Pub/sub", sub: "Redis", col: 3, row: 0, h: 66, shape: cylinder, icon: bolt}
+  - {id: S2, label: "WS server 2", sub: "holds B", col: 4, row: 0, icon: server, icon_pos: corner}
+  - {id: B, label: "Client B", col: 5, row: 0, w: 90, h: 72, shape: circle}
+
+edges:
+  - {id: AL, from: A, to: L, label: "GET"}
+  - {id: LS1, from: L, to: S1}
+  - {id: S1A, from: S1, to: A, offset: 45, tone: ok, label: "101 Switching Protocols"}
+  - {id: S1R, from: S1, to: R}
+  - {id: RS2, from: R, to: S2}
+  - {id: S2B, from: S2, to: B, label: "frame"}
+  - {id: BS2, from: B, to: S2, offset: 45, tone: ok, label: "reply frame"}
+
+steps:
+  - lights: [A]
+    title: Start with HTTP
+    text: "Client A opens wss://chat.example.com with an ordinary GET carrying Upgrade: websocket and a random Sec-WebSocket-Key."
+  - edges: [AL]
+    title: Through the load balancer
+    text: The balancer must allow the Upgrade header and long-lived connections; it pins the connection to one backend.
+  - edges: [LS1]
+    title: Server accepts
+    text: Server 1 checks Origin and auth, then computes Sec-WebSocket-Accept from the key to prove it speaks WebSocket.
+  - edges: [S1A]
+    title: Connection upgraded
+    text: "101 Switching Protocols: from now on the same TCP connection carries WebSocket frames in both directions, with no more HTTP."
+  - edges: [AL, LS1]
+    title: A sends a message
+    text: "A sends a small text frame such as {type: msg, room: 42, text: hi}. Frames have a 2 to 14 byte header, not a full HTTP request."
+  - edges: [S1R]
+    title: Publish to the room
+    text: B is connected to a different server, so server 1 publishes the message to a pub/sub backplane channel for room 42.
+  - edges: [RS2]
+    title: Other servers receive it
+    text: Every server with a member of room 42 is subscribed and gets the message.
+  - edges: [S2B]
+    title: Server pushes to B
+    text: Server 2 writes a frame on B's open connection. B did not ask for it; this server push is what WebSocket is for.
+  - edges: [BS2]
+    title: Full duplex
+    text: B replies on the same connection at any time, even while messages are flowing the other way. Ping and pong frames keep idle connections alive.

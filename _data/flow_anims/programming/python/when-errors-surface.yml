@@ -1,0 +1,45 @@
+# Animated flow diagram for _posts/programming/python/2026-10-08-python-at-a-glance.md
+# (include id: programming/python/when-errors-surface).
+title: When a typo gets caught, compiled vs Python
+accent: "#FACC15"
+accent2: "#3B82F6"
+viewbox: [1000, 400]
+modes:
+  - { id: notest, label: "No test covers the button handler" }
+  - { id: test, label: "Add a test that covers the handler" }
+lanes:
+  - { label: "Java / C: compile first", x: 8, y: 8, w: 984, h: 130 }
+  - { label: "Python: run first", x: 8, y: 160, w: 984, h: 232 }
+nodes:
+  - { id: JW, label: "Write code", sub: "typo inside", x: 110, y: 85, shape: terminal, icon: code }
+  - { id: JC, label: "Compile", sub: "javac / gcc", x: 320, y: 85, icon: code }
+  - { id: JX, label: "Build fails", sub: "cannot find symbol", x: 540, y: 85, w: 170, tone: fail, icon: cross, icon_pos: corner }
+  - { id: JF, label: "Fix, then run", x: 760, y: 85, tone: ok }
+  - { id: PW, label: "Write code", sub: "same typo", x: 110, y: 240, shape: terminal, icon: code }
+  - { id: PR, label: "Run it", sub: "python app.py", x: 320, y: 240, icon: "programming/python.svg", icon_pos: corner }
+  - { id: PO, label: "Works fine", sub: "main paths", x: 540, y: 240, tone: ok }
+  - { id: PB, label: "User clicks\nthe button", x: 760, y: 240, icon: user }
+  - { id: PE, label: "NameError", sub: "in production", x: 920, y: 340, w: 130, h: 46, tone: fail }
+  - { id: PT, label: "pytest", sub: "tests the handler", x: 320, y: 340, h: 50, icon: check, icon_pos: corner }
+  - { id: PX, label: "Caught in CI", x: 540, y: 340, h: 46, tone: ok }
+edges:
+  - { id: JWC, from: JW, to: JC }
+  - { id: JCX, from: JC, to: JX, tone: fail }
+  - { id: JXF, from: JX, to: JF }
+  - { id: PWR, from: PW, to: PR }
+  - { id: PRO, from: PR, to: PO }
+  - { id: POB, from: PO, to: PB }
+  - { id: PBE, from: PB, to: PE, tone: fail, points: [[835, 240], [920, 240], [920, 317]] }
+  - { id: PWT, from: PW, to: PT, points: [[110, 268], [110, 340], [245, 340]] }
+  - { id: PTX, from: PT, to: PX, tone: ok }
+steps:
+  - { lights: [JW, PW], title: "Same bug, two languages", text: "Both programs have the same typo inside a function that only runs when a user clicks one specific button." }
+  - { edges: [JWC], title: "Java/C: compile step", text: "Before anything runs, the compiler checks every name and type in the whole program." }
+  - { edges: [JCX], title: "Caught before running", text: "The unknown name fails the build. The bug never reaches a user, but you wait for a compile on every change." }
+  - { edges: [JXF], title: "Fix and run", text: "You fix the typo, rebuild and only then see the program run." }
+  - { edges: [PWT], when: test, title: "A test exercises the handler", text: "A pytest test calls the button handler directly, so that line actually executes." }
+  - { edges: [PTX], when: test, title: "Caught in CI", text: "The NameError fails the test run instead of a user's session. In Python, tests are your compiler-style safety net." }
+  - { edges: [PWR], title: "Python: just run it", text: "No build step. Python compiles to bytecode on the fly and starts running straight away." }
+  - { edges: [PRO], title: "Everything looks fine", text: "The paths you tried work. The typo sits in a line nobody has executed yet, so nothing complains." }
+  - { edges: [POB], when: notest, title: "Someone clicks the button", text: "Days later a user triggers the rarely used handler and the VM finally reaches the broken line." }
+  - { edges: [PBE], when: notest, title: "Runtime error", text: "NameError: name 'totl' is not defined. Python only reports it when that line runs, here in production." }

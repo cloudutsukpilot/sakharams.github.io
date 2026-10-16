@@ -1,0 +1,240 @@
+{
+  "_comment": "Cloudutsuk house style. One entry per top-level _posts/ folder. accent/accent2 drive the mesh glow, kicker, chips and motif; motif2d picks the Level-1 procedural motif (network|stack|pipeline|shield|blueprint|orbit); scene is the subject hint used by Level 2 (3D) and Level 3 (Flux) prompts.",
+  "site": {
+    "name": "cloudutsuk.com",
+    "tagline": "Cloud, DevOps and Security",
+    "ink": "#0B1020",
+    "text": "#F1F5F9",
+    "muted": "#94A3B8",
+    "size": [
+      1200,
+      630
+    ]
+  },
+  "default": {
+    "label": "Cloudutsuk",
+    "accent": "#38BDF8",
+    "accent2": "#8B5CF6",
+    "motif2d": "orbit",
+    "scene": "abstract glowing tech shapes floating above a dark reflective floor"
+  },
+  "categories": {
+    "agenticai": {
+      "label": "Agentic AI",
+      "accent": "#A855F7",
+      "accent2": "#84CC16",
+      "motif2d": "network",
+      "scene": "a constellation of small autonomous robot nodes passing glowing tasks along connected paths"
+    },
+    "aicodingtools": {
+      "label": "AI Coding Tools",
+      "accent": "#F472B6",
+      "accent2": "#60A5FA",
+      "motif2d": "network",
+      "scene": "a floating code editor window with glowing brackets and an abstract AI spark beside it"
+    },
+    "architect": {
+      "label": "Architecture",
+      "accent": "#60A5FA",
+      "accent2": "#FBBF24",
+      "motif2d": "blueprint",
+      "scene": "an isometric blueprint of connected system blocks on a drafting grid"
+    },
+    "artificialintelligence": {
+      "label": "Artificial Intelligence",
+      "accent": "#D946EF",
+      "accent2": "#22D3EE",
+      "motif2d": "network",
+      "scene": "a glowing neural network of layered nodes and luminous connections"
+    },
+    "basics": {
+      "label": "Basics",
+      "accent": "#5EEAD4",
+      "accent2": "#93C5FD",
+      "motif2d": "orbit",
+      "scene": "simple clean geometric building blocks stacked neatly"
+    },
+    "certification": {
+      "label": "Certification",
+      "accent": "#FBBF24",
+      "accent2": "#A78BFA",
+      "motif2d": "shield",
+      "scene": "a glowing achievement badge medal on a pedestal"
+    },
+    "cloud": {
+      "label": "Cloud",
+      "accent": "#38BDF8",
+      "accent2": "#6366F1",
+      "motif2d": "stack",
+      "scene": "soft stylized clouds floating above stacks of glowing server racks"
+    },
+    "cloudnative": {
+      "label": "Cloud Native",
+      "accent": "#3B82F6",
+      "accent2": "#22D3EE",
+      "motif2d": "network",
+      "scene": "colorful shipping-container cubes orchestrated on a glowing grid by a ship's wheel"
+    },
+    "communication": {
+      "label": "Communication",
+      "accent": "#38BDF8",
+      "accent2": "#F472B6",
+      "motif2d": "blueprint",
+      "scene": "glowing message packets traveling between two connected endpoints"
+    },
+    "comparison": {
+      "label": "Comparison",
+      "accent": "#60A5FA",
+      "accent2": "#F97316",
+      "motif2d": "blueprint",
+      "scene": "two contrasting glowing objects facing each other on a split stage"
+    },
+    "cybersecurity": {
+      "label": "Cybersecurity",
+      "accent": "#22D3EE",
+      "accent2": "#EF4444",
+      "motif2d": "shield",
+      "scene": "a glowing shield with a padlock protecting a digital network grid"
+    },
+    "databases": {
+      "label": "Databases",
+      "accent": "#F59E0B",
+      "accent2": "#3B82F6",
+      "motif2d": "stack",
+      "scene": "stacked glowing database cylinders with data streams flowing between them"
+    },
+    "devops": {
+      "label": "DevOps",
+      "accent": "#F97316",
+      "accent2": "#8B5CF6",
+      "motif2d": "pipeline",
+      "scene": "an infinity-loop conveyor pipeline carrying glowing build artifacts"
+    },
+    "devsecops": {
+      "label": "DevSecOps",
+      "accent": "#10B981",
+      "accent2": "#F59E0B",
+      "motif2d": "shield",
+      "scene": "a CI/CD pipeline passing through a glowing security scanner gate"
+    },
+    "finops": {
+      "label": "FinOps",
+      "accent": "#22C55E",
+      "accent2": "#EAB308",
+      "motif2d": "stack",
+      "scene": "stacked coins beside a cloud and a rising bar chart"
+    },
+    "homelab": {
+      "label": "Homelab",
+      "accent": "#34D399",
+      "accent2": "#F472B6",
+      "motif2d": "stack",
+      "scene": "a small tidy home server rack with blinking lights on a wooden desk"
+    },
+    "iam": {
+      "label": "Identity & Access",
+      "accent": "#FBBF24",
+      "accent2": "#14B8A6",
+      "motif2d": "shield",
+      "scene": "a glowing key and a user identity badge in front of a secure door"
+    },
+    "issues-fixes": {
+      "label": "Issues & Fixes",
+      "accent": "#F87171",
+      "accent2": "#FBBF24",
+      "motif2d": "orbit",
+      "scene": "a wrench and a bug icon over a terminal window showing an error"
+    },
+    "labs": {
+      "label": "Labs",
+      "accent": "#22D3EE",
+      "accent2": "#A3E635",
+      "motif2d": "pipeline",
+      "scene": "a hands-on lab bench with a small Kubernetes cluster, glowing dashboards and signal traces"
+    },
+    "m365": {
+      "label": "Microsoft 365",
+      "accent": "#F97316",
+      "accent2": "#3B82F6",
+      "motif2d": "network",
+      "scene": "office documents and mailboxes migrating between two tenants"
+    },
+    "microservices": {
+      "label": "Microservices",
+      "accent": "#2DD4BF",
+      "accent2": "#F472B6",
+      "motif2d": "network",
+      "scene": "many small glowing hexagonal service cells connected by light"
+    },
+    "mlops": {
+      "label": "MLOps",
+      "accent": "#E879F9",
+      "accent2": "#FB923C",
+      "motif2d": "pipeline",
+      "scene": "a machine-learning model moving through a training-to-deployment pipeline"
+    },
+    "networking": {
+      "label": "Networking",
+      "accent": "#06B6D4",
+      "accent2": "#A3E635",
+      "motif2d": "network",
+      "scene": "routers and switches linked by glowing network cables and packets"
+    },
+    "operatingsystems": {
+      "label": "Operating Systems",
+      "accent": "#FB923C",
+      "accent2": "#A78BFA",
+      "motif2d": "stack",
+      "scene": "a glowing terminal window on a sleek laptop with kernel layers beneath"
+    },
+    "platformengg": {
+      "label": "Platform Engineering",
+      "accent": "#818CF8",
+      "accent2": "#2DD4BF",
+      "motif2d": "stack",
+      "scene": "a layered internal developer platform with golden-path roads between building blocks"
+    },
+    "productivity": {
+      "label": "Productivity",
+      "accent": "#A3E635",
+      "accent2": "#38BDF8",
+      "motif2d": "pipeline",
+      "scene": "a neat developer desk setup with a terminal and tool icons"
+    },
+    "programming": {
+      "label": "Programming",
+      "accent": "#FACC15",
+      "accent2": "#3B82F6",
+      "motif2d": "blueprint",
+      "scene": "floating code brackets and syntax-highlighted lines of code"
+    },
+    "projects": {
+      "label": "Projects",
+      "accent": "#F472B6",
+      "accent2": "#FACC15",
+      "motif2d": "blueprint",
+      "scene": "a workbench with assembled modular project components"
+    },
+    "templates": {
+      "label": "Templates",
+      "accent": "#94A3B8",
+      "accent2": "#CBD5E1",
+      "motif2d": "blueprint",
+      "scene": "blank document templates arranged on a grid"
+    },
+    "virtualization": {
+      "label": "Virtualization",
+      "accent": "#A78BFA",
+      "accent2": "#38BDF8",
+      "motif2d": "stack",
+      "scene": "translucent virtual machines nested inside a physical server"
+    },
+    "websites": {
+      "label": "Websites",
+      "accent": "#F472B6",
+      "accent2": "#60A5FA",
+      "motif2d": "blueprint",
+      "scene": "a browser window with a clean blog layout and floating UI cards"
+    }
+  }
+}

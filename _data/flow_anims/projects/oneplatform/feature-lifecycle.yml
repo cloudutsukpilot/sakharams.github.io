@@ -1,0 +1,87 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-09-implementation.md
+# (include id: projects/oneplatform/feature-lifecycle). How a OnePlatform feature goes from ticket to
+# release: pre-flight reuse check, size gate, PLAN / DESIGN / IMPLEMENTATION docs, phased build with
+# unit tests per phase, integration and E2E, docs sync, PR gates, release. Second mode: the
+# change-request path for small changes. Source: the repo's feature-planner, feature-implement and
+# change-request prompts and the prompts usage guide. Coordinates are viewBox units; x/y is the centre.
+title: OnePlatform feature lifecycle
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 360]
+modes:
+  - { id: full, label: "New feature or plugin" }
+  - { id: small, label: "Show the small-change path" }
+
+lanes:
+  - { label: "Requirements and design", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Build, test and release", x: 8, y: 215, w: 984, h: 137 }
+
+grid: { x0: 90, y0: 75, dx: 164, dy: 0, w: 136, h: 56 }
+nodes:
+  - { id: TICKET, label: "Jira ticket", col: 0, row: 0, shape: terminal }
+  - { id: PRE, label: "Pre-flight", sub: "reuse check", col: 1, row: 0, icon: check, icon_pos: corner }
+  - { id: GATE, label: "Size?", col: 2, row: 0, w: 110, h: 84, shape: diamond }
+  - { id: PLAN, label: "PLAN", sub: "requirements", col: 3, row: 0 }
+  - { id: DESIGN, label: "DESIGN", sub: "UI, API, data", col: 4, row: 0, icon: api, icon_pos: corner }
+  - { id: IMPL, label: "Checklist", sub: "IMPLEMENTATION", col: 5, row: 0 }
+  - { id: BUILD, label: "Build phases", sub: "+ unit tests", x: 130, y: 295, w: 150, icon: check, icon_pos: corner }
+  - { id: INTEG, label: "Integration\n+ E2E tests", x: 330, y: 295, w: 150, icon: check }
+  - { id: DOCS, label: "Sync arch\ndocs", x: 530, y: 295, w: 150, icon: package }
+  - { id: PR, label: "PR gates", sub: "CI, Sonar, review", x: 730, y: 295, w: 150, icon: check, icon_pos: corner }
+  - { id: REL, label: "Release", x: 915, y: 295, w: 120, shape: terminal, tone: ok, icon: rocket }
+
+edges:
+  - { id: E1, from: TICKET, to: PRE }
+  - { id: E2, from: PRE, to: GATE }
+  - { id: FULL, from: GATE, to: PLAN }
+  - { id: E4, from: PLAN, to: DESIGN }
+  - { id: E5, from: DESIGN, to: IMPL }
+  - { id: WRAP, from: IMPL, to: BUILD, points: [[910, 103], [910, 165], [35, 165], [35, 295], [55, 295]] }
+  - { id: SMALL, from: GATE, to: BUILD, points: [[418, 117], [418, 190], [160, 190], [160, 267]], label: "small change", label_at: [290, 205] }
+  - { id: E7, from: BUILD, to: INTEG }
+  - { id: E8, from: INTEG, to: DOCS }
+  - { id: E9, from: DOCS, to: PR }
+  - { id: E10, from: PR, to: REL }
+
+steps:
+  - lights: [TICKET]
+    title: A ticket
+    text: Every change starts as a Jira ticket with the problem, who asked and what done looks like. The feature folder is named after it.
+  - edges: [E1]
+    title: Pre-flight
+    text: The assistant loads the architecture routing tables and searches for an existing plugin, API, permission or template that already does this.
+  - edges: [E2]
+    title: Size gate
+    text: A new plugin or service, a page with a backend, more than two components or a migration gets full planning. Anything smaller is a change request.
+  - edges: [FULL]
+    when: full
+    title: PLAN
+    text: Requirements, users and roles, business rules, reuse decisions, risks and acceptance criteria, including the denial case.
+  - edges: [E4]
+    when: full
+    title: DESIGN
+    text: Component tree, page states, API contracts, data model and permission keys, using the shared UI library.
+  - edges: [E5]
+    when: full
+    title: Implementation checklist
+    text: Up to ten phases (setup, database, API, data layer, components, template, wiring, tests, docs), each with a pre-check.
+  - edges: [WRAP]
+    when: full
+    title: Build in phases
+    text: Each phase is implemented and validated in turn, and unit tests are written in the same phase as the code they cover.
+  - edges: [SMALL]
+    when: small
+    title: Change request
+    text: A short plan (or CHANGES.md for two files or fewer), then the same phase-by-phase implementation and validation.
+  - edges: [E7]
+    title: Integration and E2E
+    text: PostgreSQL-backed integration tests in Testcontainers cover migrations and routes; Playwright covers browser journeys where needed.
+  - edges: [E8]
+    title: Docs gate
+    text: ARCHITECTURE.md and the central architecture model are updated, so the next feature's pre-flight sees this one.
+  - edges: [E9]
+    title: Pull request
+    text: CI builds, type-checks and runs unit and integration lanes; SonarQube gates new code; code owners review.
+  - edges: [E10]
+    title: Release
+    text: The release workflow tags an image, Argo CD deploys development, and promotion workflows take it to staging and production.

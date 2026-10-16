@@ -1,0 +1,24 @@
+# Upstream DNS for the lab's pods (homelab ADR 0024).
+#
+# k3d rewrites every node's /etc/resolv.conf to the homelab gateway 172.30.0.1:53 and redirects that
+# address inside the node to Docker's embedded resolver, which only answers the node itself. Pods
+# (and so CoreDNS) can't use it: external lookups time out ("read udp ...->172.30.0.1:53: i/o
+# timeout"), which breaks any download from inside the lab. So:
+#   - the internal zone home.cloudutsuk.com goes to 172.30.0.1:1053, the second port `core`'s load
+#     balancer publishes for pods (PowerDNS, authoritative only: it REFUSES other names);
+#   - everything else goes straight to public resolvers, which pods can reach through the node's
+#     masquerading (SNAT).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  upstream.override: |
+    forward . 1.1.1.1 8.8.8.8
+  home.server: |
+    home.cloudutsuk.com:53 {
+      errors
+      cache 30
+      forward . 172.30.0.1:1053
+    }

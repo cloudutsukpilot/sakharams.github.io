@@ -1,0 +1,59 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-sse-and-long-polling.md
+# (include id: communication/api/sse-vs-long-polling). The same server push done with one
+# Server-Sent Events stream, or (second mode) with repeated long-poll requests.
+title: Server-Sent Events versus long polling
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 280]
+modes:
+  - {id: sse, label: "Server-Sent Events"}
+  - {id: poll, label: "Show long polling instead"}
+
+nodes:
+  - {id: B, label: "Browser", sub: "EventSource", x: 140, y: 140, w: 160, h: 60, shape: terminal, icon: browser}
+  - {id: S, label: "Web server", sub: "holds the request", x: 500, y: 140, w: 170, h: 60, icon: server, icon_pos: corner}
+  - {id: E, label: "Event source", sub: "jobs, prices, LLM", x: 860, y: 140, w: 170, h: 70, shape: cylinder, icon: git, icon_pos: corner}
+
+edges:
+  - {id: BS, from: B, to: S, label: "GET /events"}
+  - {id: ES, from: E, to: S, exit: top, enter: top, offset: 50, label: "new event"}
+  - {id: SB, from: S, to: B, offset: 55, tone: ok, label: "event pushed to the client"}
+
+steps:
+  - lights: [B, E]
+    title: Client wants updates
+    text: The page needs to know when something changes on the server (a job, a price, generated text) without the user refreshing.
+  - edges: [BS]
+    when: sse
+    title: Open one stream
+    text: "new EventSource('/events') sends a GET with Accept: text/event-stream. The server answers 200 and never finishes the response."
+  - edges: [BS]
+    when: poll
+    title: Ask and wait
+    text: The client sends GET /updates?since=41. Instead of answering "nothing yet" at once, the server holds the request open for up to about 30 seconds.
+  - edges: [ES]
+    title: Something happens
+    text: An order ships, a price moves or a model produces the next tokens. The server learns about it from a queue or pub/sub.
+  - edges: [SB]
+    when: sse
+    title: Push down the open stream
+    text: "The server writes id: 42, event: order and data: {...} lines followed by a blank line. The connection stays open."
+  - edges: [SB]
+    when: poll
+    title: Answer the held request
+    text: The server completes the response with the event. That HTTP request is now finished.
+  - edges: [BS]
+    when: poll
+    title: Poll again at once
+    text: The client immediately sends the next request with since=42. Every event costs a full request and response, with headers.
+  - edges: [ES]
+    title: The next event
+    text: More events arrive on the server side.
+  - edges: [SB]
+    when: sse
+    title: Same connection, next event
+    text: No new request is needed. If the connection drops, the browser reconnects by itself and sends Last-Event-ID so nothing is missed.
+  - edges: [SB]
+    when: poll
+    title: Respond, then repeat
+    text: The cycle repeats forever. If no event arrives before the timeout, the server returns an empty response and the client polls again.

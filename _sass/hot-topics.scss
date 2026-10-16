@@ -1,0 +1,292 @@
+// Home page: hot topics explorer (_includes/hot-topics.html, assets/js/hot-topics.js) and the section
+// headings around it. Theme variables keep light and dark mode working.
+
+.home-section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--heading-color);
+  margin: 0.25rem 0 0.9rem;
+
+  i {
+    color: #f97316;
+    margin-right: 0.25rem;
+  }
+}
+
+.home-section-title + #post-list {
+  margin-top: 0;
+}
+
+.hot-topics {
+  --ht-accent: #f97316;
+  --ht-line: color-mix(in srgb, var(--heading-color) 12%, transparent);
+  --ht-muted: color-mix(in srgb, var(--text-color) 65%, transparent);
+
+  margin-bottom: 2rem;
+}
+
+.ht-tabs {
+  position: relative;
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.6rem;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  // Wide screens (and no JavaScript, where the tabs are jump links) wrap; phones scroll sideways.
+  .hot-topics:not(.ht-js) & {
+    flex-wrap: wrap;
+  }
+
+  @media (min-width: 768px) {
+    flex-wrap: wrap;
+  }
+}
+
+.ht-tab {
+  flex: none;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--ht-line);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-color);
+  background: var(--card-bg);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    color 0.15s;
+
+  i {
+    color: var(--ht-muted);
+    margin-right: 0.3rem;
+  }
+
+  &:hover {
+    color: var(--heading-color);
+    border-color: color-mix(in srgb, var(--ht-accent) 50%, transparent);
+  }
+
+  // The sliding .ht-indicator paints the selected tab's background.
+  .ht-js &[aria-selected='true'] {
+    color: #fff;
+    background: transparent;
+    border-color: transparent;
+
+    i {
+      color: inherit;
+    }
+  }
+
+  .ht-js & {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.ht-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--ht-accent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ht-accent) 35%, transparent);
+  pointer-events: none;
+
+  .ht-ready & {
+    transition:
+      transform 0.4s cubic-bezier(0.35, 1.35, 0.5, 1),
+      width 0.4s cubic-bezier(0.35, 1.35, 0.5, 1),
+      height 0.3s ease;
+  }
+}
+
+.ht-flame {
+  display: inline-block;
+  transform-origin: 50% 90%;
+  animation: ht-flicker 2.6s ease-in-out infinite;
+}
+
+@keyframes ht-flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+
+  30% {
+    transform: scale(1.08, 1.14) rotate(-4deg);
+  }
+
+  60% {
+    transform: scale(0.96, 1.04) rotate(3deg);
+  }
+}
+
+.ht-panel {
+  border: 1px solid var(--ht-line);
+  border-radius: 0.75rem;
+  background: var(--card-bg);
+  padding: 1rem 1.25rem 0.5rem;
+
+  .hot-topics:not(.ht-js) & + & {
+    margin-top: 0.75rem;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ht-accent);
+    outline-offset: 2px;
+  }
+
+  // Rows wait hidden until the section scrolls into view, then slide in one after another.
+  &.ht-waiting li {
+    opacity: 0;
+  }
+
+  &.ht-enter .ht-panel-head {
+    animation: ht-fade 0.3s ease both;
+  }
+
+  &.ht-enter li {
+    animation: ht-row 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+    animation-delay: calc(var(--i, 1) * 55ms);
+  }
+}
+
+@keyframes ht-row {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ht-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.ht-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--ht-line);
+}
+
+.ht-blurb {
+  margin: 0;
+  color: var(--ht-muted);
+  font-size: 0.9rem;
+}
+
+.ht-all {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  i {
+    transition: transform 0.2s ease;
+  }
+
+  &:hover i {
+    transform: translateX(4px);
+  }
+}
+
+.ht-posts {
+  list-style: none;
+  counter-reset: ht;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  column-gap: 2rem;
+
+  li {
+    counter-increment: ht;
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    align-items: baseline;
+    padding: 0.55rem 0;
+    border-bottom: 1px dashed var(--ht-line);
+
+    &::before {
+      content: counter(ht, decimal-leading-zero);
+      grid-row: span 2;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--ht-accent);
+      transition: transform 0.2s ease;
+    }
+
+    > * {
+      transition: transform 0.2s ease;
+    }
+
+    &:hover::before {
+      transform: scale(1.2);
+    }
+
+    &:hover > * {
+      transform: translateX(4px);
+    }
+  }
+
+  a {
+    font-weight: 500;
+    color: var(--heading-color);
+    line-height: 1.35;
+
+    &:hover {
+      color: var(--link-color);
+    }
+  }
+
+  .ht-kind {
+    display: inline-block;
+    padding: 0 0.4rem;
+    margin-right: 0.15rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    color: var(--ht-accent);
+    background: color-mix(in srgb, var(--ht-accent) 12%, transparent);
+  }
+
+  .ht-meta {
+    grid-column: 2;
+    font-size: 0.75rem;
+    color: var(--ht-muted);
+    margin-top: 0.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-flame,
+  .ht-panel.ht-enter li,
+  .ht-panel.ht-enter .ht-panel-head {
+    animation: none;
+  }
+
+  .ht-panel.ht-waiting li {
+    opacity: 1;
+  }
+
+  .ht-ready .ht-indicator,
+  .ht-posts li::before,
+  .ht-posts li > *,
+  .ht-all i {
+    transition: none;
+  }
+}

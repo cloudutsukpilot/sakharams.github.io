@@ -1,0 +1,65 @@
+# Animated flow diagram for _posts/labs/ebpf-lab/2026-10-11-03-set-up-infrastructure.md
+# (include id: labs/ebpf-lab/signal-paths): how each eBPF tool's output is collected and reaches mon.
+# Facts from ~/gitrepos/observability/ebpf-lab (helm/*.yaml, Makefile) and homelab-gitops
+# apps/monitoring-pack (agent collector), captured 2026-10-14.
+title: eBPF Lab, how each signal is collected
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 560]
+
+lanes:
+  - { label: "In lab-ebpf (per node)", x: 8, y: 8, w: 984, h: 290 }
+  - { label: "On mon", x: 8, y: 308, w: 984, h: 244 }
+
+nodes:
+  - { id: OBI, label: "OBI", sub: "host network", x: 100, y: 90, w: 150, h: 56, color: green }
+  - { id: TET, label: "Tetragon", sub: "export-stdout", x: 300, y: 90, w: 150, h: 56, color: rose }
+  - { id: FAL, label: "Falco", sub: "json_output", x: 500, y: 90, w: 150, h: 56, color: rose }
+  - { id: FSK, label: "Falcosidekick", sub: "UI :8093", x: 700, y: 90, w: 150, h: 56, color: rose }
+  - { id: KL, label: "kubelet", sub: "and cAdvisor", x: 895, y: 90, w: 150, h: 56, icon: server, color: violet }
+  - { id: LOG, label: "Pod log files", sub: "/var/log/pods", x: 300, y: 225, w: 170, h: 56, icon: file, color: amber }
+  - { id: AGT, label: "Agent", sub: "collector", x: 700, y: 225, w: 150, h: 56, icon: chart, color: green }
+  - { id: GW, label: "Gateway", sub: "otlp.mon…", x: 300, y: 385, w: 150, h: 56, icon: balancer, color: green }
+  - { id: MI, label: "Mimir", sub: "metrics", x: 300, y: 495, w: 150, h: 50, shape: cylinder, color: green }
+  - { id: LO, label: "Loki", sub: "logs", x: 500, y: 495, w: 150, h: 50, shape: cylinder, color: green }
+  - { id: TE, label: "Tempo", sub: "traces", x: 700, y: 495, w: 150, h: 50, shape: cylinder, color: green }
+  - { id: GR, label: "Grafana", sub: "eBPF lab", x: 895, y: 420, w: 150, h: 56, shape: terminal, color: green }
+
+edges:
+  - { id: TET_LOG, from: TET, to: LOG, kind: telemetry, label: "JSON lines" }
+  - { id: FAL_LOG, from: FAL, to: LOG, points: [[500, 118], [500, 165], [350, 165], [350, 197]], kind: telemetry }
+  - { id: FAL_FSK, from: FAL, to: FSK, kind: event }
+  - { id: LOG_AGT, from: LOG, to: AGT, kind: telemetry, label: "tail" }
+  - { id: KL_AGT, from: KL, to: AGT, points: [[895, 118], [895, 225], [775, 225]], kind: telemetry, label: "scrape 30s", label_at: [905, 175] }
+  - { id: OBI_GW, from: OBI, to: GW, points: [[100, 118], [100, 385], [225, 385]], kind: telemetry, label: "OTLP direct, 60s", label_at: [112, 262] }
+  - { id: AGT_GW, from: AGT, to: GW, points: [[700, 253], [700, 340], [340, 340], [340, 357]], kind: telemetry, label: "OTLP + labs token", label_at: [520, 330] }
+  - { id: GW_MI, from: GW, to: MI, kind: telemetry }
+  - { id: GW_LO, from: GW, to: LO, points: [[375, 375], [500, 375], [500, 470]], kind: telemetry }
+  - { id: GW_TE, from: GW, to: TE, points: [[375, 400], [700, 400], [700, 470]], kind: telemetry }
+  - { id: TE_GR, from: TE, to: GR, points: [[775, 495], [895, 495], [895, 448]], kind: telemetry }
+
+steps:
+  - lights: [OBI, TET, FAL, KL]
+    title: Four sources
+    text: "OBI, Tetragon and Falco watch the kernel; the kubelet and cAdvisor expose container metrics. None of the eBPF tools is configured with an exporter to Loki."
+  - edges: [TET_LOG, FAL_LOG]
+    title: Events are log lines
+    text: "Tetragon writes JSON events on its export-stdout container, Falco on stdout. The container runtime stores both under /var/log/pods."
+  - edges: [FAL_FSK]
+    title: Falco's own UI
+    text: "Falcosidekick receives each Falco alert over HTTP and keeps it in the UI's Redis, on a static PV."
+  - edges: [LOG_AGT, KL_AGT]
+    title: The agent collects
+    text: "The monitoring pack's agent collector tails every pod log on its node and scrapes the kubelet and cAdvisor every 30 s, adding pod labels and k8s.cluster.name."
+  - edges: [OBI_GW]
+    title: OBI goes direct
+    text: "OBI can't reach the agent from the host network here, so it pushes OTLP to the gateway itself: metrics every 60 s, spans in 15 s batches."
+  - edges: [AGT_GW]
+    title: One token for labs
+    text: "Everything else reaches the gateway through the agent, with the shared labs token. The gateway sets cluster=lab-ebpf from k8s.cluster.name."
+  - edges: [GW_MI, GW_LO, GW_TE]
+    title: Three stores
+    text: "Metrics go to Mimir, logs (including Tetragon and Falco events) to Loki, spans to Tempo."
+  - edges: [TE_GR]
+    title: One dashboard
+    text: "The eBPF lab dashboard queries all three, every query filtered on lab-ebpf."

@@ -1,0 +1,39 @@
+{% comment %}
+  Hands-on lab navigation bar for a post with `lab:` and `lab_part:` front matter (written by the
+  cloudutsuk-learning-lab scaffold). Links back to the lab index (/tags/<lab>/) and to the previous
+  and next written parts. Styled by .project-nav (_sass/project-index.scss).
+{% endcomment %}
+{% if page.lab and page.lab_part %}
+  {% assign nav_lab = site.data.labs[page.lab] %}
+  {% assign nav_posts = site.posts | where: 'lab', page.lab | where_exp: 'p', 'p.lab_part' | sort: 'lab_part' %}
+  {% assign nav_prev = nil %}
+  {% assign nav_next = nil %}
+  {% for p in nav_posts %}
+    {% if p.lab_part == page.lab_part %}
+      {% assign i_prev = forloop.index0 | minus: 1 %}
+      {% if i_prev >= 0 %}{% assign nav_prev = nav_posts[i_prev] %}{% endif %}
+      {% assign nav_next = nav_posts[forloop.index] %}
+    {% endif %}
+  {% endfor %}
+  <nav class="project-nav lab-nav" aria-label="Lab navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.lab | append: '/' | relative_url }}">
+      <i class="fas fa-flask fa-fw" aria-hidden="true"></i>
+      {{ nav_lab.name | default: page.lab }}: lab index
+    </a>
+    <span class="project-nav-step text-muted">
+      Part {{ page.lab_part }} of {{ site.data.lab_framework.parts | size }}
+    </span>
+    <span class="project-nav-links">
+      {% if nav_prev %}
+        <a href="{{ nav_prev.url | relative_url }}" title="{{ nav_prev.title }}">
+          <i class="fas fa-angle-left" aria-hidden="true"></i> Previous
+        </a>
+      {% endif %}
+      {% if nav_next %}
+        <a href="{{ nav_next.url | relative_url }}" title="{{ nav_next.title }}">
+          Next <i class="fas fa-angle-right" aria-hidden="true"></i>
+        </a>
+      {% endif %}
+    </span>
+  </nav>
+{% endif %}

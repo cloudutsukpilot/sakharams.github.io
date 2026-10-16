@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/projects/sql-blocking-agent/2026-10-05-13-deployment-and-go-live.md
+# (include id: projects/sql-blocking-agent/real-kill-rollout). Recommended staged rollout from production
+# dry-run to approved real kills, with the DRY_RUN kill switch as rollback. A recommendation, not history.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: SQL Blocking Agent real-kill rollout
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 270]
+grid: { x0: 90, y0: 70, dx: 164, dy: 140, w: 136, h: 56 }
+modes:
+  - { id: go, label: "Pilot goes well" }
+  - { id: back, label: "Simulate a bad decision in the pilot" }
+
+nodes:
+  - { id: R, label: "Dry-run\nreview", col: 0, row: 0, shape: terminal, icon: check }
+  - { id: P, label: "Promote\ncurrent code", col: 1, row: 0, icon: rocket, icon_pos: corner }
+  - { id: A, label: "Approval\nAPI auth", col: 2, row: 0, icon: lock }
+  - { id: O, label: "Real kills on\none server", col: 3, row: 0, icon: server, icon_pos: corner }
+  - { id: W, label: "Pilot\nclean?", col: 4, row: 0, w: 120, h: 84, shape: diamond }
+  - { id: E, label: "Expand server\nby server", col: 5, row: 0, tone: ok, icon: server, icon_pos: corner }
+  - { id: B, label: "DRY_RUN=true,\nreview", col: 4, row: 1, h: 50, tone: fail, icon: check, icon_pos: corner }
+
+edges:
+  - { id: RP, from: R, to: P }
+  - { id: PA, from: P, to: A }
+  - { id: AO, from: A, to: O }
+  - { id: OW, from: O, to: W }
+  - { id: WE, from: W, to: E, label: "yes", tone: ok }
+  - { id: WB, from: W, to: B, label: "no", label_at: [762, 150], tone: fail }
+
+steps:
+  - lights: [R]
+    title: Review dry-run decisions
+    text: The database team reviews a sample of production dry-run decisions and agrees with every proposed KILL and every gate outcome.
+  - edges: [RP]
+    title: Promote current code
+    text: Production moves from v1.0.6 to the current version, so the transaction-safe KILL path is what goes live, and is reviewed in dry-run first.
+  - edges: [PA]
+    title: Secure the approval API
+    text: Approvals require an authenticated DBA identity, and the reviewer recorded is the authenticated one.
+  - edges: [AO]
+    title: Pilot one server
+    text: DRY_RUN=false on one agreed server, approval still mandatory, max_kills_per_hour set low. The change is a Git commit synced by Argo CD.
+  - edges: [OW]
+    title: Watch the pilot
+    text: For an agreed period, every proposed KILL, approval, validation and RCA is reviewed with the database team.
+  - edges: [WE]
+    when: go
+    title: Expand gradually
+    text: Add servers one at a time, each as its own reviewed change, keeping the kill-rate limit conservative.
+  - edges: [WB]
+    when: back
+    title: Kill switch
+    text: Any doubtful decision flips DRY_RUN back to true through Argo CD. Detection and RCA continue; nothing is killed until the cause is fixed and tested.

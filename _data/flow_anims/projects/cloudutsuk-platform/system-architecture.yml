@@ -1,0 +1,145 @@
+# Cloudutsuk Platform: system architecture (portal, labs, cost, RAG chat, alert agent).
+# Belongs to the Technical Architecture post of the "Cloudutsuk Platform" project playbook
+# (_posts/projects/cloudutsuk-platform/2026-10-10-05-technical-architecture.md). Made with the
+# cloudutsuk-flow-anim skill. The whole AI stack (RAG API, Qdrant, Redis cache, gateway, vLLM) sits in its own
+# `ai` k3d cluster (ADR 0022); the SRE agent stays in platform so it can still report when ai is down.
+# Ports are the products' defaults (Backstage 7007, LiteLLM 4000, vLLM 8000, Qdrant 6333, Redis 6379,
+# Postgres 5432, OTLP gRPC 4317, Kubernetes API 6443, OpenBao 8200, Keycloak 8443); the post's own services have no fixed port yet.
+# Design review gate: approve this diagram before infrastructure or code work starts.
+title: Cloudutsuk Platform system architecture (portal, labs, AI stack, alerts)
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 1090]
+lanes:
+  - {label: "Edge and sources", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Platform cluster (k3d)", x: 8, y: 160, w: 984, h: 300}
+  - {label: "CI/CD", x: 8, y: 470, w: 984, h: 120}
+  - {label: "Core cluster (k3d, boots first)", x: 8, y: 620, w: 392, h: 130}
+  - {label: "Labs (k3d)", x: 412, y: 620, w: 228, h: 130}
+  - {label: "Monitoring (k3d)", x: 652, y: 620, w: 340, h: 130}
+  - {label: "AI stack (ai cluster, GPU)", x: 8, y: 780, w: 984, h: 292}
+modes:
+  - {id: normal, label: "Normal flow"}
+  - {id: alert, label: "Simulate an alert"}
+nodes:
+  - {id: user, label: "You", sub: "browser", x: 75, y: 70, w: 110, h: 56, shape: terminal, icon: user, icon_pos: corner, color: blue}
+  - {id: cf, label: "Tailscale", sub: "private network", x: 310, y: 70, w: 150, h: 56, icon: lock, icon_pos: corner, color: teal}
+  - {id: clouds, label: "Clouds", sub: "Azure AWS GCP", x: 530, y: 70, w: 130, h: 60, shape: cylinder, icon: cloud, icon_pos: corner, color: sky}
+  - {id: blog, label: "Blog + repos", sub: "GitHub", x: 925, y: 70, w: 140, h: 60, shape: cylinder, icon: "devops/cicd/github-18.svg", icon_pos: corner, color: slate}
+  - {id: slack, label: "Slack", sub: "approve/reject", x: 740, y: 70, w: 130, h: 56, icon: message, icon_pos: corner, color: pink}
+  - {id: inv, label: "Inventory", sub: "cost collector", x: 75, y: 235, w: 120, h: 56, icon: chart, icon_pos: corner, color: green}
+  - {id: bs, label: "Backstage", sub: "portal", x: 310, y: 235, w: 150, h: 56, icon: browser, color: indigo}
+  - {id: runner, label: "Lab runner", sub: "make up/down", x: 530, y: 235, w: 140, h: 56, icon: terminal, icon_pos: corner, color: orange}
+  - {id: argo, label: "Argo CD", sub: "hub", x: 740, y: 235, w: 140, h: 56, icon: git, color: orange}
+  - {id: sre, label: "SRE agent", sub: "HITL", x: 920, y: 235, w: 120, h: 56, icon: server, icon_pos: corner, color: violet}
+  - {id: pg, label: "Postgres", sub: "inventory, jobs", x: 75, y: 395, w: 130, h: 66, shape: cylinder, icon: "databases/postgresql-18.svg", icon_pos: corner, color: amber}
+  - {id: rag, label: "RAG API", sub: "rag-api", x: 230, y: 850, w: 140, h: 56, icon: api, color: violet}
+  - {id: cache, label: "Redis", sub: "semantic cache", x: 480, y: 850, w: 120, h: 66, shape: cylinder, icon: bolt, icon_pos: corner, color: amber}
+  - {id: qd, label: "Qdrant", sub: "vectors", x: 700, y: 850, w: 120, h: 66, shape: cylinder, icon: database, icon_pos: corner, color: amber}
+  - {id: ci, label: "ARC runners", sub: "tests, scans", x: 292, y: 530, w: 130, h: 56, icon: "devops/cicd/github-18.svg", icon_pos: corner, color: orange}
+  - {id: bk, label: "BuildKit", sub: "SBOM, Cosign", x: 629, y: 530, w: 130, h: 56, icon: package, icon_pos: corner, color: orange}
+  - {id: kc, label: "Keycloak", sub: "identity", x: 70, y: 690, w: 110, h: 56, icon: user, icon_pos: corner, color: blue}
+  - {id: core, label: "OpenBao", sub: "secrets", x: 200, y: 690, w: 110, h: 56, icon: lock, icon_pos: corner, color: slate}
+  - {id: dns, label: "PowerDNS", sub: "home zone", x: 330, y: 690, w: 110, h: 56, icon: globe, icon_pos: corner, color: teal}
+  - {id: labs, label: "Lab clusters", sub: "one per lab", x: 530, y: 690, w: 160, h: 56, icon: cluster, color: violet}
+  - {id: mon, label: "mon cluster", sub: "LGTM, Alertmgr", x: 900, y: 690, w: 120, h: 56, icon: bell, icon_pos: corner, color: green}
+  - {id: px, label: "Phoenix", sub: "RAG traces", x: 900, y: 850, w: 120, h: 56, icon: chart, icon_pos: corner, color: pink}
+  - {id: more, label: "More capacity", sub: "2nd box, hosted", x: 80, y: 980, w: 140, h: 56, tone: warn}
+  - {id: emb, label: "vLLM embed", sub: "embeddings", x: 280, y: 980, w: 140, h: 56, icon: cpu, icon_pos: corner, color: violet}
+  - {id: gw, label: "Model gateway", sub: "LiteLLM", x: 530, y: 980, w: 150, h: 56, icon: balancer, icon_pos: corner, color: teal}
+  - {id: llm, label: "vLLM chat", sub: "local model", x: 800, y: 980, w: 140, h: 56, icon: message, icon_pos: corner, color: violet}
+edges:
+  - {id: u_cf, from: user, to: cf, label: "tailnet", proto: WireGuard, kind: stream}
+  - {id: cf_bs, from: cf, to: bs, proto: HTTPS, port: 443, proto_at: [310, 122]}
+  - {id: bs_inv, from: bs, to: inv, exit: left, enter: right, proto: HTTP}
+  - {id: inv_cl, from: inv, to: clouds, points: [[75, 207], [75, 150], [530, 150], [530, 100]], label: "every 6 h", proto: HTTPS, port: 443, proto_at: [430, 150]}
+  - {id: inv_pg, from: inv, to: pg, proto: PostgreSQL, port: 5432}
+  - {id: kc_bs, from: kc, to: bs, points: [[70, 662], [70, 600], [160, 600], [160, 330], [250, 330], [250, 263]], dashed: true, label: "OIDC"}
+  - {id: core_inv, from: core, to: inv, points: [[215, 662], [215, 300], [110, 300], [110, 263]], dashed: true, label: "ESO", proto: HTTPS, port: 8200, proto_at: [215, 420]}
+  - {id: bs_run, from: bs, to: runner, proto: HTTP}
+  - {id: run_labs, from: runner, to: labs, curve: 0, label: "make up", badge: false, label_at: [565, 440]}
+  - {id: run_argo, from: runner, to: argo, curve: -0.45, proto: HTTPS, port: 443}
+  - {id: argo_labs, from: argo, to: labs, points: [[728, 263], [728, 600], [470, 600], [470, 662]], proto: HTTPS, port: 6443, proto_at: [605, 600]}
+  - {id: labs_mon, from: labs, to: mon, proto: OTLP, port: 4317, proto_at: [700, 690]}
+  - {id: bs_rag, from: bs, to: rag, points: [[370, 263], [370, 600], [406, 600], [406, 770], [260, 770], [260, 822]], label: "chat", label_at: [385, 300], proto: HTTP, proto_at: [406, 730]}
+  - {id: rag_cache, from: rag, to: cache, proto: Redis, port: 6379}
+  - {id: rag_qd, from: rag, to: qd, curve: -0.3, proto: Qdrant, port: 6333, kind: data}
+  - {id: rag_gw, from: rag, to: gw, points: [[230, 878], [230, 920], [500, 920], [500, 952]], proto: HTTP, port: 4000, proto_at: [380, 920]}
+  - {id: rag_px, from: rag, to: px, points: [[260, 878], [260, 900], [900, 900], [900, 878]], kind: telemetry, label: "traces", label_at: [590, 890], proto: OTLP, port: 4317, proto_at: [790, 900]}
+  - {id: gw_llm, from: gw, to: llm, proto: HTTP, port: 8000}
+  - {id: gw_emb, from: gw, to: emb, exit: left, enter: right, proto: HTTP, port: 8000}
+  - {id: gw_more, from: gw, to: more, exit: bottom, enter: bottom, offset: 40, dashed: true, tone: warn, label: "overflow, later", proto: HTTPS, port: 443}
+  - {id: blog_qd, from: blog, to: qd, points: [[855, 70], [825, 70], [825, 770], [700, 770], [700, 817]], label: "rag-ingest, 6 h", label_at: [825, 113], proto: HTTPS, port: 443, proto_at: [825, 330]}
+  - {id: mon_sre, from: mon, to: sre, points: [[900, 662], [900, 263]], label: "alert", proto: Webhook, proto_at: [900, 450]}
+  - {id: sre_labs, from: sre, to: labs, points: [[950, 263], [950, 635], [500, 635], [500, 662]], dashed: true, proto: HTTPS, port: 6443, proto_at: [580, 635]}
+  - {id: sre_qd, from: sre, to: qd, curve: 0, kind: data}
+  - {id: sre_gw, from: sre, to: gw, points: [[975, 263], [975, 920], [590, 920], [590, 952]], proto: HTTP, port: 4000, proto_at: [880, 920]}
+  - {id: sre_slack, from: sre, to: slack, points: [[890, 207], [890, 182], [760, 182], [760, 98]], label: "RCA", proto: HTTPS, port: 443, proto_at: [760, 140]}
+  - {id: ci_bk, from: ci, to: bk, kind: control, label: "gates pass"}
+  - {id: bk_argo, from: bk, to: argo, points: [[650, 502], [650, 290], [700, 290], [700, 263]], label: "tag commit", kind: control}
+  - {id: slack_argo, from: slack, to: argo, points: [[715, 98], [715, 207]], label: "PR"}
+steps:
+  - title: You open the portal
+    text: "portal.platform.home.cloudutsuk.com is served from the DGX Spark and published nowhere on the internet. The core cluster boots first: Keycloak for identity, OpenBao for secrets, PowerDNS for internal names."
+    lights: [user, blog, kc, core, dns, ci]
+  - title: In through the tailnet
+    text: "Your phone or laptop joins the private Tailscale network over WireGuard. Only your login may reach the platform's addresses, and split DNS resolves home.cloudutsuk.com there. Nothing listens on the internet."
+    edges: [u_cf]
+  - title: Backstage signs you in
+    text: "The DGX routes you to platform's Traefik on 443, then Backstage (7007), which signs you in with Keycloak OIDC (brokering Entra ID) and maps your groups to roles. Network access alone gets nobody in."
+    edges: [cf_bs, kc_bs]
+  - title: One view of everything
+    text: "The Inventory plugin reads what the collector stored. Collectors run every 6 hours, or on demand with Sync now."
+    edges: [bs_inv]
+  - title: Resources and cost
+    text: "External Secrets fetches read-only cloud credentials from OpenBao (8200). Resources and cost land in Postgres (5432), grouped by lab and repo tags."
+    edges: [inv_cl, inv_pg, core_inv]
+  - title: One-click lab deploy
+    text: "Deploy on a lab tile calls the lab runner, which checks the memory budget and takes a per-lab lock first."
+    edges: [bs_run]
+  - title: Cluster up, registered
+    text: "The runner runs the lab's make up to create a k3d cluster, then registers that cluster with the central Argo CD."
+    edges: [run_labs, run_argo]
+  - title: Every lab is observed
+    text: "Argo CD installs the OTel collector on the new cluster through its Kubernetes API (6443); it sends traces, metrics and logs to mon over OTLP gRPC (4317)."
+    edges: [argo_labs, labs_mon]
+  - title: Ask about your setup
+    text: "The chat plugin sends your question to the RAG API, which runs with the rest of the AI stack in the ai cluster."
+    edges: [bs_rag]
+  - title: Cache, retrieve, generate
+    text: "A Redis semantic cache hit (6379) answers instantly. On a miss, Qdrant (6333) finds the docs and the gateway (LiteLLM, default 4000) gets the prompt."
+    edges: [rag_cache, rag_qd, rag_gw]
+  - title: Every answer is traceable
+    text: "The RAG API's spans (cache check, retrieved chunks and scores, prompt, tokens) go through the collector to Phoenix; each chat answer links to its trace."
+    edges: [rag_px]
+  - title: One gateway, many models
+    text: "Every model call goes through one OpenAI-compatible gateway. It routes by model name to the chat or embedding vLLM (default port 8000) and counts tokens."
+    edges: [gw_llm, gw_emb]
+  - title: Room to grow
+    text: "One GB10 can't scale out. When the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers."
+    edges: [gw_more]
+  - title: Knowledge stays fresh
+    text: "rag-ingest re-embeds only changed files every 6 hours, or on Re-index now, and the cache invalidates with the index version."
+    edges: [blog_qd]
+  - title: Code to cluster
+    text: "A push to a private repo wakes an ARC runner on the DGX (it polls GitHub, no inbound). Tests run, then Gitleaks, Semgrep, Trivy and Checkov must pass."
+    edges: [ci_bk]
+  - title: Signed, then synced
+    text: "BuildKit builds the image, Trivy scans it, Syft adds an SBOM, Cosign signs it and it goes to Zot in core. The digest commit lets Argo CD sync; Kyverno only admits signed images."
+    edges: [bk_argo]
+  - title: An alert fires
+    when: alert
+    text: "Alertmanager in the mon cluster POSTs to the SRE agent's /alerts webhook with the cluster, namespace and pod labels."
+    edges: [mon_sre]
+  - title: The agent investigates
+    when: alert
+    text: "It reads the lab cluster read-only through the Kubernetes API, pulls runbooks from Qdrant (6333), and asks the local model, via the gateway, for a root cause."
+    edges: [sre_labs, sre_qd, sre_gw]
+  - title: You get the RCA
+    when: alert
+    text: "The root cause and a proposed fix are posted to Slack and the portal. Nothing changes without your approval."
+    edges: [sre_slack]
+  - title: Fix through GitOps
+    when: alert
+    text: "Approving opens a PR to homelab-gitops. Argo CD syncs the merged fix, so every change is reviewed and reversible."
+    edges: [slack_argo]

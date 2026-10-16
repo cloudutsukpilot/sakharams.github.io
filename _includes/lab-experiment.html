@@ -1,0 +1,56 @@
+{%- comment -%}
+  One experiment card in a hands-on lab post: {% include lab-experiment.html id="<experiment id>" %}.
+  Renders from _data/labs/<page.lab>.yml (`experiments[id]`): signals, goal, the action to perform,
+  the prediction prompt, what to look for per signal, and the screenshots. A screenshot shows once
+  capture.cjs has written it and listed it in _data/lab_shots/<lab>.json (with its size); until then a
+  dashed "not captured yet" box stands in. The explanation of what the screenshots show is written in
+  the post below the include. Pass lab="<slug>" to use another lab's data.
+  Created by the cloudutsuk-learning-lab skill; styles in _sass/lab.scss.
+{%- endcomment -%}
+{%- assign lab_key = include.lab | default: page.lab -%}
+{%- assign xlab = site.data.labs[lab_key] -%}
+{%- assign exp = xlab.experiments | where: 'id', include.id | first -%}
+{%- assign shots_meta = site.data.lab_shots[lab_key] -%}
+{%- if exp -%}
+<div class="lab-exp">
+<div class="lab-exp-meta">
+{%- for s in exp.signals %}<span class="lab-sig lab-sig-{{ s }}">{{ s }}</span>{% endfor -%}
+{%- if exp.wait %}<span class="lab-exp-wait"><i class="far fa-clock" aria-hidden="true"></i> allow about {{ exp.wait }}s for signals to arrive</span>{% endif -%}
+</div>
+{%- if exp.goal %}<p class="lab-exp-goal">{{ exp.goal | markdownify | remove: '<p>' | remove: '</p>' | strip }}</p>{% endif -%}
+<div class="lab-exp-step"><span class="lab-exp-label"><i class="fas fa-hand-pointer" aria-hidden="true"></i> Do this</span>
+{%- if exp.action.say %}<p>{{ exp.action.say | markdownify | remove: '<p>' | remove: '</p>' | strip }}</p>{% endif -%}
+{%- if exp.action.run %}<div class="lab-exp-cmd"><code>{{ exp.action.run | strip | escape }}</code></div>{% endif -%}
+</div>
+{%- if exp.predict %}<div class="lab-exp-step lab-exp-predict"><span class="lab-exp-label"><i class="fas fa-lightbulb" aria-hidden="true"></i> Predict first</span><p>{{ exp.predict | markdownify | remove: '<p>' | remove: '</p>' | strip }}</p></div>{% endif -%}
+{%- if exp.look_for.size > 0 -%}
+<div class="lab-exp-step"><span class="lab-exp-label"><i class="fas fa-search" aria-hidden="true"></i> Look for</span>
+<div class="table-wrapper"><table class="lab-exp-look">
+<thead><tr><th>Signal</th><th>Where</th><th>Query</th><th>What you should see</th></tr></thead>
+<tbody>
+{%- for l in exp.look_for %}<tr><td data-label="Signal"><span class="lab-sig lab-sig-{{ l.signal }}">{{ l.signal }}</span></td><td data-label="Where">{{ l.where | escape }}</td><td data-label="Query">{% if l.query %}<code>{{ l.query | escape }}</code>{% endif %}</td><td data-label="Expect">{{ l.expect | markdownify | remove: '<p>' | remove: '</p>' | strip }}</td></tr>{% endfor -%}
+</tbody>
+</table></div>
+</div>
+{%- endif -%}
+{%- if exp.shots.size > 0 -%}
+<div class="lab-shots">
+{%- for shot in exp.shots -%}
+{%- capture shot_file %}{{ exp.id }}-{{ shot.name }}.webp{% endcapture -%}
+{%- assign meta = shots_meta[shot_file] -%}
+{%- case shot.phase -%}{%- when 'before' -%}{%- assign phase_label = 'Before' -%}{%- when 'during' -%}{%- assign phase_label = 'Live' -%}{%- else -%}{%- assign phase_label = 'After' -%}{%- endcase -%}
+<figure class="lab-shot lab-shot-{{ shot.phase | default: 'after' }}{% if shot.wide or shot.timelapse %} is-wide{% endif %}">
+{%- if meta -%}
+<img src="{{ '/assets/img/labs/' | append: lab_key | append: '/' | append: shot_file }}" alt="{{ shot.alt | escape }}" width="{{ meta.w }}" height="{{ meta.h }}">
+{%- else -%}
+<div class="lab-shot-pending"><i class="far fa-image" aria-hidden="true"></i> Screenshot not captured yet: {{ shot.alt | escape }}</div>
+{%- endif -%}
+<figcaption><span class="lab-shot-phase">{{ phase_label }}{% if shot.timelapse %} · animated{% endif %}</span> {{ shot.caption | escape }}</figcaption>
+</figure>
+{%- endfor -%}
+</div>
+{%- endif -%}
+</div>
+{%- else -%}
+<p class="lab-shot-pending">Unknown experiment "{{ include.id }}" for lab "{{ lab_key }}" (check _data/labs/{{ lab_key }}.yml).</p>
+{%- endif -%}

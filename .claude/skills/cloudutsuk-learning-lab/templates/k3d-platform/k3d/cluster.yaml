@@ -1,0 +1,34 @@
+# __CLUSTER__: a short-lived lab cluster owned by this repo's Makefile, on lab contract v2 (homelab
+# Phase 2 step 5): it joins the shared `homelab` Docker network, keeps its own pod and service ranges
+# (ADR 0030: labs from 10.100 up, one pair per lab), pulls public images through the homelab's Zot
+# mirror, and sends its signals to the platform's monitoring cluster instead of a Grafana of its own.
+#
+# Host port mappings and ranges are fixed when the cluster is created: `make rebuild` after changing them.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: __CLUSTER__
+servers: 1
+agents: 0
+image: rancher/k3s:v1.35.5-k3s1
+network: homelab
+kubeAPI:
+  hostIP: 127.0.0.1
+  hostPort: "__API_PORT__"        # list it in the card's deploy.ports
+ports:
+  - port: 127.0.0.1:__SITE_PORT__:80   # the app, through the bundled Traefik ingress
+    nodeFilters: [loadbalancer]
+volumes:
+  # Public images through the homelab's Zot pull-through mirror (ADR 0034); containerd falls back to
+  # the upstream registry if Zot is down.
+  - volume: /srv/homelab/k3s/registries.yaml:/etc/rancher/k3s/registries.yaml
+    nodeFilters: [server:*, agent:*]
+options:
+  k3s:
+    extraArgs:
+      - arg: --cluster-cidr=10.__POD_OCTET__.0.0/16
+        nodeFilters: [server:*]
+      - arg: --service-cidr=10.__SVC_OCTET__.0.0/16
+        nodeFilters: [server:*]
+      - arg: --cluster-dns=10.__SVC_OCTET__.0.10
+        nodeFilters: [server:*]

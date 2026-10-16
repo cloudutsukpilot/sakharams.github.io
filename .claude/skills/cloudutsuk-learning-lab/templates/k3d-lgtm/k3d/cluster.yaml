@@ -1,0 +1,13 @@
+# Host port mappings are fixed when the cluster is created: after changing them run
+# `make down && make up` (this deletes the cluster and its ephemeral observability data).
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: __CLUSTER__
+servers: 1
+agents: 0
+ports:
+  - port: __SITE_PORT__:80          # app, via the bundled Traefik ingress
+    nodeFilters: [loadbalancer]
+  - port: __GRAFANA_PORT__:30030    # Grafana, via NodePort
+    nodeFilters: [server:0]

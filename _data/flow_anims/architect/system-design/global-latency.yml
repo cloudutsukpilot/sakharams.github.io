@@ -1,0 +1,55 @@
+# Geo map for _posts/architect/system-design/2025-04-01-system-design-building-blocks.md, section "5. Latency"
+# (include id: architect/system-design/global-latency).
+# Badge figures are typical public-internet round trips, rounded; real values depend on provider and route.
+title: "Latency: one far-away data center vs a nearby region"
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 405]
+map: {name: world, lon: [-85, 115], lat: [62, -14], graticule: 30}
+
+nodes:
+  - {id: ny, label: "New York", sub: "origin", shape: site, icon: server, lat: 40.7, lon: -74.0}
+  - {id: fra, label: "Frankfurt", sub: "region", shape: site, icon: server, lat: 50.1, lon: 8.7}
+  - {id: sgp, label: "Singapore", sub: "region", shape: site, icon: server, lat: 1.35, lon: 103.8}
+  - {id: user, label: "User", sub: "Kolkata", shape: site, icon: user, lat: 22.6, lon: 88.4}
+
+edges:
+  - {id: req_ny, from: user, to: ny, label: "~230ms", tone: warn, curve: -0.2}
+  - {id: res_ny, from: ny, to: user, tone: warn, curve: 0.08}
+  - {id: rep_fra, from: ny, to: fra, label: "~85ms", dashed: true}
+  - {id: rep_sgp, from: fra, to: sgp, label: "~160ms", dashed: true}
+  - {id: req_sgp, from: user, to: sgp, label: "~50ms", tone: ok, label_at: [955, 255]}
+  - {id: res_sgp, from: sgp, to: user, tone: ok}
+
+modes:
+  - {id: origin, label: "One data center"}
+  - {id: nearest, label: "Deploy to several regions"}
+
+steps:
+  - title: "A user far from the server"
+    text: "The service runs in one data center in New York. A user in Kolkata opens the app."
+    lights: [user, ny]
+  - title: "Request crosses the globe"
+    when: origin
+    edges: [req_ny]
+    text: "About 12,700 km each way. Light in fibre alone needs over 125ms for the round trip; typical routes take about 230ms."
+  - title: "And the reply comes back"
+    when: origin
+    edges: [res_ny]
+    text: "Every call pays that round trip again. Five sequential calls on one page spend over a second just on distance."
+  - title: "Copy the service to Europe"
+    when: nearest
+    edges: [rep_fra]
+    text: "Deploy the service and replicate its data to a second region. Replication runs in the background, so users don't wait on it."
+  - title: "And to Asia"
+    when: nearest
+    edges: [rep_sgp]
+    text: "A third region in Singapore puts a copy of the service about 2,900 km from the user instead of 12,700."
+  - title: "Route to the nearest region"
+    when: nearest
+    edges: [req_sgp]
+    text: "Geo-DNS or anycast sends the request to the closest healthy region: about 50ms round trip instead of about 230ms."
+  - title: "Answer close to home"
+    when: nearest
+    edges: [res_sgp]
+    text: "Reads are served locally. Writes may still need the primary region, which is the trade-off multi-region designs manage."

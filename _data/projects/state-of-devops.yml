@@ -1,0 +1,64 @@
+# Project playbook card for /tags/state-of-devops/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company, GitHub org names, hostnames and registry URLs are deliberately left out (public repo).
+name: State of DevOps
+tag: State of DevOps
+summary: A cronjob pipeline and FastAPI + React dashboard that measures DevOps best-practice adoption
+  across four GitHub organizations every day, so progress is a number that trends instead of a status update.
+status: Live
+created: '2026-10-05'
+category: devops-kubernetes
+clouds: [azure]
+facts:
+- label: Type
+  value: Internal DevOps health scorecard
+- label: Stack
+  value: Python cronjobs, FastAPI, React (CRA), Redis
+- label: Hosting
+  value: AKS (prod), k3d (local)
+- label: Delivery
+  value: GitHub Actions, JFrog, Helm, ArgoCD
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/state-of-devops/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture", url: /posts/projects/state-of-devops/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/state-of-devops/system-architecture, format: animated}
+brief: |
+  Source material: the project's own docs (README, architecture, cronjobs, deployment, storage, ui,
+  tech-stack) plus the author's answers below. Company and org names are redacted.
+
+  Why it was built: nobody could see repo hygiene, pipeline coverage, GHAS findings or cost across
+  orgs; the access was limited to the DevOps team. The project was created to track what state of
+  best practices is implemented across the organization. Earlier it was just human updates, but no
+  numbers. With this project we could actually track progress and see the numbers increase. This is
+  also the first part of a major enterprise-wide project that will map the best practices of other
+  teams (SRE, CloudOps, platform architecture, database, etc.) against the actual infrastructure and
+  derive a score / progress card for the health of the enterprise infrastructure covering best
+  practices, security and compliance. It also helps identify gaps, prioritize improvements, and
+  ensure consistent adoption of best practices so the organization stays compliant with IT audits,
+  HIPAA, PCI, PHI rules, etc.
+
+  Who it's for: open to everyone to check the current state of best practices across the
+  organization, but mostly for stakeholders and C-level executives.
+
+  Success measures: not given (KPI baselines and targets are open questions).
+
+  Team and timeline: individual contribution to get it live; the DevOps team started contributing
+  after 8-10 months of continued development.
+
+  Constraints: only non-PHI data; org-specific checks and certification checks such as
+  HIPAA-specific checks.
+
+  Lesson: initially every cronjob collected data that was common across multiple jobs; later a common
+  job was created to handle data collection centrally, reducing redundancy and improving efficiency,
+  and individual cronjobs read that data and fetch more detail based on their type.
+
+  Settled facts: the frontend is Create React App (react-scripts 5.0.1), not Vite. One dashboard
+  replica with no autoscaling is a known gap; the playbook proposes autoscaling.
+
+  Author's answers (2026-10-06): users sign in to the dashboard with Azure Entra ID through an
+  enterprise app registration. Azure Backup is set up on the share and a restore has been tested. The
+  SLOs are agreed. The executive sponsor is the VP of Platform Engineering. A new team member made
+  their first merged change in 2 days. Merge gates: define them as best practice (tests, SonarQube
+  quality gate and PR CodeQL block the merge). KPI before/after numbers: not given yet.

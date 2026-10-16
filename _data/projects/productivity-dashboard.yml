@@ -1,0 +1,59 @@
+# Project playbook card for /tags/productivity-dashboard/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company, people, usernames, emails, department codes, POD labels, storage account and identity IDs
+# are deliberately left out (public repo). Team names (DevOps, SRE, CNS) are kept, as agreed.
+name: Productivity Dashboard
+tag: Productivity Dashboard
+summary: GitHub and Jira collectors plus Azure OpenAI generators that write daily, weekly and monthly
+  work summaries for people, teams, epics and PODs, so nobody has to type a status update again.
+status: Live
+created: '2026-10-05'
+category: ai-automation
+clouds: [azure]
+facts:
+- label: Type
+  value: AI work-summary platform
+- label: Stack
+  value: Python cronjobs, Azure OpenAI, FastAPI, React (Vite), Redis
+- label: Hosting
+  value: AKS (prod), k3d (local)
+- label: Audience
+  value: Managers and stakeholders daily, executives weekly and monthly
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/productivity-dashboard/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture", url: /posts/projects/productivity-dashboard/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/productivity-dashboard/system-architecture, format: animated}
+brief: |
+  Source material: the project's own docs (README, architecture, cronjobs, deployment, storage, ui,
+  tech-stack), a read-only look at the repo, and the author's answers below. People, company and
+  environment identifiers are redacted.
+
+  Why it was built: to provide a daily summary for managers, stakeholders, etc., and weekly and monthly
+  summaries for C-level executives. Each person works in different tools and has a manual dependency
+  on updating their status; this system automates the collection and summarization of their activities.
+
+  Who reads what: open to all to read what is currently being done. It provides accurate data as it
+  pulls from Jira and GitHub. Sensitive information like private repos or Jira comments is excluded
+  (author's statement; see the code finding below).
+
+  People data: people know their activity is summarized and can see their own summaries. The
+  summaries are used in performance reviews. HR, legal and privacy reviewed it. Nothing is kept out of
+  the AI prompts specifically; there is no PHI in GitHub or Jira.
+
+  AI: Azure OpenAI in production. Accuracy is an ongoing process of tuning prompts and models.
+
+  Team and timeline: solo for 5 months, then a team.
+
+  Results: time saved for every individual contributor, who get daily, weekly and monthly updates for
+  standups and weekly updates; time saved for managers giving updates to stakeholders; monthly updates
+  for C-level executives.
+
+  Standalone project; no cross-links to other playbooks.
+
+  Code findings (repo, read-only): the Jira collector's default config collects comment bodies
+  (search_types.comments: true, comment_fields includes body) and the daily prompt asks the AI to
+  summarize them; the GitHub collector has no private-repo filter (it sees what the GitHub App
+  installations can see). The frontend is Vite 5 + Tailwind + react-markdown; the POD generator is
+  prod-pod-summary-generator; productivity-ui runs 1 replica with an unused autoscaling block.

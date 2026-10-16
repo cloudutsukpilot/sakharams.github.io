@@ -25,37 +25,50 @@ tasks:
     cmds:
       - bundle exec htmlproofer _site --disable-external --ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
 
+  test-custom:
+    desc: Test theme customizations (AdSense, Mermaid, config, theme sync) against the built _site
+    cmds:
+      - bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require File.expand_path(f) }'
+
   setup-local:
     desc: Install Ruby, Bundler, native build deps, and project gems (bundle install) for local development
     cmds:
       - |
-        if command -v ruby >/dev/null 2>&1 && command -v bundle >/dev/null 2>&1; then
-          echo "Ruby and Bundler are already installed:"
-          ruby -v
-          bundle -v
+        # System packages: Ruby + headers/compilers for gems with native extensions (needs sudo once)
+        if command -v ruby >/dev/null 2>&1; then
+          echo "Ruby already installed: $(ruby -v)"
         else
-          echo "Installing Ruby, Bundler, and native extension build dependencies..."
+          echo "Installing Ruby and native extension build dependencies..."
           sudo apt update
           sudo apt install -y ruby-full build-essential zlib1g-dev libffi-dev
-          gem install bundler
         fi
       - |
-        # Install gems to a user-writable path so `bundle install` never needs sudo
-        GEM_USER_DIR="$HOME/.local/share/gem"
-        bundle config set --local path "$GEM_USER_DIR"
-        echo "Bundle install path set to $GEM_USER_DIR"
-      - |
-        RUBY_ABI_VERSION="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
-        GEM_BIN_DIR="$HOME/.local/share/gem/ruby/${RUBY_ABI_VERSION}/bin"
-        if ! grep -q "$GEM_BIN_DIR" ~/.bashrc 2>/dev/null; then
-          echo "export PATH=\"$GEM_BIN_DIR:\$PATH\"" >> ~/.bashrc
-          echo "Added $GEM_BIN_DIR to PATH in ~/.bashrc (run 'source ~/.bashrc' or restart your shell)."
+        # Everything below installs into ~/.local/share/gem/ruby/<ver> (Gem.user_dir) - never needs sudo.
+        # Each cmd runs in a fresh shell, so put the user gem bin dir on PATH here and in the next step.
+        GEM_BIN_DIR="$(ruby -e 'print Gem.user_dir')/bin"
+        export PATH="$GEM_BIN_DIR:$PATH"
+        if command -v bundle >/dev/null 2>&1; then
+          echo "Bundler already installed: $(bundle -v)"
+        else
+          echo "Installing Bundler into $GEM_BIN_DIR ..."
+          gem install --user-install bundler
         fi
-      - bundle install
-      - echo "Setup complete. Run 'task start-local' to start the server."
+        for rc in ~/.bashrc ~/.zshrc; do
+          [ -f "$rc" ] || continue
+          if ! grep -qF "$GEM_BIN_DIR" "$rc"; then
+            echo "export PATH=\"$GEM_BIN_DIR:\$PATH\"" >> "$rc"
+            echo "Added $GEM_BIN_DIR to PATH in $rc"
+          fi
+        done
+      - |
+        GEM_BIN_DIR="$(ruby -e 'print Gem.user_dir')/bin"
+        export PATH="$GEM_BIN_DIR:$PATH"
+        bundle config set --local path "$HOME/.local/share/gem"
+        bundle install
+      - echo "Setup complete. Open a new terminal (or 'source ~/.zshrc'), then run 'task start-local'."
 
   start-local:
-    desc: "Start Jekyll server in the background on a port and open it in the browser (override with: task start-local PORT=4001)"
+    desc: "Start Jekyll server in the background (includes unpublished/future posts, e.g. _posts/private/) and open it in the browser (override with: task start-local PORT=4001)"
     vars:
       PORT: '{{.PORT | default "4000"}}'
     cmds:
@@ -64,7 +77,7 @@ tasks:
           echo "Jekyll server is already running."
         else
           echo "Starting Jekyll server on port {{.PORT}} in the background..."
-          JEKYLL_ENV=production nohup bundle exec jekyll serve --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 &
+          JEKYLL_ENV=production nohup bundle exec jekyll serve --unpublished --future --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 &
         fi
       - |
         URL="http://127.0.0.1:{{.PORT}}"
@@ -175,7 +188,7 @@ tasks:
       # bound to this repo's absolute path at the time this task runs.
       - |
         REPO_DIR="$(pwd)"
-        ALIAS_LINE="alias start-cloudutsuk='if pgrep -f \"jekyll serve\" > /dev/null; then echo \"Jekyll server is already running.\"; else cd $REPO_DIR && JEKYLL_ENV=production nohup bundle exec jekyll serve --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 & echo \"Jekyll server started at http://127.0.0.1:{{.PORT}} (logs: /tmp/jekyll-server.log).\"; fi'"
+        ALIAS_LINE="alias start-cloudutsuk='if pgrep -f \"jekyll serve\" > /dev/null; then echo \"Jekyll server is already running.\"; else cd $REPO_DIR && JEKYLL_ENV=production nohup bundle exec jekyll serve --unpublished --future --host 0.0.0.0 --port {{.PORT}} > /tmp/jekyll-server.log 2>&1 & echo \"Jekyll server started at http://127.0.0.1:{{.PORT}} (logs: /tmp/jekyll-server.log).\"; fi'"
         if ! grep -qF "alias start-cloudutsuk" ~/.zshrc 2>/dev/null; then
           echo "$ALIAS_LINE" >> ~/.zshrc
           echo "Added alias start-cloudutsuk to ~/.zshrc."

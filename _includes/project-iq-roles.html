@@ -1,0 +1,104 @@
+<!--
+  Role tabs for a project interview post (framework `interview.roles`).
+  Usage in the post, once, right after the first project-nav include:  include project-iq-roles.html
+  Each question is <details class="project-iq"> holding one <div class="iq-role" data-role="<id>"> per role.
+  Without JavaScript every role shows stacked, labelled by the CSS below. With JavaScript each question gets
+  a tab per role it has, and the bar here picks the role every question opens on (remembered per browser).
+  Created by the cloudutsuk-project skill (.claude/skills/cloudutsuk-project/).
+-->
+{% assign iq_roles = site.data.project_framework.interview.roles %}
+<style>
+{% for r in iq_roles %}.iq-role[data-role="{{ r.id }}"]::before { content: "{{ r.title }}"; }
+{% endfor %}</style>
+<div class="iq-filter" role="group" aria-label="Answer perspective" hidden>
+  <span class="iq-filter-label text-muted">Answer as:</span>
+  {% for r in iq_roles %}
+    <button type="button" class="iq-filter-btn" data-role="{{ r.id }}">
+      <i class="{{ r.icon }} fa-fw" aria-hidden="true"></i> {{ r.title }}
+      <span class="iq-filter-count"></span>
+    </button>
+  {% endfor %}
+  <button type="button" class="iq-filter-btn" data-role="all">All roles</button>
+</div>
+<script>
+(function () {
+  var ROLES = [{% for r in iq_roles %}{ id: "{{ r.id }}", title: "{{ r.title }}", icon: "{{ r.icon }}" }{% unless forloop.last %}, {% endunless %}{% endfor %}];
+  var KEY = 'project-iq-role';
+
+  function load() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+
+  function init() {
+    var bar = document.querySelector('.iq-filter');
+    var blocks = document.querySelectorAll('details.project-iq');
+    var counts = {};
+    var anyRoles = false;
+
+    blocks.forEach(function (d) {
+      var panes = d.querySelectorAll(':scope > .iq-role');
+      if (!panes.length) return;
+      anyRoles = true;
+      d.classList.add('iq-has-tabs');
+      var tabs = document.createElement('div');
+      tabs.className = 'iq-tabs';
+      tabs.setAttribute('role', 'tablist');
+      ROLES.forEach(function (r) {
+        var pane = d.querySelector(':scope > .iq-role[data-role="' + r.id + '"]');
+        if (!pane) return;
+        counts[r.id] = (counts[r.id] || 0) + 1;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'iq-tab';
+        b.setAttribute('role', 'tab');
+        b.dataset.role = r.id;
+        b.innerHTML = '<i class="' + r.icon + ' fa-fw" aria-hidden="true"></i> ' + r.title;
+        b.addEventListener('click', function () { show(d, r.id); });
+        tabs.appendChild(b);
+      });
+      panes[0].parentNode.insertBefore(tabs, panes[0]);
+    });
+
+    if (!anyRoles || !bar) return;
+    bar.hidden = false;
+    bar.querySelectorAll('.iq-filter-btn').forEach(function (b) {
+      var c = b.querySelector('.iq-filter-count');
+      if (c && counts[b.dataset.role]) c.textContent = counts[b.dataset.role];
+      if (b.dataset.role !== 'all' && !counts[b.dataset.role]) b.hidden = true;
+      b.addEventListener('click', function () { apply(b.dataset.role); save(b.dataset.role); });
+    });
+    apply(load() || 'architect');
+  }
+
+  /* Show one role in a question; fall back to its first role when it has no answer for that one. */
+  function show(d, role) {
+    var panes = d.querySelectorAll(':scope > .iq-role');
+    var has = d.querySelector(':scope > .iq-role[data-role="' + role + '"]');
+    var active = has ? role : panes[0].dataset.role;
+    d.classList.remove('iq-show-all');
+    panes.forEach(function (p) { p.hidden = p.dataset.role !== active; });
+    d.querySelectorAll('.iq-tab').forEach(function (t) {
+      var on = t.dataset.role === active;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  function apply(role) {
+    document.querySelectorAll('.iq-filter-btn').forEach(function (b) {
+      b.classList.toggle('is-active', b.dataset.role === role);
+    });
+    document.querySelectorAll('details.project-iq.iq-has-tabs').forEach(function (d) {
+      if (role === 'all') {
+        d.classList.add('iq-show-all');
+        d.querySelectorAll(':scope > .iq-role').forEach(function (p) { p.hidden = false; });
+        d.querySelectorAll('.iq-tab').forEach(function (t) { t.classList.remove('is-active'); });
+      } else {
+        show(d, role);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>

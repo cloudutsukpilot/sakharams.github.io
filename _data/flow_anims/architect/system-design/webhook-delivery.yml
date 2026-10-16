@@ -1,0 +1,58 @@
+# Animated flow for _posts/architect/system-design/2025-04-01-system-design-building-blocks.md, section "25. Webhooks"
+# (include id: architect/system-design/webhook-delivery).
+title: "Webhook delivery with retries"
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 280]
+grid: {x0: 110, y0: 130, dx: 195, dy: 0, w: 150, h: 60}
+
+nodes:
+  - {id: U, label: "Customer", sub: "pays", col: 0, row: 0, shape: terminal, icon: user}
+  - {id: P, label: "Provider", sub: "payment API", col: 1, row: 0, icon: api}
+  - {id: Q, label: "Delivery\nqueue", col: 2, row: 0, shape: cylinder, icon: queue}
+  - {id: A, label: "Your webhook\nendpoint", col: 3, row: 0, icon: message, icon_pos: corner}
+  - {id: H, label: "Handle event", sub: "dedupe by ID", col: 4, row: 0, shape: terminal}
+
+edges:
+  - {id: reg, from: A, to: P, exit: top, enter: top, offset: 50, label: "register https://app/hooks"}
+  - {id: UP, from: U, to: P}
+  - {id: PQ, from: P, to: Q}
+  - {id: QA, from: Q, to: A}
+  - {id: fail, from: A, to: Q, points: [[720, 160], [720, 225], [475, 225], [475, 160]], label: "5xx / timeout", tone: fail}
+  - {id: ack, from: A, to: Q, exit: bottom, enter: bottom, offset: 40, label: "200 OK", tone: ok}
+  - {id: AH, from: A, to: H}
+
+modes:
+  - {id: ok, label: "Endpoint is healthy"}
+  - {id: down, label: "Simulate a failed delivery"}
+
+steps:
+  - lights: [A, U]
+    title: "Your app and a customer"
+    text: "Instead of polling the provider for new payments, your app asks to be told when something happens."
+  - edges: [reg]
+    title: "Register a URL"
+    text: "Once, ahead of time, you give the provider an HTTPS endpoint and pick the events you care about."
+  - edges: [UP]
+    title: "An event happens"
+    text: "A customer pays. The provider records a payment.succeeded event with a unique event ID."
+  - edges: [PQ]
+    title: "Queue the delivery"
+    text: "Providers queue outgoing events so a slow or broken receiver can't hold up payments."
+  - edges: [QA]
+    title: "POST the event"
+    text: "The provider sends an HTTP POST with the JSON payload and a signature header made with a shared secret."
+  - edges: [fail]
+    when: down
+    title: "Delivery fails"
+    text: "Your endpoint is down or too slow. The provider treats anything other than a quick 2xx as a failure."
+  - edges: [QA]
+    when: down
+    title: "Retry with backoff"
+    text: "The event is sent again later, with growing gaps between attempts, so the same event can arrive more than once."
+  - edges: [AH]
+    title: "Verify and handle"
+    text: "Check the signature, skip event IDs you've already processed, and hand the real work to a background job."
+  - edges: [ack]
+    title: "Acknowledge fast"
+    text: "Return 200 within a few seconds. The provider marks the event delivered and stops retrying."

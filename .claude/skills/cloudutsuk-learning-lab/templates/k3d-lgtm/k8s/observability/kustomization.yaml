@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - namespace.yaml
+  - lgtm.yaml
+  - otel-collector.yaml
+configMapGenerator:
+  - name: lab-dashboard
+    files:
+      - dashboard.json
+      - dashboard-provider.yaml
+  - name: otel-collector-config
+    files:
+      - config.yaml=otel-collector-config.yaml
+generatorOptions:
+  disableNameSuffixHash: true

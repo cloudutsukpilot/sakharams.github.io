@@ -1,0 +1,1637 @@
+// Explorable diagrams (_includes/diagram.html, assets/js/diagram.js). Colours derive from Chirpy's
+// theme variables, so light and dark mode both work. Every class is prefixed `dgm-`.
+
+$dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+
+.dgm {
+  --dgm-ink: var(--heading-color);
+  --dgm-text: var(--text-color);
+  --dgm-muted: color-mix(in srgb, var(--dgm-text) 55%, transparent);
+  --dgm-line: color-mix(in srgb, var(--dgm-ink) 32%, transparent);
+  --dgm-soft: color-mix(in srgb, var(--dgm-ink) 4%, var(--main-bg));
+  --dgm-border: color-mix(in srgb, var(--dgm-ink) 16%, transparent);
+
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--dgm-ink) 2%, var(--main-bg));
+
+  &.is-ready .dgm-fallback,
+  &.is-ready .dgm-loading {
+    display: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+.dgm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.dgm-levels {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+// One button per level; the current one is filled, the levels it already includes are tinted.
+.dgm-lvl {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 2rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.5rem;
+  background: var(--main-bg);
+  color: var(--dgm-text);
+  line-height: 1.15;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--dgm-accent);
+  }
+
+  &.is-below {
+    background: color-mix(in srgb, var(--dgm-accent) 12%, var(--main-bg));
+  }
+
+  &.is-on {
+    border-color: transparent;
+    background: var(--dgm-accent);
+    color: #fff;
+
+    .dgm-lvl-name {
+      color: inherit;
+      opacity: 0.9;
+    }
+  }
+}
+
+.dgm-lvl-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dgm-lvl-name {
+  color: var(--dgm-muted);
+  font-size: 0.7rem;
+}
+
+.dgm.is-stepping .dgm-lvl {
+  cursor: progress;
+}
+
+.dgm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.5rem;
+  background: var(--main-bg);
+  color: var(--dgm-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--dgm-accent);
+  }
+}
+
+.dgm-btn-primary {
+  border-color: transparent;
+  background: var(--dgm-accent);
+  color: #fff;
+}
+
+.dgm-stage {
+  position: relative;
+  height: clamp(420px, 64vh, 700px);
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background-color: var(--dgm-soft);
+  background-image: radial-gradient(color-mix(in srgb, var(--dgm-ink) 12%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dgm-accent);
+  }
+}
+
+.dgm-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  overflow: visible;
+}
+
+.dgm-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--dgm-muted);
+}
+
+.dgm-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dgm-ink) 75%, transparent);
+  color: var(--main-bg);
+  font-size: 0.85rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.dgm.show-hint .dgm-hint {
+  opacity: 1;
+}
+
+// ---- components (icon first)
+.dgm-node {
+  --dgm-c: var(--dgm-accent);
+
+  cursor: pointer;
+  outline: none;
+
+  .dgm-hit {
+    fill: transparent;
+  }
+
+  &:focus-visible .dgm-hit {
+    stroke: var(--dgm-accent);
+    stroke-width: 2;
+  }
+}
+
+.dgm-disc {
+  fill: color-mix(in srgb, var(--dgm-c) 13%, var(--main-bg));
+  stroke: color-mix(in srgb, var(--dgm-c) 60%, transparent);
+  stroke-width: 1.6;
+  transition: fill 0.3s ease, stroke-width 0.3s ease;
+}
+
+.dgm-stack {
+  fill: var(--main-bg);
+  stroke: color-mix(in srgb, var(--dgm-c) 45%, transparent);
+  stroke-width: 1.4;
+}
+
+.dgm-icon {
+  fill: none;
+  stroke: var(--dgm-c);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  .dgm-ifill {
+    fill: var(--dgm-c);
+    stroke: none;
+  }
+}
+
+.dgm-logo-tile {
+  fill: #fff;
+  stroke: color-mix(in srgb, var(--dgm-c) 35%, transparent);
+}
+
+.dgm-label {
+  fill: var(--dgm-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dgm-sub {
+  fill: color-mix(in srgb, var(--dgm-c) 70%, var(--dgm-text));
+  font-family: $dgm-mono;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.dgm-badge {
+  circle {
+    fill: var(--dgm-c);
+    stroke: var(--main-bg);
+    stroke-width: 2;
+  }
+
+  text {
+    fill: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+}
+
+.dgm-badge-info {
+  circle {
+    fill: var(--main-bg);
+    stroke: var(--dgm-c);
+    stroke-width: 1.5;
+  }
+
+  text {
+    fill: var(--dgm-c);
+    font-family: Georgia, serif;
+    font-size: 11px;
+    font-style: italic;
+  }
+}
+
+.dgm-node:hover .dgm-disc,
+.dgm-node.is-active .dgm-disc {
+  stroke-width: 2.6;
+}
+
+.dgm-node.is-lit .dgm-disc {
+  fill: color-mix(in srgb, var(--dgm-c) 26%, var(--main-bg));
+  stroke: var(--dgm-c);
+}
+
+.dgm-tone .dgm-disc {
+  stroke-dasharray: 4 3;
+}
+
+// ---- open groups
+.dgm-group {
+  --dgm-c: var(--dgm-accent);
+}
+
+.dgm-frame {
+  fill: color-mix(in srgb, var(--dgm-c) 5%, var(--main-bg));
+  stroke: color-mix(in srgb, var(--dgm-c) 42%, transparent);
+  stroke-width: 1.4;
+}
+
+.dgm-group.is-lit .dgm-frame {
+  stroke: var(--dgm-c);
+}
+
+.dgm-head {
+  cursor: pointer;
+  outline: none;
+
+  &:focus-visible .dgm-head-disc {
+    stroke-width: 3;
+  }
+}
+
+.dgm-head-hit {
+  fill: transparent;
+}
+
+.dgm-head-disc {
+  fill: color-mix(in srgb, var(--dgm-c) 14%, var(--main-bg));
+  stroke: var(--dgm-c);
+  stroke-width: 1.3;
+}
+
+.dgm-head-label {
+  fill: var(--dgm-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dgm-head-sub {
+  fill: var(--dgm-muted);
+  font-family: $dgm-mono;
+  font-size: 10.5px;
+}
+
+.dgm-toggle {
+  cursor: pointer;
+
+  circle {
+    fill: var(--main-bg);
+    stroke: color-mix(in srgb, var(--dgm-c) 60%, transparent);
+  }
+
+  text {
+    fill: var(--dgm-c);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  &:hover circle {
+    stroke-width: 2;
+  }
+}
+
+.dgm-info text {
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-style: italic;
+}
+
+// ---- arrows
+.dgm-link {
+  transition: opacity 0.2s ease;
+
+  &.is-dim {
+    opacity: 0.22;
+  }
+}
+
+.dgm-link-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  cursor: help;
+}
+
+.dgm-link-line {
+  fill: none;
+  stroke: var(--dgm-line);
+  stroke-width: 1.6;
+  pointer-events: none;
+
+  &.has-kind {
+    stroke: color-mix(in srgb, var(--dgm-e) 55%, transparent);
+  }
+
+  &.is-dashed {
+    stroke-dasharray: 6 5;
+  }
+}
+
+.dgm-link.is-hot .dgm-link-line {
+  stroke: var(--dgm-e, var(--dgm-ink));
+  stroke-width: 2.6;
+}
+
+.dgm-link-trail {
+  fill: none;
+  stroke: var(--dgm-e, var(--dgm-accent));
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.dgm-marker-base {
+  fill: var(--dgm-line);
+}
+
+.dgm-flow circle {
+  fill: var(--dgm-e, var(--dgm-accent));
+  pointer-events: none;
+
+  &.is-back {
+    opacity: 0.75;
+  }
+}
+
+.dgm-pill {
+  cursor: help;
+
+  rect {
+    fill: color-mix(in srgb, var(--dgm-e, var(--dgm-ink)) 9%, var(--main-bg));
+    stroke: color-mix(in srgb, var(--dgm-e, var(--dgm-ink)) 45%, transparent);
+  }
+
+  text {
+    fill: color-mix(in srgb, var(--dgm-e, var(--dgm-text)) 65%, var(--dgm-text));
+    font-family: $dgm-mono;
+    font-size: 11px;
+    font-weight: 700;
+  }
+}
+
+.dgm-link-label {
+  fill: var(--dgm-muted);
+  font-size: 11px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--dgm-soft);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+
+.dgm-pointer {
+  pointer-events: none;
+
+  .dgm-halo {
+    fill: var(--dgm-accent2);
+    opacity: 0.3;
+  }
+
+  .dgm-head {
+    fill: var(--dgm-accent2);
+    stroke: var(--main-bg);
+    stroke-width: 1.5;
+  }
+}
+
+// ---- geo backdrop
+.dgm-map-sea {
+  fill: color-mix(in srgb, var(--dgm-ink) 3%, var(--main-bg));
+}
+
+.dgm-map-land {
+  fill: color-mix(in srgb, var(--dgm-accent) 9%, var(--main-bg));
+  stroke: color-mix(in srgb, var(--dgm-accent) 40%, transparent);
+  stroke-width: 0.15;
+}
+
+// ---- hover card and protocol sequences
+.dgm-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: min(330px, 85%);
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.6rem;
+  background: var(--main-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 0.85rem;
+}
+
+.dgm-card-head {
+  margin-bottom: 0.35rem;
+  color: var(--dgm-ink);
+}
+
+.dgm-card-row {
+  margin: 0.25rem 0;
+  padding-left: 0.5rem;
+  border-left: 3px solid var(--dgm-e);
+}
+
+.dgm-card-ends {
+  display: block;
+  color: var(--dgm-muted);
+  font-size: 0.78rem;
+}
+
+.dgm-card-proto {
+  font-family: $dgm-mono;
+  font-weight: 700;
+}
+
+.dgm-card-kind {
+  margin-left: 0.4rem;
+  color: var(--dgm-muted);
+  font-size: 0.78rem;
+}
+
+// Why this connection exists / when it is used: the first thing a reader wants to know.
+.dgm-card-why {
+  margin: 0.25rem 0 0.1rem;
+  color: var(--dgm-ink);
+  font-size: 0.84rem;
+  line-height: 1.35;
+
+  p {
+    margin: 0;
+  }
+}
+
+.dgm-card-label {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 0.6rem;
+  background: var(--dgm-soft);
+  color: var(--dgm-muted);
+  font-size: 0.75rem;
+}
+
+.dgm-link-why {
+  color: var(--dgm-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.dgm-card-note {
+  color: var(--dgm-muted);
+  font-size: 0.8rem;
+}
+
+.dgm-card-note p {
+  margin: 0.15rem 0 0;
+}
+
+.dgm-seq-end {
+  fill: var(--dgm-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dgm-seq-life {
+  stroke: var(--dgm-border);
+  stroke-dasharray: 3 3;
+}
+
+.dgm-exchange {
+  margin-top: 0.6rem;
+}
+
+.dgm-ex-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+
+  .dgm-sec {
+    margin: 0;
+  }
+}
+
+.dgm-ex-cap {
+  overflow: hidden;
+  color: var(--dgm-muted);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dgm-ex-toggle {
+  margin-left: auto;
+  padding: 0 0.5rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 1rem;
+  background: none;
+  color: var(--dgm-ink);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.dgm-ex {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 0.2rem;
+}
+
+.dgm-ex-grp {
+  cursor: pointer;
+  outline: none;
+
+  .dgm-ex-band {
+    fill: var(--dgm-g);
+    fill-opacity: 0;
+    transition: fill-opacity 0.3s;
+  }
+
+  .dgm-ex-brk {
+    fill: none;
+    stroke: var(--dgm-g);
+    stroke-width: 2;
+    stroke-opacity: 0.55;
+  }
+
+  .dgm-ex-tag {
+    fill: var(--dgm-g);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+
+  &:hover .dgm-ex-band,
+  &:focus-visible .dgm-ex-band {
+    fill-opacity: 0.06;
+  }
+
+  &.is-on {
+    .dgm-ex-band {
+      fill-opacity: 0.1;
+    }
+
+    .dgm-ex-brk {
+      stroke-opacity: 1;
+      stroke-width: 3;
+    }
+  }
+}
+
+.dgm-ex-msg {
+  opacity: 0.16;
+  transition: opacity 0.35s;
+
+  &.is-done,
+  &.is-now {
+    opacity: 1;
+  }
+
+  &.is-now .dgm-ex-line {
+    animation: dgm-ex-draw 0.7s ease-out;
+  }
+
+  &.is-now .dgm-ex-head {
+    animation: dgm-ex-pop 0.7s ease-out;
+  }
+}
+
+.dgm-ex-line {
+  stroke: var(--dgm-g);
+  stroke-width: 1.8;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 0;
+}
+
+.dgm-ex-head {
+  fill: var(--dgm-g);
+}
+
+.dgm-ex-text {
+  fill: var(--dgm-ink);
+  font-family: $dgm-mono;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dgm-ex-note {
+  fill: var(--dgm-muted);
+  font-size: 9px;
+}
+
+@keyframes dgm-ex-draw {
+  from {
+    stroke-dashoffset: 260;
+  }
+}
+
+@keyframes dgm-ex-pop {
+  0%,
+  70% {
+    opacity: 0;
+  }
+}
+
+.dgm-card-chain {
+  margin-top: 0.4rem;
+  font-family: $dgm-mono;
+  font-size: 0.74rem;
+  font-weight: 700;
+
+  span {
+    color: var(--dgm-muted);
+    font-family: inherit;
+    font-weight: 400;
+  }
+}
+
+// ---- side panel
+.dgm-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: min(var(--dgm-panel-w, 360px), 94%);
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  border-left: 1px solid var(--dgm-border);
+  background: var(--main-bg);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.9rem;
+  cursor: auto;
+  user-select: text;
+
+  h4 {
+    margin: 0.2rem 0;
+    padding-left: 0.5rem;
+    border-left: 4px solid var(--dgm-c);
+    font-size: 1.05rem;
+  }
+
+  ul {
+    padding-left: 1.1rem;
+  }
+}
+
+.dgm-panel-grip {
+  position: absolute;
+  top: 0;
+  right: calc(min(var(--dgm-panel-w, 360px), 94%) - 6px);
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+
+  // The grab bar: faint until hovered, focused or dragged.
+  &::after {
+    content: '';
+    width: 4px;
+    height: 36px;
+    border-radius: 2px;
+    background: var(--dgm-border);
+    transition: background 0.15s;
+  }
+
+  &:hover::after,
+  &:focus-visible::after,
+  .is-resizing &::after {
+    background: var(--dgm-accent);
+  }
+}
+
+.dgm-panel[hidden] + .dgm-panel-grip {
+  display: none;
+}
+
+.is-resizing {
+  user-select: none;
+
+  .dgm-panel {
+    transition: none;
+  }
+}
+
+.dgm-panel-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.dgm-crumbs,
+.dgm-panel-sub {
+  color: var(--dgm-muted);
+  font-size: 0.8rem;
+}
+
+.dgm-panel-sub {
+  font-family: $dgm-mono;
+}
+
+.dgm-md p {
+  margin: 0.5rem 0;
+}
+
+// Component facts: status badge, where/when chips, lead sentence, how it works, links, API.
+.dgm-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  padding-right: 1.4rem; // room for the close button
+}
+
+.dgm-status {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--dgm-s) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dgm-s) 14%, transparent);
+  color: var(--dgm-s);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dgm-status-built {
+  --dgm-s: #16a34a;
+}
+
+.dgm-status-planned {
+  --dgm-s: #d97706;
+}
+
+.dgm-status-deferred {
+  --dgm-s: #64748b;
+}
+
+.dgm-status-external {
+  --dgm-s: #2563eb;
+}
+
+.dgm-facts {
+  margin: 0.55rem 0 0.4rem;
+}
+
+.dgm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.55rem;
+}
+
+.dgm-chip {
+  max-width: 100%;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.4rem;
+  background: var(--dgm-soft);
+  font-size: 0.76rem;
+  line-height: 1.5;
+
+  b {
+    margin-right: 0.15rem;
+    color: var(--dgm-muted);
+    font-weight: 600;
+  }
+
+  code {
+    font-size: 0.72rem;
+  }
+}
+
+.dgm-lead p {
+  margin: 0 0 0.6rem;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.dgm-sec {
+  margin: 0.2rem 0 0.15rem;
+  color: var(--dgm-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dgm-how p {
+  margin: 0 0 0.6rem;
+}
+
+.dgm-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.1rem 0 0.6rem;
+}
+
+.dgm-btn {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.45rem;
+  background: var(--main-bg);
+  font-size: 0.8rem;
+  text-decoration: none !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--dgm-c, currentColor);
+  }
+}
+
+.dgm-link-note {
+  font-size: 0.8rem;
+  color: var(--dgm-muted);
+}
+
+.dgm-api {
+  margin-bottom: 0.5rem;
+
+  ul {
+    margin: 0;
+    padding: 0 !important; // the theme's `.content ul` padding outranks this selector
+  }
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.1rem 0;
+    list-style: none;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    flex: none;
+    margin-left: auto;
+    padding: 0 0.35rem;
+    border: 1px solid var(--dgm-border);
+    border-radius: 0.3rem;
+    background: var(--main-bg);
+    color: var(--dgm-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+  }
+}
+
+.dgm-notes {
+  padding-top: 0.2rem;
+  border-top: 1px dashed var(--dgm-border);
+  color: var(--dgm-muted);
+  font-size: 0.85rem;
+}
+
+.dgm-config {
+  margin: 0.6rem 0;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+
+  pre {
+    margin: 0;
+    padding: 0.5rem 0.6rem;
+    max-height: 18rem;
+    overflow: auto;
+    font-size: 0.78rem;
+  }
+}
+
+.dgm-config-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.6rem;
+  background: var(--dgm-soft);
+  font-family: $dgm-mono;
+  font-size: 0.78rem;
+
+  button {
+    border: 1px solid var(--dgm-border);
+    border-radius: 0.35rem;
+    background: var(--main-bg);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+}
+
+.dgm-panel-links li {
+  margin: 0.2rem 0;
+  padding-left: 0.3rem;
+  border-left: 3px solid var(--dgm-e);
+  list-style: none;
+}
+
+// ---- legend, caption, tour controls
+.dgm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  color: var(--dgm-muted);
+  font-size: 0.8rem;
+
+  span::before {
+    content: '';
+    display: inline-block;
+    width: 1.25rem;
+    height: 3px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+    border-radius: 2px;
+    background: var(--dgm-e);
+  }
+}
+
+.dgm-caption {
+  margin-top: 0.6rem;
+  min-height: 3rem;
+  font-size: 0.95rem;
+
+  .dgm-counter {
+    padding: 0.05rem 0.5rem;
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--dgm-accent) 16%, var(--main-bg));
+    color: var(--dgm-ink);
+    font-size: 0.8rem;
+  }
+
+  .dgm-step-title {
+    color: var(--dgm-ink);
+  }
+
+  .dgm-counter:empty {
+    display: none;
+  }
+
+  .dgm-step-text {
+    display: block;
+    margin-top: 0.2rem;
+  }
+}
+
+// Body: the use-case sidebar on the left, the canvas on the right (stacked on phones).
+.dgm-body {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.dgm-body > .dgm-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dgm-scenarios {
+  display: flex;
+  flex: 0 0 11.5rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: clamp(420px, 64vh, 700px);
+  overflow: auto;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.dgm-scenarios-head {
+  padding: 0.1rem 0.2rem 0.2rem;
+  color: var(--dgm-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dgm-scn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--dgm-border);
+  border-left: 3px solid var(--dgm-border);
+  border-radius: 0.5rem;
+  background: var(--main-bg);
+  text-align: left;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-left-color: var(--dgm-accent);
+  }
+
+  &.is-on {
+    border-left-color: var(--dgm-accent);
+    background: color-mix(in srgb, var(--dgm-accent) 16%, var(--main-bg));
+  }
+}
+
+.dgm-scn-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.dgm-scn-meta {
+  color: var(--dgm-muted);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 760px) {
+  .dgm-body {
+    flex-direction: column;
+  }
+
+  .dgm-scenarios {
+    flex: none;
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+
+  .dgm-scenarios-head {
+    display: none;
+  }
+
+  .dgm-scn {
+    flex: 0 0 auto;
+  }
+}
+
+// View tabs at the top centre of the canvas: reveal and highlight cross-cutting connections.
+.dgm-views {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15rem;
+  width: max-content;
+  max-width: calc(100% - 1rem);
+  padding: 0.18rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--main-bg) 92%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  transform: translateX(-50%);
+  // Only the buttons take clicks; the space around them lets the map through.
+  pointer-events: none;
+
+  .dgm-vtab {
+    pointer-events: auto;
+  }
+}
+
+.dgm-vtab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: none;
+  color: var(--dgm-text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  svg {
+    width: 15px;
+    height: 15px;
+    --dgm-c: currentColor;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--dgm-soft);
+  }
+
+  &.is-on {
+    background: var(--dgm-accent);
+    color: #fff;
+
+    .dgm-vtab-n {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
+  }
+}
+
+.dgm-vtab-n {
+  min-width: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 0.6rem;
+  background: var(--dgm-soft);
+  color: var(--dgm-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+// While a view is on: its arrows and components stand out, the rest fades back.
+.dgm.has-view {
+  .dgm-link.is-faded,
+  .dgm-pill.is-faded {
+    opacity: 0.12;
+  }
+
+  .dgm-node.is-faded {
+    opacity: 0.28;
+  }
+
+  .dgm-link.is-view .dgm-link-line {
+    stroke: var(--dgm-e, var(--dgm-accent));
+    stroke-width: 2.6;
+  }
+
+  .dgm-node.is-view .dgm-disc {
+    stroke-width: 2.6;
+  }
+}
+
+.dgm-node,
+.dgm-link,
+.dgm-pill {
+  transition: opacity 0.3s ease;
+}
+
+// Action banner at the bottom of the canvas: what the current step does, then its outcome.
+.dgm-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 0.8rem;
+  z-index: 4;
+  max-width: calc(100% - 2rem);
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--dgm-ink) 82%, transparent);
+  color: var(--main-bg);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.6rem);
+  transition: opacity 0.25s ease, transform 0.25s ease, background 0.25s ease;
+
+  &.is-on {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  &.is-success {
+    background: #16a34a;
+    color: #fff;
+  }
+
+  &.is-fail {
+    background: #dc2626;
+    color: #fff;
+  }
+
+  &.is-done {
+    background: var(--dgm-accent);
+    color: #fff;
+  }
+}
+
+.dgm.has-panel .dgm-banner {
+  left: calc((100% - min(360px, 92%)) / 2);
+}
+
+// Response packets (path hops marked ~) are green and travel backwards.
+.dgm-pointer.is-back {
+  .dgm-halo {
+    fill: #22c55e;
+  }
+
+  .dgm-head {
+    fill: #22c55e;
+  }
+}
+
+// Celebration when a request succeeds (or fails).
+.dgm-burst-ring {
+  fill: none;
+  stroke-width: 3;
+}
+
+.dgm-burst-mark {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dgm-node.is-winning .dgm-disc {
+  animation: dgm-win 0.7s ease-out 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dgm-node.is-failing {
+  animation: dgm-shake 0.45s ease-in-out 2;
+}
+
+@keyframes dgm-win {
+  50% {
+    transform: scale(1.18);
+    stroke-width: 4;
+  }
+}
+
+@keyframes dgm-shake {
+  20%,
+  60% {
+    translate: -4px 0;
+  }
+
+  40%,
+  80% {
+    translate: 4px 0;
+  }
+}
+
+.dgm-toggle-mode[hidden] {
+  display: none;
+}
+
+.dgm-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.dgm-dots {
+  display: flex;
+  flex: 1 1 8rem;
+  gap: 0.25rem;
+}
+
+.dgm-dot {
+  flex: 1;
+  height: 1rem;
+  padding: 0.3rem 0;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--dgm-border);
+  background-clip: content-box;
+  cursor: pointer;
+
+  &.is-done {
+    background-color: color-mix(in srgb, var(--dgm-accent) 55%, transparent);
+  }
+
+  &.is-current {
+    background-color: var(--dgm-accent);
+  }
+}
+
+.dgm-toggle-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.dgm-fallback ul ul {
+  margin-bottom: 0;
+}
+
+// ---- fullscreen: browser fullscreen when allowed, and always a fixed overlay. The canvas row takes
+// every pixel the toolbar, legend, caption and player leave.
+.dgm.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--main-bg);
+
+  > .dgm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .dgm-stage {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .dgm-scenarios {
+    max-height: none;
+  }
+
+  .dgm-legend,
+  .dgm-caption,
+  .dgm-controls {
+    flex: none;
+  }
+}
+
+body.dgm-full-open {
+  overflow: hidden;
+}
+
+@media (max-width: 576px) {
+  .dgm-stage {
+    height: 70vh;
+  }
+
+  .dgm-panel-grip {
+    top: auto;
+    right: 0;
+    bottom: calc(min(var(--dgm-panel-h, 58%), 94%) - 7px);
+    left: 0;
+    width: auto;
+    height: 14px;
+    cursor: row-resize;
+
+    &::after {
+      width: 36px;
+      height: 4px;
+    }
+  }
+
+  .dgm-panel {
+    top: auto;
+    width: 100%;
+    height: min(var(--dgm-panel-h, 58%), 94%);
+    border-left: 0;
+    border-top: 1px solid var(--dgm-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dgm-ex-line,
+  .dgm-ex-head {
+    animation: none !important;
+  }
+}
+
+// Certificates on a connection: a one-line hint on the hover card, cards in the side panel.
+.dgm-card-cert {
+  margin-top: 0.2rem;
+  color: var(--dgm-muted);
+  font-size: 0.76rem;
+
+  code {
+    font-size: 0.72rem;
+  }
+
+  &.is-none {
+    font-style: italic;
+  }
+}
+
+.dgm-card .dgm-card-cert-more {
+  opacity: 0.8;
+}
+
+.dgm-panel .dgm-card-cert-more {
+  display: none;
+}
+
+.dgm-certs {
+  margin: 0.5rem 0 0.2rem;
+}
+
+.dgm-cert {
+  --dgm-s: #16a34a;
+  margin: 0.3rem 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--dgm-s) 40%, var(--dgm-border));
+  border-left: 3px solid var(--dgm-s);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--dgm-s) 6%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.35;
+
+  &[open] > summary::before {
+    transform: rotate(45deg);
+  }
+
+  // Open, the full name wraps instead of being cut.
+  &[open] > summary {
+    flex-wrap: wrap;
+
+    code {
+      white-space: normal;
+    }
+  }
+
+  &:not([open]) {
+    padding-block: 0.3rem;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.1rem 0.55rem;
+    margin: 0.3rem 0 0;
+  }
+
+  dt {
+    color: var(--dgm-muted);
+    font-weight: 600;
+  }
+
+  dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    font-size: 0.74rem;
+  }
+}
+
+.dgm-cert-private {
+  --dgm-s: #7c3aed;
+}
+
+.dgm-cert-cluster {
+  --dgm-s: #0891b2;
+}
+
+.dgm-cert-self {
+  --dgm-s: #d97706;
+}
+
+.dgm-cert-key {
+  --dgm-s: #2563eb;
+}
+
+.dgm-cert-none {
+  --dgm-s: #64748b;
+  color: var(--dgm-muted);
+
+  b {
+    margin-right: 0.3rem;
+    color: var(--dgm-ink);
+  }
+}
+
+.dgm-cert-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+
+  // A collapsed certificate is one line; the chevron shows it opens.
+  &:is(summary) {
+    flex-wrap: nowrap;
+    list-style: none;
+    cursor: pointer;
+
+    code {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: '';
+      width: 0.4rem;
+      height: 0.4rem;
+      border-right: 2px solid var(--dgm-muted);
+      border-bottom: 2px solid var(--dgm-muted);
+      transform: rotate(-45deg);
+      transition: transform 0.15s;
+    }
+  }
+
+  code {
+    overflow-wrap: anywhere;
+    font-weight: 600;
+  }
+}
+
+.dgm-cert-role {
+  color: var(--dgm-s);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dgm-cert-type {
+  margin-left: auto;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dgm-s) 14%, transparent);
+  color: var(--dgm-s);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.dgm-cert-note {
+  margin-top: 0.25rem;
+  color: var(--dgm-muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 480px) {
+  .dgm-cert dl {
+    grid-template-columns: 1fr;
+  }
+
+  .dgm-cert dd {
+    margin-bottom: 0.2rem;
+  }
+}
+
+.dgm-cert-tbd {
+  --dgm-s: #d97706;
+  border-style: dashed;
+}

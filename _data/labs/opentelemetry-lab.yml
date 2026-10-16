@@ -1,0 +1,308 @@
+# Hands-on lab card for /tags/opentelemetry-lab/ (see _includes/lab-index.html).
+# Created by the cloudutsuk-learning-lab skill. `experiments` drive the experiment cards in part 6,
+# the index tiles and scripts/capture.cjs. `brief` is the author's request, not rendered.
+# Explore URLs are generated (URL-encoded panes JSON); selectors and timings verified by hand on
+# 2026-10-08 against otel-static-site-k3d 8fbd1b1 (Grafana 13.2, grafana/otel-lgtm 0.35.0).
+# Lab contract v2 (homelab Phase 2 step 6, 2026-10-14): cluster lab-otel on the homelab network, no bundled
+# LGTM; signals go to mon, so every query is filtered on the lab's cluster and the Grafana URLs are mon's
+# (data source uids mimir, loki, tempo; the dashboard is lab-otel-signals in folder Labs).
+name: OpenTelemetry End to End
+tag: OpenTelemetry Lab
+summary: "Follow one click from the browser through nginx, Traefik, a FastAPI API, a backend with
+  Redis and SQLite, and into traces, logs and metrics in Grafana, all on a local k3d cluster."
+status: Built
+created: '2026-10-08'
+level: Intermediate
+duration: about 90 minutes
+category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
+lab_category: observability   # Labs tab group (_data/lab_catalog.yml)
+clouds: [agnostic]
+repo:
+  path: /home/sakharam/gitrepos/observability/otel-static-site-k3d   # absolute: the lab runner rejects ~
+deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
+  targets: {up: up, down: down, status: status}
+  memory_gb: 3            # the k3d cluster with the monitoring pack and cert-manager; no LGTM any more
+  ports: [8081, 6451]     # site (Traefik) and the cluster's API, both on 127.0.0.1
+platform:
+  runtime: "k3d (lab-otel) on the homelab network"
+  observability: "OpenTelemetry Collector → homelab mon cluster (Grafana, Mimir, Loki, Tempo)"
+  cost: free-local
+facts:
+  - {label: Stack, value: "nginx, Traefik, FastAPI (Python), Redis, SQLite, OpenTelemetry JS + Python"}
+  - {label: Services, value: "5 traced services, 3 signals"}
+endpoints:
+  site: http://localhost:8081
+  grafana: https://grafana.mon.home.cloudutsuk.com
+capture:
+  urls:
+    site: http://localhost:8081
+    grafana: https://grafana.mon.home.cloudutsuk.com
+  viewport: {width: 1440, height: 900}
+  color_scheme: dark
+  window: 10m
+  settle_ms: 3500
+  preflight: make status
+  cooldown: 30
+experiments:
+  - id: reload
+    title: Reload the page
+    goal: "See one page load turn into nginx requests, JSON access-log lines and a browser documentLoad trace."
+    signals: [metrics, logs, traces]
+    action:
+      say: "Open the site and reload it once."
+      browser:
+        url: site:/
+        steps: [{wait_for_text: "Loaded at"}]
+    predict: "The page needs three files. Will nginx's request counter go up by exactly three?"
+    wait: 30
+    verify: make verify-reload
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Requests in selected range"
+        query: 'sum(increase(nginx_http_requests_total{cluster="lab-otel", job="state-site-nginx"}[$__range]))'
+        expect: "Rises after the next 15-second scrape, by more than the page's files: stub_status counts every request, health probes and /v1/traces exports included."
+      - signal: logs
+        where: "Dashboard › Request logs (Service = state-site-nginx)"
+        query: '{service_name="state-site-nginx", k8s_cluster_name="lab-otel"} | json'
+        expect: "One JSON line per file (`/`, `/otel.js`, `/favicon.ico`), each with a `trace_id`. Probes and exports are not logged."
+      - signal: traces
+        where: "Explore › Tempo"
+        query: '{ resource.k8s.cluster.name = "lab-otel" && resource.service.name = "state-site-browser" && name = "documentLoad" }'
+        expect: "A `documentLoad` trace from `state-site-browser`."
+    shots:
+      - name: requests-before
+        phase: before
+        url: "grafana:/d/lab-otel-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-nginx"
+        selector: '[data-viz-panel-key="panel-5"]'
+        alt: "Requests in selected range stat panel before the reload"
+        caption: "nginx request count before the reload."
+      - name: requests-after
+        phase: after
+        url: "grafana:/d/lab-otel-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-nginx"
+        selector: '[data-viz-panel-key="panel-5"]'
+        alt: "Requests in selected range stat panel after the reload"
+        caption: "The same panel after the next scrape."
+      - name: logs
+        phase: after
+        url: "grafana:/d/lab-otel-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-nginx"
+        selector: '[data-viz-panel-key="panel-3"]'
+        wide: true
+        alt: "Request logs panel with nginx JSON access-log lines carrying trace IDs"
+        caption: "The access-log lines the reload produced. Each carries the trace_id of its request."
+
+  - id: cache-miss
+    title: Follow a request on a cache miss
+    goal: "Watch one click cross four services in one trace (browser, Traefik, API, backend), and see the backend fall back to SQLite when Redis has no copy."
+    signals: [traces, logs]
+    action:
+      say: "Empty the cache, then click **Call /api/demo** on the site."
+      run: make exp-cache-miss
+      browser:
+        url: site:/
+        steps: [{click: "#ping"}, {wait_for_text: "HTTP 200"}]
+    predict: "Which services will appear in the trace, and in what order? Where should the SQLite query sit?"
+    wait: 30
+    verify: make verify-cache-miss
+    look_for:
+      - signal: traces
+        where: "Explore › Tempo, then open the trace"
+        query: '{ resource.k8s.cluster.name = "lab-otel" && resource.service.name = "state-site-browser" } && { name = "sqlite SELECT records" }'
+        expect: "browser `GET` → Traefik → `GET /api/demo` → backend `GET /data` → `GET (cache miss)` → `sqlite SELECT records` → `SETEX`."
+      - signal: logs
+        where: "Explore › Loki"
+        query: '{service_name="state-site-api", k8s_cluster_name="lab-otel"} |= "api.demo.completed"'
+        expect: "An `api.demo.completed` line with `cache_source` `database` and the same `trace_id`."
+    shots:
+      - name: waterfall
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.cluster.name%20%3D%20%5C%22lab-otel%5C%22%20%26%26%20resource.service.name%20%3D%20%5C%22state-site-browser%5C%22%20%7D%20%26%26%20%7B%20name%20%3D%20%5C%22sqlite%20SELECT%20records%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        steps:
+          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1300}
+        wide: true
+        alt: "Tempo waterfall: browser, Traefik, API and backend spans with a Redis cache miss, a SQLite SELECT and a Redis SETEX"
+        caption: "One trace, four services. The cache miss sends the backend to SQLite, then SETEX refills Redis."
+
+  - id: cache-hit
+    title: Compare a cache hit
+    goal: "Run the same request with a warm cache and spot what disappears from the trace."
+    signals: [traces]
+    action:
+      say: "Warm the cache, then click **Call /api/demo** again within 60 seconds."
+      run: make exp-cache-hit
+      browser:
+        url: site:/
+        steps: [{click: "#ping"}, {wait_for_text: "HTTP 200"}]
+    predict: "Which spans will be missing compared with the miss? Will the request be noticeably faster?"
+    wait: 30
+    verify: make verify-cache-hit
+    look_for:
+      - signal: traces
+        where: "Explore › Tempo, then open the trace"
+        query: '{ resource.k8s.cluster.name = "lab-otel" && resource.service.name = "state-site-browser" } && { name = "GET (cache hit)" }'
+        expect: "`GET (cache hit)` and no `sqlite SELECT records` or `SETEX` spans."
+    shots:
+      - name: waterfall
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.cluster.name%20%3D%20%5C%22lab-otel%5C%22%20%26%26%20resource.service.name%20%3D%20%5C%22state-site-browser%5C%22%20%7D%20%26%26%20%7B%20name%20%3D%20%5C%22GET%20%28cache%20hit%29%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        steps:
+          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1300}
+        wide: true
+        alt: "Tempo waterfall of a cache hit: the backend answers from Redis with no SQLite span"
+        caption: "The same request served from Redis. No SQLite, no SETEX."
+
+  - id: traffic
+    title: Send a burst of traffic
+    goal: "See Traefik's request metrics climb while 150 requests arrive, and how pushed metrics differ from scraped ones."
+    signals: [metrics]
+    action:
+      say: "Send 100 API calls and 50 page loads from the terminal."
+      run: make exp-traffic
+    predict: "Will the browser service show up in the traces for this burst? (curl is not a browser.)"
+    wait: 90
+    verify: make verify-traffic
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Traefik requests in selected range"
+        query: 'sum(increase(traefik_entrypoint_requests_total{cluster="lab-otel", job="state-site-traefik"}[$__range]))'
+        expect: "Jumps by roughly 150 once Traefik's next OTLP metrics push lands (anywhere from about 15 to 60 seconds)."
+      - signal: metrics
+        where: "Explore › Mimir"
+        query: 'sum by (code) (rate(traefik_entrypoint_requests_total{cluster="lab-otel", job="state-site-traefik", method="GET"}[1m]))'
+        expect: "A spike in the `200` series during the burst."
+    shots:
+      - name: traefik-live
+        phase: during
+        url: "grafana:/d/lab-otel-signals/?orgId=1&kiosk&from=${from}&to=${to}&var-service_name=state-site-traefik"
+        selector: '[data-viz-panel-key="panel-6"]'
+        viewport: {width: 1440, height: 1900}   # panel 6 is below the fold; Grafana renders only visible panels
+        timelapse: {seconds: 90, every: 6, reload: true}
+        alt: "Animated Traefik requests stat panel counting up during the burst"
+        caption: "Traefik's request count over 90 seconds after the burst starts, one frame every 6 seconds."
+      - name: rate
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22mimir%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22mimir%22%7D%2C%22expr%22%3A%22sum%20by%20%28code%29%20%28rate%28traefik_entrypoint_requests_total%7Bcluster%3D%5C%22lab-otel%5C%22%2C%20job%3D%5C%22state-site-traefik%5C%22%2C%20method%3D%5C%22GET%5C%22%7D%5B1m%5D%29%29%22%2C%22legendFormat%22%3A%22%7B%7Bcode%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bfrom%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        window: 4m
+        selector: 'section[data-testid="data-testid Panel header Graph"]'
+        wide: true
+        alt: "Traefik request rate by status code with a spike of 200 responses"
+        caption: "Request rate by status code. The burst is the spike in 200s."
+      - name: dashboard
+        phase: after
+        url: "grafana:/d/lab-otel-signals/?orgId=1&kiosk&from=${from}&to=${to}"
+        viewport: {width: 1440, height: 1180}
+        wide: true
+        alt: "The whole Static Site dashboard after a traffic burst: request rate, request counts, nginx connections, logs, traces and Traefik requests"
+        caption: "The provisioned dashboard after the burst, with every service selected."
+
+  - id: log-to-trace
+    title: Jump from a log line to its trace
+    goal: "Use the trace ID in the API's log line to find the exact trace, the way the lab page does it."
+    signals: [logs, traces]
+    action:
+      say: "Click **Call /api/demo** and watch the **This request in Grafana** panel fill in."
+      browser:
+        url: site:/
+        steps: [{click: "#ping"}, {wait_for_text: "HTTP 200"}]
+    predict: "What links a log line in Loki to a trace in Tempo? Nothing in Loki knows about Tempo."
+    wait: 20
+    verify: make verify-log-to-trace
+    look_for:
+      - signal: logs
+        where: "Lab page › This request in Grafana › Logs"
+        query: '{service_name="state-site-api", k8s_cluster_name="lab-otel"} | json | trace_id="<trace id>"'
+        expect: "The `api.demo.completed` line for this click, with its `trace_id`."
+      - signal: traces
+        where: "Lab page › This request in Grafana › Trace"
+        expect: "The spans of the trace with that same ID."
+    shots:
+      - name: page-panel
+        phase: after
+        url: "site:/"
+        steps:
+          - {click: "#ping"}
+          - {wait_for: "#logs-output .telemetry-row"}
+          - {wait: 20000}
+          - {click: "#refresh-telemetry"}
+          - {wait_for_text: "GET /data"}
+          - {wait: 2000}
+        selector: "section.telemetry"
+        wide: true
+        alt: "The lab page's own panel showing the API log line and the trace spans for the same trace ID"
+        caption: "The page looks up its own request: the log line and the trace share one trace_id."
+      - name: api-logs
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bservice_name%3D%5C%22state-site-api%5C%22%2C%20k8s_cluster_name%3D%5C%22lab-otel%5C%22%7D%20%7C%3D%20%5C%22api.demo.completed%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        selector: 'section[data-testid="data-testid Panel header Logs"]'
+        viewport: {width: 1440, height: 860}
+        wide: true
+        alt: "Grafana Explore showing the API's api.demo.completed JSON log lines with trace_id and cache_source"
+        caption: "The API's completion lines in Loki: each one carries the trace_id of its request."
+
+  - id: outage
+    title: Take the backend down
+    goal: "Stop the backend, watch errors show up in all three signals, then watch it recover."
+    signals: [traces, logs, metrics]
+    action:
+      say: "Scale the backend to zero, call the API five times, scale it back and call it five more times."
+      run: make exp-outage
+    predict: "What status will the browser get, and which span will hold the real cause of the failure?"
+    wait: 45
+    verify: make verify-outage
+    look_for:
+      - signal: traces
+        where: "Explore › Tempo, then open the trace"
+        query: '{ resource.k8s.cluster.name = "lab-otel" && status = error && resource.service.name = "state-site-api" }'
+        expect: "Error spans from Traefik down to the API's outgoing `GET`, which carries `ConnectError: All connection attempts failed`."
+      - signal: logs
+        where: "Explore › Loki"
+        query: '{service_name="state-site-api", k8s_cluster_name="lab-otel"} |= "GET /api/demo"'
+        expect: "uvicorn access lines with `502 Bad Gateway` during the outage, then `200 OK` again after recovery."
+      - signal: metrics
+        where: "Explore › Mimir"
+        query: 'sum by (code) (increase(traefik_entrypoint_requests_total{cluster="lab-otel", job="state-site-traefik", method="GET"}[1m]))'
+        expect: "A `502` series appears next to the `200` series."
+    shots:
+      - name: codes
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22mimir%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22prometheus%22%2C%22uid%22%3A%22mimir%22%7D%2C%22expr%22%3A%22sum%20by%20%28code%29%20%28increase%28traefik_entrypoint_requests_total%7Bcluster%3D%5C%22lab-otel%5C%22%2C%20job%3D%5C%22state-site-traefik%5C%22%2C%20method%3D%5C%22GET%5C%22%7D%5B1m%5D%29%29%22%2C%22legendFormat%22%3A%22%7B%7Bcode%7D%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        selector: 'section[data-testid="data-testid Panel header Graph"]'
+        wide: true
+        alt: "Traefik requests per minute by status code with a 502 series during the outage"
+        caption: "Requests per minute by status code since the experiment started. The 502s are the outage."
+      - name: error-trace
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B%20resource.k8s.cluster.name%20%3D%20%5C%22lab-otel%5C%22%20%26%26%20status%20%3D%20error%20%26%26%20resource.service.name%20%3D%20%5C%22state-site-api%5C%22%20%7D%22%2C%22limit%22%3A20%2C%22tableType%22%3A%22traces%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        steps:
+          - {click: 'section[data-testid="data-testid Panel header Table - Traces"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1300}
+        wide: true
+        alt: "Tempo waterfall of a failed request with error spans from Traefik to the API's backend call"
+        caption: "A failed request. The error starts at the API's call to the backend and travels up."
+      - name: api-logs
+        phase: after
+        url: "grafana:/explore?schemaVersion=1&orgId=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22loki%22%7D%2C%22expr%22%3A%22%7Bservice_name%3D%5C%22state-site-api%5C%22%2C%20k8s_cluster_name%3D%5C%22lab-otel%5C%22%7D%20%7C%3D%20%5C%22GET%20%2Fapi%2Fdemo%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7Bstart%7D%22%2C%22to%22%3A%22%24%7Bto%7D%22%7D%7D%7D"
+        selector: 'section[data-testid="data-testid Panel header Logs"]'
+        viewport: {width: 1440, height: 1200}
+        wide: true
+        alt: "API access log lines in Grafana Explore: 502 Bad Gateway during the outage, 200 OK after recovery"
+        caption: "The API's access lines, newest first: 200 OK after recovery on top, the 502s from the outage below."
+brief: |
+  Author's request (2026-10-08): "please refer to the otel-static-site-k3d and create a learning lab
+  for opentelemetry topic, Other topics such as FastAPI, Docker, Kuberenetes, Python, API, backend,
+  web, nginx, etc should also be listed in the blog with summarized content good enough to understand
+  what it is and why it was used."
+
+  Author's answers:
+  - Technology summaries: a "Building Blocks" topic in Part 1 (one short card per technology).
+  - Experiments: page load + API cache miss, cache hit vs miss, traffic burst + logs to trace,
+    backend outage.
+  - Lab repo: Claude adds exp/verify targets, scripts/signal.sh and EXPERIMENTS.md; the author commits.
+  - Name: OpenTelemetry End to End, tag OpenTelemetry Lab, Intermediate.

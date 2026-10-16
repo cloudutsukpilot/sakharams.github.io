@@ -1,0 +1,94 @@
+# Cloudutsuk Platform: network view (networks, subnets, ports, TLS, DNS).
+# Belongs to the Technical Architecture post (_posts/projects/cloudutsuk-platform/2026-10-10-05-technical-architecture.md,
+# "Hosting and deployment model"). Companion to system-architecture.yml. Made with the cloudutsuk-flow-anim skill.
+# Subnets are the planned values (ADR 0030): homelab bridge 172.30.0.0/24; per-cluster pod/service CIDRs, e.g. platform
+# 10.20.0.0/16 and 10.21.0.0/16. Ports are product defaults: Tailscale WireGuard 41641/udp, Backstage 7007, OpenBao 8200, Keycloak 8443,
+# Kubernetes API 6443, OTLP gRPC 4317, Zot registry 443 (published on the gateway), WireGuard 51820.
+title: Cloudutsuk Platform network layout (subnets, ports, TLS, DNS)
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 640]
+lanes:
+  - {label: "Internet", x: 8, y: 8, w: 984, h: 130}
+  - {label: "Home network and DGX host", x: 8, y: 160, w: 984, h: 130}
+  - {label: "Docker network homelab 172.30.0.0/24", x: 8, y: 312, w: 984, h: 140}
+  - {label: "In each cluster", x: 8, y: 474, w: 984, h: 150}
+modes:
+  - {id: normal, label: "Platform traffic"}
+  - {id: cloudlab, label: "Simulate a cloud lab (WireGuard)"}
+nodes:
+  - {id: you, label: "You", sub: "devices", x: 60, y: 75, w: 90, h: 56, shape: terminal, icon: user, icon_pos: corner, color: blue}
+  - {id: ts, label: "Tailscale", sub: "keys, relays", x: 215, y: 75, w: 120, h: 56, icon: lock, icon_pos: corner, color: teal}
+  - {id: cf, label: "Cloudflare", sub: "public DNS", x: 340, y: 75, w: 100, h: 56, icon: globe, icon_pos: corner, color: teal}
+  - {id: gh, label: "GitHub", sub: "Pages, repos", x: 470, y: 75, w: 120, h: 56, icon: "devops/cicd/github-18.svg", icon_pos: corner, color: slate}
+  - {id: clouds, label: "Cloud APIs", sub: "Azure AWS GCP", x: 640, y: 75, w: 130, h: 56, icon: cloud, icon_pos: corner, color: sky}
+  - {id: le, label: "Let's Encrypt", sub: "ACME", x: 800, y: 75, w: 130, h: 56, icon: cert, icon_pos: corner, color: rose}
+  - {id: azvm, label: "Azure VM", sub: "WG peer", x: 935, y: 75, w: 100, h: 56, icon: server, icon_pos: corner, color: sky}
+  - {id: router, label: "Home router", sub: "NAT, no inbound", x: 300, y: 225, w: 140, h: 56, icon: router, icon_pos: corner, color: teal}
+  - {id: dgx, label: "DGX host", sub: "tailscaled", x: 540, y: 225, w: 130, h: 56, icon: server, icon_pos: corner, color: violet}
+  - {id: reg, label: "Zot", sub: "in core", x: 940, y: 225, w: 90, h: 56, icon: package, icon_pos: corner, color: amber}
+  - {id: core, label: "core", sub: "443 53", x: 80, y: 385, w: 110, h: 56, icon: lock, icon_pos: corner, color: rose}
+  - {id: platform, label: "platform", sub: "172.30.0.2", x: 305, y: 385, w: 120, h: 56, icon: cluster, icon_pos: corner, color: indigo}
+  - {id: ai, label: "ai", sub: "GPU", x: 530, y: 385, w: 110, h: 56, icon: cpu, icon_pos: corner, color: violet}
+  - {id: mon, label: "mon", sub: "LGTM", x: 700, y: 385, w: 100, h: 56, icon: chart, icon_pos: corner, color: green}
+  - {id: lab, label: "labs", sub: "one per lab", x: 920, y: 385, w: 110, h: 56, icon: cluster, icon_pos: corner, color: orange}
+  - {id: traefik, label: "Traefik", sub: "ingress, TLS", x: 300, y: 545, w: 120, h: 56, icon: balancer, icon_pos: corner, color: teal}
+  - {id: pods, label: "Pods, Services", sub: "10.20/16 10.21/16", x: 540, y: 545, w: 150, h: 56, icon: container, icon_pos: corner, color: violet}
+  - {id: coredns, label: "CoreDNS", sub: "fwd zone", x: 770, y: 545, w: 100, h: 56, icon: globe, icon_pos: corner, color: teal}
+  - {id: certm, label: "certs", sub: "cert-manager", x: 920, y: 545, w: 110, h: 56, icon: cert, icon_pos: corner, color: rose}
+edges:
+  - {id: dgx_rt, from: dgx, to: router, exit: left, enter: right, proto: WireGuard, kind: stream}
+  - {id: rt_ts, from: router, to: ts, points: [[260, 197], [260, 160], [215, 160], [215, 103]], label: "outbound", label_at: [230, 150], proto: WireGuard, kind: stream}
+  - {id: you_ts, from: you, to: ts, kind: stream}
+  - {id: dgx_pl, from: dgx, to: platform, points: [[520, 253], [520, 340], [345, 340], [345, 357]], label: "subnet route", label_at: [440, 330], proto: HTTPS, port: 443}
+  - {id: cf_gh, from: cf, to: gh, dashed: true, kind: control}
+  - {id: pl_tr, from: platform, to: traefik, points: [[300, 413], [300, 517]], label: "TLS", label_at: [345, 430], proto: HTTPS, port: 443, proto_at: [300, 495]}
+  - {id: tr_pods, from: traefik, to: pods, proto: HTTP, port: 7007}
+  - {id: pods_dns, from: pods, to: coredns, proto: DNS, port: 53}
+  - {id: dns_core, from: coredns, to: core, points: [[770, 517], [770, 463], [80, 463], [80, 413]], label: "forward", proto: DNS, port: 53}
+  - {id: pl_ai, from: platform, to: ai, label: "JWT", proto: HTTPS, port: 443}
+  - {id: pl_core, from: platform, to: core, exit: left, enter: right, proto: HTTPS, port: 443}
+  - {id: pl_lab, from: platform, to: lab, points: [[345, 413], [345, 440], [920, 440], [920, 413]], label: "K8s API", label_at: [610, 430], proto: HTTPS, port: 6443}
+  - {id: lab_mon, from: lab, to: mon, exit: left, enter: right, label: "OTLP", kind: telemetry}
+  - {id: lab_reg, from: lab, to: reg, points: [[930, 357], [930, 253]], label: "pull", proto: HTTPS, port: 443}
+  - {id: certm_le, from: certm, to: le, points: [[865, 545], [845, 545], [845, 103]], label: "ACME", proto: HTTPS, port: 443}
+  - {id: rt_clouds, from: router, to: clouds, points: [[340, 197], [340, 170], [640, 170], [640, 103]], label: "egress", proto: HTTPS, port: 443}
+  - {id: dgx_az, from: dgx, to: azvm, points: [[560, 197], [560, 145], [935, 145], [935, 103]], proto: WireGuard, port: 51820, kind: control}
+steps:
+  - title: Nothing listens at home
+    text: "The home router has no port forwards and nothing is published on the internet. tailscaled runs on the DGX host itself, outside every cluster."
+    lights: [dgx, router, you, cf, platform, certm]
+  - title: Out through NAT
+    text: "tailscaled keeps an outbound WireGuard connection (UDP 41641) through the router's NAT, falling back to Tailscale's relays over 443 when a direct path isn't possible."
+    edges: [dgx_rt, rt_ts]
+  - title: You join the tailnet
+    text: "Your phone or laptop joins the tailnet. The policy lets only your login reach 172.30.0.0/24, and split DNS sends home.cloudutsuk.com to PowerDNS. Cloudflare keeps only public DNS."
+    edges: [you_ts, cf_gh]
+  - title: Into the bridge
+    text: "The DGX routes you onto the homelab bridge: portal.platform.home.cloudutsuk.com is 172.30.0.2, where platform's Traefik serves 443 with a Let's Encrypt certificate."
+    edges: [dgx_pl, pl_tr]
+  - title: To the pod
+    text: "Traefik routes through the Backstage Service (10.21.0.0/16) to its pod (10.20.0.0/16) on 7007. NetworkPolicies only allow ingress from Traefik."
+    edges: [tr_pods]
+  - title: Internal names
+    text: "Pods look up *.home.cloudutsuk.com through their cluster's CoreDNS, like any other name."
+    edges: [pods_dns]
+  - title: One DNS for all clusters
+    text: "CoreDNS forwards home.cloudutsuk.com to PowerDNS in core, never via the gateway's port 53 (k3d keeps that for Docker's DNS). The DGX uses systemd-resolved split DNS."
+    edges: [dns_core]
+  - title: Calls between clusters
+    text: "Clusters reach each other only through their k3d load balancers on the homelab network: HTTPS 443 with a JWT to ai, and HTTPS 443 to OpenBao and Keycloak in core."
+    edges: [pl_ai, pl_core]
+  - title: Cluster APIs
+    text: "Argo CD and the SRE agent reach each cluster's Kubernetes API on 6443 with short-lived tokens. APIs listen only on the bridge gateway: reachable from the tailnet with a Keycloak login, never from the internet."
+    edges: [pl_lab]
+  - title: Telemetry and images
+    text: "Collectors send OTLP gRPC with TLS on 4317 to mon. Nodes pull from Zot in core over HTTPS (published on 172.30.0.1:443, a k3d host alias); public images come through its mirror."
+    edges: [lab_mon, lab_reg]
+  - title: Out to the internet
+    text: "cert-manager gets Let's Encrypt certificates with DNS-01 (a TXT record in Cloudflare). Cloud APIs, GitHub and model downloads leave through NAT on 443."
+    edges: [certm_le, rt_clouds]
+  - title: A cloud lab joins
+    when: cloudlab
+    text: "A cloud lab such as the Azure private endpoint lab adds a WireGuard tunnel (UDP 51820) from the DGX to a VM in Azure, and split DNS sends only Azure's names there."
+    edges: [dgx_az]

@@ -1,0 +1,68 @@
+# Hot topics explorer on the home page (_includes/hot-topics.html, assets/js/hot-topics.js).
+# One tab per topic, in the order listed. Each tab lists the newest posts carrying ANY of the
+# topic's `tags` or `categories` (exact names as used in post front matter; case matters).
+#   name:       tab label
+#   icon:       Font Awesome classes (https://fontawesome.com/search?ic=free)
+#   blurb:      one line shown above the posts
+#   tags / categories: where the posts come from (either or both)
+#   link:       optional "View all" target; defaults to the first tag's page, else the first category's
+# `limit` is how many posts each tab shows.
+limit: 6
+topics:
+  - name: Kubernetes
+    icon: fas fa-dharmachakra
+    blurb: Clusters, workloads, Helm and the interview questions that go with them.
+    tags: [Kubernetes]
+    categories: [kubernetes]
+
+  - name: Agentic AI
+    icon: fas fa-robot
+    blurb: AI agents, tool calling and the Model Context Protocol (MCP).
+    tags: [Agentic AI, AI Agents, MCP, Model Context Protocol(MCP)]
+    categories: [agenticai, ModelContextProtocol]
+
+  - name: AI & LLMs
+    icon: fas fa-brain
+    blurb: LLMs, local models, GenAI on Azure and AI coding tools.
+    tags: [Artificial Intelligence(AI), LLM, LLMs, Local LLMs, GenAI, AI Coding Tools]
+    categories: [aicodingtools, ai]
+
+  - name: DevSecOps
+    icon: fas fa-shield-halved
+    blurb: "Security in the pipeline: SAST, SCA, secrets and supply chain."
+    tags: [DevSecOps]
+    categories: [devsecops]
+
+  - name: Observability
+    icon: fas fa-chart-line
+    blurb: Metrics, logs and traces with OpenTelemetry and Grafana.
+    tags: [Observability, OpenTelemetry]
+
+  - name: Terraform & IaC
+    icon: fas fa-cubes
+    blurb: Infrastructure as code with Terraform and friends.
+    tags: [Terraform]
+    categories: [terraform]
+
+  - name: Cloud Security
+    icon: fas fa-lock
+    blurb: Identity, network and workload security in the cloud.
+    tags: [Cloud Security]
+    categories: [cloudsecurity]
+
+  - name: Docker
+    icon: fab fa-docker
+    blurb: Images, containers and local container tooling.
+    tags: [Docker]
+    categories: [docker]
+
+  - name: HomeLab
+    icon: fas fa-server
+    blurb: Building and running a home lab for hands-on cloud and Kubernetes practice.
+    tags: [HomeLab]
+    categories: [homelab]
+
+  - name: Interview Prep
+    icon: fas fa-user-tie
+    blurb: Question banks for DevOps, cloud, security and architect roles.
+    tags: [Interview Questions, Interview Prep]

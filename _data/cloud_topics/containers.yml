@@ -1,0 +1,61 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-container-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: kubernetes
+    title: Managed Kubernetes
+    aws:
+      - ref: Amazon EKS
+        summary: Upstream-conformant Kubernetes with a managed control plane (billed per cluster-hour). Run nodes as managed node groups, on Fargate, or let EKS Auto Mode and Karpenter provision and right-size EC2 nodes for you. Deep IAM integration via EKS Pod Identity.
+    azure:
+      - ref: Azure Kubernetes Service (AKS)
+        summary: Managed Kubernetes where the control plane is free on the Free tier (Standard and Premium tiers add an uptime SLA and long-term support). Strong Entra ID integration, Azure CNI networking options and AKS Automatic for an opinionated, mostly hands-off setup.
+    gcp:
+      - ref: Google Kubernetes Engine (GKE)
+        summary: Built by the team that created Kubernetes and still the most polished. Autopilot mode manages nodes entirely and bills per pod resource request; Standard mode gives full node control. Fast version rollout, release channels and good multi-cluster tooling.
+
+  - id: orchestration
+    title: Simpler container hosting (no Kubernetes)
+    aws:
+      - ref: Amazon ECS
+        summary: AWS's own orchestrator. Simpler than Kubernetes, with no control-plane fee, task definitions instead of YAML manifests, and tight integration with ALB, IAM and CloudWatch. ECS Express Mode (AWS's recommended replacement for App Runner) provisions a service, load balancer and autoscaling from one call.
+    azure:
+      - ref: Container Apps
+        summary: Serverless containers built on Kubernetes, KEDA and Envoy, without exposing Kubernetes. Scales to zero on HTTP traffic or event sources, supports revisions and traffic splitting, Dapr sidecars, jobs and GPU workloads. The default choice for microservices on Azure.
+    gcp:
+      - ref: Cloud Run
+        summary: Deploy any container that listens on a port and get HTTPS, autoscaling (including to zero) and per-request or instance-based billing. Also runs jobs, worker pools and GPU workloads. Probably the simplest way to run a container on any cloud.
+
+  - id: serverless
+    title: Serverless container compute
+    aws:
+      - ref: AWS Fargate
+        summary: A compute engine for ECS and EKS that runs each task or pod on its own right-sized micro-VM. No EC2 instances to patch or scale; you pay per vCPU and GB per second. Fargate Spot gives large discounts for interruptible tasks.
+    azure:
+      - ref: Container Instances
+        summary: Run a single container or a small group on demand in seconds, billed per second, with no orchestrator. Good for build agents, one-off tasks and burst capacity for AKS through virtual nodes. Not designed for long-running, scaled services.
+    gcp:
+      - ref: Cloud Run
+        summary: Cloud Run covers this row too. For pod-level serverless inside Kubernetes, use GKE Autopilot, where Google manages the nodes and you pay for the resources your pods request.
+
+  - id: registry
+    title: Container registries
+    aws:
+      - ref: Amazon ECR
+        summary: Private and public OCI registries with image scanning (basic or enhanced via Amazon Inspector), lifecycle policies, cross-region and cross-account replication, and pull-through cache for Docker Hub and other upstreams.
+    azure:
+      - ref: Container Registry
+        summary: OCI registry with geo-replication (Premium tier), ACR Tasks for building images in the cloud, artifact streaming, and scanning through Defender for Containers. Integrates with AKS using managed identities so no pull secrets are needed.
+    gcp:
+      - ref: Artifact Registry
+        summary: Stores container images plus Maven, npm, Python, Go, apt and yum packages in one service. Remote and virtual repositories proxy upstreams; vulnerability scanning and Binary Authorization enforce what can be deployed. Replaced the older Container Registry.
+
+  - id: openshift
+    title: Managed OpenShift
+    aws:
+      - name: Red Hat OpenShift Service on AWS (ROSA)
+        icon: rosa
+        summary: Jointly supported by Red Hat and AWS, billed through your AWS account. ROSA with hosted control planes runs the control plane in a Red Hat account and cuts cost and provisioning time.
+    azure:
+      - ref: Azure Red Hat OpenShift
+        summary: Jointly engineered, operated and supported by Microsoft and Red Hat, with a 99.95% SLA. A good fit when you've standardised on OpenShift's developer tooling, operators and security model across on-premises and cloud.
+    gcp:
+      note: Google doesn't run a first-party OpenShift service. Red Hat offers **OpenShift Dedicated** on Google Cloud, or you can self-manage OpenShift on Compute Engine.

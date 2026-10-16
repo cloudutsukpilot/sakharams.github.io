@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/labs/opentelemetry-lab/2026-10-08-06-experiments.md
+# (include id: labs/opentelemetry-lab/outage), above Experiment 6.
+# How one request fails while the backend Deployment is scaled to 0, and where each signal records it.
+# Behaviour from app/api/main.py (502 on httpx.HTTPError) and the captured error trace.
+title: A request during the backend outage
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 330]
+
+lanes:
+  - { label: "Request", x: 8, y: 8, w: 984, h: 168 }
+  - { label: "Evidence", x: 8, y: 188, w: 984, h: 134 }
+
+nodes:
+  - { id: CL, label: "curl", sub: "make exp-outage", x: 100, y: 95, w: 150, h: 56, icon: gear, icon_pos: corner }
+  - { id: TR, label: "Traefik", sub: "gateway span", x: 330, y: 95, w: 150, h: 56, icon: balancer }
+  - { id: API, label: "API", sub: "GET /api/demo", x: 560, y: 95, w: 150, h: 56, icon: api, icon_pos: corner }
+  - { id: BK, label: "Backend", sub: "0 replicas", x: 820, y: 95, w: 150, h: 56, tone: fail, icon: server }
+  - { id: TE, label: "Tempo", sub: "error spans", x: 560, y: 265, w: 150, h: 56, shape: cylinder, icon: cross }
+  - { id: LO, label: "Loki", sub: "502 access line", x: 820, y: 265, w: 150, h: 56, shape: cylinder, icon: "devops/monitoring/loki-18.svg", icon_pos: corner }
+  - { id: PR, label: "Prometheus", sub: "code=502", x: 330, y: 265, w: 150, h: 56, shape: cylinder, icon: "devops/monitoring/prometheus-18.svg" }
+
+edges:
+  - { id: CL_TR, from: CL, to: TR }
+  - { id: TR_API, from: TR, to: API }
+  - { id: API_BK, from: API, to: BK, tone: fail, label: "ConnectError", label_at: [690, 82] }
+  - { id: API_TR, from: API, to: TR, points: [[485, 113], [405, 113]], tone: fail, label: "502", label_at: [445, 134] }
+  - { id: TR_CL, from: TR, to: CL, points: [[255, 113], [175, 113]], tone: fail, label: "502", label_at: [215, 134] }
+  - { id: API_TE, from: API, to: TE, dashed: true }
+  - { id: API_LO, from: API, to: LO, points: [[610, 123], [610, 205], [820, 205], [820, 237]], dashed: true }
+  - { id: TR_PR, from: TR, to: PR, dashed: true }
+
+steps:
+  - lights: [CL]
+    title: A normal request
+    text: "make exp-outage sends five GET /api/demo requests right after scaling the backend Deployment to 0."
+  - edges: [CL_TR]
+    title: Traefik forwards it
+    text: "Nothing is wrong at the edge yet. Traefik starts a gateway span and routes /api to the API Service."
+  - edges: [TR_API]
+    title: The API is healthy
+    text: "The API pod is up, so its server span starts as usual and it calls http://backend:8000/data."
+  - edges: [API_BK]
+    title: Nobody answers
+    text: "The backend Service has no endpoints. HTTPX raises ConnectError and its client span records the exception."
+  - edges: [API_TR]
+    title: The API turns it into a 502
+    text: "main.py catches httpx.HTTPError and raises HTTPException(502). The server span is marked as an error."
+  - edges: [TR_CL]
+    title: The 502 reaches the caller
+    text: "Traefik passes the 502 back and marks its own spans as errors too, so the trace is red from top to bottom."
+  - edges: [API_TE, API_LO, TR_PR]
+    title: Three signals, three views
+    text: "Tempo holds the error spans and the exception, Loki the uvicorn 502 access line, Prometheus a code=502 count from Traefik."

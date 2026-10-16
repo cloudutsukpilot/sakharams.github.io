@@ -1,0 +1,32 @@
+# Layout of the Labs tab (_tabs/labs.md → _includes/labs-catalog.html).
+#
+# categories: the tile groups, in display order. A lab joins a group through `lab_category:` in its
+# card (_data/labs/<slug>.yml). A lab without a known category shows under "More labs".
+# Categories with no labs yet still show, with a short "no labs yet" line, so the tab maps the
+# ground the labs will cover.
+
+categories:
+  - id: observability
+    title: Observability
+    icon: fas fa-chart-line
+    blurb: Traces, metrics and logs. Instrument an app, follow a request, and learn to read the dashboards.
+  - id: containers-kubernetes
+    title: Containers & Kubernetes
+    icon: fas fa-dharmachakra
+    blurb: Build images, run workloads on a local cluster, and watch scheduling, scaling and failures happen.
+  - id: cicd-gitops
+    title: CI/CD & GitOps
+    icon: fas fa-infinity
+    blurb: Pipelines and reconcile loops you can run locally, break on purpose, and fix.
+  - id: cloud
+    title: Cloud
+    icon: fas fa-cloud
+    blurb: Managed services on Azure, AWS or GCP, with the cost and teardown spelled out.
+  - id: security
+    title: Security
+    icon: fas fa-shield-halved
+    blurb: Scanning, policy and identity, shown through the signals they produce.
+  - id: data-ai
+    title: Data & AI
+    icon: fas fa-robot
+    blurb: Databases, caches and LLM-backed services, observed end to end.

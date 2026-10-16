@@ -1,0 +1,59 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-amqp.md
+# (include id: communication/api/amqp-exchange-routing). AMQP 0-9-1 (RabbitMQ) model: producer,
+# topic exchange, bindings, queues, consumers, acks, with a dead-letter mode.
+title: AMQP routing through an exchange to queues
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 345]
+modes:
+  - {id: ack, label: "Both consumers succeed"}
+  - {id: dlq, label: "Simulate a poison message"}
+
+nodes:
+  - {id: P, label: "Producer", sub: "Order service", x: 95, y: 165, w: 150, shape: terminal, icon: server, icon_pos: corner}
+  - {id: X, label: "Exchange", sub: "orders (topic)", x: 290, y: 165, w: 150, icon: queue, icon_pos: corner}
+  - {id: Q1, label: "billing queue", sub: "order.*", x: 500, y: 85, w: 160, h: 62, shape: cylinder, icon: queue, icon_pos: corner}
+  - {id: Q2, label: "shipping queue", sub: "order.paid", x: 500, y: 245, w: 160, h: 62, shape: cylinder, icon: queue, icon_pos: corner}
+  - {id: C1, label: "Billing\nconsumer", x: 710, y: 85, w: 140}
+  - {id: C2, label: "Shipping\nconsumer", x: 710, y: 245, w: 140}
+  - {id: L, label: "Dead-letter\nqueue", x: 905, y: 245, w: 130, h: 62, shape: cylinder, tone: fail, icon: queue, icon_pos: corner}
+
+edges:
+  - {id: PX, from: P, to: X}
+  - {id: XQ1, from: X, to: Q1}
+  - {id: XQ2, from: X, to: Q2}
+  - {id: Q1C1, from: Q1, to: C1}
+  - {id: Q2C2, from: Q2, to: C2}
+  - {id: C1Q1, from: C1, to: Q1, exit: top, enter: top, offset: 30, tone: ok, label: "basic.ack"}
+  - {id: C2Q2, from: C2, to: Q2, exit: top, enter: top, offset: 30, tone: ok, label: "basic.ack"}
+  - {id: C2Q2N, from: C2, to: Q2, exit: bottom, enter: bottom, offset: 24, tone: fail, label: "nack, requeue=false"}
+  - {id: Q2L, from: Q2, to: L, points: [[440, 276], [440, 328], [905, 328], [905, 276]], tone: fail}
+
+steps:
+  - lights: [P]
+    title: Publish with a routing key
+    text: The Order service publishes a persistent message with routing key order.paid to the orders exchange. It never names a queue.
+  - edges: [PX]
+    title: Exchange receives it
+    text: With publisher confirms on, the broker acknowledges the publish once the message is safely routed and stored.
+  - edges: [XQ1, XQ2]
+    title: Bindings decide
+    text: "A topic exchange matches the key against bindings: billing is bound with order.* and shipping with order.paid, so both get a copy."
+  - edges: [Q1C1, Q2C2]
+    title: Deliver to consumers
+    text: Each queue pushes messages to its consumers, at most prefetch (basic.qos) unacknowledged at a time, so a slow consumer is not flooded.
+  - edges: [C1Q1]
+    title: Billing acknowledges
+    text: Billing finishes and sends basic.ack. Only now does the broker delete the message from the billing queue.
+  - edges: [C2Q2]
+    when: ack
+    title: Shipping acknowledges
+    text: Shipping acks too. If a consumer had crashed before acking, the message would be redelivered to another consumer.
+  - edges: [C2Q2N]
+    when: dlq
+    title: Poison message
+    text: Shipping cannot parse the message, so it rejects it with requeue=false instead of looping on it forever.
+  - edges: [Q2L]
+    when: dlq
+    title: Dead-lettered
+    text: The queue has a dead-letter exchange configured, so the broker re-routes the rejected message to a dead-letter queue for inspection and replay.

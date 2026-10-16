@@ -1,0 +1,64 @@
+# Animated flow diagram for
+# _posts/cloud/azure/containers/aks/2026-10-08-migrate-aks-nginx-ingress-to-application-gateway-for-containers.md
+# (include id: cloud/azure/containers/aks/nginx-ingress-packet-flow).
+# Browser to pod through an internal Azure Load Balancer and the ingress-nginx controller.
+title: "Packet path: browser to pod through ingress-nginx on an internal load balancer"
+accent: "#38BDF8"
+accent2: "#6366F1"
+viewbox: [1000, 400]
+modes:
+  - { id: offload, label: "TLS ends at NGINX" }
+  - { id: e2e, label: "Re-encrypt from NGINX to the pod" }
+
+lanes:
+  - { label: "Client and DNS", x: 8, y: 8, w: 984, h: 150 }
+  - { label: "Private network path into AKS", x: 8, y: 200, w: 984, h: 192 }
+
+nodes:
+  - { id: B, label: "Browser", sub: "corp network", x: 100, y: 95, shape: terminal, icon: browser }
+  - { id: D, label: "Private DNS\nzone", x: 330, y: 95, shape: cylinder, w: 140, h: 62, icon: globe, icon_pos: corner }
+  - { id: V, label: "VPN or\nExpressRoute", x: 100, y: 300, icon: "cloud/azure/services/expressroute.svg", icon_pos: corner }
+  - { id: L, label: "Internal LB", sub: "Layer 4", x: 300, y: 300, icon: balancer }
+  - { id: N, label: "AKS node", sub: "kube-proxy", x: 500, y: 300, icon: "cloud/azure/services/aks.svg" }
+  - { id: X, label: "NGINX pod", sub: "Layer 7", x: 700, y: 300, icon: container }
+  - { id: P, label: "App pod", sub: "pod IP", x: 900, y: 300, shape: terminal, icon: container }
+
+edges:
+  - { id: BD, from: B, to: D, label: "lookup" }
+  - { id: DB, from: D, to: B, exit: top, enter: top, offset: 32, tone: ok, label: "10.20.0.100" }
+  - { id: BV, from: B, to: V }
+  - { id: VL, from: V, to: L }
+  - { id: LN, from: L, to: N }
+  - { id: NX, from: N, to: X }
+  - { id: XP, from: X, to: P }
+
+steps:
+  - lights: [B]
+    title: User opens the app
+    text: A user on the corporate network browses to https://orders.corp.example.com.
+  - edges: [BD]
+    title: Private DNS lookup
+    text: The corporate resolver forwards the query to the Azure Private DNS zone, which holds an A record for the hostname.
+  - edges: [DB]
+    title: A private IP comes back
+    text: The answer is 10.20.0.100, the internal load balancer's frontend IP. You chose and reserved that IP yourself.
+  - edges: [BV]
+    title: Over the private link
+    text: The TCP SYN to 10.20.0.100 leaves through the VPN or ExpressRoute gateway. The traffic never touches the internet.
+  - edges: [VL]
+    title: Layer 4 load balancer
+    text: The internal Standard Load Balancer only sees the 5-tuple. It can't read the hostname or the path, so it hashes the flow to a healthy node.
+  - edges: [LN]
+    title: NodePort and kube-proxy
+    text: On the node, kube-proxy DNATs the packet to an NGINX pod. With externalTrafficPolicy Cluster this can mean an extra hop and a SNAT to another node.
+  - edges: [NX]
+    title: TLS and routing in NGINX
+    text: NGINX terminates TLS with the cert-manager Secret (chosen by SNI), then matches the Host and path against the Ingress rules.
+  - edges: [XP]
+    when: offload
+    title: Plain HTTP to the pod
+    text: NGINX proxies plain HTTP straight to a pod IP from the Service's endpoints, adding the X-Forwarded-For header. The ClusterIP is bypassed.
+  - edges: [XP]
+    when: e2e
+    title: New TLS session to the pod
+    text: With backend-protocol HTTPS, NGINX opens a new TLS connection to the pod, so the hop inside the cluster is encrypted too.

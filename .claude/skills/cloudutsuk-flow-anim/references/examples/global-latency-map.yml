@@ -1,0 +1,62 @@
+# Geo map reference (keyword "geo map"): latency between cloud regions, in the style of the
+# algomaster.io "Latency - Global Network" diagram. Copy to _data/flow_anims/<post folders>/<name>.yml.
+# Badge figures are typical public-internet round-trip times (rounded, "~"); they vary by provider and
+# route, so captions say so instead of presenting them as exact.
+title: "Latency across a global network"
+accent: "#38BDF8"
+accent2: "#8B5CF6"
+viewbox: [1000, 460]
+map: {name: world, lon: [-100, 160], lat: [64, -50], graticule: 30}
+
+nodes:
+  - {id: us, label: "US-East", sub: "origin", shape: site, icon: server, lat: 38.9, lon: -77.4}
+  - {id: eu, label: "EU-West", shape: site, icon: server, lat: 53.3, lon: -6.3}
+  - {id: aps, label: "AP-South", shape: site, icon: server, lat: 19.1, lon: 72.9}
+  - {id: apse, label: "AP-Southeast", sub: "replica", shape: site, icon: database, lat: 1.35, lon: 103.8}
+  - {id: user, label: "User", sub: "Sydney", shape: site, icon: user, lat: -33.9, lon: 151.2}
+
+edges:
+  - {id: req_us, from: user, to: us, label: "~200ms", tone: warn, curve: -0.22}
+  - {id: res_us, from: us, to: user, tone: warn, curve: 0.1}
+  - {id: rep_eu, from: us, to: eu, label: "~75ms", dashed: true}
+  - {id: rep_aps, from: eu, to: aps, label: "~120ms", dashed: true}
+  - {id: rep_apse, from: aps, to: apse, label: "~60ms", dashed: true, curve: -0.35}
+  - {id: req_apse, from: user, to: apse, label: "~90ms", tone: ok}
+  - {id: res_apse, from: apse, to: user, tone: ok}
+
+modes:
+  - {id: origin, label: "Origin only"}
+  - {id: nearest, label: "Serve from the nearest region"}
+
+steps:
+  - title: "One origin, one far user"
+    text: "The app runs in US-East. A user in Sydney opens it, and every request is a round trip to wherever the data lives."
+    lights: [user, us]
+  - title: "Halfway around the world"
+    when: origin
+    edges: [req_us]
+    text: "About 16,000 km each way. Light in fibre alone needs over 150ms for the round trip; real routes take about 200ms, before any server work."
+  - title: "Then wait for the reply"
+    when: origin
+    edges: [res_us]
+    text: "The answer travels the same distance back. A page that makes five calls in sequence spends about a second just waiting on distance."
+  - title: "Replicate to Europe"
+    when: nearest
+    edges: [rep_eu]
+    text: "Instead, copy the data out from the origin. Replication runs in the background, so users never wait on this hop."
+  - title: "Then to India"
+    when: nearest
+    edges: [rep_aps]
+    text: "Each region keeps a copy that is a little behind the origin (asynchronous replication), which is fine for most reads."
+  - title: "And to Singapore"
+    when: nearest
+    edges: [rep_apse]
+    text: "Now a replica sits in AP-Southeast, a few thousand kilometres from the user instead of sixteen thousand."
+  - title: "Route to the nearest region"
+    when: nearest
+    edges: [req_apse]
+    text: "Geo-DNS or anycast sends the request to the closest healthy region, at about 90ms round trip instead of 200ms."
+  - title: "Answer locally"
+    when: nearest
+    edges: [res_apse]
+    text: "Reads are served next door. Writes still go to the origin, which is why CDNs, caches and regional replicas exist."

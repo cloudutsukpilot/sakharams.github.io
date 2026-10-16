@@ -1,0 +1,86 @@
+# Animated flow diagram for _posts/projects/y-iac/2026-10-05-12-cicd-and-release-management.md
+# (include id: projects/y-iac/cicd-pipeline). The consumer's terragrunt-cicd.yaml (from
+# template/terragrunt-cicd.yaml in Y-IaC): plan on pull request, approved apply on push to main.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Y-IaC consumer CI/CD pipeline
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 420]
+modes:
+  - { id: approve, label: "Apply is approved" }
+  - { id: reject, label: "Simulate a rejected approval" }
+
+lanes:
+  - { label: "Pull request: plan only", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Push to main: approved apply", x: 8, y: 205, w: 984, h: 207 }
+
+nodes:
+  - { id: PR, label: "Pull request", sub: "environments/**", x: 90, y: 75, w: 136, shape: terminal, icon: git, icon_pos: corner }
+  - { id: DET, label: "Detect\nchanges", x: 254, y: 75, w: 136 }
+  - { id: VARS, label: "Build\nvariables", x: 418, y: 75, w: 136, icon: gear }
+  - { id: PLAN, label: "Plan matrix", sub: "terragrunt-ci", x: 582, y: 75, w: 136 }
+  - { id: SUM, label: "Summary\nreport", x: 746, y: 75, w: 136, icon: chart }
+  - { id: REV, label: "Review\nand merge", x: 910, y: 75, w: 136, icon: check }
+
+  - { id: APR, label: "Approval", x: 130, y: 280, w: 120, h: 84, shape: diamond }
+  - { id: APPLY, label: "Apply", sub: "terragrunt-cd", x: 320, y: 280, w: 150 }
+  - { id: REPLAN, label: "Plan after\napply", x: 510, y: 280, w: 150 }
+  - { id: SUM2, label: "Apply summary\n+ Jira", x: 700, y: 280, w: 150 }
+  - { id: DONE, label: "No drift\nleft", x: 890, y: 280, w: 150, shape: terminal, tone: ok }
+  - { id: REJ, label: "Not applied", x: 130, y: 375, w: 140, h: 42, tone: fail }
+
+edges:
+  - { id: PRDET, from: PR, to: DET }
+  - { id: DETVARS, from: DET, to: VARS }
+  - { id: VARSPLAN, from: VARS, to: PLAN }
+  - { id: PLANSUM, from: PLAN, to: SUM }
+  - { id: SUMREV, from: SUM, to: REV }
+  - { id: REVAPR, from: REV, to: APR, points: [[910, 103], [910, 165], [35, 165], [35, 280], [70, 280]] }
+  - { id: APRAPPLY, from: APR, to: APPLY, label: "yes", label_at: [210, 270], tone: ok }
+  - { id: APPLYREPLAN, from: APPLY, to: REPLAN }
+  - { id: REPLANSUM2, from: REPLAN, to: SUM2 }
+  - { id: SUM2DONE, from: SUM2, to: DONE }
+  - { id: APRREJ, from: APR, to: REJ, points: [[130, 322], [130, 354]], label: "no", label_at: [144, 342], tone: fail }
+
+steps:
+  - lights: [PR]
+    title: A pull request
+    text: The workflow runs on a pull request or push to main that touches environments/** or the workflow file itself.
+  - edges: [PRDET]
+    title: Detect changes
+    text: Changed files are mapped to a matrix of cloud, environment and stack. If no stack changed, nothing else runs.
+  - edges: [DETVARS]
+    title: Build variables
+    text: The shared repo, the Y-IaC ref (iac_shared_module_ref) and the runner come from the workflow block in the consumer's config.yaml.
+  - edges: [VARSPLAN]
+    title: Plan every changed stack
+    text: Each matrix entry calls terragrunt-ci from Y-IaC, which checks out the shared module and runs the CLI with plan, including the OPA, scanner and cost gates.
+  - edges: [PLANSUM]
+    title: Summary report
+    text: Plan results, gate outcomes and the add/change/destroy counts are rendered into one job summary for the reviewer.
+  - edges: [SUMREV]
+    title: Review and merge
+    text: A reviewer reads the plan, not just the YAML diff, and merges to main.
+  - edges: [REVAPR]
+    title: Waiting for approval
+    text: On push to main the plan runs again, then each apply job waits on its GitHub environment's protection rules. Jobs run one at a time (max-parallel 1).
+  - edges: [APRAPPLY]
+    when: approve
+    title: Apply
+    text: An approver releases the job and terragrunt-cd runs the same CLI with apply for that stack.
+  - edges: [APPLYREPLAN]
+    when: approve
+    title: Plan after apply
+    text: A fresh plan right after the apply should show no changes. Anything else means the module or provider did not converge.
+  - edges: [REPLANSUM2]
+    when: approve
+    title: Apply summary and Jira
+    text: An apply summary is generated and the GitHub to Jira webhook links the change to its ticket.
+  - edges: [SUM2DONE]
+    when: approve
+    title: Converged
+    text: State matches the YAML on main. The weekly drift scan checks it stays that way.
+  - edges: [APRREJ]
+    when: reject
+    title: Not applied
+    text: Nobody approves, or the approver rejects, so nothing touches the cloud. The plan artifacts stay on the run as a record.

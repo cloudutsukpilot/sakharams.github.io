@@ -1,0 +1,61 @@
+# Animated flow for _posts/architect/system-design/2025-04-01-system-design-building-blocks.md, section "6. HTTP/HTTPS"
+# (include id: architect/system-design/https-handshake). Simplified TLS 1.3 (one round trip).
+title: "HTTPS: TLS handshake, then encrypted HTTP"
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 290]
+grid: {x0: 130, y0: 82, dx: 185, dy: 155, w: 140, h: 64}
+
+lanes:
+  - {label: "Handshake (once per connection)", x: 40, y: 8, w: 952, h: 128}
+  - {label: "Encrypted HTTP", x: 40, y: 163, w: 952, h: 120}
+
+nodes:
+  - {id: A, label: "Browser", sub: "https://shop", col: 0, row: 0, shape: terminal, icon: browser, icon_pos: corner}
+  - {id: B, label: "TCP connect", sub: "SYN/SYN-ACK/ACK", col: 1, row: 0}
+  - {id: C, label: "ClientHello", sub: "ciphers + key", col: 2, row: 0}
+  - {id: D, label: "ServerHello\n+ certificate", col: 3, row: 0, icon: cert, icon_pos: corner}
+  - {id: E, label: "Verify cert,\nderive keys", col: 4, row: 0, icon: cert, icon_pos: corner}
+  - {id: F, label: "Encrypted\nrequest", sub: "GET /cart", col: 0, row: 1, h: 64}
+  - {id: G, label: "Server decrypts\nand handles", col: 1, row: 1, h: 64, icon: server, icon_pos: corner}
+  - {id: H, label: "Encrypted\nresponse", sub: "200 OK", col: 2, row: 1, h: 64}
+  - {id: I, label: "Page renders", sub: "padlock shown", col: 3, row: 1, h: 64, shape: terminal}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[870, 114], [870, 150], [22, 150], [22, 237], [60, 237]]}
+  - {id: FG, from: F, to: G}
+  - {id: GH, from: G, to: H}
+  - {id: HI, from: H, to: I}
+
+steps:
+  - lights: [A]
+    title: "Open an https:// URL"
+    text: "The browser needs a private channel before it sends anything sensitive, such as a password or a card number."
+  - edges: [AB]
+    title: "TCP connection"
+    text: "A normal TCP handshake opens the connection to port 443. Nothing is encrypted yet."
+  - edges: [BC]
+    title: "ClientHello"
+    text: "The client lists the TLS versions and ciphers it supports and sends its half of a key exchange."
+  - edges: [CD]
+    title: "ServerHello and certificate"
+    text: "The server picks a cipher, sends its key share and its certificate, which proves it owns the domain."
+  - edges: [DE]
+    title: "Verify and derive keys"
+    text: "The browser checks the certificate chain against trusted CAs. Both sides now derive the same session keys without ever sending them."
+  - edges: [EF]
+    title: "Encrypted request"
+    text: "The HTTP request, headers, cookies and body included, travels encrypted. Anyone on the path sees only ciphertext."
+  - edges: [FG]
+    title: "Server handles it"
+    text: "The server, or a load balancer terminating TLS, decrypts the request and processes it as ordinary HTTP."
+  - edges: [GH]
+    title: "Encrypted response"
+    text: "The response is encrypted with the same session keys. Tampering in transit would fail the integrity check."
+  - edges: [HI]
+    title: "Page renders"
+    text: "Later requests reuse the connection and keys, so the handshake cost is paid once, not per request."

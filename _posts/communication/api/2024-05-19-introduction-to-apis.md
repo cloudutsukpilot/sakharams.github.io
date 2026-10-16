@@ -7,6 +7,9 @@ tags: [Communication, API]
 
 ## Introduction to API's
 
+For a deeper look at each protocol, see the [API communication protocols](/posts/communication/api/api-communication-protocols/) series.
+{: .prompt-tip }
+
 - APIs act as the bridge between different software applications, allowing them to interact and share data efficiently.
 - Different types of APIs:
 

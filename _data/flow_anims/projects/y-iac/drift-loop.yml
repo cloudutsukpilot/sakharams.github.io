@@ -1,0 +1,51 @@
+# Animated flow diagram for _posts/projects/y-iac/2026-10-05-14-operations-and-observability.md
+# (include id: projects/y-iac/drift-loop). The scheduled drift loop from template/terragrunt-cicd.yaml:
+# weekly plan of every stack, analysis, Teams + Jira, fix, next scan.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Y-IaC drift detection loop
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 330]
+grid: { x0: 110, y0: 200, dx: 195, dy: 140, w: 150, h: 56 }
+
+nodes:
+  - { id: SCH, label: "Weekly scan", sub: "Sun 06:00 UTC", col: 0, row: 0, shape: terminal, icon: shield, icon_pos: corner }
+  - { id: PLN, label: "Plan every\nstack", col: 1, row: 0 }
+  - { id: ANA, label: "Drift?", col: 2, row: 0, w: 120, h: 86, shape: diamond }
+  - { id: NOT, label: "Teams +\nJira ticket", col: 3, row: 0, tone: warn, icon: message }
+  - { id: FIX, label: "Fix: revert\nor adopt", col: 4, row: 0 }
+  - { id: OK, label: "No alert", col: 2, row: -1, w: 150, h: 46, tone: ok, icon: bell }
+
+edges:
+  - { id: SCHPLN, from: SCH, to: PLN }
+  - { id: PLNANA, from: PLN, to: ANA }
+  - { id: ANANOT, from: ANA, to: NOT, label: "yes" }
+  - { id: NOTFIX, from: NOT, to: FIX }
+  - { id: FIXPLN, from: FIX, to: PLN, offset: 50, label: "next scan" }
+  - { id: ANAOK, from: ANA, to: OK, label: "no", label_at: [516, 125], tone: ok }
+
+steps:
+  - lights: [SCH]
+    title: Scheduled run
+    text: The consumer workflow's cron fires weekly (or someone runs it manually with drift_scan set). No YAML has changed.
+  - edges: [SCHPLN]
+    title: Plan every stack
+    text: Every stack in the consumer is planned with the same CLI and gates. A plan with changes means the cloud no longer matches the YAML on main.
+  - edges: [PLNANA]
+    title: Analyze
+    text: drift-detection-analyze counts stacks with changes and stacks that failed to plan.
+  - edges: [ANANOT]
+    title: Notify and ticket
+    text: Teams gets a message, and Jira gets one ticket per repository. An open ticket gets a comment instead of a duplicate; priority rises on destroys.
+  - edges: [NOTFIX]
+    title: Fix the cause
+    text: The owner either reverts the manual change with an apply, or adopts it by updating the YAML through a normal PR.
+  - edges: [FIXPLN]
+    title: Next scan
+    text: The loop never ends. The following scheduled run plans every stack again.
+  - edges: [PLNANA]
+    title: Analyze again
+    text: Same analysis on fresh plans.
+  - edges: [ANAOK]
+    title: In sync
+    text: No drift and no failed stacks, so nothing is sent. Unchanged drift on an open ticket is also suppressed by its fingerprint.

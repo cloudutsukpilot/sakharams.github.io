@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-16-support-and-maintenance.md
+# (include id: projects/dunderly/support-escalation). How a support request moves from an employee
+# through the HR service desk (L1), the application team (L2) and, rarely, Microsoft (L3).
+title: Dunderly support escalation
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 280]
+modes:
+  - { id: defect, label: "It's a defect" }
+  - { id: howto, label: "Simulate a how-to question" }
+
+nodes:
+  - { id: USR, label: "Employee", x: 80, y: 80, w: 120, shape: terminal, icon: user, icon_pos: corner }
+  - { id: L1, label: "HR service desk", sub: "L1", x: 260, y: 80, w: 150, icon: server, icon_pos: corner }
+  - { id: TRI, label: "Defect?", x: 450, y: 80, w: 110, h: 84, shape: diamond }
+  - { id: L2, label: "App team", sub: "L2, on rota", x: 640, y: 80, w: 140, icon: users }
+  - { id: L3, label: "Microsoft\nsupport", x: 860, y: 80, w: 150 }
+  - { id: ANS, label: "Answer + KB", sub: "close ticket", x: 450, y: 230, w: 150, tone: ok }
+  - { id: FIX, label: "Fix + review", sub: "via pipeline", x: 640, y: 230, w: 150, tone: ok, icon: check, icon_pos: corner }
+
+edges:
+  - { id: UL, from: USR, to: L1 }
+  - { id: LT, from: L1, to: TRI }
+  - { id: TA, from: TRI, to: ANS, label: "how-to", tone: ok }
+  - { id: T2, from: TRI, to: L2, label: "defect" }
+  - { id: L23, from: L2, to: L3, label: "platform", dashed: true }
+  - { id: L2F, from: L2, to: FIX }
+
+steps:
+  - lights: [USR]
+    title: Something's wrong
+    text: An employee can't book leave, or a manager's request won't submit. The Help link in the app opens a ticket with the page and a correlation ID.
+  - edges: [UL]
+    title: HR service desk
+    text: Level 1 is HR operations. They handle access, how-to questions and the data corrections their role allows.
+  - edges: [LT]
+    title: Triage
+    text: If it looks like a defect or an outage, L1 sets the severity and passes it on with the correlation ID attached.
+  - edges: [TA]
+    when: howto
+    title: Answer and document
+    text: Most tickets end here. The answer becomes a knowledge-base article, so the next person can find it without a ticket.
+  - edges: [T2]
+    when: defect
+    title: App team
+    text: Level 2 is the development team's business-hours rota. The correlation ID takes them straight to the trace in Application Insights.
+  - edges: [L23]
+    when: defect
+    title: Microsoft, only for the platform
+    text: If App Service, Azure SQL or Entra ID is at fault, L2 opens an Azure support request. Application bugs never go this way.
+  - edges: [L2F]
+    when: defect
+    title: Fix and review
+    text: The fix ships through the normal pipeline. Sev-1 and Sev-2 incidents get a short blameless review within a week.

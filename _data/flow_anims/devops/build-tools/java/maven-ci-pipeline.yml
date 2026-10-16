@@ -1,0 +1,90 @@
+# Animated CI pipeline for _posts/devops/build-tools/java/2026-10-01-maven-build.md
+# (include id: devops/build-tools/java/maven-ci-pipeline). The stages follow the generic build pipeline in
+# _data/flow_anims/devops/build-tools/generic-build-pipeline.yml; labels name the real tool.
+title: "CI pipeline with Maven"
+accent: "#F97316"
+accent2: "#8B5CF6"
+viewbox: [1000, 500]
+modes:
+  - {id: pass, label: "Gate passes"}
+  - {id: fail, label: "Simulate a failing gate"}
+
+lanes:
+  - {label: "Build with Maven", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Verify, package and publish", x: 8, y: 205, w: 984, h: 287}
+
+nodes:
+  - {id: A, label: "Source", sub: "pom.xml + mvnw", x: 100, y: 75, w: 150, h: 56, shape: terminal, icon: git, icon_pos: corner}
+  - {id: B, label: "Resolve deps", sub: "Maven Central", x: 300, y: 75, w: 150, h: 56, icon: package, icon_pos: corner}
+  - {id: C, label: "Lint + format", sub: "Checkstyle", x: 500, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: D, label: "Compile", sub: "./mvnw compile", x: 700, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: E, label: "Test + coverage", sub: "Surefire+JaCoCo", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner}
+  - {id: F, label: "SAST", sub: "SpotBugs", x: 130, y: 270, w: 150, h: 46, icon: shield}
+  - {id: G, label: "SCA", sub: "Dependency-Check", x: 130, y: 340, w: 150, h: 46, icon: shield, icon_pos: corner}
+  - {id: H, label: "Secrets", sub: "Gitleaks", x: 130, y: 410, w: 150, h: 46, icon: key}
+  - {id: I, label: "Quality\ngate", x: 320, y: 340, w: 110, h: 84, shape: diamond}
+  - {id: X, label: "Fail the build", x: 320, y: 452, w: 140, h: 42, tone: fail, icon: cross, icon_pos: corner}
+  - {id: J, label: "Package", sub: "./mvnw package", x: 492, y: 340, w: 146, h: 56, icon: package, icon_pos: corner}
+  - {id: K, label: "SBOM + sign", sub: "CycloneDX+cosign", x: 662, y: 340, w: 146, h: 56, icon: cert, icon_pos: corner}
+  - {id: L, label: "Maven repo", sub: "./mvnw deploy", x: 830, y: 340, w: 140, h: 66, shape: cylinder, icon: bucket, icon_pos: corner}
+  - {id: M, label: "Container image", sub: "Jib", x: 830, y: 450, w: 150, h: 50, icon: container, icon_pos: corner}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]]}
+  - {id: EG, from: E, to: G, points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]]}
+  - {id: EH, from: E, to: H, points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]]}
+  - {id: FI, from: F, to: I}
+  - {id: GI, from: G, to: I}
+  - {id: HI, from: H, to: I}
+  - {id: IX, from: I, to: X, points: [[320, 382], [320, 431]], label: "fail", label_at: [334, 410], tone: fail}
+  - {id: IJ, from: I, to: J, label: "pass", label_at: [396, 330]}
+  - {id: JK, from: J, to: K}
+  - {id: KL, from: K, to: L}
+  - {id: LM, from: L, to: M, points: [[830, 373], [830, 425]]}
+
+steps:
+  - lights: [A]
+    title: "Source + pom.xml"
+    text: "A commit triggers CI. pom.xml declares dependencies and plugins, and the committed Maven Wrapper (mvnw) pins the Maven version."
+  - edges: [AB]
+    title: "Resolve dependencies"
+    text: "Maven downloads dependencies and plugins from Maven Central or a private Nexus / Artifactory into ~/.m2/repository, which CI caches."
+  - edges: [BC]
+    title: "Lint and format"
+    text: "./mvnw -B checkstyle:check fails on style violations. PMD, Spotless and Error Prone are common additions."
+  - edges: [CD]
+    title: "Compile"
+    text: "maven-compiler-plugin:compile runs in the compile phase. Asking for a later phase, such as verify, runs every phase before it."
+  - edges: [DE]
+    title: "Test and coverage"
+    text: "maven-surefire-plugin runs the JUnit 5 tests in the test phase, and JaCoCo records coverage (./mvnw -B test jacoco:report)."
+  - edges: [EF, EG, EH]
+    title: "Security scans in parallel"
+    text: "SpotBugs with FindSecBugs checks our code, OWASP Dependency-Check fails on CVSS 7 or higher, and Gitleaks looks for committed keys and tokens."
+  - edges: [FI, GI, HI]
+    title: "Quality gate"
+    text: "./mvnw -B -ntp verify is the CI target: unit tests, integration tests (Failsafe) and every check bound to verify must pass."
+  - edges: [IX]
+    when: fail
+    title: "Fail the build"
+    text: "A failing test or check fails the verify phase, so nothing is packaged, signed or deployed."
+  - edges: [IJ]
+    when: pass
+    title: "Package"
+    text: "The package phase writes the .jar (or .war / .ear) to target/."
+  - edges: [JK]
+    when: pass
+    title: "SBOM and signing"
+    text: "The CycloneDX Maven plugin (makeAggregateBom) writes target/bom.json, and the artifact is signed with Sigstore cosign."
+  - edges: [KL]
+    when: pass
+    title: "Deploy to the repository"
+    text: "./mvnw -B deploy uploads to the repository in <distributionManagement>. install is only for local multi-project builds, not CI."
+  - edges: [LM]
+    when: pass
+    title: "Container image"
+    text: "Jib or Cloud Native Buildpacks build the container image without a Dockerfile, and the registry scans it again."

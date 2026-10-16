@@ -2,19 +2,27 @@
 layout: compress
 ---
 
+{% comment %}
+  Override of jekyll-theme-chirpy 7.6.0 `_layouts/default.html`.
+  Local changes (keep in sync when upgrading the theme; see test/theme_sync_test.rb):
+  - AdSense blocks: #center-bottom under <main>, #sidebar-top / #sidebar-center /
+    #sidebar-bottom in the panel.
+  - Panel order: trending tags before recently updated.
+{% endcomment %}
 <!doctype html>
 
 {% include origin-type.html %}
 
 {% include lang.html %}
 
-{% if site.theme_mode %}
-  {% capture prefer_mode %}data-mode="{{ site.theme_mode }}"{% endcapture %}
-{% endif %}
-
 <!-- `site.alt_lang` can specify a language different from the UI -->
-<html lang="{{ page.lang | default: site.alt_lang | default: site.lang }}" {{ prefer_mode }}>
-  {% include head.html %}
+<html
+  lang="{{ page.lang | default: site.alt_lang | default: site.lang }}"
+  {%- if site.theme_mode == 'light' or site.theme_mode == 'dark' -%}
+    data-bs-theme="{{ site.theme_mode }}"
+  {%- endif -%}
+>
+  {% include head.html lang=lang %}
 
   <body>
     {% include sidebar.html lang=lang %}
@@ -25,28 +33,30 @@ layout: compress
 
         <div class="row flex-grow-1">
           <main aria-label="Main Content" class="col-12 col-lg-11 col-xl-9 px-md-4">
-            {% if layout.refactor or layout.layout == 'default' %}
+            {% if layout.layout == 'default' %}
               {% include refactor-content.html content=content lang=lang %}
+
               <!-- AdSense Center Row -->
               <div id="center-bottom" style="margin-top: 20px;">
                 {% include adsense_center.html %}
               </div>
-              
             {% else %}
               {{ content }}
             {% endif %}
           </main>
 
           <!-- panel -->
-          <aside aria-label="Panel" id="panel-wrapper" class="col-xl-3 ps-2 mb-5 text-muted">
+          <aside aria-label="Panel" id="panel-wrapper" class="col-xl-3 ps-2 text-muted">
             <div class="access">
               {% include_cached trending-tags.html lang=lang %}
+
               <!-- AdSense Side Panel Top -->
               <div id="sidebar-top" style="margin-bottom: 30px; margin-top: 30px;">
                 {% include adsense_panel_sidebar_top.html %}
               </div>
+
               {% include_cached update-list.html lang=lang %}
-              
+
               <!-- AdSense Side Panel Center -->
               <div id="sidebar-center" style="margin-bottom: 30px; margin-top: 30px;">
                 {% include adsense_panel_sidebar_center.html %}
@@ -62,7 +72,6 @@ layout: compress
             <div id="sidebar-bottom" style="margin-bottom: 30px; margin-top: 30px;">
               {% include adsense_panel_sidebar_bottom.html %}
             </div>
-
           </aside>
         </div>
 
@@ -88,14 +97,18 @@ layout: compress
       </aside>
     </div>
 
-    <div id="mask"></div>
+    <div id="mask" class="d-none position-fixed w-100 h-100 z-1"></div>
 
     {% if site.pwa.enabled %}
       {% include_cached notification.html lang=lang %}
     {% endif %}
 
-    <!-- JavaScripts -->
-    {% include js-selector.html lang=lang %}
+    <!-- Embedded scripts -->
+
+    {% for _include in layout.script_includes %}
+      {% assign _include_path = _include | append: '.html' %}
+      {% include {{ _include_path }} %}
+    {% endfor %}
 
     {% include_cached search-loader.html lang=lang %}
   </body>

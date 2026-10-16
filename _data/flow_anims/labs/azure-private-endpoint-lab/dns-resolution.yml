@@ -1,0 +1,61 @@
+# Animated flow diagram for _posts/labs/azure-private-endpoint-lab/2026-10-10-06-experiments.md
+# (include id: labs/azure-private-endpoint-lab/dns-resolution), above experiment 4. Also used in part 3.
+# How Azure DNS answers <account>.openai.azure.com with and without the privatelink.openai.azure.com
+# zone linked to the VNet. Chain and IPs from the 2026-10-10 run (dig @10.200.0.1 on the VM).
+title: Resolving a Foundry name inside the VNet, with and without the private zone
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 330]
+grid: { x0: 100, y0: 90, dx: 200, dy: 170, w: 150, h: 60 }
+modes:
+  - { id: linked, label: "Zone linked to the VNet" }
+  - { id: missing, label: "Show the openai zone missing (before experiment 4)" }
+
+nodes:
+  - { id: RQ, label: "dnsmasq", sub: "on the VM", col: 0, row: 0, icon: "cloud/azure/compute/non-serverless/virtualmachine.svg" }
+  - { id: AD, label: "Azure DNS", sub: "168.63.129.16", col: 1, row: 0, icon: globe, icon_pos: corner }
+  - { id: CN, label: "Public CNAME", sub: "→ privatelink", col: 2, row: 0 }
+  - { id: DZ, label: "Zone\nlinked?", col: 3, row: 0, shape: diamond, w: 150, h: 90 }
+  - { id: PZ, label: "Private zone", sub: "A 10.60.1.5", col: 4, row: 0, shape: cylinder, h: 66 }
+  - { id: OK, label: "PRIVATE", sub: "HTTP 200", col: 4, row: 1, shape: terminal, tone: ok }
+  - { id: CH, label: "Public chain", sub: "6 more CNAMEs", col: 3, row: 1 }
+  - { id: PUB, label: "PUBLIC", sub: "20.232.91.180", col: 2, row: 1, shape: terminal, tone: fail }
+
+edges:
+  - { id: RQ_AD, from: RQ, to: AD }
+  - { id: AD_CN, from: AD, to: CN }
+  - { id: CN_DZ, from: CN, to: DZ }
+  - { id: DZ_PZ, from: DZ, to: PZ, label: "yes", tone: ok }
+  - { id: PZ_OK, from: PZ, to: OK, tone: ok }
+  - { id: DZ_CH, from: DZ, to: CH, label: "no", tone: fail }
+  - { id: CH_PUB, from: CH, to: PUB, exit: left, enter: right, tone: fail }
+
+steps:
+  - lights: [RQ]
+    title: A query reaches the VNet
+    text: "The DGX's query for <account>.openai.azure.com came through the tunnel. dnsmasq has one upstream: Azure DNS."
+  - edges: [RQ_AD]
+    title: Forward to Azure DNS
+    text: "168.63.129.16 resolves public names like any resolver, but also checks the private zones linked to this VNet."
+  - edges: [AD_CN]
+    title: The public record is a CNAME
+    text: "Since the private endpoint exists, the public record says <account>.openai.azure.com is an alias for <account>.privatelink.openai.azure.com."
+  - edges: [CN_DZ]
+    title: Is that zone linked here?
+    text: "Azure DNS answers a privatelink name from a private zone only if a zone with that exact name is linked to the asking VNet."
+  - edges: [DZ_PZ]
+    when: linked
+    title: The private zone answers
+    text: "privatelink.openai.azure.com is linked, and the zone group wrote the A record: 10.60.1.5, the endpoint's openai IP."
+  - edges: [PZ_OK]
+    when: linked
+    title: Private IP, call succeeds
+    text: "The DGX connects to 10.60.1.5 through the tunnel and the account answers 200."
+  - edges: [DZ_CH]
+    when: missing
+    title: No zone, keep resolving publicly
+    text: "No linked zone has that name, so the privatelink CNAME is followed on the internet: Traffic Manager, API Management, a regional host."
+  - edges: [CH_PUB]
+    when: missing
+    title: Public IP, call blocked
+    text: "The chain ends at 20.232.91.180. The DGX connects over the internet and the account answers 403 Public access is disabled."

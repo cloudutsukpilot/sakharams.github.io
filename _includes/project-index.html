@@ -1,0 +1,264 @@
+<!--
+  Project playbook index, rendered on /tags/<project>/ by _layouts/tag.html when
+  _data/projects/<project>.yml exists. Expects `project`, `project_key` and the tag `page`.
+  Areas and topics come from _data/project_framework.yml; each area links to the post with
+  `project: <project_key>` and `project_step: <area id>`, and each topic to that post's #<topic | slugify>.
+  A fact with `url` renders as a link chip (used for the Architecture diagram link).
+  The Interview Prep tile links to the post with `project: <project_key>` and `project_interview: true`,
+  and each question category (framework `interview.categories`) to that post's #<category title | slugify>.
+  The Diagrams lane lists every diagram type in framework `diagrams.types`; a project's drawn diagrams come
+  from `diagrams:` in its data file (type, title, url, optional flow-anim `diagram` id and `format`).
+  The Architecture Decisions tile appears only when _data/project_adrs/<project>.yml exists (written by
+  scripts/sync_adrs.py) and links to the post with `project: <project_key>` and `project_adrs: true`.
+  The Lessons Learned tile appears only when _data/project_lessons/<project>.yml exists (written by hand,
+  checked by scripts/lessons.py) and links to the post with `project_lessons: true`.
+  Created and checked by the cloudutsuk-project skill (.claude/skills/cloudutsuk-project/).
+-->
+{% assign framework = site.data.project_framework %}
+{% assign project_posts = page.posts | where: 'project', project_key %}
+{% assign written = project_posts | where_exp: 'p', 'p.project_step' %}
+{% assign interview = framework.interview %}
+{% assign dlane = framework.diagrams %}
+{% assign drawn = project.diagrams %}{% unless drawn %}{% assign drawn = '' | split: '' %}{% endunless %}
+{% assign interview_post = page.posts | where: 'project', project_key | where: 'project_interview', true | first %}
+{% assign adr_log = site.data.project_adrs[project_key] %}
+{% assign adr_post = page.posts | where: 'project', project_key | where: 'project_adrs', true | first %}
+{% assign lessons_log = site.data.project_lessons[project_key] %}
+{% assign lessons_post = page.posts | where: 'project', project_key | where: 'project_lessons', true | first %}
+{% assign others = page.posts | where_exp: 'p', 'p.project != project_key or p.project_step == nil' | where_exp: 'p', 'p.project != project_key or p.project_interview != true' | where_exp: 'p', 'p.project != project_key or p.project_adrs != true' | where_exp: 'p', 'p.project != project_key or p.project_lessons != true' %}
+
+<div id="page-tag" class="project-index">
+  <h1 class="ps-lg-2">
+    <i class="fa fa-tag fa-fw text-muted"></i>
+    {{ project.name }}
+    <span class="lead text-muted ps-2">{{ page.posts | size }}</span>
+  </h1>
+
+  {% if project.summary %}
+    <p class="project-summary">{{ project.summary }}</p>
+  {% endif %}
+
+  <div class="project-meta">
+    {% if project.status %}
+      <span class="project-chip project-chip-status">{{ project.status }}</span>
+    {% endif %}
+    {% for fact in project.facts %}
+      {% if fact.url %}
+        <a class="project-chip project-chip-link" href="{{ fact.url | relative_url }}"><span class="text-muted">{{ fact.label }}:</span> {{ fact.value }} <i class="fas fa-arrow-right fa-xs" aria-hidden="true"></i></a>
+      {% else %}
+        <span class="project-chip"><span class="text-muted">{{ fact.label }}:</span> {{ fact.value }}</span>
+      {% endif %}
+    {% endfor %}
+    <span class="project-chip">{{ written | size }} of {{ framework.areas | size }} areas written</span>
+    {% if dlane and drawn.size > 0 %}<a class="project-chip project-chip-link" href="#diagrams">{{ drawn | size }} {% if drawn.size == 1 %}diagram{% else %}diagrams{% endif %} <i class="fas fa-arrow-right fa-xs" aria-hidden="true"></i></a>{% endif %}
+  </div>
+
+  <nav class="project-phases" aria-label="Project phases">
+    {% if dlane %}<a href="#diagrams">{{ dlane.title }}</a>{% endif %}
+    {% for phase in framework.phases %}
+      <a href="#phase-{{ phase.id }}">{{ phase.title }}</a>
+    {% endfor %}
+    {% if adr_log %}<a href="#architecture-decisions">Architecture Decisions</a>{% endif %}
+    {% if lessons_log %}<a href="#lessons-learned">Lessons Learned</a>{% endif %}
+    {% if interview %}<a href="#interview-prep">Interview Prep</a>{% endif %}
+  </nav>
+
+  {% if dlane %}
+    <section class="project-phase project-diagrams" id="diagrams">
+      <h2 class="project-phase-title">{{ dlane.title }}</h2>
+      <p class="project-card-summary">{{ dlane.summary }}</p>
+      <div class="project-grid">
+        {% for dtype in dlane.types %}
+          {% assign mine = drawn | where: 'type', dtype.id %}
+          {% assign area = framework.areas | where: 'id', dtype.area | first %}
+          <article class="project-card{% if mine.size == 0 %} is-missing{% endif %}">
+            <header class="project-card-head">
+              <i class="{{ dtype.icon }} fa-fw text-muted" aria-hidden="true"></i>
+              {% if mine.size > 0 %}
+                <a class="project-card-title" href="{{ mine[0].url | relative_url }}">{{ dtype.title }}</a>
+              {% else %}
+                <span class="project-card-title">{{ dtype.title }}</span>
+              {% endif %}
+            </header>
+            <p class="project-card-summary">{{ dtype.summary }}</p>
+            {% if mine.size > 0 %}
+              <ul class="project-topics">
+                {% for d in mine %}
+                  <li><a href="{{ d.url | relative_url }}">{{ d.title | default: dtype.title }}</a> <span class="text-muted">({{ d.format | default: dtype.format }})</span></li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="project-card-pending text-muted">Not drawn yet{% if area %}; belongs in {{ area.title }}{% endif %}</p>
+            {% endif %}
+          </article>
+        {% endfor %}
+        {% assign extras = '' | split: '' %}
+        {% for d in drawn %}
+          {% assign known = dlane.types | where: 'id', d.type | first %}
+          {% unless known %}{% assign extras = extras | push: d %}{% endunless %}
+        {% endfor %}
+        {% if extras.size > 0 %}
+          <article class="project-card">
+            <header class="project-card-head">
+              <i class="{{ dlane.icon }} fa-fw text-muted" aria-hidden="true"></i>
+              <span class="project-card-title">More diagrams</span>
+            </header>
+            <ul class="project-topics">
+              {% for d in extras %}
+                <li><a href="{{ d.url | relative_url }}">{{ d.title }}</a>{% if d.format %} <span class="text-muted">({{ d.format }})</span>{% endif %}</li>
+              {% endfor %}
+            </ul>
+          </article>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% for phase in framework.phases %}
+    {% assign areas = framework.areas | where: 'phase', phase.id %}
+    <section class="project-phase" id="phase-{{ phase.id }}">
+      <h2 class="project-phase-title">{{ phase.title }}</h2>
+      <div class="project-grid">
+        {% for area in areas %}
+          {% assign post = project_posts | where: 'project_step', area.id | first %}
+          <article class="project-card{% unless post %} is-missing{% endunless %}">
+            <header class="project-card-head">
+              <span class="project-step">{{ area.id }}</span>
+              <i class="{{ area.icon }} fa-fw text-muted" aria-hidden="true"></i>
+              {% if post %}
+                <a class="project-card-title" href="{{ post.url | relative_url }}">{{ area.title }}</a>
+              {% else %}
+                <span class="project-card-title">{{ area.title }}</span>
+              {% endif %}
+            </header>
+            <p class="project-card-summary">{{ area.summary }}</p>
+            <ul class="project-topics">
+              {% for topic in area.topics %}
+                <li>
+                  {% if post %}
+                    <a href="{{ post.url | relative_url }}#{{ topic | slugify }}">{{ topic }}</a>
+                  {% else %}
+                    {{ topic }}
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+            {% unless post %}<p class="project-card-pending text-muted">Not written yet</p>{% endunless %}
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+
+  {% if adr_log %}
+    {% assign adr_accepted = adr_log.adrs | where: 'status', 'accepted' %}
+    {% assign adr_proposed = adr_log.adrs | where: 'status', 'proposed' %}
+    {% assign adr_other = adr_log.adrs.size | minus: adr_accepted.size | minus: adr_proposed.size %}
+    <section class="project-phase" id="architecture-decisions">
+      <h2 class="project-phase-title">Architecture Decisions</h2>
+      <article class="project-card project-card-wide{% unless adr_post %} is-missing{% endunless %}">
+        <header class="project-card-head">
+          <i class="fas fa-scale-balanced fa-fw text-muted" aria-hidden="true"></i>
+          {% if adr_post %}
+            <a class="project-card-title" href="{{ adr_post.url | relative_url }}">Architecture Decision Records</a>
+          {% else %}
+            <span class="project-card-title">Architecture Decision Records</span>
+          {% endif %}
+          <span class="project-card-count text-muted">{{ adr_log.adrs | size }} decisions</span>
+        </header>
+        <p class="project-card-summary">Every significant decision with its context, the options that lost and the consequences, synced from <code>{{ adr_log.source }}</code>.</p>
+        <p class="adr-tile-counts">
+          <span class="adr-status adr-status-accepted">{{ adr_accepted | size }} accepted</span>
+          {% if adr_proposed.size > 0 %}<span class="adr-status adr-status-proposed">{{ adr_proposed | size }} proposed</span>{% endif %}
+          {% if adr_other > 0 %}<span class="adr-status adr-status-superseded">{{ adr_other }} superseded or deprecated</span>{% endif %}
+        </p>
+        {% if adr_post %}
+          <ul class="project-topics project-topics-cols">
+            {% for adr in adr_log.adrs %}{% if adr.status == 'proposed' %}
+              <li><a href="{{ adr_post.url | relative_url }}#{{ adr.anchor }}">ADR-{{ adr.id }}</a> <span class="text-muted">{{ adr.title | truncate: 70 }}</span></li>
+            {% endif %}{% endfor %}
+          </ul>
+        {% else %}
+          <p class="project-card-pending text-muted">Not published yet</p>
+        {% endif %}
+      </article>
+    </section>
+  {% endif %}
+
+  {% if lessons_log %}
+    {% assign lessons_recent = lessons_log.lessons | reverse %}
+    <section class="project-phase" id="lessons-learned">
+      <h2 class="project-phase-title">Lessons Learned</h2>
+      <article class="project-card project-card-wide{% unless lessons_post %} is-missing{% endunless %}">
+        <header class="project-card-head">
+          <i class="fas fa-lightbulb fa-fw text-muted" aria-hidden="true"></i>
+          {% if lessons_post %}
+            <a class="project-card-title" href="{{ lessons_post.url | relative_url }}">Lessons Learned</a>
+          {% else %}
+            <span class="project-card-title">Lessons Learned</span>
+          {% endif %}
+          <span class="project-card-count text-muted">{{ lessons_log.lessons | size }} lessons</span>
+        </header>
+        <p class="project-card-summary">Problems hit while building it, with the symptom, the cause, the fix and what to do next time. Newest first.</p>
+        {% if lessons_post %}
+          <ul class="project-topics project-topics-cols">
+            {% for l in lessons_recent limit: 6 %}
+              <li><a href="{{ lessons_post.url | relative_url }}#lesson-{{ l.id | downcase }}">{{ l.id }}</a> <span class="text-muted">{{ l.title | markdownify | strip_html | truncate: 70 }}</span></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="project-card-pending text-muted">Not published yet</p>
+        {% endif %}
+      </article>
+    </section>
+  {% endif %}
+
+  {% if interview %}
+    {% assign iq_total = 0 %}
+    {% for cat in interview.categories %}{% assign iq_total = iq_total | plus: cat.questions.size %}{% endfor %}
+    <section class="project-phase" id="interview-prep">
+      <h2 class="project-phase-title">Interview Prep</h2>
+      <article class="project-card project-card-wide{% unless interview_post %} is-missing{% endunless %}">
+        <header class="project-card-head">
+          <i class="{{ interview.icon }} fa-fw text-muted" aria-hidden="true"></i>
+          {% if interview_post %}
+            <a class="project-card-title" href="{{ interview_post.url | relative_url }}">{{ interview.title }}</a>
+          {% else %}
+            <span class="project-card-title">{{ interview.title }}</span>
+          {% endif %}
+          <span class="project-card-count text-muted">{{ iq_total }} questions</span>
+        </header>
+        <p class="project-card-summary">{{ interview.summary }}</p>
+        <ul class="project-topics project-topics-cols">
+          {% for cat in interview.categories %}
+            <li>
+              <i class="{{ cat.icon }} fa-fw text-muted" aria-hidden="true"></i>
+              {% if interview_post %}
+                <a href="{{ interview_post.url | relative_url }}#{{ cat.title | slugify }}">{{ cat.title }}</a>
+              {% else %}
+                {{ cat.title }}
+              {% endif %}
+              <span class="text-muted">({{ cat.questions | size }})</span>
+            </li>
+          {% endfor %}
+        </ul>
+        {% unless interview_post %}<p class="project-card-pending text-muted">Not written yet</p>{% endunless %}
+      </article>
+    </section>
+  {% endif %}
+
+  {% if others.size > 0 %}
+    <section class="project-phase" id="other-posts">
+      <h2 class="project-phase-title">Other posts tagged {{ page.title }}</h2>
+      <ul class="content ps-0">
+        {% for post in others %}
+          <li class="d-flex justify-content-between px-md-3">
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <span class="dash flex-grow-1"></span>
+            {% include datetime.html date=post.date class='text-muted small text-nowrap' lang=lang %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>

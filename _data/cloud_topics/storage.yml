@@ -1,0 +1,52 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-storage-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: object
+    title: Object storage
+    aws:
+      - ref: Amazon S3
+        summary: The de facto standard object store; its API is copied by most other storage products. Storage classes from Standard to Deep Archive, Intelligent-Tiering that moves objects automatically, strong read-after-write consistency, versioning, Object Lock and event notifications.
+    azure:
+      - ref: Blob Storage
+        summary: Object storage inside a storage account, with Hot, Cool, Cold and Archive access tiers and lifecycle management. Enable the hierarchical namespace and it becomes Data Lake Storage Gen2 for analytics. Supports immutability policies, versioning and NFS 3.0 access.
+    gcp:
+      - ref: Cloud Storage
+        summary: One API across Standard, Nearline, Coldline and Archive classes, all with millisecond access. Dual-region and multi-region buckets give geo-redundancy without managing replication, and Autoclass moves objects between classes based on access.
+
+  - id: block
+    title: Block storage for VMs
+    aws:
+      - ref: Amazon EBS
+        summary: Network-attached volumes for EC2, from gp3 (baseline 3,000 IOPS, tunable independently of size) to io2 Block Express for databases needing very high IOPS. Snapshots go to S3 and can be copied across regions. Volumes live in a single Availability Zone.
+    azure:
+      - ref: Managed Disks
+        summary: Disks for Azure VMs in Standard HDD, Standard SSD, Premium SSD, Premium SSD v2 and Ultra Disk tiers. Premium SSD v2 and Ultra let you tune IOPS and throughput separately from size. Zone-redundant disks (ZRS) replicate synchronously across zones.
+    gcp:
+      - ref: Persistent Disk
+        summary: Network block storage for Compute Engine, including regional disks that replicate across two zones. Newer machine series use Hyperdisk, which lets you provision IOPS and throughput independently and share volumes between VMs.
+
+  - id: file
+    title: Managed file shares
+    aws:
+      - ref: Amazon EFS
+        summary: Serverless NFS for Linux that grows and shrinks automatically, mountable from thousands of EC2 instances, containers and Lambda functions across Availability Zones. For Windows SMB, NetApp ONTAP, Lustre or OpenZFS, AWS offers the Amazon FSx family.
+    azure:
+      - ref: Azure Files
+        summary: Fully managed SMB and NFS shares. Mount them from Windows, Linux and macOS, use Azure File Sync to cache shares on on-premises Windows servers, and join shares to Active Directory or Entra ID for identity-based access.
+      - ref: Azure NetApp Files
+        summary: Enterprise NAS powered by NetApp ONTAP, for latency-sensitive workloads such as SAP HANA, HPC and large file-based databases. Supports NFS, SMB and dual-protocol volumes with snapshots and cross-region replication.
+    gcp:
+      - ref: Filestore
+        summary: Managed NFS in Basic, Zonal and Regional tiers, from small shares to high-scale performance for HPC and GKE. Google Cloud NetApp Volumes covers SMB and enterprise NetApp features.
+
+  - id: archive
+    title: Archive storage
+    aws:
+      - ref: S3 Glacier storage classes
+        summary: "Three archive classes inside S3: Glacier Instant Retrieval (millisecond access), Flexible Retrieval (minutes to hours) and Deep Archive (the cheapest, retrieval in up to 12–48 hours). The original vault-based Amazon Glacier service is closed to new customers."
+    azure:
+      - ref: Archive Storage
+        summary: The Archive access tier for Blob Storage. Offline storage at the lowest price; blobs must be rehydrated to Hot or Cool (up to 15 hours at standard priority) before they can be read. Minimum 180-day retention before early-deletion charges.
+    gcp:
+      - ref: Cloud Storage
+        name: Cloud Storage (Archive class)
+        summary: The Archive storage class keeps the same API and millisecond access as other classes. You pay instead through higher retrieval costs and a 365-day minimum storage duration, so there's no rehydration step to plan around.

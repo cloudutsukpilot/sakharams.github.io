@@ -1,0 +1,134 @@
+# Example explorable diagram (engine: assets/js/diagram.js; workflow: references/diagram.md).
+# A generic web shop on Kubernetes, written to show the format: a 3-level tree, protocol:port arrows,
+# two views for cross-cutting plumbing, and two use cases (one with a cache hit/miss mode).
+# Ports: products' defaults (HTTPS 443, Postgres 5432, Redis 6379, OTLP gRPC 4317, Kafka 9092).
+# To try it, copy it to _data/diagrams/<category>/<name>.yml and embed it with
+# {% include diagram.html id="<category>/<name>" %}.
+title: Web shop architecture
+accent: "#38BDF8"
+accent2: "#8B5CF6"
+level: 1
+levels: [Overview, Areas, Services]
+views:
+  - {id: observability, label: Observability, icon: chart}
+  - {id: security, label: Security, icon: lock}
+
+nodes:
+  - id: shopper
+    label: Shopper
+    sub: browser
+    icon: user
+    detail: A customer browsing the catalogue and placing orders from a web browser.
+  - id: edge
+    label: Edge
+    sub: CDN + ingress
+    icon: globe
+    color: teal
+    detail: Everything the internet touches. TLS ends here; nothing behind it is public.
+    children:
+      - id: cdn
+        label: CDN
+        sub: static assets
+        icon: cloud
+        detail: Serves images, scripts and styles from the nearest edge location and forwards API calls to the ingress.
+      - id: ingress
+        label: Ingress
+        sub: TLS termination
+        icon: balancer
+        detail: The cluster's ingress controller. It ends TLS and routes `/api/*` to the API service.
+  - id: cluster
+    label: Kubernetes cluster
+    sub: one namespace
+    icon: cluster
+    color: violet
+    detail: The shop's workloads and data, in one namespace.
+    children:
+      - id: services
+        label: Services
+        icon: container
+        children:
+          - id: api
+            label: Shop API
+            sub: REST
+            icon: api
+            detail: Owns the catalogue and checkout. Reads through a Redis cache, writes orders to Postgres and publishes an `order-placed` event.
+          - id: worker
+            label: Order worker
+            sub: consumer
+            icon: gear
+            detail: Consumes `order-placed` events and sends the confirmation email.
+      - id: data
+        label: Data
+        icon: database
+        color: amber
+        children:
+          - id: cache
+            label: Redis
+            sub: cache-aside
+            icon: bolt
+            detail: Catalogue entries cached for 5 minutes. On a miss the API reads Postgres and fills the cache.
+          - id: db
+            label: PostgreSQL
+            sub: orders, catalogue
+            icon: database
+            detail: The system of record for products and orders.
+          - id: broker
+            label: Kafka
+            sub: order events
+            icon: queue
+            color: pink
+            detail: Carries `order-placed` events from the API to the worker, so checkout doesn't wait for email.
+      - id: otel
+        label: OTel Collector
+        icon: chart
+        views: [observability]
+        detail: Receives traces and metrics from the services over OTLP and forwards them to the monitoring backend.
+  - id: idp
+    label: Identity provider
+    sub: OIDC
+    icon: key
+    color: rose
+    detail: Signs shoppers in and issues the tokens the API checks on every call.
+  - id: mail
+    label: Email service
+    sub: SaaS
+    icon: mail
+    color: slate
+    detail: A third-party email API used for order confirmations.
+
+edges:
+  - {id: u_cdn, from: shopper, to: cdn, proto: HTTPS, port: 443, why: "Every visit starts here: the browser loads the shop's pages and assets from the nearest CDN edge."}
+  - {id: cdn_ing, from: cdn, to: ingress, proto: HTTPS, port: 443, why: "Used for every API call: the CDN forwards /api requests it can't cache to the cluster's ingress."}
+  - {id: ing_api, from: ingress, to: api, proto: HTTP, port: 8080, why: "The ingress hands each API request, TLS already ended, to the Shop API inside the cluster."}
+  - {id: api_cache, from: api, to: cache, proto: Redis, port: 6379, why: "Used on every catalogue read: the API asks Redis first and fills it after a miss."}
+  - {id: api_db, from: api, to: db, proto: PostgreSQL, port: 5432, why: "Used on a cache miss and on checkout: the API reads products and writes orders."}
+  - {id: api_bus, from: api, to: broker, proto: Kafka, port: 9092, oneway: true, why: "Used after checkout: the API publishes order-placed and returns at once instead of waiting for email."}
+  - {id: bus_wrk, from: broker, to: worker, proto: Kafka, port: 9092, oneway: true, why: "Always on: the worker consumes order-placed events as they arrive."}
+  - {id: wrk_mail, from: worker, to: mail, proto: HTTPS, port: 443, oneway: true, why: "Used once per order: the worker asks the email service to send the confirmation."}
+  - {id: u_idp, view: security, main: true, from: shopper, to: idp, proto: OIDC, tls: true, why: "Used when a shopper signs in: the identity provider checks the login and returns tokens to the browser."}
+  - {id: api_idp, view: security, from: api, to: idp, proto: HTTPS, port: 443, label: JWKS, why: "Every few minutes the API fetches the identity provider's signing keys, so it can check tokens locally."}
+  - {id: api_otel, view: observability, from: api, to: otel, proto: OTLP, port: 4317, why: "Always on: the API streams traces and metrics to the collector."}
+  - {id: wrk_otel, view: observability, from: worker, to: otel, proto: OTLP, port: 4317, why: "Always on: the worker streams traces and metrics to the collector."}
+
+scenarios:
+  - id: browse
+    title: Browse the catalogue
+    summary: "A product page: from the browser to the API, through the cache, and back."
+    modes: [{id: miss, label: Cache miss}, {id: hit, label: "Simulate a cache hit"}]
+    steps:
+      - {title: Open a product, action: "Shopper opens a product page", text: "The browser asks for the product's details.", lights: [shopper]}
+      - {title: Through the edge, action: "Browser → CDN → ingress: GET /api/products/42 (443)", text: "The CDN can't cache the API call, so it forwards it to the cluster's ingress over HTTPS 443.", path: [u_cdn, cdn_ing]}
+      - {title: To the API, action: "Ingress → Shop API: GET /api/products/42 (8080)", text: "The ingress ends TLS and hands the request to the Shop API.", edges: [ing_api]}
+      - {title: Cache hit, when: hit, action: "Shop API ↔ Redis: GET product:42 (hit)", text: "Redis (default port 6379) has the entry, so Postgres isn't touched.", path: [api_cache, ~api_cache]}
+      - {title: Cache miss, when: miss, action: "Shop API ↔ Redis: GET product:42 (miss)", text: "Redis has no entry, so the API goes to the database.", path: [api_cache, ~api_cache]}
+      - {title: Read and fill, when: miss, action: "Shop API ↔ Postgres: SELECT, then SET in Redis", text: "The API reads Postgres (default port 5432) and stores the result in Redis for 5 minutes.", path: [api_db, ~api_db, api_cache]}
+      - {title: Page returns, action: "Shop API → ingress → CDN → browser: the product", text: "The response travels back the way it came.", path: [~ing_api, ~cdn_ing, ~u_cdn], result: success, outcome: "Product page shown"}
+  - id: checkout
+    title: Place an order
+    summary: "Checkout writes the order, then the email happens in the background."
+    steps:
+      - {title: Pay, action: "Browser → CDN → ingress → API: POST /api/orders", text: "The shopper confirms the basket; the request reaches the Shop API over HTTPS 443.", path: [u_cdn, cdn_ing, ing_api]}
+      - {title: Save the order, action: "Shop API ↔ Postgres: INSERT order", text: "The order is committed to Postgres before anything else happens.", path: [api_db, ~api_db]}
+      - {title: Publish the event, action: "Shop API → Kafka: order-placed (9092)", text: "The API publishes an event and doesn't wait for the email.", edges: [api_bus]}
+      - {title: Confirmed, action: "Shop API → browser: 201 Created", text: "The shopper sees the confirmation straight away.", path: [~ing_api, ~cdn_ing, ~u_cdn]}
+      - {title: Send the email, action: "Kafka → worker → email service (443)", text: "The worker consumes the event and asks the email service to send the confirmation.", path: [bus_wrk, wrk_mail], result: success, outcome: "Order placed and confirmed"}

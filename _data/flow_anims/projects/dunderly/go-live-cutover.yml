@@ -1,0 +1,63 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-13-deployment-and-go-live.md
+# (include id: projects/dunderly/go-live-cutover). Cutover from the legacy HR records (assumed to be
+# spreadsheets and a file share of scans) to the new system, with a go/no-go and a rollback path.
+title: Dunderly go-live cutover
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 430]
+modes:
+  - { id: go, label: "Go decision" }
+  - { id: nogo, label: "Simulate a no-go" }
+
+nodes:
+  - { id: FREEZE, label: "Freeze old\nrecords", x: 80, y: 80, w: 120, shape: terminal }
+  - { id: EXTRACT, label: "Extract", sub: "sheets + scans", x: 250, y: 80, w: 140, icon: shield, icon_pos: corner }
+  - { id: LOAD, label: "Load", sub: "import tool", x: 430, y: 80, w: 140 }
+  - { id: RECON, label: "Reconcile", sub: "counts, totals", x: 610, y: 80, w: 140 }
+  - { id: SMOKE, label: "Smoke + spot\ncheck", x: 820, y: 80, w: 150, icon: check, icon_pos: corner }
+  - { id: DECIDE, label: "Go /\nno-go", x: 820, y: 240, w: 120, h: 84, shape: diamond }
+  - { id: HR, label: "Open to HR", sub: "week one", x: 570, y: 240, w: 150, tone: ok }
+  - { id: ALL, label: "Open to all\nstaff", x: 330, y: 240, w: 150, tone: ok }
+  - { id: RB, label: "Roll back", sub: "unfreeze sheets", x: 820, y: 380, w: 150, h: 50, tone: fail }
+
+edges:
+  - { id: FE, from: FREEZE, to: EXTRACT }
+  - { id: EL, from: EXTRACT, to: LOAD }
+  - { id: LR, from: LOAD, to: RECON }
+  - { id: RS, from: RECON, to: SMOKE }
+  - { id: SD, from: SMOKE, to: DECIDE }
+  - { id: DH, from: DECIDE, to: HR, label: "go", tone: ok, points: [[760, 240], [645, 240]] }
+  - { id: HA, from: HR, to: ALL, points: [[495, 240], [405, 240]] }
+  - { id: DR, from: DECIDE, to: RB, label: "no-go", tone: fail }
+
+steps:
+  - lights: [FREEZE]
+    title: Freeze the old records
+    text: At the start of the cutover weekend the old HR records go read-only. Any urgent change after this point is logged by hand and re-keyed.
+  - edges: [FE]
+    title: Extract
+    text: Employee data is exported to CSV and the scanned documents (about 2,500 at 250 employees) are copied with a manifest of names and SHA-256 hashes.
+  - edges: [EL]
+    title: Load
+    text: An idempotent import tool loads employees, salary history and vacation balances, and sends every document through the same malware scan as the app.
+  - edges: [LR]
+    title: Reconcile
+    text: Headcount, salary totals, vacation-day totals and document hashes are compared source to target. The report goes into the go/no-go pack.
+  - edges: [RS]
+    title: Smoke and spot-check
+    text: HR spot-checks named employees end to end, and smoke tests prove sign-in, roles and a payroll dry run against the migrated data.
+  - edges: [SD]
+    title: Go or no-go
+    text: The sponsor, HR and IT decide against written criteria, such as zero unexplained reconciliation differences and no open Sev-1 or Sev-2 defects.
+  - edges: [DH]
+    when: go
+    title: HR first
+    text: HR uses the system alone for the first week, including a payroll dry run, before anyone else is invited.
+  - edges: [HA]
+    when: go
+    title: Everyone else
+    text: Managers and then all staff get access. The old records stay read-only for reference and are archived later.
+  - edges: [DR]
+    when: nogo
+    title: Roll back
+    text: The old records are unfrozen and stay the system of record. Nothing is lost, because nothing was ever written back to them.

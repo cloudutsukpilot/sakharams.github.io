@@ -1,0 +1,81 @@
+# Animated flow diagram for _posts/projects/y-iac/2026-10-05-05-technical-architecture.md
+# (include id: projects/y-iac/system-architecture). System context: who changes what, where the CLI
+# runs, and which external systems a run touches. The project card's Architecture chip links here.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Y-IaC system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 540]
+
+lanes:
+  - { label: "GitHub", x: 8, y: 8, w: 214, h: 524 }
+  - { label: "Laptop or CI runner", x: 250, y: 8, w: 470, h: 524 }
+  - { label: "Targets and services", x: 748, y: 8, w: 244, h: 524 }
+
+nodes:
+  - { id: ENG, label: "Engineer", x: 115, y: 82, w: 86, h: 86, shape: circle }
+  - { id: CONS, label: "infra-* repo\n(YAML)", x: 115, y: 195, w: 150, h: 64, shape: cylinder, icon: bucket, icon_pos: corner }
+  - { id: SHARED, label: "Y-IaC repo\nmodules + CLI", x: 115, y: 320, w: 150, h: 64, shape: cylinder, icon: bucket, icon_pos: corner }
+  - { id: GHA, label: "Reusable\nworkflows", x: 115, y: 445, w: 150 }
+
+  - { id: CLI, label: "Python CLI", sub: "entrypoint.py", x: 360, y: 195, w: 150, icon: "programming/python.svg", icon_pos: corner }
+  - { id: TG, label: "Terragrunt\nstack", x: 600, y: 195, w: 150 }
+  - { id: GATES, label: "Plan gates", sub: "OPA, Trivy, cost", x: 360, y: 320, w: 160, icon: shield, icon_pos: corner }
+  - { id: TF, label: "Terraform +\nproviders", x: 600, y: 320, w: 150, icon: "devops/iac/terraform.svg" }
+  - { id: PRS, label: "Plan summary\n+ artifacts", x: 360, y: 445, w: 150 }
+
+  - { id: STATE, label: "Remote state", sub: "Blob, S3, GCS", x: 870, y: 195, w: 150, h: 64, shape: cylinder, icon: bucket, icon_pos: corner }
+  - { id: CLOUD, label: "Azure, AWS, GCP\n+ SaaS APIs", x: 870, y: 320, w: 150, icon: cloud, icon_pos: corner }
+  - { id: NOTIFY, label: "Teams + Jira", x: 870, y: 445, w: 150, icon: message, icon_pos: corner }
+
+edges:
+  - { id: ENGCONS, from: ENG, to: CONS }
+  - { id: CONSGHA, from: CONS, to: GHA, points: [[40, 195], [24, 195], [24, 445], [40, 445]] }
+  - { id: GHACLI, from: GHA, to: CLI, points: [[190, 432], [236, 432], [236, 205], [285, 205]] }
+  - { id: SHAREDCLI, from: SHARED, to: CLI, points: [[190, 320], [226, 320], [226, 185], [285, 185]] }
+  - { id: CLITG, from: CLI, to: TG }
+  - { id: TGTF, from: TG, to: TF }
+  - { id: TFSTATE, from: TF, to: STATE, points: [[675, 305], [732, 305], [732, 195], [795, 195]] }
+  - { id: TFCLOUD, from: TF, to: CLOUD }
+  - { id: TFGATES, from: TF, to: GATES, points: [[525, 320], [440, 320]] }
+  - { id: GATESPRS, from: GATES, to: PRS }
+  - { id: PRSGHA, from: PRS, to: GHA, points: [[285, 458], [190, 458]] }
+  - { id: GHANOTIFY, from: GHA, to: NOTIFY, dashed: true, label: "scheduled drift scan", points: [[115, 473], [115, 508], [870, 508], [870, 473]] }
+
+steps:
+  - lights: [ENG, SHARED]
+    title: Two repositories, two jobs
+    text: Y-IaC holds every module, the Python CLI and the reusable workflows. An infra-* consumer repo holds only YAML describing what it wants.
+  - edges: [ENGCONS]
+    title: Declare it in YAML
+    text: An engineer adds an entry to resources.yaml in a consumer such as infra-aws and opens a pull request. No HCL is written.
+  - edges: [CONSGHA]
+    title: Consumer workflow calls Y-IaC
+    text: The consumer's terragrunt-cicd.yaml calls the reusable workflows in Y-IaC at the ref set by iac_shared_module_ref in config.yaml.
+  - edges: [GHACLI, SHAREDCLI]
+    title: The runner runs the CLI
+    text: The runner checks Y-IaC out into ./terragrunt_shared_module and runs entrypoint.py. On a laptop the same CLI runs from a sibling checkout.
+  - edges: [CLITG]
+    title: YAML becomes a Terragrunt stack
+    text: The CLI validates, authenticates and writes terragrunt.stack.hcl with one unit per resource type. Parts 1 and 2 below zoom in on this.
+  - edges: [TGTF]
+    title: root.hcl generates the rest
+    text: Each unit includes root.hcl, which generates provider.tf and backend.tf and points at the shared Terraform module.
+  - edges: [TFSTATE, TFCLOUD]
+    title: State and APIs
+    text: Terraform reads each unit's own state file and refreshes against Azure, AWS, GCP, GitHub, JFrog, Grafana or whichever provider the stack uses.
+  - edges: [TFGATES]
+    title: Plan through the gates
+    text: Plan JSON goes through OPA policies, Trivy or Wiz, and Infracost before anyone is asked to approve it.
+  - edges: [GATESPRS]
+    title: Evidence for the reviewer
+    text: Per-unit add/change/destroy tables, gate results and plan files are saved as workflow artifacts and summarised for the pull request.
+  - edges: [PRSGHA]
+    title: Approve, then apply
+    text: After merge, a GitHub environment approval releases the apply job. The CD workflow runs the same CLI with apply, then plans again to prove a clean state.
+  - edges: [GHACLI]
+    title: Same path for apply
+    text: Apply goes through the identical CLI, root.hcl and modules. Only the action changes, so what was reviewed is what runs.
+  - edges: [GHANOTIFY]
+    title: Scheduled drift scan
+    text: A scheduled plan looks for drift. Findings go to Microsoft Teams and to one Jira ticket per repository, updated rather than duplicated.

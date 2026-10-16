@@ -1,0 +1,59 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-webhooks.md
+# (include id: communication/api/webhook-delivery). Registration, a signed event delivery,
+# verification and a fast 2xx, with a retry-with-backoff mode.
+title: Webhook delivery with signature check and retries
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 300]
+grid: {x0: 90, y0: 140, dx: 164, dy: 0, w: 136, h: 56}
+modes:
+  - {id: ok, label: "Receiver is up"}
+  - {id: retry, label: "Simulate a receiver outage"}
+
+nodes:
+  - {id: R, label: "Register URL", sub: "+ shared secret", col: 0, row: 0, shape: terminal, icon: key, icon_pos: corner}
+  - {id: E, label: "Event occurs", sub: "payment.paid", col: 1, row: 0}
+  - {id: P, label: "Sign + POST", sub: "HMAC-SHA256", col: 2, row: 0, icon: cert, icon_pos: corner}
+  - {id: H, label: "Receiver\nendpoint", col: 3, row: 0, icon: api}
+  - {id: V, label: "Verify\nHMAC", col: 4, row: 0, w: 116, h: 84, shape: diamond}
+  - {id: Q, label: "Queue job", sub: "process later", col: 5, row: 0, h: 66, shape: cylinder, icon: queue, icon_pos: corner}
+
+edges:
+  - {id: RE, from: R, to: E, dashed: true}
+  - {id: EP, from: E, to: P}
+  - {id: PH, from: P, to: H}
+  - {id: HP, from: H, to: P, exit: top, enter: top, offset: 45, tone: fail, label: "503 / timeout"}
+  - {id: HV, from: H, to: V}
+  - {id: VQ, from: V, to: Q}
+  - {id: QP, from: Q, to: P, offset: 60, tone: ok, label: "200 OK within a few seconds"}
+
+steps:
+  - lights: [R]
+    title: Subscribe once
+    text: The consumer registers an HTTPS URL and the event types it wants with the provider, and receives a signing secret.
+  - edges: [RE]
+    title: Something happens
+    text: Later, an event occurs in the provider's system, such as a payment succeeding or a commit being pushed.
+  - edges: [EP]
+    title: Sign and send
+    text: The provider POSTs a JSON payload to the URL with an event ID, a timestamp and an HMAC signature of the body in a header.
+  - edges: [PH]
+    title: Delivery attempt
+    text: The HTTP request reaches the receiver's endpoint, possibly days after registration. Nobody on the receiver side polled for it.
+  - edges: [HP]
+    when: retry
+    title: Delivery fails
+    text: The receiver is down or too slow. The provider records the failure and schedules a retry with exponential backoff.
+  - edges: [PH]
+    when: retry
+    title: Retry later
+    text: Minutes or hours later the same event, with the same event ID, is sent again. Receivers must be idempotent because duplicates happen.
+  - edges: [HV]
+    title: Verify the signature
+    text: The receiver recomputes the HMAC over the raw body with its secret, compares it in constant time and rejects old timestamps to stop replays.
+  - edges: [VQ]
+    title: Queue, do not process
+    text: The event is stored or queued, and deduplicated by event ID. Heavy work happens asynchronously.
+  - edges: [QP]
+    title: Acknowledge fast
+    text: Any 2xx tells the provider the event was delivered. Slow handlers cause timeouts, which cause retries and duplicates.

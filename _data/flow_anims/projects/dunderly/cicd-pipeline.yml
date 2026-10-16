@@ -1,0 +1,87 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-12-cicd-and-release-management.md
+# (include id: projects/dunderly/cicd-pipeline). Pull request checks, build once on main, promote
+# through dev and test, approve, migrate and deploy to the staging slot, smoke test, swap.
+title: Dunderly CI/CD pipeline
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 570]
+modes:
+  - { id: pass, label: "Smoke tests pass" }
+  - { id: fail, label: "Simulate failing smoke tests" }
+
+lanes:
+  - { label: "Pull request", x: 8, y: 8, w: 984, h: 140 }
+  - { label: "Main branch to production", x: 8, y: 190, w: 984, h: 372 }
+
+nodes:
+  - { id: PR, label: "Pull request", x: 80, y: 90, w: 120, shape: terminal, icon: git, icon_pos: corner }
+  - { id: BUILD, label: "Build + test", sub: "dotnet test", x: 250, y: 90, w: 140, icon: check, icon_pos: corner }
+  - { id: SCAN, label: "Scans", sub: "CodeQL, deps", x: 430, y: 90, w: 140, icon: package, icon_pos: corner }
+  - { id: PREV, label: "PR preview", sub: "SWA preview env", x: 610, y: 90, w: 140, icon: git, icon_pos: corner }
+  - { id: MERGE, label: "Review\n+ merge", x: 830, y: 90, w: 130, h: 88, shape: diamond }
+
+  - { id: ART, label: "Build once", sub: "zips + efbundle", x: 130, y: 270, w: 150, icon: gear, icon_pos: corner }
+  - { id: DEV, label: "Deploy dev", sub: "Bicep + app", x: 320, y: 270, w: 140, icon: "devops/iac/azureresourcemanager-18.svg" }
+  - { id: TEST, label: "Deploy test", sub: "E2E + UAT", x: 500, y: 270, w: 140, icon: check, icon_pos: corner }
+  - { id: GATE, label: "Prod approval", sub: "env reviewer", x: 680, y: 270, w: 140, icon: check, icon_pos: corner }
+  - { id: SLOT, label: "Staging slot", sub: "migrate + deploy", x: 880, y: 270, w: 150, icon: rocket, icon_pos: corner }
+  - { id: SMOKE, label: "Smoke\ntests", x: 880, y: 395, w: 120, h: 84, shape: diamond }
+  - { id: SWAP, label: "Swap to\nproduction", x: 640, y: 395, w: 150, tone: ok }
+  - { id: STOP, label: "No swap", sub: "fix forward", x: 880, y: 515, w: 150, h: 50, tone: fail }
+
+edges:
+  - { id: PB, from: PR, to: BUILD }
+  - { id: BS, from: BUILD, to: SCAN }
+  - { id: SP, from: SCAN, to: PREV }
+  - { id: PM, from: PREV, to: MERGE }
+  - { id: MA, from: MERGE, to: ART, label: "merge to main", label_at: [600, 160], points: [[830, 134], [830, 168], [35, 168], [35, 270], [55, 270]] }
+  - { id: AD, from: ART, to: DEV }
+  - { id: DT, from: DEV, to: TEST }
+  - { id: TG, from: TEST, to: GATE }
+  - { id: GS, from: GATE, to: SLOT }
+  - { id: SS, from: SLOT, to: SMOKE }
+  - { id: SW, from: SMOKE, to: SWAP, label: "pass", tone: ok, points: [[820, 395], [715, 395]] }
+  - { id: SX, from: SMOKE, to: STOP, label: "fail", tone: fail }
+
+steps:
+  - lights: [PR]
+    title: Open a pull request
+    text: Every change, whether code, Bicep or a migration, starts as a short-lived branch and a pull request against main.
+  - edges: [PB]
+    title: Build and test
+    text: GitHub Actions builds the API, the Functions and the Blazor app and runs unit tests, plus integration tests against SQL Server in a container.
+  - edges: [BS]
+    title: Scan
+    text: CodeQL, dependency review, secret scanning and Bicep linting run on every PR. A high-severity finding fails the check.
+  - edges: [SP]
+    title: Preview
+    text: Static Web Apps creates a preview environment for the PR, so the HR product owner can click through a UI change before it merges.
+  - edges: [PM]
+    title: Review and merge
+    text: Branch protection needs one approving review and green checks. Merging to main is the only way into the release path.
+  - edges: [MA]
+    title: Build once
+    text: Main builds the release artifacts once (API and Functions zips, the Blazor bundle, an EF Core migration bundle), all stamped with one version.
+  - edges: [AD]
+    title: Deploy to dev
+    text: The workflow signs in to Azure with OIDC, so there's no stored secret. Bicep applies first, then the artifacts deploy.
+  - edges: [DT]
+    title: Promote to test
+    text: The same artifacts go to test, where Playwright end-to-end tests run and HR does acceptance testing on release candidates.
+  - edges: [TG]
+    title: Production approval
+    text: The production environment needs a named reviewer. Payroll week is a change freeze unless the fix is for payroll itself.
+  - edges: [GS]
+    title: Migrate, then deploy to the slot
+    text: The migration bundle applies backward-compatible schema changes, then the new build goes to the staging slot while production keeps serving.
+  - edges: [SS]
+    title: Smoke test the slot
+    text: Health, sign-in, an employee read and a document download run against the warmed-up staging slot.
+  - edges: [SW]
+    when: pass
+    title: Swap
+    text: The slot swap is the release. Rolling back is swapping again, within minutes, because the previous build is still sitting in the slot.
+  - edges: [SX]
+    when: fail
+    title: Don't swap
+    text: Production never saw the bad build. The team fixes forward on main, and the expand-only migration is harmless to the version still running.
