@@ -531,11 +531,14 @@ nodes:
             facts:
               summary: Deploys every cluster except core from git, so every change is a reviewed commit and drift raises an alert
                 (ADR 0038).
-              how: Polls `homelab-gitops` and applies through each cluster's API; ApplicationSets pick clusters by label; 45 apps.
+              how: Polls `homelab-gitops` and applies through each cluster's API; ApplicationSets pick clusters by label. About
+                60 apps in five groups (projects, label `homelab/group`), each limited to its own sources and clusters (ADR 0047).
               where: platform · ns argocd
               when: always on · 3-min poll
               url:
                 Argo CD: https://argocd.platform.home.cloudutsuk.com
+                Monitoring group: https://argocd.platform.home.cloudutsuk.com/applications?proj=monitoring
+                Labs group: https://argocd.platform.home.cloudutsuk.com/applications?proj=labs
               api: '`argocd-server.argocd` (gRPC and REST)'
             detail: Labs (`homelab/addons=monitoring`) get only cert-manager and the monitoring pack.
           - id: karmada
@@ -883,17 +886,17 @@ nodes:
           children:
           - id: gateway
             label: Model gateway
-            sub: planned · LiteLLM
+            sub: LiteLLM
             icon: balancer
-            status: planned
-            phase: 5
+            status: built
             facts:
-              summary: Planned single endpoint for every model call, local or later hosted (ADR 0022).
-              how: 'LiteLLM: routes by model name with queueing, limits and token counts.'
-              where: ai
+              summary: The single endpoint for every model call, local or later hosted (ADR 0022).
+              how: 'LiteLLM v1.103.1: routes by model name; one virtual key per caller, limited to its models (ADR 0029).'
+              where: ai · ns litellm
+              when: always on
               url:
-              - 'Planned: https://llm.ai.home.cloudutsuk.com'
-              api: 'Planned: `/v1/chat/completions` · `/v1/embeddings` (port 4000)'
+              - https://llm.ai.home.cloudutsuk.com
+              api: '`/v1/chat/completions` · `/v1/embeddings` (port 4000)'
           - id: vllm-embed
             label: vLLM embed
             sub: Qwen3-Embedding-0.6B
@@ -909,15 +912,15 @@ nodes:
             detail: Passes all seven Kyverno policies without an exception. `VLLMNotServing` fires after 10 minutes not ready.
           - id: vllm-chat
             label: vLLM chat
-            sub: planned · phase 5
+            sub: Qwen3.5-35B-A3B
             icon: message
-            status: planned
-            phase: 5
+            status: built
             facts:
-              summary: Planned local chat model, so chat and diagnosis never leave the DGX.
-              how: 'vLLM behind the gateway; proposed first model: gpt-oss-20b in a 0.17 slice of the GB10 (ADR 0046).'
-              where: ai
-              api: 'Planned: `/v1/chat/completions` (port 8000)'
+              summary: The local chat model, so chat and diagnosis never leave the DGX (ADR 0049).
+              how: 'Qwen3.5-35B-A3B (FP8, 3B active) on vLLM 0.24 in a 0.36 slice of the GB10, 128k context, tool calls; gpt-oss-20b until 2026-10-16 (ADR 0046).'
+              where: ai · ns models
+              when: always on
+              api: '`http://vllm-chat.models.svc:8000/v1/chat/completions`'
           - id: vllm-ondemand
             label: On-demand models
             sub: planned · 0 when idle
@@ -1438,139 +1441,372 @@ nodes:
       when: when the queue stays long
       api: 'Planned: through the gateway'
 
+# Certificates on each connection (shown in an arrow's side panel), checked against the live clusters on 2026-10-15.
+certs:
+  le-portal:
+    label: "portal.platform.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on platform (TLS ends there)"
+    issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `portal/portal-tls` on platform"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-argocd:
+    label: "argocd.platform.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on platform (Argo CD itself runs `server.insecure`)"
+    issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `argocd/argocd-server-tls` on platform"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-velero:
+    label: "velero.platform.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on platform"
+    issuer: "Let's Encrypt YR2 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `velero-ui/velero-ui-tls` on platform"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-grafana:
+    label: "grafana.mon.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on mon"
+    issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `monitoring/grafana-tls` on mon"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-otlp:
+    label: "otlp.mon.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on mon, in front of the OTLP gateway"
+    issuer: "Let's Encrypt YR2 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `monitoring/otlp-tls` on mon"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-auth:
+    label: "auth.core.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on core (Keycloak reads X-Forwarded-*)"
+    issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `keycloak/keycloak-tls` on core"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-bao:
+    label: "bao.core.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on core; OpenBao behind it listens on plain HTTP 8200"
+    issuer: "Let's Encrypt YR2 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `openbao/openbao-tls` on core"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-registry:
+    label: "registry.core.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on core"
+    issuer: "Let's Encrypt YR2 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `zot/zot-tls` on core"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  le-pdns:
+    label: "pdns-api.core.home.cloudutsuk.com"
+    type: "public"
+    by: "Traefik on core"
+    issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 through Cloudflare (ClusterIssuer `letsencrypt`)"
+    key: "RSA 2048 · TLS 1.3"
+    valid: "90 days; cert-manager renews it 30 days before expiry"
+    stored: "Secret `powerdns/powerdns-api-tls` on core"
+    trust: "Public chain: every browser, OS and container CA bundle trusts ISRG Root X1"
+  k3s-platform:
+    label: "k3s API server · platform"
+    type: "cluster"
+    by: "the platform cluster's API server (172.30.0.1:6442)"
+    issuer: "`k3s-server-ca`, the platform cluster's own CA, made by k3s when the cluster was created"
+    key: "ECDSA P-256"
+    valid: "1 year (to Oct 2027); k3s renews it when it restarts close to expiry"
+    stored: "Secret `kube-system/k3s-serving`; the CA in the server node's data directory"
+    trust: "Clients carry this cluster's CA: `caData` in Argo CD's cluster secret, `certificate-authority-data` in kubeconfigs"
+    note: "Recreating a cluster makes a new CA, so it must be registered again."
+  k3s-ai:
+    label: "k3s API server · ai"
+    type: "cluster"
+    by: "the ai cluster's API server (172.30.0.1:6444)"
+    issuer: "`k3s-server-ca`, the ai cluster's own CA, made by k3s when the cluster was created"
+    key: "ECDSA P-256"
+    valid: "1 year (to Oct 2027); k3s renews it when it restarts close to expiry"
+    stored: "Secret `kube-system/k3s-serving`; the CA in the server node's data directory"
+    trust: "Clients carry this cluster's CA: `caData` in Argo CD's cluster secret, `certificate-authority-data` in kubeconfigs"
+    note: "Recreating a cluster makes a new CA, so it must be registered again."
+  k3s-lab:
+    label: "k3s API server · each lab"
+    type: "cluster"
+    by: "the lab cluster's API server (its server node's address on 6443)"
+    issuer: "`k3s-server-ca`, each lab cluster's own CA, made when `make up` creates it"
+    key: "ECDSA P-256"
+    valid: "1 year (to Oct 2027); k3s renews it when it restarts close to expiry"
+    stored: "Secret `kube-system/k3s-serving`; the CA in the server node's data directory"
+    trust: "lab.sh copies the lab's CA into Argo CD's cluster secret (`caData`) at registration"
+    note: "A lab gets a new CA every time it is recreated; `make up` registers it again."
+  k3s-all:
+    label: "k3s API server · every cluster"
+    type: "cluster"
+    by: "the every k3d cluster's API server (platform :6442, mon :6443, ai :6444, each lab)"
+    issuer: "each cluster's own `k3s-server-ca`"
+    key: "ECDSA P-256"
+    valid: "1 year (to Oct 2027); k3s renews it when it restarts close to expiry"
+    stored: "Secret `kube-system/k3s-serving`; the CA in the server node's data directory"
+    trust: "Clients carry this cluster's CA: `caData` in Argo CD's cluster secret, `certificate-authority-data` in kubeconfigs"
+    note: "Recreating a cluster makes a new CA, so it must be registered again."
+  k3s-admin:
+    label: "system:admin (O=system:masters)"
+    type: "cluster"
+    by: "you, through the kubeconfig k3d wrote"
+    issuer: "`k3s-client-ca`, the cluster's client CA"
+    key: "ECDSA P-256"
+    valid: "1 year (to Oct 2027)"
+    stored: "`~/.kube/config` on the DGX, outside git"
+    trust: "The API server trusts its own client CA; the group `system:masters` makes it cluster-admin"
+  kyverno-webhook:
+    label: "kyverno-platform-svc"
+    type: "self"
+    by: "Kyverno's admission webhook (each long-lived cluster has its own)"
+    issuer: "Kyverno's own CA `*.kyverno.svc` (self-signed, 1 year)"
+    key: "RSA 2048"
+    valid: "150 days; Kyverno renews the pair and its CA itself"
+    stored: "Secrets `kyverno/kyverno-platform-svc.kyverno.svc.kyverno-tls-pair` and `-tls-ca`"
+    trust: "The API server trusts it through the `caBundle` Kyverno writes into its webhook configurations"
+  docker-proxy-server:
+    label: "homelab-docker-proxy (IP 172.30.0.10)"
+    type: "private"
+    by: "ghostunnel on the homelab bridge"
+    issuer: "`homelab docker-proxy CA` (private, 2 years), made by `host/ci/docker-proxy.sh certs`"
+    key: "ECDSA P-256"
+    valid: "2 years; rotate by running `docker-proxy.sh certs` again"
+    stored: "`~/.config/homelab/docker-proxy` on the DGX (0700)"
+    trust: "The runner checks it against the same CA (`DOCKER_TLS_VERIFY=1`)"
+  docker-proxy-client:
+    label: "CN=homelab-iac"
+    type: "private"
+    by: "the homelab-iac runner"
+    issuer: "`homelab docker-proxy CA`"
+    key: "ECDSA P-256 · clientAuth only"
+    valid: "1 year; rotate with `docker-proxy.sh certs`"
+    stored: "OpenBao `kv/platform/ci-iac` (`docker_cert`, `docker_key`, `docker_ca`), into the runner pod through External Secrets"
+    trust: "ghostunnel accepts only a client certificate from this CA with CN homelab-iac; without one the socket refuses"
+  github-https:
+    label: "github.com / *.github.com"
+    type: "public"
+    by: "GitHub"
+    issuer: "Sectigo Public Server Authentication CA DV E36"
+    key: "ECDSA"
+    valid: "GitHub's own (current one to Nov 2026)"
+    stored: "GitHub's side"
+    trust: "Public CA in the runner's and your OS's CA bundle"
+  github-ssh:
+    label: "github.com SSH host keys"
+    type: "key"
+    by: "GitHub's SSH endpoint (port 22)"
+    valid: "Fixed until GitHub rotates them"
+    stored: "Pinned in `argocd-ssh-known-hosts-cm`; Argo CD's repository key in its repository Secret"
+    trust: "Argo CD refuses a host key that isn't pinned; GitHub checks the repository's deploy key"
+  slack-https:
+    label: "slack.com (hooks.slack.com)"
+    type: "public"
+    by: "Slack"
+    issuer: "Let's Encrypt YR2"
+    valid: "Slack's own"
+    stored: "Slack's side; the webhook URL (the secret) in OpenBao `kv/mon/alertmanager`"
+    trust: "Public CA in the container's CA bundle"
+  hc-https:
+    label: "hc-ping.com"
+    type: "public"
+    by: "healthchecks.io"
+    issuer: "Sectigo Public Server Authentication CA DV E36"
+    key: "healthchecks.io's"
+    valid: "healthchecks.io's own"
+    stored: "Their side; the ping URL (the secret) in `/etc/homelab/heartbeat-url` or Alertmanager's config"
+    trust: "Public CA in the OS or container CA bundle"
+  acme-https:
+    label: "acme-v02.api.letsencrypt.org"
+    type: "public"
+    by: "Let's Encrypt's ACME API"
+    issuer: "Let's Encrypt YE2"
+    key: "Let's Encrypt's"
+    valid: "Let's Encrypt's own"
+    stored: "Their side; cert-manager's ACME account key in Secret `letsencrypt-account`"
+    trust: "Public CA in cert-manager's image"
+  cloudflare-https:
+    label: "api.cloudflare.com"
+    type: "public"
+    by: "Cloudflare's API (DNS-01 TXT records)"
+    issuer: "Google Trust Services WE1"
+    valid: "Cloudflare's own"
+    stored: "Their side; the DNS-edit token in OpenBao `kv/shared/cert-manager`"
+    trust: "Public CA in cert-manager's image"
+  azure-blob:
+    label: "*.blob.core.windows.net"
+    type: "public"
+    by: "Azure Blob Storage"
+    issuer: "Microsoft TLS G2 RSA CA OCSP 02"
+    valid: "Microsoft's own"
+    stored: "Microsoft's side; the storage key in OpenBao, read through External Secrets"
+    trust: "Public CA in Velero's image"
+  tailscale-keys:
+    label: "WireGuard node keys"
+    type: "key"
+    by: "your device and tailscaled on the DGX"
+    valid: "Until the node key expires (Tailscale's key expiry), then you sign in again"
+    stored: "On each device; only public keys go to the coordination server"
+    trust: "The coordination server hands each peer only the public keys the tailnet policy allows"
+  tailscale-control:
+    label: "controlplane.tailscale.com"
+    type: "public"
+    by: "Tailscale's coordination server"
+    issuer: "Let's Encrypt YE1"
+    valid: "Tailscale's own"
+    stored: "Tailscale's side"
+    trust: "Public CA; inside it the control protocol is also encrypted with the machine key (Noise)"
+
 edges:
   # Remote access and the portal
-  - {id: you_tailnet, view: networking, main: true, from: you, to: ts-policy, proto: WireGuard, kind: stream, label: tailnet, why: "Every visit starts here: your device sends the request over WireGuard into the private tailnet; nothing at home listens on the internet."}
-  - {id: ts_allow, view: networking, main: true, from: ts-policy, to: ts-router, label: allowed, kind: control, why: "The tailnet policy only lets your login reach the platform's addresses; anyone else's packets are dropped here."}
-  - {id: ts_route, view: networking, main: true, from: ts-router, to: traefik-platform, proto: HTTPS, port: 443, tls: true, label: "172.30.0.2", why: "Carries every request home: tailscaled on the DGX routes it onto the homelab bridge to platform's Traefik."}
-  - {id: tr_bs, view: networking, main: true, from: traefik-platform, to: backstage, proto: HTTP, port: 7007, why: "Traefik forwards each portal request to Backstage inside the platform cluster."}
-  - {id: bs_kc, view: security, main: true, from: backstage, to: keycloak, proto: OIDC, tls: true, detail: "Confidential client `portal`; groups become Backstage identity claims.", why: "Used when you sign in to Backstage: Keycloak brokers your Entra ID login and your groups become roles. The tailnet decides who reaches the network; Keycloak decides who may use the portal."}
-  - {id: kc_db, view: security, main: true, from: keycloak, to: core-db, proto: PostgreSQL, port: 5432, why: "Keycloak keeps its realm, groups and your Entra ID links here, and reads them on every sign-in."}
-  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTPS, port: 443, label: "grafana.mon", detail: "grafana.mon.home.cloudutsuk.com over the tailnet, then Grafana's own Keycloak sign-in.", why: "Used when you open Grafana to look at a dashboard or an alert."}
+  - {id: you_tailnet, view: networking, main: true, from: you, to: ts-policy, proto: WireGuard, kind: stream, label: tailnet, why: "Every visit starts here: your device sends the request over WireGuard into the private tailnet; nothing at home listens on the internet.", certs: {server: "tailscale-keys", note: "WireGuard (Noise IK, Curve25519) encrypts the hop with keys, not X.509 certificates; the HTTPS inside it is checked separately."}}
+  - {id: ts_allow, view: networking, main: true, from: ts-policy, to: ts-router, label: allowed, kind: control, why: "The tailnet policy only lets your login reach the platform's addresses; anyone else's packets are dropped here.", certs: {server: "tailscale-control"}}
+  - {id: ts_route, view: networking, main: true, from: ts-router, to: traefik-platform, proto: HTTPS, port: 443, tls: true, label: "172.30.0.2", why: "Carries every request home: tailscaled on the DGX routes it onto the homelab bridge to platform's Traefik.", certs: {server: ["le-portal", "le-argocd", "le-velero"], note: "Traefik picks the certificate by the name you typed (SNI)."}}
+  - {id: tr_bs, view: networking, main: true, from: traefik-platform, to: backstage, proto: HTTP, port: 7007, why: "Traefik forwards each portal request to Backstage inside the platform cluster.", certs: {none: "Plain HTTP inside the platform cluster: the hop never leaves the cluster network, so there's no certificate. TLS ended at Traefik."}}
+  - {id: bs_kc, view: security, main: true, from: backstage, to: keycloak, proto: OIDC, tls: true, detail: "Confidential client `portal`; groups become Backstage identity claims.", why: "Used when you sign in to Backstage: Keycloak brokers your Entra ID login and your groups become roles. The tailnet decides who reaches the network; Keycloak decides who may use the portal.", certs: {server: "le-auth"}}
+  - {id: kc_db, view: security, main: true, from: keycloak, to: core-db, proto: PostgreSQL, port: 5432, why: "Keycloak keeps its realm, groups and your Entra ID links here, and reads them on every sign-in.", certs: {none: "Plain PostgreSQL inside the core cluster: the hop never leaves the cluster network, so there's no certificate. The JDBC URL sets no SSL; the password comes from OpenBao."}}
+  - {id: you_graf, view: observability, main: true, from: you, to: grafana, proto: HTTPS, port: 443, label: "grafana.mon", detail: "grafana.mon.home.cloudutsuk.com over the tailnet, then Grafana's own Keycloak sign-in.", why: "Used when you open Grafana to look at a dashboard or an alert.", certs: {server: "le-grafana"}}
 
   # Labs: deploy through the runner, register through lab.sh (lab contract v2)
-  - {id: bs_run, from: labs-plugin, to: runner, proto: HTTP, port: 8095, label: "172.30.0.1:8095", detail: "Bearer token from OpenBao `kv/platform/lab-runner`, read by the portal through External Secrets.", why: "Used when you click Deploy or Destroy on a lab tile: the Labs plugin asks the lab runner to do it and follows the job's log."}
-  - {id: run_labs, oneway: true, from: runner, to: labs, label: make up, kind: control, why: "Used when a lab is deployed: after the port and memory checks, the runner runs the lab's make up, which creates the lab's k3d cluster on the homelab network."}
-  - {id: run_labsh, oneway: true, from: runner, to: lab-sh, label: "make up: register", kind: control, why: "At the end of every make up: the lab's Makefile runs lab.sh register to join the cluster to the platform (and unregister first in make down)."}
-  - {id: labsh_lab, from: lab-sh, to: labs, proto: HTTPS, port: 6443, label: "SA + OTLP token", detail: "The shared `labs` token is copied from mon's otlp-gateway-tokens Secret; labs have no External Secrets.", why: "During registration: lab.sh creates the argocd-manager ServiceAccount in the lab and copies in the shared labs OTLP token."}
-  - {id: labsh_argo, from: lab-sh, to: argocd, proto: HTTPS, port: 6443, label: cluster secret, detail: "Secret cluster-<lab> in platform, labelled homelab/addons=monitoring.", why: "During registration: lab.sh writes the lab's Argo CD cluster secret, so the ApplicationSets start installing its add-ons."}
-  - {id: labsh_graf, view: observability, from: lab-sh, to: grafana, proto: HTTPS, port: 443, label: Labs folder, detail: "Dashboards go in as ConfigMaps in mon; unregister removes them and revokes the lab's Grafana token.", why: "During registration: the lab's dashboard JSON is loaded into Grafana's Labs folder, and removed again when the lab leaves."}
-  - {id: argo_labs, view: cicd, main: true, from: argocd, to: lab-operator, proto: HTTPS, port: 6443, label: "cert-manager + pack", why: "Used when a lab registers: Argo CD's ApplicationSets install cert-manager and the monitoring pack through the lab's Kubernetes API."}
+  - {id: bs_run, from: labs-plugin, to: runner, proto: HTTP, port: 8095, label: "172.30.0.1:8095", detail: "Bearer token from OpenBao `kv/platform/lab-runner`, read by the portal through External Secrets.", why: "Used when you click Deploy or Destroy on a lab tile: the Labs plugin asks the lab runner to do it and follows the job's log.", certs: {none: "Plain HTTP from the platform cluster to the runner on the homelab bridge (172.30.0.1:8095); a bearer token authenticates the call."}}
+  - {id: run_labs, oneway: true, from: runner, to: labs, label: make up, kind: control, why: "Used when a lab is deployed: after the port and memory checks, the runner runs the lab's make up, which creates the lab's k3d cluster on the homelab network.", certs: {none: "Local processes on the DGX: the runner starts `make up`, no network hop."}}
+  - {id: run_labsh, oneway: true, from: runner, to: lab-sh, label: "make up: register", kind: control, why: "At the end of every make up: the lab's Makefile runs lab.sh register to join the cluster to the platform (and unregister first in make down).", certs: {none: "Local processes on the DGX: the lab's Makefile runs `lab.sh register`, no network hop."}}
+  - {id: labsh_lab, from: lab-sh, to: labs, proto: HTTPS, port: 6443, label: "SA + OTLP token", detail: "The shared `labs` token is copied from mon's otlp-gateway-tokens Secret; labs have no External Secrets.", why: "During registration: lab.sh creates the argocd-manager ServiceAccount in the lab and copies in the shared labs OTLP token.", certs: {server: "k3s-lab", client: "k3s-admin", note: "lab.sh uses the lab's kubeconfig context `k3d-<lab>`, whose client certificate k3d wrote."}}
+  - {id: labsh_argo, from: lab-sh, to: argocd, proto: HTTPS, port: 6443, label: cluster secret, detail: "Secret cluster-<lab> in platform, labelled homelab/addons=monitoring.", why: "During registration: lab.sh writes the lab's Argo CD cluster secret, so the ApplicationSets start installing its add-ons.", certs: {server: "k3s-platform", client: "k3s-admin"}}
+  - {id: labsh_graf, view: observability, from: lab-sh, to: grafana, proto: HTTPS, port: 443, label: Labs folder, detail: "Dashboards go in as ConfigMaps in mon; unregister removes them and revokes the lab's Grafana token.", why: "During registration: the lab's dashboard JSON is loaded into Grafana's Labs folder, and removed again when the lab leaves.", certs: {server: "le-grafana", note: "Authenticated with the host's lab-tools Grafana token."}}
+  - {id: argo_labs, view: cicd, main: true, from: argocd, to: lab-operator, proto: HTTPS, port: 6443, label: "cert-manager + pack", why: "Used when a lab registers: Argo CD's ApplicationSets install cert-manager and the monitoring pack through the lab's Kubernetes API.", certs: {server: "k3s-lab", note: "Argo CD authenticates with the cluster's `argocd-manager` ServiceAccount token, not a client certificate."}}
 
   # GitOps and delivery
-  - {id: argo_git, view: cicd, main: true, from: argocd, to: gitops, proto: HTTPS, port: 443, label: "sync · 3 min", why: "Argo CD polls homelab-gitops every 3 minutes; every merged change (a new image digest, a policy, a dashboard) is synced from here."}
-  - {id: argo_admit, view: [security, cicd], from: argocd, to: kyverno, proto: HTTPS, port: 6443, label: admission, detail: "Argo CD applies through the cluster's Kubernetes API, which calls Kyverno's admission webhook for every object.", why: "On every apply: Kyverno checks each object against its seven Deny policies before the API server accepts it."}
-  - {id: kyv_zot, view: [security, cicd], from: kyverno, to: zot, proto: HTTPS, port: 443, label: verify signature, detail: "Committed Cosign public key; a zot-pull credential for the lookup.", why: "For every platform/* and labs/* image: Kyverno fetches the Cosign signature and the SBOM attestation from Zot and verifies them."}
-  - {id: argo_platform, view: cicd, from: argocd, to: portal-area, proto: HTTPS, port: 6443, label: apply, why: "After a portal digest commit, Argo CD applies the portal's manifests through the Kubernetes API, so the new image rolls out."}
-  - {id: argo_hello, view: cicd, from: argocd, to: hello-world, proto: HTTPS, port: 6443, label: apply, why: "After a hello-world digest commit, Argo CD applies the Deployment with the new image digest."}
-  - {id: smoke_hw, view: cicd, from: argocd, to: hello-world, proto: HTTP, label: PostSync smoke test, detail: "A hook Job with a pinned curl image; it passes every Kyverno policy too.", why: "After every sync: the PostSync Job checks /readyz, / and the revision. A failing test fails the sync; the fix is a revert."}
-  - {id: argo_ai, view: cicd, from: argocd, to: vllm-embed, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the ai cluster's changed manifests (today the embeddings model) through its Kubernetes API."}
-  - {id: you_push, view: cicd, from: you, to: repos, proto: HTTPS, port: 443, label: git push, why: "Every release starts here: you push a commit (or merge a pull request), and GitHub queues the CI workflow."}
-  - {id: ci_gh, view: cicd, from: arc, to: repos, proto: HTTPS, port: 443, label: poll jobs, why: "Always polling: the runners ask GitHub for queued jobs, so no inbound connection is needed."}
-  - {id: ci_bao, view: [security, cicd], from: arc, to: openbao, proto: OIDC, tls: true, label: GitHub OIDC, detail: "Role main is bound to the org, self-hosted runners, refs/heads/main and the reusable workflow; role pr reads only the pull key.", why: "At the start of a CI job the runner logs in to OpenBao with GitHub OIDC to get short-lived secrets; nothing is stored as a GitHub secret."}
-  - {id: ci_bk, view: cicd, from: arc, to: buildkit, proto: gRPC, port: 1234, label: buildx build, why: "Used when tests and security gates pass: the job builds the image on the shared BuildKit and gets an OCI layout back to scan."}
-  - {id: ci_zot, view: cicd, from: arc, to: zot, proto: HTTPS, port: 443, label: crane push, why: "On main only: the scanned image bytes are pushed to Zot under platform/<name>."}
-  - {id: ci_sign, view: [security, cicd], from: arc, to: openbao, proto: HTTPS, port: 8200, label: transit sign, detail: "cosign with hashivault://cosign (ECDSA P-256, not exportable); only role main may sign.", why: "On main only: Cosign signs the pushed image and its SBOM attestation with OpenBao's transit key; a PR job gets 403."}
-  - {id: ci_app, view: [security, cicd], from: arc, to: gitops-app, proto: HTTPS, port: 443, label: App token, why: "In the promote job: the runner mints a short-lived gitops-writer token limited to homelab-gitops and contents: write."}
-  - {id: ci_git, view: cicd, oneway: true, from: arc, to: gitops, proto: HTTPS, port: 443, label: digest commit, why: "After the push, kustomize edit set image commits the new digest to homelab-gitops so Argo CD deploys it; the token is then revoked."}
-  - {id: iac_gh, view: cicd, from: arc-iac, to: repos, proto: HTTPS, port: 443, label: infra-local jobs, why: "Always polling, for infra-local only: Terragrunt plans on pull requests and applies on merge."}
-  - {id: iac_docker, view: [security, cicd], from: arc-iac, to: ghostunnel, proto: TCP, kind: control, port: 2376, tls: true, label: mTLS, detail: "Client certificate CN=homelab-iac; ghostunnel forwards to the host's Docker socket.", why: "Used when an IaC job plans or applies a k3d stack: it reaches the host's Docker through the mutual-TLS endpoint, not a socket mount."}
+  - {id: argo_git, view: cicd, main: true, from: argocd, to: gitops, proto: SSH, port: 22, label: "sync · 3 min", why: "Argo CD polls homelab-gitops every 3 minutes; every merged change (a new image digest, a policy, a dashboard) is synced from here.", certs: {server: "github-ssh", note: "Argo CD reads the repo over SSH (`git@github.com:…`), so a pinned host key, not a certificate, proves it is GitHub."}}
+  - {id: argo_admit, view: [security, cicd], from: argocd, to: kyverno, proto: HTTPS, port: 6443, label: admission, detail: "Argo CD applies through the cluster's Kubernetes API, which calls Kyverno's admission webhook for every object.", why: "On every apply: Kyverno checks each object against its seven Deny policies before the API server accepts it.", certs: {server: "kyverno-webhook", note: "The API server is the client here; it calls Kyverno's webhook over HTTPS for every object."}}
+  - {id: kyv_zot, view: [security, cicd], from: kyverno, to: zot, proto: HTTPS, port: 443, label: verify signature, detail: "Committed Cosign public key; a zot-pull credential for the lookup.", why: "For every platform/* and labs/* image: Kyverno fetches the Cosign signature and the SBOM attestation from Zot and verifies them.", certs: {server: "le-registry"}}
+  - {id: argo_platform, view: cicd, from: argocd, to: portal-area, proto: HTTPS, port: 6443, label: apply, why: "After a portal digest commit, Argo CD applies the portal's manifests through the Kubernetes API, so the new image rolls out.", certs: {server: "k3s-platform", note: "In-cluster: Argo CD uses its ServiceAccount and the mounted cluster CA (`ca.crt`)."}}
+  - {id: argo_hello, view: cicd, from: argocd, to: hello-world, proto: HTTPS, port: 6443, label: apply, why: "After a hello-world digest commit, Argo CD applies the Deployment with the new image digest.", certs: {server: "k3s-platform", note: "In-cluster: Argo CD uses its ServiceAccount and the mounted cluster CA (`ca.crt`)."}}
+  - {id: smoke_hw, view: cicd, from: argocd, to: hello-world, proto: HTTP, label: PostSync smoke test, detail: "A hook Job with a pinned curl image; it passes every Kyverno policy too.", why: "After every sync: the PostSync Job checks /readyz, / and the revision. A failing test fails the sync; the fix is a revert.", certs: {none: "Plain HTTP inside the platform cluster: the hop never leaves the cluster network, so there's no certificate. The PostSync Job calls the Service directly."}}
+  - {id: argo_ai, view: cicd, from: argocd, to: vllm-embed, proto: HTTPS, port: 6443, label: apply, why: "After every sync, Argo CD applies the ai cluster's changed manifests (today the embeddings model) through its Kubernetes API.", certs: {server: "k3s-ai", note: "Argo CD authenticates with the cluster's `argocd-manager` ServiceAccount token, not a client certificate."}}
+  - {id: you_push, view: cicd, from: you, to: repos, proto: HTTPS, port: 443, label: git push, why: "Every release starts here: you push a commit (or merge a pull request), and GitHub queues the CI workflow.", certs: {server: "github-https"}}
+  - {id: ci_gh, view: cicd, from: arc, to: repos, proto: HTTPS, port: 443, label: poll jobs, why: "Always polling: the runners ask GitHub for queued jobs, so no inbound connection is needed.", certs: {server: "github-https"}}
+  - {id: ci_bao, view: [security, cicd], from: arc, to: openbao, proto: OIDC, tls: true, label: GitHub OIDC, detail: "Role main is bound to the org, self-hosted runners, refs/heads/main and the reusable workflow; role pr reads only the pull key.", why: "At the start of a CI job the runner logs in to OpenBao with GitHub OIDC to get short-lived secrets; nothing is stored as a GitHub secret.", certs: {server: "le-bao", note: "The runner logs in with a GitHub OIDC JWT, signed by GitHub's key, not a client certificate."}}
+  - {id: ci_bk, view: cicd, from: arc, to: buildkit, proto: gRPC, port: 1234, label: buildx build, why: "Used when tests and security gates pass: the job builds the image on the shared BuildKit and gets an OCI layout back to scan.", certs: {none: "Plain gRPC (`tcp://…:1234`) inside the platform cluster: the hop never leaves the cluster network, so there's no certificate. buildkitd runs without `--tlscert`."}}
+  - {id: ci_zot, view: cicd, from: arc, to: zot, proto: HTTPS, port: 443, label: crane push, why: "On main only: the scanned image bytes are pushed to Zot under platform/<name>.", certs: {server: "le-registry"}}
+  - {id: ci_sign, view: [security, cicd], from: arc, to: openbao, proto: HTTPS, port: 443, label: transit sign, detail: "cosign with hashivault://cosign (ECDSA P-256, not exportable); only role main may sign.", why: "On main only: Cosign signs the pushed image and its SBOM attestation with OpenBao's transit key; a PR job gets 403.", certs: {server: "le-bao", note: "The signing key itself stays in OpenBao's transit engine (ECDSA P-256, not exportable)."}}
+  - {id: ci_app, view: [security, cicd], from: arc, to: gitops-app, proto: HTTPS, port: 443, label: App token, why: "In the promote job: the runner mints a short-lived gitops-writer token limited to homelab-gitops and contents: write.", certs: {server: "github-https"}}
+  - {id: ci_git, view: cicd, oneway: true, from: arc, to: gitops, proto: HTTPS, port: 443, label: digest commit, why: "After the push, kustomize edit set image commits the new digest to homelab-gitops so Argo CD deploys it; the token is then revoked.", certs: {server: "github-https"}}
+  - {id: iac_gh, view: cicd, from: arc-iac, to: repos, proto: HTTPS, port: 443, label: infra-local jobs, why: "Always polling, for infra-local only: Terragrunt plans on pull requests and applies on merge.", certs: {server: "github-https"}}
+  - {id: iac_docker, view: [security, cicd], from: arc-iac, to: ghostunnel, proto: TCP, kind: control, port: 2376, tls: true, cards: [tcp, mtls, http], label: mTLS, detail: "Client certificate CN=homelab-iac; ghostunnel forwards to the host's Docker socket.", why: "Used when an IaC job plans or applies a k3d stack: it reaches the host's Docker through the mutual-TLS endpoint, not a socket mount.", certs: {server: "docker-proxy-server", client: "docker-proxy-client"}}
 
   # Telemetry
-  - {id: app_otlp, main: true, view: observability, from: lab-app, to: lab-agent, proto: OTLP gRPC, port: 4317, why: "Always on: the lab app's traces, metrics and logs go to the in-cluster agent collector, which adds pod metadata."}
-  - {id: labs_mon, main: true, view: observability, from: lab-agent, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, detail: "Bearer: the shared labs token. k8s.cluster.name is set to the lab's cluster.", why: "Always on: the lab's agent collector forwards app telemetry, pod logs and node metrics to mon's gateway."}
-  - {id: lab_cc_mon, main: true, view: observability, from: lab-clustercol, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the lab's cluster collector sends kube-state-metrics, API server metrics, ServiceMonitor scrapes and events to mon."}
-  - {id: ksm_scrape, view: observability, from: lab-clustercol, to: lab-ksm, proto: Prometheus, label: scrape, why: "Every scrape interval: the cluster collector reads object state from kube-state-metrics for the Kubernetes dashboards."}
-  - {id: obi_gw, main: true, view: observability, from: lab-obi, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on in lab-ebpf: OBI's eBPF traces and RED metrics go straight to the gateway, since host-network pods can't reach the agent's Service."}
-  - {id: platform_otel, view: observability, from: platform-otel, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the platform cluster's telemetry (portal, Argo CD, Kyverno, Traefik, runners) streams to mon with its own token."}
-  - {id: ai_otel, view: observability, from: ai-otel, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the ai cluster's vLLM and pod telemetry streams to mon for the AI dashboards and the vLLM alerts."}
-  - {id: gw_scrape, main: true, view: observability, from: otel-gw, to: host-exporters, proto: Prometheus, label: "9100 9400 9101 9115", why: "Every 30 seconds: the gateway scrapes the host's node, GPU, Docker and blackbox exporters as cluster dgx."}
-  - {id: bb_kc, view: observability, from: host-exporters, to: keycloak, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes Keycloak's OIDC discovery, so a down identity provider and its certificate expiry raise alerts."}
-  - {id: bb_bao, view: observability, from: host-exporters, to: openbao, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes OpenBao's health endpoint, since core has no collector of its own."}
-  - {id: bb_zot, view: observability, from: host-exporters, to: zot, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes Zot's /v2/ endpoint, so a dead registry is noticed before pods fail to pull."}
-  - {id: gw_logs, main: true, from: otel-gw, to: loki, view: observability, kind: telemetry, label: logs, why: "Always on: pod logs and Kubernetes events from every cluster are written to Loki."}
-  - {id: gw_metrics, main: true, from: otel-gw, to: mimir-store, view: observability, kind: telemetry, label: metrics, why: "Always on: metrics from every cluster and the host are written to Mimir for dashboards and alert rules."}
-  - {id: gw_traces, main: true, from: otel-gw, to: tempo, view: observability, kind: telemetry, label: traces, why: "Always on: traces from every cluster are written to Tempo."}
-  - {id: graf_q, view: observability, from: grafana, to: mimir-store, proto: HTTP, port: 8080, label: PromQL, why: "Every time a dashboard panel loads: Grafana queries Mimir's Prometheus API (and Loki and Tempo the same way)."}
-  - {id: ruler_eval, view: observability, from: ruler, to: mimir-store, kind: data, label: evaluate, why: "Every minute: the ruler evaluates the 195 alert and recording rules against the stored metrics."}
-  - {id: ruler_am, main: true, view: observability, from: ruler, to: alertmanager, kind: event, oneway: true, label: firing, why: "Used when a rule's condition holds for its duration: the ruler sends the alert to Alertmanager (the Watchdog always fires)."}
-  - {id: am_slack, main: true, view: observability, oneway: true, from: alertmanager, to: slack, proto: Webhook, tls: true, port: 443, label: alert, why: "Used when a warning or critical alert fires or resolves: Alertmanager posts it to the Slack channel."}
-  - {id: am_watchdog, view: observability, oneway: true, from: alertmanager, to: healthchecks, proto: HTTPS, port: 443, label: Watchdog · 1 min, why: "Every minute: the always-firing Watchdog pings healthchecks.io, so a broken alert path itself sends an email."}
-  - {id: hb_bao, view: observability, from: heartbeat, to: openbao, proto: HTTPS, port: 443, label: health, detail: "Through core's Traefik on 172.30.0.1.", why: "Every 5 minutes: the heartbeat checks OpenBao is initialised, unsealed and active, which proves Docker, core, ingress and DNS."}
-  - {id: hb_hc, view: observability, oneway: true, from: heartbeat, to: healthchecks, proto: HTTPS, port: 443, label: ping · 5 min, why: "Every 5 minutes: a healthy platform pings healthchecks.io (a sick one pings /fail), so a silent DGX emails me."}
-  - {id: doc_k8s, view: observability, from: doctor, to: platform, proto: HTTPS, port: 6443, label: every cluster, detail: "A merged kubeconfig of every k3d cluster, outside git.", why: "Used when you open Headlamp or run Popeye: the doctor reads every cluster's API server, read-only scans included."}
-  - {id: doc_graf, view: observability, from: doctor, to: grafana, proto: HTTPS, port: 443, label: dashboards, why: "At each link-page refresh: the doctor lists every Grafana dashboard by folder with the read-only lab-tools token."}
+  - {id: app_otlp, main: true, view: observability, from: lab-app, to: lab-agent, proto: OTLP gRPC, port: 4317, why: "Always on: the lab app's traces, metrics and logs go to the in-cluster agent collector, which adds pod metadata.", certs: {none: "Plain OTLP gRPC inside the lab cluster: the hop never leaves the cluster network, so there's no certificate. The app sends to the node's agent collector."}}
+  - {id: labs_mon, main: true, view: observability, from: lab-agent, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, detail: "Bearer: the shared labs token. k8s.cluster.name is set to the lab's cluster.", why: "Always on: the lab's agent collector forwards app telemetry, pod logs and node metrics to mon's gateway.", certs: {server: "le-otlp", note: "Authenticated with the shared `labs` bearer token."}}
+  - {id: lab_cc_mon, main: true, view: observability, from: lab-clustercol, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the lab's cluster collector sends kube-state-metrics, API server metrics, ServiceMonitor scrapes and events to mon.", certs: {server: "le-otlp", note: "Authenticated with the shared `labs` bearer token."}}
+  - {id: ksm_scrape, view: observability, from: lab-clustercol, to: lab-ksm, proto: Prometheus, label: scrape, why: "Every scrape interval: the cluster collector reads object state from kube-state-metrics for the Kubernetes dashboards.", certs: {none: "Plain HTTP inside the lab cluster: the hop never leaves the cluster network, so there's no certificate. (`kube-state-metrics:8080`)."}}
+  - {id: obi_gw, main: true, view: observability, from: lab-obi, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on in lab-ebpf: OBI's eBPF traces and RED metrics go straight to the gateway, since host-network pods can't reach the agent's Service.", certs: {server: "le-otlp", note: "Authenticated with the shared `labs` bearer token."}}
+  - {id: platform_otel, view: observability, from: platform-otel, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the platform cluster's telemetry (portal, Argo CD, Kyverno, Traefik, runners) streams to mon with its own token.", certs: {server: "le-otlp", note: "Authenticated with the platform cluster's own bearer token."}}
+  - {id: ai_otel, view: observability, from: ai-otel, to: otel-gw, proto: OTLP HTTP, port: 443, tls: true, why: "Always on: the ai cluster's vLLM and pod telemetry streams to mon for the AI dashboards and the vLLM alerts.", certs: {server: "le-otlp", note: "Authenticated with the ai cluster's own bearer token."}}
+  - {id: gw_scrape, main: true, view: observability, from: otel-gw, to: host-exporters, proto: Prometheus, label: "9100 9400 9101 9115", why: "Every 30 seconds: the gateway scrapes the host's node, GPU, Docker and blackbox exporters as cluster dgx.", certs: {none: "Plain HTTP from mon to the host exporters on 172.30.0.1 (ports 9100, 9400, 9101, 9115); they never leave the DGX."}}
+  - {id: bb_kc, view: observability, from: host-exporters, to: keycloak, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes Keycloak's OIDC discovery, so a down identity provider and its certificate expiry raise alerts.", certs: {server: "le-auth", note: "The probe checks the chain and alerts before the certificate expires."}}
+  - {id: bb_bao, view: observability, from: host-exporters, to: openbao, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes OpenBao's health endpoint, since core has no collector of its own.", certs: {server: "le-bao", note: "The probe checks the chain and alerts before the certificate expires."}}
+  - {id: bb_zot, view: observability, from: host-exporters, to: zot, proto: HTTPS, port: 443, label: probe, why: "Every minute: blackbox probes Zot's /v2/ endpoint, so a dead registry is noticed before pods fail to pull.", certs: {server: "le-registry", note: "The probe checks the chain and alerts before the certificate expires."}}
+  - {id: gw_logs, main: true, from: otel-gw, to: loki, view: observability, kind: telemetry, label: logs, why: "Always on: pod logs and Kubernetes events from every cluster are written to Loki.", certs: {none: "Plain HTTP (`loki.monitoring.svc:3100`) inside the mon cluster: the hop never leaves the cluster network, so there's no certificate."}}
+  - {id: gw_metrics, main: true, from: otel-gw, to: mimir-store, view: observability, kind: telemetry, label: metrics, why: "Always on: metrics from every cluster and the host are written to Mimir for dashboards and alert rules.", certs: {none: "Plain HTTP (`mimir.monitoring.svc:8080`) inside the mon cluster: the hop never leaves the cluster network, so there's no certificate."}}
+  - {id: gw_traces, main: true, from: otel-gw, to: tempo, view: observability, kind: telemetry, label: traces, why: "Always on: traces from every cluster are written to Tempo.", certs: {none: "Plain gRPC (`tempo.monitoring.svc:4317`, `tls.insecure`) inside the mon cluster: the hop never leaves the cluster network, so there's no certificate."}}
+  - {id: graf_q, view: observability, from: grafana, to: mimir-store, proto: HTTP, port: 8080, label: PromQL, why: "Every time a dashboard panel loads: Grafana queries Mimir's Prometheus API (and Loki and Tempo the same way).", certs: {none: "Plain HTTP inside the mon cluster: the hop never leaves the cluster network, so there's no certificate."}}
+  - {id: ruler_eval, view: observability, from: ruler, to: mimir-store, kind: data, label: evaluate, why: "Every minute: the ruler evaluates the 195 alert and recording rules against the stored metrics.", certs: {none: "Inside Mimir: the ruler reads the store in-process, no network hop of its own."}}
+  - {id: ruler_am, main: true, view: observability, from: ruler, to: alertmanager, kind: event, oneway: true, label: firing, why: "Used when a rule's condition holds for its duration: the ruler sends the alert to Alertmanager (the Watchdog always fires).", certs: {none: "Inside Mimir: the ruler hands alerts to Alertmanager in-process."}}
+  - {id: am_slack, main: true, view: observability, oneway: true, from: alertmanager, to: slack, proto: Webhook, tls: true, port: 443, label: alert, why: "Used when a warning or critical alert fires or resolves: Alertmanager posts it to the Slack channel.", certs: {server: "slack-https"}}
+  - {id: am_watchdog, view: observability, oneway: true, from: alertmanager, to: healthchecks, proto: HTTPS, port: 443, label: Watchdog · 1 min, why: "Every minute: the always-firing Watchdog pings healthchecks.io, so a broken alert path itself sends an email.", certs: {server: "hc-https"}}
+  - {id: hb_bao, view: observability, from: heartbeat, to: openbao, proto: HTTPS, port: 443, label: health, detail: "Through core's Traefik on 172.30.0.1.", why: "Every 5 minutes: the heartbeat checks OpenBao is initialised, unsealed and active, which proves Docker, core, ingress and DNS.", certs: {server: "le-bao"}}
+  - {id: hb_hc, view: observability, oneway: true, from: heartbeat, to: healthchecks, proto: HTTPS, port: 443, label: ping · 5 min, why: "Every 5 minutes: a healthy platform pings healthchecks.io (a sick one pings /fail), so a silent DGX emails me.", certs: {server: "hc-https"}}
+  - {id: doc_k8s, view: observability, from: doctor, to: platform, proto: HTTPS, port: 6443, label: every cluster, detail: "A merged kubeconfig of every k3d cluster, outside git.", why: "Used when you open Headlamp or run Popeye: the doctor reads every cluster's API server, read-only scans included.", certs: {server: "k3s-all", client: "k3s-admin", note: "One merged kubeconfig: each cluster's CA and admin client certificate."}}
+  - {id: doc_graf, view: observability, from: doctor, to: grafana, proto: HTTPS, port: 443, label: dashboards, why: "At each link-page refresh: the doctor lists every Grafana dashboard by folder with the read-only lab-tools token.", certs: {server: "le-grafana"}}
 
   # Secrets, identity and certificates
-  - {id: eso_bao, view: security, from: eso-platform, to: openbao, proto: HTTPS, port: 8200, detail: "Per-cluster Kubernetes auth; the cluster's policy reads only its own paths.", why: "Used whenever the platform cluster needs a secret (Keycloak clients, the runner token, zot-pull, OTLP token): External Secrets copies it from OpenBao."}
-  - {id: eso_ai_bao, from: eso-ai, to: openbao, view: security, proto: HTTPS, port: 8200, why: "Used when the ai cluster needs a secret (zot-pull, its OTLP token); it can read only its own OpenBao paths."}
-  - {id: argo_bao, from: argocd, to: openbao, view: security, proto: HTTPS, port: 8200, label: cluster tokens, why: "Argo CD's ServiceAccount tokens for the long-lived clusters are refreshed from OpenBao, so no long-lived cluster token is stored."}
-  - {id: cm_le, view: security, from: cert-manager, to: letsencrypt, proto: HTTPS, port: 443, label: ACME DNS-01, detail: "TXT records written through the Cloudflare API.", why: "Used when a certificate is new or near expiry: cert-manager proves the domain with a DNS-01 TXT record and gets a real certificate."}
-  - {id: velero_kc, view: security, from: velero, to: keycloak, proto: OIDC, tls: true, why: "Used when you open the Velero UI: client velero-ui; platform-admins manage backups, viewers only read."}
-  - {id: graf_kc, view: security, from: grafana, to: keycloak, proto: OIDC, tls: true, why: "Used when you sign in to Grafana: platform-admins become Admin and viewers Viewer."}
+  - {id: eso_bao, view: security, from: eso-platform, to: openbao, proto: HTTPS, port: 443, detail: "Per-cluster Kubernetes auth; the cluster's policy reads only its own paths.", why: "Used whenever the platform cluster needs a secret (Keycloak clients, the runner token, zot-pull, OTLP token): External Secrets copies it from OpenBao.", certs: {server: "le-bao", note: "Authenticated with a Kubernetes ServiceAccount login, not a client certificate."}}
+  - {id: eso_ai_bao, from: eso-ai, to: openbao, view: security, proto: HTTPS, port: 443, why: "Used when the ai cluster needs a secret (zot-pull, its OTLP token); it can read only its own OpenBao paths.", certs: {server: "le-bao", note: "Authenticated with a Kubernetes ServiceAccount login, not a client certificate."}}
+  - {id: argo_bao, from: argocd, to: openbao, view: security, proto: HTTPS, port: 443, label: cluster tokens, why: "Argo CD's ServiceAccount tokens for the long-lived clusters are refreshed from OpenBao, so no long-lived cluster token is stored.", certs: {server: "le-bao", note: "Read through External Secrets on platform."}}
+  - {id: cm_le, view: security, from: cert-manager, to: letsencrypt, proto: HTTPS, port: 443, label: ACME DNS-01, detail: "TXT records written through the Cloudflare API.", why: "Used when a certificate is new or near expiry: cert-manager proves the domain with a DNS-01 TXT record and gets a real certificate.", certs: {server: ["acme-https", "cloudflare-https"], note: "cert-manager talks to both: the ACME API to order, Cloudflare's API to write the `_acme-challenge` TXT record."}}
+  - {id: velero_kc, view: security, from: velero, to: keycloak, proto: OIDC, tls: true, why: "Used when you open the Velero UI: client velero-ui; platform-admins manage backups, viewers only read.", certs: {server: "le-auth"}}
+  - {id: graf_kc, view: security, from: grafana, to: keycloak, proto: OIDC, tls: true, why: "Used when you sign in to Grafana: platform-admins become Admin and viewers Viewer.", certs: {server: "le-auth"}}
 
   # Networking
-  - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTP, kind: control, label: PowerDNS API, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone."}
-  - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers."}
-  - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's mirror."}
-  - {id: pull_labs, from: labs, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Lab clusters also pull through Zot, so labs keep working when an upstream registry is slow or rate-limited."}
+  - {id: extdns_pdns, from: extdns, to: powerdns, view: networking, proto: HTTPS, kind: control, label: PowerDNS API, port: 443, why: "Whenever a service is created or changes, ExternalDNS publishes its name into the home.cloudutsuk.com zone.", certs: {server: "le-pdns", note: "Authenticated with PowerDNS's API key from OpenBao."}}
+  - {id: dns_lookup, from: platform, to: powerdns, view: networking, proto: DNS, port: 53, label: "*.home", why: "Cross-cluster calls use names in the internal home.cloudutsuk.com zone, which PowerDNS answers.", certs: {none: "Plain DNS on 172.30.0.1:53; no DNSSEC or DNS over TLS on the internal zone."}}
+  - {id: pull_platform, from: platform, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Every time a pod starts, the cluster pulls its image from Zot: our signed images, or upstream ones through Zot's mirror.", certs: {server: "le-registry", note: "containerd checks it with the public CA bundle; the pull credential is a Zot account."}}
+  - {id: pull_labs, from: labs, to: zot, view: [networking, cicd], proto: HTTPS, label: image pulls, why: "Lab clusters also pull through Zot, so labs keep working when an upstream registry is slow or rate-limited.", certs: {server: "le-registry", note: "containerd checks it with the public CA bundle."}}
 
   # Backups
-  - {id: dump_db, view: ops, from: core-backup, to: core-db, proto: PostgreSQL, port: 5432, label: pg_dump, why: "Nightly at 02:00, before the backup: the dump hook reads Keycloak's database through a read-only pg_read_all_data role."}
-  - {id: dump_bao, view: ops, from: core-backup, to: openbao, proto: HTTPS, port: 8200, label: raft snapshot, why: "Nightly at 02:00: the dump hook takes an OpenBao snapshot with its own Kubernetes login and a snapshot-only policy."}
-  - {id: bkp_blob, view: ops, from: core-backup, to: backup-blob, proto: HTTPS, port: 443, label: upload, detail: "Kopia, with our own repository password.", why: "Nightly: Velero uploads core's objects and the two dumps to Azure Blob (kept 30 days; weekly ones 12 weeks)."}
-  - {id: velero_pdb, view: ops, from: velero, to: platform-db, proto: PostgreSQL, port: 5432, label: pg_dump, why: "Nightly: the platform cluster's dump hook takes a pg_dump of platform-db before Velero's backup."}
-  - {id: velero_blob, view: ops, from: velero, to: backup-blob, proto: HTTPS, port: 443, label: "backups, read-only core/ ai/", why: "Nightly it uploads platform's backup; the UI also reads core's and ai's backups through read-only locations."}
-  - {id: you_velero, view: ops, from: you, to: velero, proto: HTTPS, port: 443, label: velero.platform, why: "Used when you check what was backed up, when and how big, or take an on-demand backup before a risky change."}
+  - {id: dump_db, view: ops, from: core-backup, to: core-db, proto: PostgreSQL, port: 5432, label: pg_dump, why: "Nightly at 02:00, before the backup: the dump hook reads Keycloak's database through a read-only pg_read_all_data role.", certs: {none: "Plain PostgreSQL inside the core cluster: the hop never leaves the cluster network, so there's no certificate. The nightly dump hook runs next to the database."}}
+  - {id: dump_bao, view: ops, from: core-backup, to: openbao, proto: HTTP, port: 8200, label: raft snapshot, why: "Nightly at 02:00: the dump hook takes an OpenBao snapshot with its own Kubernetes login and a snapshot-only policy.", certs: {none: "Plain HTTP (`openbao.openbao.svc:8200`) inside the core cluster: the hop never leaves the cluster network, so there's no certificate. The hook skips Traefik and logs in with its ServiceAccount."}}
+  - {id: bkp_blob, view: ops, from: core-backup, to: backup-blob, proto: HTTPS, port: 443, label: upload, detail: "Kopia, with our own repository password.", why: "Nightly: Velero uploads core's objects and the two dumps to Azure Blob (kept 30 days; weekly ones 12 weeks).", certs: {server: "azure-blob"}}
+  - {id: velero_pdb, view: ops, from: velero, to: platform-db, proto: PostgreSQL, port: 5432, label: pg_dump, why: "Nightly: the platform cluster's dump hook takes a pg_dump of platform-db before Velero's backup.", certs: {none: "Plain PostgreSQL inside the platform cluster: the hop never leaves the cluster network, so there's no certificate."}}
+  - {id: velero_blob, view: ops, from: velero, to: backup-blob, proto: HTTPS, port: 443, label: "backups, read-only core/ ai/", why: "Nightly it uploads platform's backup; the UI also reads core's and ai's backups through read-only locations.", certs: {server: "azure-blob"}}
+  - {id: you_velero, view: ops, from: you, to: velero, proto: HTTPS, port: 443, label: velero.platform, why: "Used when you check what was backed up, when and how big, or take an on-demand backup before a risky change.", certs: {server: "le-velero"}}
 
   # Planned: inventory and cost (phase 4)
-  - {id: bs_inv, dashed: true, from: inv-plugin, to: inventory, proto: HTTP, detail: "OAuth2 client credentials from Keycloak (5-minute JWTs).", why: "Planned: when you open the Inventory page or press Sync now, the plugin reads resources and cost from the inventory service."}
-  - {id: inv_cl, dashed: true, from: inventory, to: clouds, proto: HTTPS, port: 443, label: every 6 h, why: "Planned: every 6 hours (or on Sync now) the inventory pulls resources and cost from the cloud APIs with read-only credentials."}
-  - {id: inv_pg, dashed: true, from: inventory, to: platform-db, proto: PostgreSQL, port: 5432, why: "Planned: after each sync the inventory writes resources and daily cost to its own database."}
-  - {id: inv_oc, dashed: true, from: inventory, to: lab-opencost, proto: HTTPS, port: 443, label: daily allocation, detail: "OAuth2 client credentials from Keycloak (ADR 0029).", why: "Planned: once a day the inventory reads each cluster's cost by namespace from OpenCost and stores it as the DGX's line."}
-  - {id: oc_mimir, dashed: true, view: observability, from: lab-opencost, to: mimir-store, proto: HTTPS, port: 443, label: PromQL, detail: "Filtered by the cluster's own label; no Prometheus runs in the cluster.", why: "Planned: whenever OpenCost computes an allocation, it reads that cluster's CPU, memory and pod metrics from Mimir."}
-  - {id: oc_metrics, dashed: true, stream: false, view: observability, from: lab-clustercol, to: lab-opencost, proto: Prometheus, label: scrape, why: "Planned: OpenCost's cost metrics are scraped by the monitoring pack, so Grafana shows cost per cluster and lab."}
+  - {id: bs_inv, dashed: true, from: inv-plugin, to: inventory, proto: HTTP, detail: "OAuth2 client credentials from Keycloak (5-minute JWTs).", why: "Planned: when you open the Inventory page or press Sync now, the plugin reads resources and cost from the inventory service.", certs: {planned: "Planned: not designed yet."}}
+  - {id: inv_cl, dashed: true, from: inventory, to: clouds, proto: HTTPS, port: 443, label: every 6 h, why: "Planned: every 6 hours (or on Sync now) the inventory pulls resources and cost from the cloud APIs with read-only credentials.", certs: {planned: "Planned: each cloud's public API certificate (for example Azure's Microsoft TLS G2 CA)."}}
+  - {id: inv_pg, dashed: true, from: inventory, to: platform-db, proto: PostgreSQL, port: 5432, why: "Planned: after each sync the inventory writes resources and daily cost to its own database.", certs: {planned: "Planned: not designed yet."}}
+  - {id: inv_oc, dashed: true, from: inventory, to: lab-opencost, proto: HTTPS, port: 443, label: daily allocation, detail: "OAuth2 client credentials from Keycloak (ADR 0029).", why: "Planned: once a day the inventory reads each cluster's cost by namespace from OpenCost and stores it as the DGX's line.", certs: {planned: "Planned: not designed yet."}}
+  - {id: oc_mimir, dashed: true, view: observability, from: lab-opencost, to: mimir-store, proto: HTTPS, port: 443, label: PromQL, detail: "Filtered by the cluster's own label; no Prometheus runs in the cluster.", why: "Planned: whenever OpenCost computes an allocation, it reads that cluster's CPU, memory and pod metrics from Mimir.", certs: {planned: "Planned: not designed yet."}}
+  - {id: oc_metrics, dashed: true, stream: false, view: observability, from: lab-clustercol, to: lab-opencost, proto: Prometheus, label: scrape, why: "Planned: OpenCost's cost metrics are scraped by the monitoring pack, so Grafana shows cost per cluster and lab.", certs: {planned: "Planned: not designed yet."}}
 
   # Planned: chat, RAG and model serving (phase 5)
-  - {id: bs_rag, dashed: true, from: chat-plugin, to: rag-api, proto: HTTPS, label: chat, why: "Planned: used every time you ask the chatbot a question in the portal."}
-  - {id: rag_cache, dashed: true, from: rag-api, to: redis, proto: Redis, port: 6379, why: "Planned: first step of every chat request; an answer to a similar earlier question is returned straight from the cache."}
-  - {id: rag_qd, dashed: true, from: rag-api, to: qdrant, proto: Qdrant, port: 6333, why: "Planned: on a cache miss, the RAG API retrieves the most relevant chunks of posts and repos to ground the answer."}
-  - {id: rag_gw, dashed: true, from: rag-api, to: gateway, proto: HTTP, port: 4000, why: "Planned: on a cache miss, the prompt with the retrieved chunks goes to the model through the single gateway."}
-  - {id: rag_px, dashed: true, stream: false, view: observability, from: rag-api, to: phoenix, proto: OTLP gRPC, port: 4317, label: traces, why: "Planned: every chat request is traced, so a wrong answer can be investigated step by step in Phoenix."}
-  - {id: rag_db, dashed: true, from: rag-api, to: ai-db, proto: PostgreSQL, port: 5432, why: "Planned: stores the RAG service's ingest state and chat history."}
-  - {id: gw_llm, dashed: true, from: gateway, to: vllm-chat, proto: HTTP, port: 8000, why: "Planned: every chat completion, from the portal chat or the SRE agent, is routed here by model name."}
-  - {id: gw_emb, dashed: true, from: gateway, to: vllm-embed, proto: HTTP, port: 8000, why: "Planned: every embedding request (ingest, and question vectors for the cache and retrieval) is routed to the running embeddings model."}
-  - {id: gw_more, view: ops, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers."}
-  - {id: ing_gh, dashed: true, oneway: true, from: repos, to: rag-ingest, proto: HTTPS, port: 443, label: clone, why: "Planned: every 6 hours (or on Re-index now) rag-ingest pulls the latest pushed content of the blog and repos."}
-  - {id: ing_qd, dashed: true, from: rag-ingest, to: qdrant, proto: Qdrant, port: 6333, why: "Planned: after embedding, new and changed chunks are written to Qdrant and the chunks of removed files deleted."}
-  - {id: ing_gw, dashed: true, from: rag-ingest, to: gateway, proto: HTTP, port: 4000, label: embeddings, why: "Planned: changed files are embedded through the gateway before they are stored."}
-  - {id: gw_od, dashed: true, view: ops, from: gateway, to: vllm-ondemand, proto: HTTP, port: 8000, label: on demand, why: "Planned: used only when a caller asks for an on-demand model; the gateway routes it here once KEDA has loaded it."}
-  - {id: keda_mimir, dashed: true, view: observability, from: keda, to: mimir-store, proto: HTTPS, port: 443, label: PromQL, detail: "An OAuth2 token from OpenBao through External Secrets.", why: "Planned: every polling interval, KEDA asks Mimir how many requests the gateway has seen for each on-demand model."}
-  - {id: keda_scale, dashed: true, view: ops, oneway: true, from: keda, to: vllm-ondemand, kind: control, label: "scale 0 ↔ 1", why: "Planned: when demand appears or after a quiet spell, KEDA loads one copy of the model, or unloads it and frees its memory."}
+  - {id: bs_rag, dashed: true, from: chat-plugin, to: rag-api, proto: HTTPS, label: chat, why: "Planned: used every time you ask the chatbot a question in the portal.", certs: {planned: "Planned: not designed yet."}}
+  - {id: rag_cache, dashed: true, from: rag-api, to: redis, proto: Redis, port: 6379, why: "Planned: first step of every chat request; an answer to a similar earlier question is returned straight from the cache.", certs: {planned: "Planned: not designed yet."}}
+  - {id: rag_qd, dashed: true, from: rag-api, to: qdrant, proto: Qdrant, port: 6333, why: "Planned: on a cache miss, the RAG API retrieves the most relevant chunks of posts and repos to ground the answer.", certs: {planned: "Qdrant's name already has a Let's Encrypt certificate (`qdrant.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
+  - {id: rag_gw, dashed: true, from: rag-api, to: gateway, proto: HTTP, port: 4000, why: "Planned: on a cache miss, the prompt with the retrieved chunks goes to the model through the single gateway.", certs: {planned: "The gateway's name already has a Let's Encrypt certificate (`llm.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
+  - {id: rag_px, dashed: true, stream: false, view: observability, from: rag-api, to: phoenix, proto: OTLP gRPC, port: 4317, label: traces, why: "Planned: every chat request is traced, so a wrong answer can be investigated step by step in Phoenix.", certs: {planned: "Planned: not designed yet."}}
+  - {id: rag_db, dashed: true, from: rag-api, to: ai-db, proto: PostgreSQL, port: 5432, why: "Planned: stores the RAG service's ingest state and chat history.", certs: {planned: "Planned: not designed yet."}}
+  - {id: gw_llm, from: gateway, to: vllm-chat, proto: HTTP, port: 8000, why: "Every chat completion (Hermes Agent today, the portal chat and the SRE agent later) is routed here by model name.", certs: {none: "Plain HTTP inside the ai cluster: the gateway and vLLM are Services in the same cluster network."}}
+  - {id: gw_emb, dashed: true, from: gateway, to: vllm-embed, proto: HTTP, port: 8000, why: "Planned: every embedding request (ingest, and question vectors for the cache and retrieval) is routed to the running embeddings model.", certs: {planned: "Planned: not designed yet."}}
+  - {id: gw_more, view: ops, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers.", certs: {planned: "Planned: each hosted model provider's public certificate."}}
+  - {id: ing_gh, dashed: true, oneway: true, from: repos, to: rag-ingest, proto: HTTPS, port: 443, label: clone, why: "Planned: every 6 hours (or on Re-index now) rag-ingest pulls the latest pushed content of the blog and repos.", certs: {server: "github-https", note: "Planned: a GitHub webhook or a poll, either way GitHub's public certificate."}}
+  - {id: ing_qd, dashed: true, from: rag-ingest, to: qdrant, proto: Qdrant, port: 6333, why: "Planned: after embedding, new and changed chunks are written to Qdrant and the chunks of removed files deleted.", certs: {planned: "Qdrant's name already has a Let's Encrypt certificate (`qdrant.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
+  - {id: ing_gw, dashed: true, from: rag-ingest, to: gateway, proto: HTTP, port: 4000, label: embeddings, why: "Planned: changed files are embedded through the gateway before they are stored.", certs: {planned: "The gateway's name already has a Let's Encrypt certificate (`llm.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
+  - {id: gw_od, dashed: true, view: ops, from: gateway, to: vllm-ondemand, proto: HTTP, port: 8000, label: on demand, why: "Planned: used only when a caller asks for an on-demand model; the gateway routes it here once KEDA has loaded it.", certs: {planned: "Planned: not designed yet."}}
+  - {id: keda_mimir, dashed: true, view: observability, from: keda, to: mimir-store, proto: HTTPS, port: 443, label: PromQL, detail: "An OAuth2 token from OpenBao through External Secrets.", why: "Planned: every polling interval, KEDA asks Mimir how many requests the gateway has seen for each on-demand model.", certs: {planned: "Planned: not designed yet."}}
+  - {id: keda_scale, dashed: true, view: ops, oneway: true, from: keda, to: vllm-ondemand, kind: control, label: "scale 0 ↔ 1", why: "Planned: when demand appears or after a quiet spell, KEDA loads one copy of the model, or unloads it and frees its memory.", certs: {planned: "Planned: not designed yet."}}
 
   # Planned: SRE agent (phase 6)
-  - {id: mon_sre, dashed: true, view: observability, from: alertmanager, to: sre, proto: Webhook, tls: true, label: alert, why: "Planned: when an alert fires, Alertmanager also hands it to the SRE agent for diagnosis."}
-  - {id: sre_labs, dashed: true, from: sre, to: lab-app, proto: HTTPS, port: 6443, label: read-only, detail: "15-minute read-only ServiceAccount tokens from OpenBao's Kubernetes secrets engine.", why: "Planned: during an investigation the agent reads the affected cluster's pods, events and logs, read-only."}
-  - {id: sre_rag, dashed: true, from: sre, to: rag-api, proto: HTTPS, label: runbooks, why: "Planned: during an investigation the agent searches the knowledge base for matching runbooks."}
-  - {id: sre_gw, dashed: true, from: sre, to: gateway, proto: HTTPS, label: root cause, why: "Planned: the agent asks the local model for a root cause and a proposed fix."}
-  - {id: sre_slack, dashed: true, oneway: true, from: sre, to: slack, proto: HTTPS, port: 443, label: RCA, why: "Planned: when the diagnosis is done, the agent posts the root cause and fix to Slack for your approval."}
-  - {id: slack_git, dashed: true, oneway: true, from: slack, to: gitops, label: approve → PR, kind: control, why: "Planned: when you approve a fix, it is opened as a pull request to homelab-gitops, so nothing changes without review."}
-  - {id: sre_bao, dashed: true, from: sre, to: openbao, view: security, proto: HTTPS, port: 8200, label: 15-min tokens, why: "Planned: before reading a cluster, the agent gets a 15-minute read-only token from OpenBao's Kubernetes secrets engine."}
+  - {id: mon_sre, dashed: true, view: observability, from: alertmanager, to: sre, proto: Webhook, tls: true, label: alert, why: "Planned: when an alert fires, Alertmanager also hands it to the SRE agent for diagnosis.", certs: {planned: "Planned: not designed yet."}}
+  - {id: sre_labs, dashed: true, from: sre, to: lab-app, proto: HTTPS, port: 6443, label: read-only, detail: "15-minute read-only ServiceAccount tokens from OpenBao's Kubernetes secrets engine.", why: "Planned: during an investigation the agent reads the affected cluster's pods, events and logs, read-only.", certs: {planned: "Planned: not designed yet."}}
+  - {id: sre_rag, dashed: true, from: sre, to: rag-api, proto: HTTPS, label: runbooks, why: "Planned: during an investigation the agent searches the knowledge base for matching runbooks.", certs: {planned: "Planned: not designed yet."}}
+  - {id: sre_gw, dashed: true, from: sre, to: gateway, proto: HTTPS, label: root cause, why: "Planned: the agent asks the local model for a root cause and a proposed fix.", certs: {planned: "Planned: not designed yet."}}
+  - {id: sre_slack, dashed: true, oneway: true, from: sre, to: slack, proto: HTTPS, port: 443, label: RCA, why: "Planned: when the diagnosis is done, the agent posts the root cause and fix to Slack for your approval.", certs: {server: "slack-https", note: "Planned."}}
+  - {id: slack_git, dashed: true, oneway: true, from: slack, to: gitops, label: approve → PR, kind: control, why: "Planned: when you approve a fix, it is opened as a pull request to homelab-gitops, so nothing changes without review.", certs: {planned: "Planned: GitHub's public certificate for the pull request."}}
+  - {id: sre_bao, dashed: true, from: sre, to: openbao, view: security, proto: HTTPS, port: 8200, label: 15-min tokens, why: "Planned: before reading a cluster, the agent gets a 15-minute read-only token from OpenBao's Kubernetes secrets engine.", certs: {server: "le-bao", note: "Planned: like every other platform client, through Traefik on core."}}
 
   # Planned: Karmada (phase 1a)
-  - {id: argo_karmada, dashed: true, view: cicd, from: argocd, to: karmada, proto: HTTPS, port: 5443, label: shared add-ons, detail: "Karmada's API server, registered in Argo CD as one more cluster.", why: "Planned: when a shared add-on changes in homelab-gitops, Argo CD syncs it once to Karmada instead of once per cluster."}
-  - {id: run_karmada, dashed: true, view: cicd, oneway: true, from: lab-sh, to: karmada, kind: control, label: register, why: "Planned: when a lab registers or leaves, it is also joined to Karmada (role lab) or removed."}
-  - {id: kagent_karmada, dashed: true, view: cicd, from: lab-karmada, to: karmada, proto: HTTPS, port: 5443, label: pull, detail: "Pull mode: the agent's own client certificate; Karmada never connects in.", why: "Planned: the agent watches Karmada for add-ons placed on its cluster and reports their status back."}
-  - {id: kagent_apply, dashed: true, view: cicd, oneway: true, from: lab-karmada, to: lab-operator, kind: control, label: apply add-ons, why: "Planned: when an add-on is placed on this cluster, the agent applies it locally, here the monitoring pack."}
+  - {id: argo_karmada, dashed: true, view: cicd, from: argocd, to: karmada, proto: HTTPS, port: 5443, label: shared add-ons, detail: "Karmada's API server, registered in Argo CD as one more cluster.", why: "Planned: when a shared add-on changes in homelab-gitops, Argo CD syncs it once to Karmada instead of once per cluster.", certs: {planned: "Planned: Karmada's API server certificate, from its own CA."}}
+  - {id: run_karmada, dashed: true, view: cicd, oneway: true, from: lab-sh, to: karmada, kind: control, label: register, why: "Planned: when a lab registers or leaves, it is also joined to Karmada (role lab) or removed.", certs: {planned: "Planned: not designed yet."}}
+  - {id: kagent_karmada, dashed: true, view: cicd, from: lab-karmada, to: karmada, proto: HTTPS, port: 5443, label: pull, detail: "Pull mode: the agent's own client certificate; Karmada never connects in.", why: "Planned: the agent watches Karmada for add-ons placed on its cluster and reports their status back.", certs: {planned: "Planned: Karmada's API server certificate, from its own CA."}}
+  - {id: kagent_apply, dashed: true, view: cicd, oneway: true, from: lab-karmada, to: lab-operator, kind: control, label: apply add-ons, why: "Planned: when an add-on is placed on this cluster, the agent applies it locally, here the monitoring pack.", certs: {planned: "Planned: not designed yet."}}
 
   # Planned: chaos engineering (phase 2a)
-  - {id: you_chaos, dashed: true, view: ops, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", why: "Planned: used when you start, schedule or review a chaos experiment in ChaosCenter."}
-  - {id: cc_db, dashed: true, view: ops, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Planned: every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB."}
-  - {id: chaos_agent, dashed: true, view: ops, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key.", why: "Planned: while a cluster is a chaos target, the agent dials out to ChaosCenter for experiments and reports their results."}
-  - {id: chaos_inject, dashed: true, view: ops, oneway: true, from: lab-chaos, to: lab-app, kind: control, label: inject fault, why: "Planned: during an experiment the chaos operator injects the fault (for example pod-delete) into the target app."}
-  - {id: chaos_metrics, dashed: true, stream: false, view: [observability, ops], from: lab-clustercol, to: lab-chaos, proto: Prometheus, label: chaos exporter, why: "Planned: experiment state and resilience scores are scraped by the cluster collector, so Grafana shows faults next to their effects."}
-  - {id: chaos_git, dashed: true, view: [cicd, ops], from: chaoscenter, to: gitops, proto: HTTPS, port: 443, label: experiments as code, why: "Planned: experiment definitions are reviewed in homelab-gitops; ChaosCenter's GitOps sync keeps its library equal to git."}
-  - {id: chaos_kc, dashed: true, view: [security, ops], from: chaoscenter, to: keycloak, proto: OIDC, tls: true, why: "Planned: you sign in to ChaosCenter with Keycloak through Litmus's Dex integration; only platform-admins may run experiments."}
+  - {id: you_chaos, dashed: true, view: ops, from: you, to: chaoscenter, proto: HTTPS, port: 443, label: "chaos.core.home", why: "Planned: used when you start, schedule or review a chaos experiment in ChaosCenter.", certs: {planned: "Planned: not designed yet."}}
+  - {id: cc_db, dashed: true, view: ops, from: chaoscenter, to: chaos-db, proto: MongoDB, port: 27017, why: "Planned: every experiment run and its result and resilience score are stored in ChaosCenter's MongoDB.", certs: {planned: "Planned: not designed yet."}}
+  - {id: chaos_agent, dashed: true, view: ops, from: lab-chaos, to: chaoscenter, proto: HTTPS, port: 443, label: experiments, detail: "Outbound from the target cluster with its infrastructure ID and access key.", why: "Planned: while a cluster is a chaos target, the agent dials out to ChaosCenter for experiments and reports their results.", certs: {planned: "Planned: not designed yet."}}
+  - {id: chaos_inject, dashed: true, view: ops, oneway: true, from: lab-chaos, to: lab-app, kind: control, label: inject fault, why: "Planned: during an experiment the chaos operator injects the fault (for example pod-delete) into the target app.", certs: {planned: "Planned: not designed yet."}}
+  - {id: chaos_metrics, dashed: true, stream: false, view: [observability, ops], from: lab-clustercol, to: lab-chaos, proto: Prometheus, label: chaos exporter, why: "Planned: experiment state and resilience scores are scraped by the cluster collector, so Grafana shows faults next to their effects.", certs: {planned: "Planned: not designed yet."}}
+  - {id: chaos_git, dashed: true, view: [cicd, ops], from: chaoscenter, to: gitops, proto: HTTPS, port: 443, label: experiments as code, why: "Planned: experiment definitions are reviewed in homelab-gitops; ChaosCenter's GitOps sync keeps its library equal to git.", certs: {planned: "Planned: GitHub's public certificate."}}
+  - {id: chaos_kc, dashed: true, view: [security, ops], from: chaoscenter, to: keycloak, proto: OIDC, tls: true, why: "Planned: you sign in to ChaosCenter with Keycloak through Litmus's Dex integration; only platform-admins may run experiments.", certs: {planned: "Would use Keycloak's certificate (`auth.core.home.cloudutsuk.com`, Let's Encrypt) like every other OIDC client."}}
 
 # Use cases: one activity each, one action per step (the reader picks one; auto-play runs them in turn).
 # `path` hops run one after another; `~id` is the response travelling back. `action` is the banner line;
@@ -1845,7 +2081,7 @@ scenarios:
     steps:
       - title: Credentials from OpenBao
         action: "External Secrets ↔ OpenBao: fetch read-only cloud credentials"
-        text: "External Secrets fetches the read-only cloud credentials from OpenBao (8200); no secret lives in git."
+        text: "External Secrets fetches the read-only cloud credentials from OpenBao (HTTPS 443 through Traefik on core); no secret lives in git."
         path: [eso_bao, ~eso_bao]
       - title: Read the clouds
         action: "Inventory ↔ Azure, AWS, GCP APIs: list resources and cost"

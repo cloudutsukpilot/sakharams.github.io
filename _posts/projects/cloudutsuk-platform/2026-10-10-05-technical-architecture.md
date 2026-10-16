@@ -121,6 +121,13 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 > LiteLLM as `gpt-oss-20b`, with OpenAI-style tool calls for the SRE agent.
 {: .prompt-info }
 
+> **Chat model, replaced 2026-10-16 (ADR 0049).** Qwen3.5-35B-A3B in FP8, under Apache 2.0: a mixture of
+> experts with 3B active parameters per token, so it decodes about as fast as gpt-oss on the GB10, with
+> stronger tool calling and a 262k native context (served at 128k). Only one layer in four keeps a KV cache,
+> so long contexts stay cheap. It runs in a slice of about 44 GB in the same `vllm-chat` app, as
+> `qwen3.5-35b-a3b` behind LiteLLM. gpt-oss-20b had broken long agent runs on malformed tool-call output.
+{: .prompt-info }
+
 ## API and integration architecture
 {: #api-and-integration-architecture }
 

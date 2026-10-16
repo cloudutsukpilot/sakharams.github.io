@@ -47,4 +47,7 @@ adrs:
   - {id: "0043", title: "CI build path: shared rootless BuildKit, OpenBao roles bound to the reusable workflow, digest commits by a GitHub App", status: accepted, date: 2026-10-12, anchor: adr-0043, repos: [homelab-gitops, infra-local, homelab-services]}
   - {id: "0044", title: "Own runner image with the CI tools baked in, rolled out by hand", status: accepted, date: 2026-10-12, anchor: adr-0044, repos: [homelab-gitops, homelab-services]}
   - {id: "0045", title: "Lab UIs by name through one labs gateway on the host", status: accepted, date: 2026-10-15, anchor: adr-0045, repos: [infra-local, sakharams.github.io]}
-  - {id: "0046", title: "First chat model: gpt-oss-20b (Apache 2.0) in a 0.17 slice of the GB10", status: proposed, date: 2026-10-15, anchor: adr-0046, repos: [homelab-gitops]}
+  - {id: "0046", title: "First chat model: gpt-oss-20b (Apache 2.0) in a 0.17 slice of the GB10", status: superseded by 0049, date: 2026-10-15, anchor: adr-0046, repos: [homelab-gitops]}
+  - {id: "0047", title: "Argo CD application groups: one AppProject per area, mirrored as the label homelab/group", status: accepted, date: 2026-10-15, anchor: adr-0047, repos: [homelab-gitops, sakharams.github.io]}
+  - {id: "0048", title: "Hermes Agent on platform: non-root without s6, the local model at 64k, dashboard for platform-admins only", status: accepted, date: 2026-10-16, anchor: adr-0048, repos: [homelab-gitops, infra-local, sakharams.github.io]}
+  - {id: "0049", title: "Chat model: Qwen3.5-35B-A3B (FP8, Apache 2.0) replaces gpt-oss-20b", status: accepted, date: 2026-10-16, anchor: adr-0049, repos: [homelab-gitops, sakharams.github.io]}

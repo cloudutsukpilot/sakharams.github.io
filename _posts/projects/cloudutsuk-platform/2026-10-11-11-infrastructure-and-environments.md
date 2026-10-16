@@ -250,7 +250,7 @@ Memory is the only quota that matters on this box. The DGX doubles as my desktop
 
 | Consumer | Budget |
 |---|---|
-| Chat model (vLLM, starting size) | ~30 GB planned; ~21 GB as built (gpt-oss-20b, ADR 0046) |
+| Chat model (vLLM, starting size) | ~30 GB planned; ~21 GB built (gpt-oss-20b, ADR 0046); ~44 GB since 2026-10-16 (Qwen3.5-35B-A3B, ADR 0049) |
 | Embeddings, gateway, RAG stack | ~7 to 11 GB |
 | `core`, `platform`, `mon` | ~16 to 21 GB |
 | Lab clusters, in total | ~10 GB |

@@ -115,6 +115,7 @@
   // [direction, text, note]: '>' client to server, '<' back, '<>' both ways (a stream).
   const CARDS = {
     tcp: { title: 'TCP handshake', msgs: [['>', 'SYN', 'client picks a sequence number'], ['<', 'SYN-ACK', 'server acknowledges and picks its own'], ['>', 'ACK', 'connection open; data can flow']] },
+    mtls: { title: 'Mutual TLS handshake', msgs: [['>', 'ClientHello', 'cipher suites, key share, SNI'], ['<', 'ServerHello + Certificate + CertRequest', 'the server proves itself and asks for a client certificate'], ['>', 'Certificate + CertVerify + Finished', 'the client proves itself; anything else is refused']] },
     tls: { title: 'TLS 1.3 handshake', msgs: [['>', 'ClientHello', 'cipher suites, key share, SNI'], ['<', 'ServerHello + Certificate + Finished', 'key share; certificate proves the server'], ['>', 'Finished', 'keys agreed in 1 round trip; data is now encrypted']] },
     http: { title: 'HTTP request', msgs: [['>', 'Request', 'method, path, headers, body'], ['<', 'Response', 'status, headers, body']] },
     websocket: { title: 'WebSocket', msgs: [['>', 'GET + Upgrade: websocket', 'starts as HTTP'], ['<', '101 Switching Protocols', 'same TCP connection, now full duplex'], ['<>', 'frames both ways', 'either side sends at any time']] },
@@ -125,26 +126,47 @@
     mqtt: { title: 'MQTT', msgs: [['>', 'CONNECT', 'client id, keep-alive'], ['<', 'CONNACK', 'session ready'], ['>', 'PUBLISH topic (QoS 1)', 'broker forwards to subscribers'], ['<', 'PUBACK', 'at least once']] },
     webhook: { title: 'Webhook delivery', msgs: [['>', 'POST event (signed)', 'HMAC signature, event id'], ['<', '2xx', 'receiver stores it, works later'], ['>', 'retry with backoff', 'only if no 2xx; receiver dedupes by id']] },
     oauth: { title: 'OAuth 2 / OIDC code flow', msgs: [['>', 'redirect to /authorize', 'client id, scopes, PKCE challenge'], ['<', 'redirect back with code', 'after the user signs in'], ['>', 'POST /token (code + verifier)', 'back channel'], ['<', 'id_token, access_token', 'signed JWTs']] },
+    ssh: { title: 'SSH session', msgs: [['<>', 'SSH-2.0 version strings', 'both sides say which SSH they speak'], ['<>', 'KEXINIT + key exchange', 'Curve25519: a shared session key, never sent'], ['<', 'host key + signature', 'proves the server: checked against the pinned known_hosts'], ['>', 'NEWKEYS', 'from here everything is encrypted'], ['>', 'userauth publickey', 'the client signs with its private key'], ['<', 'USERAUTH_SUCCESS', 'the server knows the public key'], ['>', 'exec command', 'for git: git-upload-pack, then the pack data flows']] },
+    wireguard: { title: 'WireGuard tunnel', msgs: [['>', 'handshake initiation', 'Noise IK: ephemeral key, static key, timestamp'], ['<', 'handshake response', 'both derive session keys in 1 round trip'], ['<>', 'encrypted packets both ways', 'over UDP; new keys every 2 minutes']] },
     kerberos: { title: 'Kerberos', msgs: [['>', 'AS-REQ', 'ask the KDC for a ticket-granting ticket'], ['<', 'AS-REP (TGT)', ''], ['>', 'TGS-REQ for a service', ''], ['<', 'TGS-REP (service ticket)', 'then AP-REQ to the service']] },
     stream: { title: 'Continuous stream', msgs: [['>', 'batch', 'sent as data arrives'], ['>', 'batch', ''], ['>', 'batch', 'the arrow keeps moving while data flows']] },
     query: { title: 'Request and reply', msgs: [['>', 'query / command', 'over a pooled TCP connection'], ['<', 'result', '']] }
   };
+  // Short names for the groups on an exchange's bracket rail and the hover card's chain.
+  const CARD_TAGS = { tcp: 'TCP', tls: 'TLS 1.3', mtls: 'mTLS', http: 'HTTP', websocket: 'WebSocket', sse: 'SSE', grpc: 'gRPC', kafka: 'Kafka', amqp: 'AMQP', mqtt: 'MQTT', webhook: 'Webhook', oauth: 'OIDC', ssh: 'SSH', wireguard: 'WireGuard', kerberos: 'Kerberos', stream: 'Stream', query: 'Query' };
+  const GROUP_COLOURS = ['#0ea5e9', '#16a34a', '#a855f7', '#f59e0b', '#ec4899'];
   // Which cards an arrow gets, from its protocol (`cards:` on the edge overrides; `tls: true` adds TLS).
+  // They play in order as one exchange: the connection, its security, then the conversation.
   function cardsFor(e) {
     if (e.cards) return e.cards.filter((c) => CARDS[c]);
     const p = protoKey(e.proto);
-    const tls = e.tls ?? (['HTTPS', 'WSS', 'AMQPS', 'MQTTS', 'LDAPS'].includes(p) || e.port === 443);
+    const c = certsOf(e);
+    // SSH and WireGuard bring their own encryption (keys, not TLS); DNS here is plain.
+    const ownCrypto = ['SSH', 'WIREGUARD', 'DNS'].includes(p);
+    const tls = !ownCrypto && (e.tls ?? (c ? !!c.server.length : ['HTTPS', 'WSS', 'AMQPS', 'MQTTS', 'LDAPS'].includes(p) || e.port === 443));
     const map = {
       HTTP: ['tcp', 'http'], HTTPS: ['tcp', 'tls', 'http'], REST: ['http'], GRAPHQL: ['http'], SOAP: ['http'],
-      GRPC: ['grpc'], WS: ['websocket'], WSS: ['websocket'], WEBSOCKET: ['websocket'], SSE: ['sse'],
-      KAFKA: ['kafka'], AMQP: ['amqp'], AMQPS: ['amqp'], MQTT: ['mqtt'], MQTTS: ['mqtt'], WEBHOOK: ['webhook'],
-      OIDC: ['oauth'], OAUTH: ['oauth'], OAUTH2: ['oauth'], KERBEROS: ['kerberos'], OTLP: ['stream'], PROMETHEUS: ['stream'],
-      POSTGRESQL: ['tcp', 'query'], POSTGRES: ['tcp', 'query'], MYSQL: ['tcp', 'query'], REDIS: ['query'], QDRANT: ['query'], TDS: ['tcp', 'query']
+      GRPC: ['tcp', 'grpc'], SSH: ['tcp', 'ssh'], WIREGUARD: ['wireguard'], WS: ['websocket'], WSS: ['websocket'], WEBSOCKET: ['websocket'], SSE: ['sse'],
+      KAFKA: ['kafka'], AMQP: ['amqp'], AMQPS: ['amqp'], MQTT: ['mqtt'], MQTTS: ['mqtt'], WEBHOOK: ['tcp', 'webhook'],
+      OIDC: ['tcp', 'oauth'], OAUTH: ['tcp', 'oauth'], OAUTH2: ['tcp', 'oauth'], KERBEROS: ['kerberos'], OTLP: ['tcp', 'stream'], PROMETHEUS: ['tcp', 'stream'], TCP: ['tcp'],
+      POSTGRESQL: ['tcp', 'query'], POSTGRES: ['tcp', 'query'], MYSQL: ['tcp', 'query'], REDIS: ['tcp', 'query'], QDRANT: ['tcp', 'query'], TDS: ['tcp', 'query']
     };
     const list = [...(map[p] || [])];
     if (tls && !list.includes('tls')) list.splice(list.includes('tcp') ? 1 : 0, 0, 'tls');
+    // A client certificate makes it mutual TLS.
+    if (c?.client.length) list.splice(list.indexOf('tls'), 1, 'mtls');
     return list;
   }
+  // An edge's `certs`: a catalog id (the server's), {server, client, note}, {none: "why no TLS"} or
+  // {planned: "what is known"} for a hop whose TLS isn't designed yet.
+  function certsOf(e) {
+    const c = e.certs;
+    if (c == null) return null;
+    if (typeof c === 'string') return { server: [c], client: [], note: null, none: null, planned: null };
+    return { server: [].concat(c.server ?? []), client: [].concat(c.client ?? []), note: c.note ?? null, none: c.none ?? null, planned: c.planned ?? null };
+  }
+  const CERT_TYPES = { public: 'Public CA', private: 'Private CA', cluster: 'Cluster CA', self: 'Self-signed', key: 'Keys, no certificate' };
+  const CERT_FIELDS = [['by', 'Presented by'], ['issuer', 'Issued by'], ['key', 'Key'], ['valid', 'Validity'], ['stored', 'Stored in'], ['trust', 'Trusted because']];
 
   const make = (tag, attrs, parent) => {
     const n = document.createElementNS(NS, tag);
@@ -168,6 +190,7 @@
   // `api` as copyable lines. `url` takes a string, a list, or a map of button label to address; `api`
   // takes a string or a list (Markdown; a bare address or one `code` span gets a Copy button).
   const FACTS = ['summary', 'how', 'where', 'when', 'url', 'api'];
+  const CERT_KEYS = ['label', 'type', 'by', 'issuer', 'key', 'valid', 'stored', 'trust', 'note'];
   const STATUS = { built: 'Built', planned: 'Planned', deferred: 'Deferred', external: 'External' };
   const hasInfo = (n) => !!(n.detail || n.config || n.facts);
 
@@ -421,6 +444,7 @@
       // Side panel and hover card.
       this.panel = r.querySelector('.dgm-panel');
       this.panel.querySelector('.dgm-panel-close').addEventListener('click', () => this.closePanel());
+      this.setupPanelResize();
       this.card = r.querySelector('.dgm-card');
       this.card.addEventListener('pointerenter', () => clearTimeout(this.cardTimer));
       this.card.addEventListener('pointerleave', () => this.hideCard());
@@ -1058,7 +1082,7 @@
     }
 
     // ---------------------------------------------------------------- cards and panel
-    cardHTML(v) {
+    cardHTML(v, panel = false) {
       const a = this.nodes.get(v.from);
       const b = this.nodes.get(v.to);
       const parts = [`<div class="dgm-card-head"><strong>${esc(a.label)}</strong> → <strong>${esc(b.label)}</strong></div>`];
@@ -1066,57 +1090,151 @@
         const kind = e.kind ? KINDS[e.kind][1] : '';
         const proto = [e.proto, e.port != null ? `port ${e.port}` : null].filter(Boolean).join(', ');
         const ends = v.list.length > 1 ? `<span class="dgm-card-ends">${esc(this.nodes.get(e.from).label)} → ${esc(this.nodes.get(e.to).label)}</span>` : '';
-        parts.push(`<div class="dgm-card-row" style="--dgm-e:${e.kind ? KINDS[e.kind][0] : 'var(--dgm-muted)'}">${ends}<span class="dgm-card-proto">${esc(proto || e.label || 'link')}</span>${kind ? `<span class="dgm-card-kind">${esc(kind)}</span>` : ''}${e.label && proto ? `<span class="dgm-card-label">${esc(e.label)}</span>` : ''}${e.why ? `<div class="dgm-card-why">${markdown(e.why)}</div>` : ''}${e.detail ? `<div class="dgm-card-note">${markdown(e.detail)}</div>` : ''}</div>`);
+        parts.push(`<div class="dgm-card-row" style="--dgm-e:${e.kind ? KINDS[e.kind][0] : 'var(--dgm-muted)'}">${ends}<span class="dgm-card-proto">${esc(proto || e.label || 'link')}</span>${kind ? `<span class="dgm-card-kind">${esc(kind)}</span>` : ''}${e.label && proto ? `<span class="dgm-card-label">${esc(e.label)}</span>` : ''}${e.why ? `<div class="dgm-card-why">${markdown(e.why)}</div>` : ''}${e.detail ? `<div class="dgm-card-note">${markdown(e.detail)}</div>` : ''}${panel ? '' : this.certsHTML(e, false)}</div>`);
       }
       const cards = v.list.length === 1 ? cardsFor(v.list[0]) : [];
-      if (cards.length) {
-        parts.push(`<div class="dgm-tabs" role="tablist">${cards.map((c, i) => `<button type="button" role="tab" class="dgm-tab${i ? '' : ' is-on'}" data-card="${c}">${esc(CARDS[c].title)}</button>`).join('')}</div>`);
-        parts.push(`<div class="dgm-seq-holder">${this.sequenceSVG(cards[0], a.label, b.label)}</div>`);
+      if (cards.length && panel) parts.push(this.exchangeHTML(cards, a.label, b.label));
+      else if (cards.length) parts.push(`<div class="dgm-card-chain">${cards.map((c) => esc(CARD_TAGS[c] || CARDS[c].title)).join(' → ')} <span>· click for the full exchange</span></div>`);
+      // In the panel the certificates follow the exchange (the TLS step is where they are presented).
+      if (panel) {
+        for (const e of v.list) {
+          const c = this.certsHTML(e, true);
+          if (!c) continue;
+          parts.push(v.list.length > 1 ? c.replace('<div class="dgm-sec">Certificates</div>', `<div class="dgm-sec">Certificates · ${esc(this.nodes.get(e.from).label)} → ${esc(this.nodes.get(e.to).label)}</div>`) : c);
+        }
       }
       return parts.join('');
     }
 
-    sequenceSVG(name, left, right) {
-      const c = CARDS[name];
-      const W = 300;
-      const gap = 40;
-      const H = 38 + c.msgs.length * gap;
-      const L = 34;
-      const R = W - 34;
-      const short = (s) => (String(s).length > 16 ? String(s).slice(0, 15) + '…' : s);
-      let out = `<svg class="dgm-seq" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(c.title)}">`;
-      out += `<text class="dgm-seq-end" x="${L}" y="14" text-anchor="middle">${esc(short(left))}</text><text class="dgm-seq-end" x="${R}" y="14" text-anchor="middle">${esc(short(right))}</text>`;
-      out += `<line class="dgm-seq-life" x1="${L}" y1="22" x2="${L}" y2="${H - 4}"/><line class="dgm-seq-life" x1="${R}" y1="22" x2="${R}" y2="${H - 4}"/>`;
-      c.msgs.forEach(([dir, text, note], i) => {
-        const y = 40 + i * gap;
-        const delay = `animation-delay:${(i * 0.7).toFixed(1)}s`;
-        const arrow = (x1, x2) => `<line class="dgm-seq-msg" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" style="${delay}" marker-end="url(#${this.uid}-seq-arrow)"/>`;
-        if (dir === '<>') out += arrow(L + 2, R - 2) + arrow(R - 2, L + 2).replace(`y1="${y}"`, `y1="${y + 6}"`).replace(`y2="${y}"`, `y2="${y + 6}"`);
-        else out += dir === '>' ? arrow(L + 2, R - 2) : arrow(R - 2, L + 2);
-        out += `<text class="dgm-seq-text" x="${W / 2}" y="${y - 6}" text-anchor="middle" style="${delay}">${esc(text)}</text>`;
-        if (note) out += `<text class="dgm-seq-note" x="${W / 2}" y="${y + 18}" text-anchor="middle" style="${delay}">${esc(note)}</text>`;
-      });
-      out += `<defs><marker id="${this.uid}-seq-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dgm-seq-head"/></marker></defs></svg>`;
-      return out;
+    // Certificates on a connection: one line on the hover card, the full cards in the side panel.
+    certsHTML(e, full) {
+      const c = certsOf(e);
+      if (!c) return '';
+      const cat = this.data.certs || {};
+      const inline = (t) => markdown(String(t)).replace(/^<p>|<\/p>$/g, '');
+      if (c.planned && !c.server.length) {
+        return full
+          ? `<div class="dgm-certs"><div class="dgm-sec">Certificates</div><div class="dgm-cert dgm-cert-none dgm-cert-tbd"><b>Not decided yet</b> ${inline(c.planned)}</div></div>`
+          : `<div class="dgm-card-cert is-none">Certificates: not decided yet</div>`;
+      }
+      if (c.none) {
+        return full
+          ? `<div class="dgm-certs"><div class="dgm-sec">Certificates</div><div class="dgm-cert dgm-cert-none"><b>No TLS</b> ${inline(c.none)}</div></div>`
+          : `<div class="dgm-card-cert is-none">No TLS</div>`;
+      }
+      const rows = [...c.server.map((id) => ['Server', id]), ...c.client.map((id) => ['Client', id])].filter(([, id]) => cat[id]);
+      if (!full) {
+        const names = rows.map(([role, id]) => `${role === 'Client' ? 'client ' : ''}<code>${esc(cat[id].label || id)}</code>`).join(' + ');
+        return names ? `<div class="dgm-card-cert"><span aria-hidden="true">🔒</span> ${names} <span class="dgm-card-cert-more">· click for details</span></div>` : '';
+      }
+      let h = '<div class="dgm-certs"><div class="dgm-sec">Certificates</div>';
+      for (const [role, id] of rows) {
+        const x = cat[id];
+        const type = CERT_TYPES[x.type] || '';
+        // Collapsed to its name; the details open on a click.
+        h += `<details class="dgm-cert dgm-cert-${esc(x.type || 'public')}"><summary class="dgm-cert-head"><span class="dgm-cert-role">${role}</span><code>${esc(x.label || id)}</code>${type ? `<span class="dgm-cert-type">${type}</span>` : ''}</summary><dl>`;
+        for (const [k, t] of CERT_FIELDS) if (x[k]) h += `<dt>${t}</dt><dd>${inline(x[k])}</dd>`;
+        h += `</dl>${x.note ? `<div class="dgm-cert-note">${inline(x.note)}</div>` : ''}</details>`;
+      }
+      if (c.note) h += `<div class="dgm-cert-note">${inline(c.note)}</div>`;
+      return h + '</div>';
     }
 
-    wireTabs(holder, v) {
-      holder.querySelectorAll('.dgm-tab').forEach((t) =>
-        t.addEventListener('click', (ev) => {
+    // One exchange: every card's messages in order in a single sequence diagram, with a bracket rail on
+    // the left grouping them (TCP, TLS 1.3, HTTP …). It plays on a loop; a click on a group replays from it.
+    exchangeHTML(cards, left, right) {
+      const W = 340, rail = 58, L = 84, R = W - 14, gap = 40, groupGap = 12, top = 30;
+      const short = (t) => (String(t).length > 18 ? String(t).slice(0, 17) + '…' : t);
+      let y = top, i = 0, rows = '', rail_ = '';
+      cards.forEach((c, k) => {
+        const col = GROUP_COLOURS[k % GROUP_COLOURS.length];
+        const y0 = y + 8;
+        const start = i;
+        for (const [dir, text, note] of CARDS[c].msgs) {
+          const yy = y + 30;
+          const line = (x1, x2, dy = 0) => {
+            const hx = x2 > x1 ? x2 - 7 : x2 + 7;
+            return `<line class="dgm-ex-line" x1="${x1}" y1="${yy + dy}" x2="${x2}" y2="${yy + dy}"/><path class="dgm-ex-head" d="M${x2},${yy + dy} L${hx},${yy + dy - 4} L${hx},${yy + dy + 4} z"/>`;
+          };
+          const arrows = dir === '<>' ? line(L + 2, R - 2, -3) + line(R - 2, L + 2, 3) : dir === '>' ? line(L + 2, R - 2) : line(R - 2, L + 2);
+          // Long labels are squeezed to fit between the lifelines (approximate glyph widths).
+          const fit = (t, per) => (String(t).length * per > R - L - 10 ? ` textLength="${R - L - 10}" lengthAdjust="spacingAndGlyphs"` : '');
+          rows += `<g class="dgm-ex-msg" data-i="${i}" data-g="${k}" style="--dgm-g:${col}">${arrows}<text class="dgm-ex-text" x="${(L + R) / 2}" y="${yy - 7}" text-anchor="middle"${fit(text, 6.2)}>${esc(text)}</text>${note ? `<text class="dgm-ex-note" x="${(L + R) / 2}" y="${yy + 15}" text-anchor="middle"${fit(note, 4.4)}>${esc(note)}</text>` : ''}</g>`;
+          y += gap;
+          i++;
+        }
+        const y1 = y + 2;
+        rail_ += `<g class="dgm-ex-grp" data-g="${k}" data-start="${start}" data-title="${esc(CARDS[c].title)}" style="--dgm-g:${col}" tabindex="0" role="button" aria-label="Replay from ${esc(CARDS[c].title)}"><title>${esc(CARDS[c].title)}: click to replay from here</title><rect class="dgm-ex-band" x="0" y="${y0}" width="${W}" height="${y1 - y0}" rx="6"/><path class="dgm-ex-brk" d="M${rail - 4},${y0 + 2} h-6 v${y1 - y0 - 4} h6"/><text class="dgm-ex-tag" x="${rail - 14}" y="${(y0 + y1) / 2 + 4}" text-anchor="end">${esc(CARD_TAGS[c] || c)}</text></g>`;
+        y += groupGap;
+      });
+      const H = y + 4;
+      const svg = `<svg class="dgm-ex" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cards.map((c) => CARDS[c].title).join(', then '))}">${rail_}<text class="dgm-seq-end" x="${L}" y="14" text-anchor="middle">${esc(short(left))}</text><text class="dgm-seq-end" x="${R}" y="14" text-anchor="end">${esc(short(right))}</text><line class="dgm-seq-life" x1="${L}" y1="22" x2="${L}" y2="${H - 4}"/><line class="dgm-seq-life" x1="${R}" y1="22" x2="${R}" y2="${H - 4}"/>${rows}</svg>`;
+      return `<div class="dgm-exchange"><div class="dgm-ex-bar"><div class="dgm-sec">The exchange</div><span class="dgm-ex-cap"></span><button type="button" class="dgm-ex-toggle" aria-label="Pause">Pause</button></div>${svg}</div>`;
+    }
+    playExchange(holder) {
+      clearTimeout(this.exTimer);
+      const box = holder.querySelector('.dgm-exchange');
+      if (!box) return;
+      const msgs = [...box.querySelectorAll('.dgm-ex-msg')];
+      const groups = [...box.querySelectorAll('.dgm-ex-grp')];
+      const cap = box.querySelector('.dgm-ex-cap');
+      const btn = box.querySelector('.dgm-ex-toggle');
+      let i = 0;
+      let paused = false;
+      const show = (k) => {
+        msgs.forEach((m, j) => {
+          m.classList.toggle('is-done', j < k);
+          m.classList.toggle('is-now', j === k);
+        });
+        const g = msgs[k]?.dataset.g;
+        groups.forEach((x) => x.classList.toggle('is-on', x.dataset.g === g));
+        const on = groups.find((x) => x.dataset.g === g);
+        cap.textContent = on ? on.dataset.title : '';
+      };
+      const tick = () => {
+        if (!box.isConnected || paused) return;
+        if (i >= msgs.length) {
+          show(msgs.length); // everything drawn; hold, then start again
+          i = 0;
+          this.exTimer = setTimeout(tick, 2800);
+          return;
+        }
+        show(i++);
+        this.exTimer = setTimeout(tick, 1150);
+      };
+      for (const g of groups) {
+        const go = (ev) => {
           ev.stopPropagation();
-          holder.querySelectorAll('.dgm-tab').forEach((x) => x.classList.toggle('is-on', x === t));
-          const a = this.nodes.get(v.from).label;
-          const b = this.nodes.get(v.to).label;
-          holder.querySelector('.dgm-seq-holder').innerHTML = this.sequenceSVG(t.dataset.card, a, b);
-        })
-      );
+          ev.preventDefault();
+          clearTimeout(this.exTimer);
+          i = +g.dataset.start;
+          if (reduceMotion || paused) return show(i);
+          tick();
+        };
+        g.addEventListener('click', go);
+        g.addEventListener('keydown', (ev) => (ev.key === 'Enter' || ev.key === ' ') && go(ev));
+      }
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        paused = !paused;
+        btn.textContent = paused ? 'Play' : 'Pause';
+        btn.setAttribute('aria-label', btn.textContent);
+        clearTimeout(this.exTimer);
+        if (!paused) tick();
+      });
+      if (reduceMotion) {
+        paused = true;
+        btn.hidden = true;
+        show(msgs.length);
+        return;
+      }
+      tick();
     }
 
     showCard(v, ev) {
       clearTimeout(this.cardTimer);
       if (this.cardKey !== v.key) {
         this.card.innerHTML = this.cardHTML(v);
-        this.wireTabs(this.card, v);
         this.cardKey = v.key;
       }
       this.card.hidden = false;
@@ -1204,13 +1322,71 @@
     }
     openEdgePanel(v) {
       const body = this.panel.querySelector('.dgm-panel-body');
-      body.innerHTML = this.cardHTML(v);
-      this.wireTabs(body, v);
+      body.innerHTML = this.cardHTML(v, true);
+      this.playExchange(body);
       this.panel.hidden = false;
       this.root.classList.add('has-panel');
       this.hideCard();
     }
+    // The side panel can be resized: drag its inner edge (left on desktop, top on a phone), use the arrow
+    // keys on the handle, or double-click it to reset. The size is a per-viewer convenience in localStorage.
+    setupPanelResize() {
+      const grip = document.createElement('div');
+      grip.className = 'dgm-panel-grip';
+      grip.tabIndex = 0;
+      grip.setAttribute('role', 'separator');
+      grip.setAttribute('aria-label', 'Resize the details panel');
+      this.panel.after(grip);
+      const phone = () => window.matchMedia('(max-width: 576px)').matches;
+      const key = () => `dgm-panel-${phone() ? 'h' : 'w'}`;
+      const set = (px, save = true) => {
+        const box = this.stage.getBoundingClientRect();
+        const ph = phone();
+        const v = Math.round(Math.max(ph ? 140 : 260, Math.min(px, (ph ? box.height : box.width) * 0.94)));
+        this.root.style.setProperty(ph ? '--dgm-panel-h' : '--dgm-panel-w', `${v}px`);
+        grip.setAttribute('aria-orientation', ph ? 'horizontal' : 'vertical');
+        if (save) try { localStorage.setItem(key(), v); } catch (e) { /* storage blocked: size lasts for this page only */ }
+      };
+      try {
+        const w = +localStorage.getItem('dgm-panel-w');
+        const h = +localStorage.getItem('dgm-panel-h');
+        if (w) this.root.style.setProperty('--dgm-panel-w', `${w}px`);
+        if (h) this.root.style.setProperty('--dgm-panel-h', `${h}px`);
+      } catch (e) { /* no storage: default size */ }
+      const current = () => (phone() ? this.panel.offsetHeight : this.panel.offsetWidth);
+      grip.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        grip.setPointerCapture(ev.pointerId);
+        this.root.classList.add('is-resizing');
+        const move = (e) => {
+          const box = this.stage.getBoundingClientRect();
+          set(phone() ? box.bottom - e.clientY : box.right - e.clientX, false);
+        };
+        const up = () => {
+          grip.removeEventListener('pointermove', move);
+          this.root.classList.remove('is-resizing');
+          set(current());
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up, { once: true });
+        grip.addEventListener('pointercancel', up, { once: true });
+      });
+      grip.addEventListener('keydown', (ev) => {
+        const grow = phone() ? { ArrowUp: 1, ArrowDown: -1 } : { ArrowLeft: 1, ArrowRight: -1 };
+        if (!(ev.key in grow)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        set(current() + grow[ev.key] * 32);
+      });
+      grip.addEventListener('dblclick', () => {
+        this.root.style.removeProperty(phone() ? '--dgm-panel-h' : '--dgm-panel-w');
+        try { localStorage.removeItem(key()); } catch (e) { /* nothing stored */ }
+      });
+      for (const t of ['click', 'wheel']) grip.addEventListener(t, (ev) => ev.stopPropagation());
+    }
     closePanel() {
+      clearTimeout(this.exTimer);
       this.panel.hidden = true;
       this.root.classList.remove('has-panel');
     }

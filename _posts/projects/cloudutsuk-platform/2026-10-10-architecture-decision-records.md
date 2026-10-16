@@ -350,6 +350,10 @@ credential that can change a cluster. The DGX has no inbound ports (ADR 0003).
 - arm64 checked 2026-10-10: the runner image, the scale-set controller (0.12.1-0.13.1, no `latest`
   tag, so pin a version) and `moby/buildkit:rootless` all ship arm64.
 - Gitea with Gitea Actions is the documented fully local fallback, not built in v1.
+- Faster pickup (2026-10-15): Argo CD still has no inbound webhook from GitHub. The build workflow's promote
+  job, which runs on the `homelab` runners inside `platform`, posts a GitHub-style push event to Argo CD's
+  webhook right after the digest commit, so the apps refresh at once instead of at the next 3-minute
+  poll. The webhook has no secret yet (it only triggers a refresh); signing it is a follow-up.
 
 #### Considered options
 
@@ -451,6 +455,8 @@ everything else.
   recorded as its own ADR.
 - **Chosen (2026-10-15, Phase 5 step 1):** gpt-oss-20b, Apache 2.0, in a smaller slice than planned
   above, because the host had far less free memory than this ADR budgeted ([ADR 0046](#adr-0046)).
+- **Replaced (2026-10-16):** Qwen3.5-35B-A3B in FP8, the newer generation of the Qwen candidate, for tool
+  calling and context ([ADR 0049](#adr-0049)).
 
 #### Considered options
 
@@ -470,7 +476,7 @@ everything else.
 #### Related
 
 - [ADR 0022](#adr-0022)
-- [ADR 0046](#adr-0046)
+- [ADR 0046](#adr-0046), [ADR 0049](#adr-0049)
 
 ## ADR-0011: Qdrant for vectors and Redis (RedisVL) for the semantic cache
 {: #adr-0011 }
@@ -923,7 +929,7 @@ same box don't add capacity.
   its build files, because a stale image once hid behind an unchanged tag (lesson L027). The cluster's
   memory cap (16 GB) covers only CPU-side memory: GPU allocations aren't charged to the container.
 - As built (2026-10-15, Phase 5 steps 1 and 2): LiteLLM v1.103.1 in namespace `litellm`, at
-  `https://llm.ai.home.cloudutsuk.com` (tailnet only), serving `gpt-oss-20b` (ADR 0046) and
+  `https://llm.ai.home.cloudutsuk.com` (tailnet only), serving `qwen3.5-35b-a3b` (ADR 0049; `gpt-oss-20b` until 2026-10-16, ADR 0046) and
   `qwen3-embedding-0.6b` from the `models` namespace; the model list is only in git. Its keys and spend
   live in `ai-db` (Postgres 17, namespace `ai-db`), which Phoenix will share. Qdrant 1.19.1 (`qdrant`) and
   Redis 8.10.2 (`redis-cache`) run next to it, each with its own key or password from OpenBao and a
@@ -2110,7 +2116,10 @@ Argo CD from Phase 0, no CI.
 - **Alertmanager** is Mimir's. Its fallback config is the `mimir-alertmanager` Secret, which External
   Secrets renders from `kv/mon/alertmanager` (infra-local `host/monitoring/alerting.sh`): warnings and
   critical alerts to a Slack channel, Watchdog every minute to a healthchecks.io check that emails when
-  the pings stop (a dead man's switch), severity `none` and `info` nowhere. Mimir reads it at startup.
+  the pings stop (a dead man's switch), severity `none` and `info` nowhere. Mimir reads it at startup. The `alertmanager-sync` Job
+  (monitoring-base; after each sync and hourly) also loads it through Mimir's config API, because Grafana
+  reads contact points and policies only from that API, never from the fallback file; a loaded config
+  also applies without a restart. Git and OpenBao stay the source: edits in Grafana's UI are overwritten.
 - **One OTLP entry point:** every cluster sends OTLP/HTTP to `https://otlp.mon.home.cloudutsuk.com`
   (Traefik, Let's Encrypt), inside `mon` also OTLP/gRPC. The gateway sets `cluster` from
   `k8s.cluster.name` (ADR 0026) and forwards OTLP to Mimir (`/otlp`, metric suffixes on), Loki (`/otlp`)
@@ -2121,6 +2130,12 @@ Argo CD from Phase 0, no CI.
 - **Grafana** signs in through Keycloak (confidential client `grafana`, ADR 0028): `platform-admins` are
   Admin, `viewers` Viewer, others refused; local `admin` is break-glass (`kv/mon/grafana`). Data sources
   and dashboards are provisioned; dashboards are read-only in the UI.
+- **The stack monitors itself** (Phase 3 step 8a): ServiceMonitors in `monitoring-base` scrape Mimir, Loki,
+  Tempo and Grafana as job `monitoring/<service>` (about 12,000 series; Grafana's kept to what its
+  dashboard reads), into the same Mimir. The Monitoring folder holds their upstream mixin dashboards and
+  recording rules, pointed at the single binaries, plus an Alerts overview and an LGTM health dashboard.
+  The mixins' alerts aren't used: they assume microservices. A Mimir that is down can't report itself; the
+  Watchdog's dead man's switch at healthchecks.io covers that.
 
 #### Considered options
 
@@ -2429,7 +2444,7 @@ to hang a name on.
 ## ADR-0046: First chat model: gpt-oss-20b (Apache 2.0) in a 0.17 slice of the GB10
 {: #adr-0046 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-15 · `homelab-gitops`</span>
+<span class="adr-status adr-status-superseded">Superseded by <a href="#adr-0049">ADR-0049</a></span> <span class="adr-meta text-muted">2026-10-15 · `homelab-gitops`</span>
 
 #### Context
 
@@ -2479,12 +2494,235 @@ agent, which needs tool calls.
 - Bad: it reasons before it answers, which costs tokens and time on simple questions; `reasoning_effort`
   (low, medium, high) per request is the control, and rag-api should send `low` by default.
 - Bad: 32k tokens of context per request, less than the model's 128k, to keep the slice small.
+  Raised to 64k on 2026-10-16 for Hermes Agent (ADR 0048) at the same 0.17 slice: that start's KV cache
+  held 95,834 tokens, 1.46 full-length requests (it varies by start; 173,602 had been seen).
 - Bad: its knowledge is general; everything platform-specific has to come from retrieval.
 
 #### Related
 
 - [ADR 0010](#adr-0010)
 - [ADR 0022](#adr-0022)
+
+## ADR-0047: Argo CD application groups: one AppProject per area, mirrored as the label homelab/group
+{: #adr-0047 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-15 · `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+Argo CD manages about 60 Applications across platform, mon, ai and every registered lab, all in the
+`default` project and with no grouping label. Its UI lists them as one flat set: finding "everything that
+makes up monitoring" or "what a lab got" means reading names. The `default` project also lets any
+Application deploy from any repository to any cluster.
+
+Upstream Argo CD (v3.5.3 here) has no grouped dashboard view. Codefresh's GitOps dashboard has one
+(Application Groups, the `codefresh.io/app-group` annotation), but only in Codefresh's hosted UI, with a
+Codefresh account, a runtime that keeps a tunnel open to the SaaS, a non-expiring Argo CD admin token and
+a paid plan after a trial. That conflicts with ADR 0023 (short-lived credentials from OpenBao), ADR 0037
+(nothing reachable from outside) and the $0 hosting goal.
+
+#### Decision
+
+- **Five groups, each an AppProject** in `bootstrap/projects.yaml`, synced by the root Application in wave
+  -1: `platform` (portal, its database, CI, hello-world, ExternalDNS), `monitoring` (the mon stack and the
+  monitoring pack), `security` (Kyverno and its policies, cert-manager, issuers and add-on secrets), `ai`
+  (the ai cluster's apps) and `labs` (everything Argo CD installs in a lab cluster).
+- **Each project is also a guard rail:** it allows only the sources its apps use (this repo, Zot's mirror
+  and the few public chart repos still used directly) and only the clusters they deploy to. `ai` reaches
+  only the ai cluster; `labs` reaches only lab API servers (`https://172.30.0.*:6443`, with mon's
+  `172.30.0.1:6443` denied). Cluster-scoped resources stay allowed: the add-ons ship CRDs and RBAC.
+- **The same name as a label, `homelab/group`,** on every Application, next to the existing
+  `homelab/addon`. The cert-manager and monitoring-pack ApplicationSets compute both per cluster: `labs`
+  for clusters registered with `homelab/addons=monitoring`, otherwise `security` or `monitoring`.
+- **The app-of-apps stay in `default`** (root, appsets, cluster-platform, cluster-mon, cluster-ai), labelled
+  `platform`: the root comes from infra-local, and they only create Applications.
+- **Grafana:** the vendored Argo CD dashboard gets a Group variable and a Groups row (health and out-of-sync
+  apps per group on one timeline) through `argocd_fixups` in `scripts/dashboards.py`, keyed on the metrics'
+  `project` label, so no Argo CD metrics setting changes. Sync and reconcile activity default to per group.
+- **The portal:** the Argo CD view in Backstage (Phase 3 step 6) shows the groups as tabs.
+
+#### Considered options
+
+1. **Codefresh GitOps Runtime on our Argo CD (Application Groups)**: the grouped view exists only in
+   Codefresh's SaaS UI, and the runtime needs an account, an outbound tunnel, a non-expiring admin token
+   and a paid plan. Rejected.
+2. **Labels only**: the UI's label filter works, but every app keeps `default`'s unlimited sources and
+   destinations, and the dashboard would need `applicationLabels` metrics enabled in infra-local.
+3. **AppProjects only**: the UI's project filter and the `project` metric label are enough for grouping,
+   but a label is what the portal and `kubectl -l` select on.
+4. **AppProjects mirrored as a label** (chosen): one name in both places; the project adds the guard rail.
+
+#### Consequences
+
+- Good: the Argo CD UI filters by project or label (`?proj=monitoring`, `?labels=homelab/group=labs`) and
+  each view can be bookmarked; Grafana shows sync and health per group; a mistake in an `ai` app can't
+  deploy to platform or mon.
+- Good: no new component, credential or outbound connection.
+- Bad: a new app must name its project and label, and a new chart repository must be added to its
+  project's `sourceRepos`, or Argo CD refuses to sync it (the app shows an InvalidSpecError condition).
+- Bad: lab destinations are matched by address; a lab whose API isn't on `172.30.0.*:6443` needs a rule.
+
+#### Related
+
+- ADR 0026, ADR 0027, ADR 0038, ADR 0042
+
+## ADR-0048: Hermes Agent on platform: non-root without s6, the local model at 64k, dashboard for platform-admins only
+{: #adr-0048 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Hermes Agent (Nous Research, MIT) is a self-improving agent: it learns skills from use, keeps memories
+across sessions, runs cron jobs and can reach messaging platforms. It ships one Docker image
+(`nousresearch/hermes-agent`, amd64 and arm64, about 900 MB) with a gateway (the agent, the scheduler and an
+OpenAI-compatible API on 8642) and a web dashboard (9119). All state lives in `/opt/data`, including a
+SQLite database.
+
+Running it on `platform` meets these constraints:
+
+- **Fast releases:** a release comes out almost daily. The newest at least two weeks old on 2026-10-16 is
+  v0.21.5 (tag `v2026.9.24`, 2026-09-24).
+- **Startup vs. Pod Security:** the image starts as root under s6-overlay (`/init` as PID 1), remaps its
+  user, chowns the volume, then drops to uid 10000. `platform` enforces restricted Pod Security and a
+  read-only root (ADR 0033). As uid 10000, s6 refuses to start because `/run` isn't its own.
+- **Context window:** Hermes refuses models with less than 64,000 tokens of context. `gpt-oss-20b` was
+  served at 32k (ADR 0046).
+- **Dashboard access:** the dashboard reads and writes API keys and runs commands (a terminal-backed chat
+  and maintenance actions). Its OIDC sign-in needs a public PKCE client and admits whoever the issuer signs
+  in, with no group check.
+- **Storage:** a host folder for `/opt/data` would need a new k3d node mount, which only re-creating the
+  cluster adds.
+
+#### Decision
+
+- **Image:** `docker.io/nousresearch/hermes-agent:v2026.9.24`, pinned by digest and pulled through Zot's
+  docker.io mirror.
+- **Pod:** one replica (single writer on SQLite), Recreate, in namespace `hermes` (`apps/hermes`, project
+  `platform`).
+  - **Security:** uid 10000 from the start, read-only root, all capabilities dropped.
+  - **PID 1:** `shareProcessNamespace` makes the pause container PID 1 (it reaps zombies), so the image's
+    entrypoint takes its documented non-PID-1 path, the stage2 setup without s6.
+  - **Containers:** an init container runs that setup, then writes the settings git owns into
+    `config.yaml`. Two containers then run what s6 would supervise: `hermes gateway run` and
+    `hermes dashboard`, sharing `/opt/data`. `/run`, `/tmp` and `/dev/shm` are emptyDirs.
+- **Model:** `gpt-oss-20b` (Qwen3.5-35B-A3B at 128k since 2026-10-16, ADR 0049) through LiteLLM (`https://llm.ai.home.cloudutsuk.com/v1`) with Hermes' own
+  virtual key. `vllm-chat` goes to `--max-model-len 65536` at the same 0.17 slice. Its KV cache varies by
+  start: the first 64k start had 95,834 tokens, 1.46 full-length requests.
+- **Dashboard:** `https://hermes.platform.home.cloudutsuk.com`, tailnet only, with a Let's Encrypt
+  certificate.
+  - **Sign-in:** Keycloak client `hermes` (public, PKCE). Its browser flow,
+    `browser platform-admins only` (infra-local `host/keycloak/configure-realm.sh`), denies users without
+    realm role `platform-admin`, which the group `platform-admins` carries.
+  - **Network:** a NetworkPolicy lets only Traefik reach the dashboard. The dashboard trusts
+    X-Forwarded-* only from the pod network (`10.20.0.0/24`).
+- **API:** the OpenAI-compatible API stays in the cluster (`hermes.hermes.svc:8642`, bearer key), reachable
+  only from pods in `hermes` until a caller needs it.
+- **Storage:** `/opt/data` is a 10Gi `local-path` claim, backed up nightly by Velero's file-system backup.
+- **Secrets:** both keys come from OpenBao `kv/platform/hermes`.
+
+#### Considered options
+
+1. **The image's own init as root, with a Kyverno exception:** the supported path. It would need root,
+   a writable root filesystem and chown, the exact exceptions ADR 0033 exists to avoid, for a process that
+   runs model-written code.
+2. **Non-root without s6, the pause container as PID 1** (chosen): every policy holds. The cost is that
+   nothing supervises inside the pod: Kubernetes restarts a failed container instead.
+3. **A paid model (Anthropic, OpenRouter):** better agent quality, but costs per token and sends prompts out
+   of the homelab. The local model is free and private, and enough to start.
+4. **Password sign-in, or OIDC for every realm user:** simpler, but the dashboard is a command console. A
+   password isn't SSO, and "any realm user" includes everyone Entra can sign in.
+
+#### Consequences
+
+- Good: Hermes runs under the same policies as every other app, with its UI behind the platform's SSO.
+- Good: the model stays on the DGX at no cost; other callers also get 64k context.
+- Bad: at the 0.17 slice, only about one full 64k request fits in the KV cache at a time; long Hermes
+  sessions and other callers then queue or are preempted. Raise the slice if the AI / vLLM dashboard shows it.
+- Bad: the dashboard changes settings in `config.yaml`. The keys the init container sets (model, proxy,
+  public URL) revert on restart, so they change in git.
+- Bad: `local-path` keeps the data inside the node container. Re-creating `platform` needs a Velero
+  restore of the namespace.
+- Bad (resolved by ADR 0049): `gpt-oss-20b` at 64k is a small model for an agent. Long sessions compress often, and a stronger
+  model is a later decision.
+- Bad: the release cadence is fast, and the two-week rule keeps Hermes behind upstream on purpose.
+
+#### Related
+
+- ADR 0010, ADR 0022, ADR 0046 (the model and its gateway)
+- ADR 0028 (Keycloak), ADR 0033 (Kyverno policies), ADR 0039 (Velero)
+
+## ADR-0049: Chat model: Qwen3.5-35B-A3B (FP8, Apache 2.0) replaces gpt-oss-20b
+{: #adr-0049 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+ADR 0046 chose gpt-oss-20b as the first chat model, in a 0.17 slice (about 21 GB) because the DGX had little
+free memory that day. Its first real agent workload showed its limits:
+
+- **Broken tool-call output:** Hermes Agent's task t_8d6df5e7 crashed twice. In the middle of a tool call, the
+  model wrote reasoning text where a function name belongs (`to=functions? very? we need to`). vLLM's parser for
+  gpt-oss's output format (Harmony) rejected it, in streaming and non-streaming alike, so no client-side
+  setting avoids it.
+- **No way to turn thinking off:** Harmony refuses `reasoning_effort: none`, so every Hermes session title
+  cost a 400 and a retry.
+- **Context:** 64k at that slice held about 1.5 full-length requests.
+- **Who depends on it:** agents are the main users of the chat model (Hermes now, the SRE agent in Phase 6),
+  so tool calling and context matter more than the smallest memory footprint.
+
+On 2026-10-16 the host had about 56 GB available with no chat model loaded. ADR 0010's other candidate
+family, Qwen, has a newer generation: Qwen3.5 (February 2026).
+
+#### Decision
+
+- **Model:** Qwen/Qwen3.5-35B-A3B-FP8.
+  - Apache 2.0, pinned to revision `9d1823d2` (2026-04-24, well over two weeks old).
+  - A mixture of experts: 35B parameters, 3B active per token, so it decodes about as fast as gpt-oss (3.6B
+    active) on the GB10's memory bandwidth.
+  - Linear attention in three of every four layers, so the KV cache is about 20 KB per token.
+- **Same app:** it runs in `apps/vllm-chat`, which keeps its role name. The Service, alerts, dashboards and
+  LiteLLM's `api_base` don't change.
+  - vLLM 0.24 (`nvcr.io/nvidia/vllm:26.07`), `--language-model-only` (no vision encoder).
+  - `--gpu-memory-utilization 0.36` (about 44 GB) and `--max-model-len 131072`, the model card's floor for
+    its thinking mode.
+  - Tool calls with the `qwen3_coder` parser; thinking split into `reasoning_content` with `qwen3`.
+- **Gateway:** the model is published as `qwen3.5-35b-a3b`. The `gpt-oss-20b` model name is removed, and
+  callers' virtual keys move to the new name.
+- **Hermes Agent:** it follows at 128k context (`apps/hermes`).
+- **Fallback:** gpt-oss-20b's weights stay on the `models` claim, so going back is a revert of the model
+  commits.
+
+#### Considered options
+
+1. **Keep gpt-oss-20b and work around it:** a bigger slice wouldn't fix malformed Harmony output, and its
+   context is 128k at most.
+2. **Qwen3-8B (dense, FP8):** small and cheap. A first attempt crash-looped: its native context is 40,960
+   tokens, under Hermes' 64k minimum, so it needs YaRN scaling. It's also weaker at agent work than a 35B MoE.
+3. **Qwen3-30B-A3B-Instruct-2507:** the generation ADR 0010 named; similar size, older, 256k context.
+4. **Qwen3.5-35B-A3B in FP8** (chosen): the newest small MoE in the family, 262k context, built for tool
+   calling, and a small KV cache.
+5. **Two models, switched on demand (KEDA or a model-swapping proxy):** both don't fit in memory at once, and
+   KEDA can't keep two deployments mutually exclusive. The first request after a switch would wait for a
+   2.5 to 5 minute start.
+6. **Larger models from the 2026 field (Llama 4 Scout, DeepSeek V3.2):** 55 GB to 350 GB or more, far over
+   the memory available.
+
+#### Consequences
+
+- Good: tool calls in Qwen's format, a thinking switch (`chat_template_kwargs.enable_thinking`), 128k context
+  at a small KV cost, and the same Apache 2.0 licence.
+- Good: the role-named app made the swap a change of model inside `vllm-chat`, not a new app.
+- Bad: about 44 GB instead of 21 GB of unified memory. Host headroom drops by about 23 GB, which affects
+  how many labs fit (the lab runner's admission limit).
+- Bad: a 37.5 GB first download (about 10 MB/s here, so about an hour). The startup probe allows 90 minutes.
+- Bad: callers must change the model name and their keys' model lists. That was a one-time cost with only
+  Hermes as a caller.
+
+#### Related
+
+- ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0046 (superseded), ADR 0048 (Hermes Agent)
 
 {% endraw %}
 <!-- adr:end -->

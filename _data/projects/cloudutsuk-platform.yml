@@ -29,6 +29,7 @@ facts:
   value: System diagram
   url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#system-context-and-component-architecture
 diagrams:
+- {type: system-context, title: "System architecture", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/cloudutsuk-platform/system-architecture, format: interactive}
 - {type: network, title: "Network layout (subnets, ports, TLS, DNS)", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#network-layout, diagram: projects/cloudutsuk-platform/network-architecture, format: animated}
 - {type: cicd, title: "Commit to deploy with security gates", url: /posts/projects/cloudutsuk-platform/12-cicd-and-release-management/#build-automation, diagram: projects/cloudutsuk-platform/commit-to-deploy, format: animated}
 - {type: data-model, title: "Platform data model (ER) and ownership", url: /posts/projects/cloudutsuk-platform/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}

@@ -163,9 +163,9 @@ There's no regulated data here, so no formal compliance regime applies. Two rule
 - **Provider terms.** Cloud APIs are used with read-only roles, and the local model is used under its
   licence.
 
-> **TODO:** Which model licence applies once the model is chosen (for example Apache 2.0 for gpt-oss or
-> Qwen3)? Record it in ADR 0010.
-{: .prompt-warning }
+> **Resolved 2026-10-16:** Apache 2.0. The chat model is Qwen3.5-35B-A3B (ADR 0049), after gpt-oss-20b
+> (ADR 0046), also Apache 2.0; the embeddings model, Qwen3-Embedding-0.6B, is Apache 2.0 too (ADR 0010).
+{: .prompt-info }
 
 ## Prioritization and release scope
 {: #prioritization-and-release-scope }
