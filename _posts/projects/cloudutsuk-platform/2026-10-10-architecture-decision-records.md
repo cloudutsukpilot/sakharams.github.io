@@ -350,6 +350,10 @@ credential that can change a cluster. The DGX has no inbound ports (ADR 0003).
 - arm64 checked 2026-10-10: the runner image, the scale-set controller (0.12.1-0.13.1, no `latest`
   tag, so pin a version) and `moby/buildkit:rootless` all ship arm64.
 - Gitea with Gitea Actions is the documented fully local fallback, not built in v1.
+- Faster pickup (2026-10-15): Argo CD still has no inbound webhook from GitHub. The build workflow's promote
+  job, which runs on the `homelab` runners inside `platform`, posts a GitHub-style push event to Argo CD's
+  webhook right after the digest commit, so the apps refresh at once instead of at the next 3-minute
+  poll. The webhook has no secret yet (it only triggers a refresh); signing it is a follow-up.
 
 #### Considered options
 
@@ -2110,7 +2114,10 @@ Argo CD from Phase 0, no CI.
 - **Alertmanager** is Mimir's. Its fallback config is the `mimir-alertmanager` Secret, which External
   Secrets renders from `kv/mon/alertmanager` (infra-local `host/monitoring/alerting.sh`): warnings and
   critical alerts to a Slack channel, Watchdog every minute to a healthchecks.io check that emails when
-  the pings stop (a dead man's switch), severity `none` and `info` nowhere. Mimir reads it at startup.
+  the pings stop (a dead man's switch), severity `none` and `info` nowhere. Mimir reads it at startup. The `alertmanager-sync` Job
+  (monitoring-base; after each sync and hourly) also loads it through Mimir's config API, because Grafana
+  reads contact points and policies only from that API, never from the fallback file; a loaded config
+  also applies without a restart. Git and OpenBao stay the source: edits in Grafana's UI are overwritten.
 - **One OTLP entry point:** every cluster sends OTLP/HTTP to `https://otlp.mon.home.cloudutsuk.com`
   (Traefik, Let's Encrypt), inside `mon` also OTLP/gRPC. The gateway sets `cluster` from
   `k8s.cluster.name` (ADR 0026) and forwards OTLP to Mimir (`/otlp`, metric suffixes on), Loki (`/otlp`)
@@ -2121,6 +2128,12 @@ Argo CD from Phase 0, no CI.
 - **Grafana** signs in through Keycloak (confidential client `grafana`, ADR 0028): `platform-admins` are
   Admin, `viewers` Viewer, others refused; local `admin` is break-glass (`kv/mon/grafana`). Data sources
   and dashboards are provisioned; dashboards are read-only in the UI.
+- **The stack monitors itself** (Phase 3 step 8a): ServiceMonitors in `monitoring-base` scrape Mimir, Loki,
+  Tempo and Grafana as job `monitoring/<service>` (about 12,000 series; Grafana's kept to what its
+  dashboard reads), into the same Mimir. The Monitoring folder holds their upstream mixin dashboards and
+  recording rules, pointed at the single binaries, plus an Alerts overview and an LGTM health dashboard.
+  The mixins' alerts aren't used: they assume microservices. A Mimir that is down can't report itself; the
+  Watchdog's dead man's switch at healthchecks.io covers that.
 
 #### Considered options
 
@@ -2485,6 +2498,180 @@ agent, which needs tool calls.
 
 - [ADR 0010](#adr-0010)
 - [ADR 0022](#adr-0022)
+
+## ADR-0047: Argo CD application groups: one AppProject per area, mirrored as the label homelab/group
+{: #adr-0047 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-15 · `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+Argo CD manages about 60 Applications across platform, mon, ai and every registered lab, all in the
+`default` project and with no grouping label. Its UI lists them as one flat set: finding "everything that
+makes up monitoring" or "what a lab got" means reading names. The `default` project also lets any
+Application deploy from any repository to any cluster.
+
+Upstream Argo CD (v3.5.3 here) has no grouped dashboard view. Codefresh's GitOps dashboard has one
+(Application Groups, the `codefresh.io/app-group` annotation), but only in Codefresh's hosted UI, with a
+Codefresh account, a runtime that keeps a tunnel open to the SaaS, a non-expiring Argo CD admin token and
+a paid plan after a trial. That conflicts with ADR 0023 (short-lived credentials from OpenBao), ADR 0037
+(nothing reachable from outside) and the $0 hosting goal.
+
+#### Decision
+
+- **Five groups, each an AppProject** in `bootstrap/projects.yaml`, synced by the root Application in wave
+  -1: `platform` (portal, its database, CI, hello-world, ExternalDNS), `monitoring` (the mon stack and the
+  monitoring pack), `security` (Kyverno and its policies, cert-manager, issuers and add-on secrets), `ai`
+  (the ai cluster's apps) and `labs` (everything Argo CD installs in a lab cluster).
+- **Each project is also a guard rail:** it allows only the sources its apps use (this repo, Zot's mirror
+  and the few public chart repos still used directly) and only the clusters they deploy to. `ai` reaches
+  only the ai cluster; `labs` reaches only lab API servers (`https://172.30.0.*:6443`, with mon's
+  `172.30.0.1:6443` denied). Cluster-scoped resources stay allowed: the add-ons ship CRDs and RBAC.
+- **The same name as a label, `homelab/group`,** on every Application, next to the existing
+  `homelab/addon`. The cert-manager and monitoring-pack ApplicationSets compute both per cluster: `labs`
+  for clusters registered with `homelab/addons=monitoring`, otherwise `security` or `monitoring`.
+- **The app-of-apps stay in `default`** (root, appsets, cluster-platform, cluster-mon, cluster-ai), labelled
+  `platform`: the root comes from infra-local, and they only create Applications.
+- **Grafana:** the vendored Argo CD dashboard gets a Group variable and a Groups row (health and out-of-sync
+  apps per group on one timeline) through `argocd_fixups` in `scripts/dashboards.py`, keyed on the metrics'
+  `project` label, so no Argo CD metrics setting changes. Sync and reconcile activity default to per group.
+- **The portal:** the Argo CD view in Backstage (Phase 3 step 6) shows the groups as tabs.
+
+#### Considered options
+
+1. **Codefresh GitOps Runtime on our Argo CD (Application Groups)**: the grouped view exists only in
+   Codefresh's SaaS UI, and the runtime needs an account, an outbound tunnel, a non-expiring admin token
+   and a paid plan. Rejected.
+2. **Labels only**: the UI's label filter works, but every app keeps `default`'s unlimited sources and
+   destinations, and the dashboard would need `applicationLabels` metrics enabled in infra-local.
+3. **AppProjects only**: the UI's project filter and the `project` metric label are enough for grouping,
+   but a label is what the portal and `kubectl -l` select on.
+4. **AppProjects mirrored as a label** (chosen): one name in both places; the project adds the guard rail.
+
+#### Consequences
+
+- Good: the Argo CD UI filters by project or label (`?proj=monitoring`, `?labels=homelab/group=labs`) and
+  each view can be bookmarked; Grafana shows sync and health per group; a mistake in an `ai` app can't
+  deploy to platform or mon.
+- Good: no new component, credential or outbound connection.
+- Bad: a new app must name its project and label, and a new chart repository must be added to its
+  project's `sourceRepos`, or Argo CD refuses to sync it (the app shows an InvalidSpecError condition).
+- Bad: lab destinations are matched by address; a lab whose API isn't on `172.30.0.*:6443` needs a rule.
+
+#### Related
+
+- ADR 0026, ADR 0027, ADR 0038, ADR 0042
+
+## ADR-0048: Paperclip as the agent control plane in platform: our own signed image, platform-db, Keycloak in front, models only through LiteLLM
+{: #adr-0048 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `homelab-services`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Phase 6 brings agents onto the platform: the SRE agent (ADR 0014) first, and coding agents that work on
+the platform's own repos after it. Each agent so far is a separate CLI session or service with its own
+history, its own keys and no shared view of what it is doing, what it costs or what is waiting for my
+approval.
+
+Paperclip (MIT) is a self-hosted control plane for teams of
+agents: a Node.js 24 server and React UI on one port (3100) with a Postgres database. It assigns tasks to
+agents (coding CLIs such as OpenCode, Claude Code or Codex, or HTTP endpoints), wakes them on schedules,
+and enforces budgets, review stages and an audit trail. What we checked in its source (2026-10-16, commit
+`78b833c`, release `v2026.916.1`):
+
+- The image is published for linux/amd64 and arm64 (the DGX is arm64), by full-SHA tag with a Sigstore
+  attestation. Started as non-root, its entrypoint skips `gosu` and runs unprivileged, so Pod Security
+  `restricted` is possible.
+- It takes an external Postgres through `DATABASE_URL` and runs its migrations at start. Everything else
+  it keeps lives in `PAPERCLIP_HOME` (instance config, attachments, agent workspaces and CLI state).
+- People sign in with email and password only (Better Auth); there is no OIDC sign-in. ADR 0028 wants
+  every UI behind Keycloak.
+- It needs three long-lived secrets: a session secret, a tool-action signing secret and a 32-byte master
+  key that encrypts the company secrets in its database.
+- Local adapters run the agent CLIs inside Paperclip's own container. The upstream image installs those
+  CLIs at `@latest`, so two builds of the same commit differ.
+- Telemetry is opt-in OpenTelemetry traces only, no metrics; health is `GET /api/health`.
+- Upstream moves fast: several commits a day.
+
+Kyverno (ADR 0033) admits only signed `platform/*` images or digest-pinned `mirror/*` ones. Models are
+reached only through the LiteLLM gateway with a virtual key per caller (ADR 0022, 0029).
+
+#### Decision
+
+- **Paperclip runs in `platform`,** namespace `paperclip`, Argo CD group `platform` (ADR 0047), synced from
+  `apps/paperclip` by `clusters/platform/paperclip.yaml`. It sits next to the SRE agent, so it keeps
+  working when `ai` is down (ADR 0014, 0018). One replica, `Recreate`.
+- **Our own image, `platform/paperclip`,** from `homelab-services` `services/paperclip`: a thin Dockerfile
+  on the upstream image pinned by digest through Zot's mirror (a release at least 14 days old), with the
+  agent CLIs and the OTel packages reinstalled at pinned versions and uid 1000. It goes through
+  `build-image.yaml`, so it gets the gates, a Cosign signature and an SBOM like every other image
+  (ADR 0032, 0033, 0043). No fork.
+- **Data:** a database `paperclip` with its own owner role in `platform-db` (ADR 0035); its nightly dump
+  covers it (ADR 0039). `PAPERCLIP_HOME` is a static PV on `/srv/homelab/paperclip`, not backed up: the
+  workspaces are git clones and the attachments are accepted as lost on a rebuild (ADR 0016).
+- **Secrets** in OpenBao `kv/platform/paperclip`, delivered by External Secrets (ADR 0023). The master key
+  also goes into the offline recovery kit, because without it a restored database's company secrets
+  can't be decrypted. Strict secret mode is on.
+- **Sign-in:** the Ingress (`paperclip.platform.home.cloudutsuk.com`, tailnet only, ADR 0037) sits behind
+  oauth2-proxy with a Keycloak client `paperclip`, allowing only the group `platform-admins`. Paperclip
+  runs `authenticated` with `private` exposure and its own login behind that gate; open sign-up is off
+  after the owner's account exists. This is a deliberate exception to ADR 0028's "Keycloak is the sign-in"
+  until Paperclip supports OIDC.
+- **Models only through LiteLLM:** one virtual key `paperclip`, limited to the models agents need, with a
+  monthly budget, kept in `kv/ai/litellm-clients`. Paperclip's own company and agent budgets are set below
+  it, so Paperclip stops first and LiteLLM is the backstop. A hosted model, if the spike shows one is
+  needed, becomes another LiteLLM backend rather than a key in the agents.
+- **Code changes only as pull requests:** a GitHub App of its own, installed on chosen repos with Contents
+  and Pull requests read/write and nothing else; branch protection keeps `main` review-only. Paperclip
+  never gets `cloudutsuk-gitops-writer` (ADR 0043). Every project gets a review stage in Paperclip, so an
+  agent's PR needs my approval there and on GitHub.
+- **Agents stay inside the pod and have no cluster access:** no ServiceAccount token, an egress
+  NetworkPolicy (DNS, `platform-db`, LiteLLM's HTTPS name, the OTLP gateway, GitHub), resource limits, and
+  every Kyverno policy enforced with no new exception. Any secret bound to an agent is treated as exposed
+  to it.
+- **Watching it:** traces to the OTLP gateway on `mon` (ADR 0042), logs through the monitoring pack,
+  alerts on a pod that isn't ready and on a failing `/api/health`, spend from LiteLLM's metrics for key
+  `paperclip`.
+- **Accepted only after the spike** (Phase 6, step 5a): the upstream image runs as uid 1000 with a
+  read-only root on the DGX, an OpenCode agent finishes a small task through LiteLLM, and memory and image
+  size fit the `platform` cluster. Its findings are added here before the status changes.
+
+#### Considered options
+
+1. **Paperclip in `platform` with our own signed image (chosen):** fits Kyverno, Argo CD and the backup
+   path we already run, and pins the agent CLIs that upstream leaves floating.
+2. **Paperclip in `ai`:** closer to the models, but it would go down with the GPU stack, which is when the
+   SRE agent's work matters most.
+3. **The upstream image through Zot's mirror, pinned by digest:** admitted without our signature, but the
+   CLIs inside are `@latest` at upstream's build time and it skips our scanners.
+4. **A fork of Paperclip** (for example to add OIDC sign-in): too much upkeep at upstream's pace.
+5. **Paperclip's own login alone on the tailnet:** simpler, one login, but a second identity store next
+   to Keycloak and no group check (ADR 0028).
+6. **Embedded Postgres in the pod:** zero setup, but invisible to Velero's dump hooks.
+7. **No control plane: agents as separate sessions and services:** nothing new to run, but no shared
+   board, no budgets across agents and no single place for approvals.
+
+#### Consequences
+
+- Good: one board for every agent's work, cost and pending approvals; the SRE agent can file its RCAs and
+  proposed fixes there with a review stage (Phase 6, step 5h).
+- Good: nothing new to operate around it: Argo CD, Kyverno, OpenBao, `platform-db`, Velero, LiteLLM and
+  `mon` are reused as they are.
+- Bad: two sign-ins (Keycloak, then Paperclip) until Paperclip supports OIDC.
+- Bad: agents run arbitrary code inside the pod with the secrets bound to them; the controls are the
+  egress list, the PR-only App, review stages and budgets, not isolation.
+- Bad: a large image (Node, the Rust runner, several CLIs) and frequent upstream releases; every bump is a
+  deliberate digest change with a `platform-db` dump first, and the rollback is the previous digest plus a
+  restore.
+- Bad: no Prometheus metrics of its own; availability comes from the probe and kube-state-metrics.
+- Bad: losing the master key loses every company secret, so the recovery kit grows by one key.
+
+#### Related
+
+- ADR 0014, ADR 0016, ADR 0018, ADR 0022, ADR 0023, ADR 0028, ADR 0029, ADR 0033, ADR 0035, ADR 0037,
+  ADR 0039, ADR 0042, ADR 0043, ADR 0047
+- Plan: `homelab-services` `docs/paperclip-plan.md`; roadmap: Phase 6, steps 5a to 5h
 
 {% endraw %}
 <!-- adr:end -->
