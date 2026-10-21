@@ -1,0 +1,313 @@
+# Hands-on lab card for /tags/azure-service-bus-lab/ (see _includes/lab-index.html).
+# Created by the cloudutsuk-learning-lab skill. `experiments` drive the experiment cards in part 6,
+# the index tiles and scripts/capture.cjs. `brief` is the author's request, not rendered.
+# Lab contract v2 (cluster lab-servicebus on the homelab network, signals in mon) plus a real Azure
+# Service Bus namespace (Standard). Panel ids refer to dashboards/azure-service-bus-lab.json in the lab
+# repo. The app was run end to end against the Service Bus emulator on 2026-10-21; nothing has run
+# against Azure or mon yet, so no screenshots exist and the posts carry TODO callouts.
+name: Azure Service Bus Queues and Topics
+tag: Azure Service Bus Lab
+summary: "Run a small shop on a real Azure Service Bus namespace: checkout sends orders to a queue,
+  competing workers process them, a topic fans each order out to billing, shipping, fraud review and
+  email through subscription filters, and a playground UI lets you send, peek, lock, complete,
+  abandon, defer and dead-letter messages yourself."
+status: Draft
+created: '2026-10-22'
+level: Beginner
+duration: about 90 minutes
+category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
+lab_category: cloud       # Labs tab group (_data/lab_catalog.yml)
+clouds: [azure]
+repo:
+  path: /home/sakharam/gitrepos/labs-azure/service-bus   # absolute: the lab runner rejects ~
+  # Private for now: github.com/cloudutsukpilot/labs-azure (add `url:` once public)
+deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
+  # `up` creates the Azure namespace first (az CLI, the runner's az login), then the k3d cluster.
+  targets: {up: up, down: down, status: status}
+  memory_gb: 3            # k3d with the monitoring pack and cert-manager, plus three small Python pods
+  ports: [8095, 6452]     # the app (Traefik) and the cluster's API, both on 127.0.0.1
+  ttl_hours: 4            # cloud lab: the portal asks to confirm the cost, the runner destroys it at the TTL
+platform:
+  runtime: "Azure Service Bus (Standard namespace, az CLI) + k3d (lab-servicebus) on the homelab network"
+  observability: "OpenTelemetry SDK → monitoring pack collectors → homelab mon cluster (Grafana, Mimir, Loki, Tempo)"
+  cost: "About $0.35/day while the namespace exists (Standard base charge, billed hourly); make down deletes it"
+facts:
+  - {label: Stack, value: "Azure Service Bus Standard, azure-servicebus (Python), FastAPI, OpenTelemetry, k3s 1.35"}
+  - {label: Entities, value: "2 queues + 1 session queue, 1 topic, 5 subscriptions (correlation and SQL filters, a rule action)"}
+  - {label: UI, value: "Shop page (live order journey) and Playground page (every send, receive and settle call)"}
+endpoints:                # through the labs gateway, from any tailnet device (ADR 0045); on the DGX also 127.0.0.1:8095
+  app: https://servicebus.labs.home.cloudutsuk.com
+  grafana: https://grafana.mon.home.cloudutsuk.com
+capture:
+  urls:
+    app: http://127.0.0.1:8095
+    grafana: https://grafana.mon.home.cloudutsuk.com
+  viewport: {width: 1440, height: 900}
+  color_scheme: dark
+  window: 10m
+  settle_ms: 3500
+  preflight: make status
+  cooldown: 30
+experiments:
+  - id: one-order
+    title: Follow one order through a queue and a topic
+    goal: "Place one order and watch it cross three services without any of them calling another: checkout sends to the orders queue, a fulfillment pod locks and completes it, and the OrderConfirmed event reaches every matching subscription."
+    signals: [traces, logs]
+    action:
+      say: "Place one order of 120 USD on the Shop page (or run the target)."
+      run: make exp-one-order
+    predict: "Checkout returns before the card is charged. Which services will show up in the order's trace, and which one is its root?"
+    wait: 45
+    verify: make verify-one-order
+    look_for:
+      - signal: traces
+        where: "Dashboard › Order traces, then open the trace"
+        query: '{ resource.k8s.cluster.name = "lab-servicebus" && name = "orders send" }'
+        expect: "`POST /api/shop/orders` on sblab-web → `orders send` → `orders process` and `charge card` on sblab-fulfillment → `order-events send` → `billing process`, `shipping process`, `email process` (twice: OrderConfirmed and OrderShipped) on sblab-subscribers."
+      - signal: logs
+        where: "Dashboard › Order log, Order = the order id"
+        query: '{k8s_cluster_name="lab-servicebus", service_name=~"sblab-.*"} |= "event=" |= "<order id>"'
+        expect: "`order.sent`, `order.received delivery_count=0`, `order.completed`, then one `event.handled` line per subscription that got a copy."
+    shots:
+      - name: journey
+        phase: after
+        url: "app:/"
+        selector: "#orders .order"
+        alt: "Shop page order card: sent, locked, completed, published, then delivered to billing, email and shipping, with OrderShipped published by shipping"
+        caption: "The order's journey on the Shop page. No service called another; each only talked to Service Bus."
+      - name: waterfall
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        steps:
+          - {click: '[data-viz-panel-key="panel-13"] [role="row"] a'}
+          - {wait_for_text: "Service & Operation"}
+        selector: 'section[data-testid="data-testid Panel header Trace"]'
+        viewport: {width: 2100, height: 1300}
+        wide: true
+        alt: "Tempo waterfall spanning sblab-web, sblab-fulfillment and sblab-subscribers for one order"
+        caption: "One trace across three services, joined only by the traceparent each message carries."
+
+  - id: fan-out
+    title: Fan one event out through subscription filters
+    goal: "See a topic deliver one event as several independent copies, and see each subscription's rule decide whether it gets one: the 800 USD order reaches fraud-review, the 40 USD order doesn't."
+    signals: [metrics]
+    action:
+      say: "Place a 40 USD order and an 800 USD order."
+      run: make exp-fan-out
+    predict: "Five subscriptions, two orders, and shipping publishes OrderShipped for each. How many copies will each subscription receive, and which one gets nothing at all?"
+    wait: 45
+    verify: make verify-fan-out
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Copies handled per subscription (in range)"
+        query: 'sum by (entity) (increase(sblab_messages_settled_total{cluster="lab-servicebus", entity=~"order-events/.*", outcome="completed"}[$__range]))'
+        expect: "billing 2, shipping 2, email 4 (Confirmed and Shipped for each order), fraud-review 1."
+      - signal: metrics
+        where: "Dashboard › Messages waiting, per queue and subscription"
+        query: 'max by (entity) (sblab_entity_messages{cluster="lab-servicebus", state="active"})'
+        expect: "order-events/analytics rises by 4: its TrueFilter takes everything, and nothing reads it."
+    shots:
+      - name: copies-before
+        phase: before
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-9"]'
+        alt: "Copies handled per subscription bar gauge before the two orders"
+        caption: "Before: nothing handled in this window."
+      - name: copies-after
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-9"]'
+        alt: "Copies handled per subscription bar gauge after the two orders: billing, shipping, email and fraud-review"
+        caption: "After: each subscription handled only the copies its rule let in."
+      - name: waiting
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-5"]'
+        alt: "Messages waiting time series: order-events/analytics steps up while the other subscriptions stay at zero"
+        caption: "analytics keeps its copies: a subscription is durable whether or not anyone reads it."
+
+  - id: duplicate
+    title: Send the same order twice
+    goal: "See duplicate detection drop a second send with the same MessageId, so a double-clicked button doesn't charge the customer twice."
+    signals: [metrics, logs]
+    action:
+      say: "Place an order with **Send it twice** ticked (the target does the same)."
+      run: make exp-duplicate
+    predict: "Both sends return success. How many times will fulfillment process the order?"
+    wait: 40
+    verify: make verify-duplicate
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Orders sent vs completed (in range)"
+        query: 'sum(increase(sblab_messages_sent_total{cluster="lab-servicebus", entity="orders"}[$__range]))'
+        expect: "sent 2, completed 1."
+      - signal: logs
+        where: "Dashboard › Order log, Order = the order id"
+        query: '{k8s_cluster_name="lab-servicebus", service_name=~"sblab-.*"} |= "<order id>"'
+        expect: "`order.sent sends=2`, then exactly one `order.received` and one `order.completed`."
+    shots:
+      - name: counts
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-4"]'
+        alt: "Orders sent vs completed stat panel showing two sent and one completed"
+        caption: "Two sends, one order. Service Bus kept the first message with that MessageId and dropped the second."
+      - name: journey
+        phase: after
+        url: "app:/"
+        selector: "#orders .order"
+        alt: "Shop page order card: sent twice with the same MessageId, then locked and completed once"
+        caption: "The Shop page shows one delivery for two sends."
+
+  - id: competing-consumers
+    title: Drain a flash sale with competing consumers
+    goal: "Watch a backlog build on one worker and drain three times faster when two more pods join, each order still processed exactly once."
+    signals: [metrics]
+    action:
+      say: "Send 60 orders at once with one fulfillment pod, then scale to three after 30 seconds."
+      run: make exp-competing-consumers
+    predict: "Each order takes about 1.5 seconds to process. How long will 60 orders take on one pod, and what changes when there are three?"
+    wait: 60
+    verify: make verify-competing-consumers
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Orders waiting in the queue, Messages waiting"
+        query: 'max(sblab_entity_messages{cluster="lab-servicebus", entity="orders", state="active"})'
+        expect: "Jumps to about 60, falls slowly for 30 seconds, then about three times faster."
+      - signal: metrics
+        where: "Dashboard › Orders completed per fulfillment pod (in range)"
+        query: 'sum by (worker) (increase(sblab_messages_settled_total{cluster="lab-servicebus", entity="orders", outcome="completed"}[$__range]))'
+        expect: "Three pods, the first with the most; the totals add up to 60."
+    shots:
+      - name: backlog
+        phase: during
+        timelapse: {seconds: 120, every: 5}
+        reload: true
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-5"]'
+        wide: true
+        alt: "Timelapse of the Messages waiting panel: the orders line jumps to 60, slopes down, then drops faster after the scale-up"
+        caption: "The backlog drains faster when two more pods start competing for the same queue."
+      - name: per-pod
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-8"]'
+        alt: "Orders completed per fulfillment pod bar gauge with three pods"
+        caption: "Every order went to exactly one pod."
+
+  - id: poison
+    title: Dead-letter a poison message
+    goal: "See a message that fails on every delivery come back with a higher delivery count each time, until Service Bus moves it to the dead-letter queue by itself."
+    signals: [metrics, logs]
+    action:
+      say: "Place an order with the always-declined card."
+      run: make exp-poison
+    predict: "The orders queue has a max delivery count of 3. How many times will fulfillment try, and who moves the message: the worker or Service Bus?"
+    wait: 45
+    verify: make verify-poison
+    look_for:
+      - signal: logs
+        where: "Dashboard › Order log, Order = the order id"
+        query: '{k8s_cluster_name="lab-servicebus", service_name="sblab-fulfillment"} |= "order.abandoned"'
+        expect: "Three `order.abandoned reason=\"card declined\"` lines with delivery_count 0, 1 and 2."
+      - signal: metrics
+        where: "Dashboard › Dead-lettered orders"
+        query: 'max(sblab_entity_messages{cluster="lab-servicebus", entity="orders", state="deadletter"})'
+        expect: "Goes from 0 to 1; the Shop page lists the order with reason MaxDeliveryCountExceeded."
+    shots:
+      - name: dlq-before
+        phase: before
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "Dead-lettered orders stat panel at zero"
+        caption: "Before: the dead-letter queue is empty."
+      - name: dlq-after
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-2"]'
+        alt: "Dead-lettered orders stat panel at one"
+        caption: "After three failed deliveries Service Bus dead-lettered the order. The worker never did."
+      - name: attempts
+        phase: after
+        url: "app:/"
+        selector: "#orders .order"
+        alt: "Shop page order card with three locked and abandoned attempts, then dead-lettered with MaxDeliveryCountExceeded"
+        caption: "Three attempts, each one delivery count higher, then the dead-letter queue."
+
+  - id: resubmit
+    title: Repair and resubmit a dead-lettered order
+    goal: "Move a dead-lettered order back to the queue the way Service Bus requires (receive it, send a copy, complete the original) and see why the copy needs a new MessageId."
+    signals: [metrics, logs]
+    action:
+      say: "Click **Resubmit all with manual approval** on the Shop page."
+      run: make exp-resubmit
+    predict: "The original MessageId is still inside the queue's 10-minute duplicate-detection window. What would happen to a copy that kept it?"
+    wait: 40
+    verify: make verify-resubmit
+    look_for:
+      - signal: metrics
+        where: "Dashboard › Dead-lettered orders"
+        query: 'max(sblab_entity_messages{cluster="lab-servicebus", entity="orders", state="deadletter"})'
+        expect: "Back to 0."
+      - signal: logs
+        where: "Dashboard › Order log, Order = the order id"
+        query: '{k8s_cluster_name="lab-servicebus", service_name=~"sblab-.*"} |= "<order id>"'
+        expect: "`order.resubmitted reason=MaxDeliveryCountExceeded`, then `order.received` and `order.completed`, then the subscribers' `event.handled` lines."
+    shots:
+      - name: dlq-after
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${from}&to=${to}"
+        selector: '[data-viz-panel-key="panel-11"]'
+        alt: "Dead-letter messages time series: orders goes up to one during the poison experiment and back to zero after the resubmit"
+        caption: "The dead-letter count rises with the poison order and falls with the resubmit."
+      - name: journey
+        phase: after
+        url: "app:/"
+        selector: "#orders .order"
+        alt: "Shop page order card: dead-lettered, resubmitted, then locked, completed and delivered to the subscriptions"
+        caption: "The same order, now approved, finishes its journey."
+
+  - id: least-privilege
+    title: Try to send with a listen-only key
+    goal: "See a shared access policy's rights enforced by Service Bus: the listen-only connection string can receive but is refused when it sends."
+    signals: [logs]
+    action:
+      say: "On the Playground, pick **Listen only** and send a message to the playground queue."
+      run: make exp-least-privilege
+      browser:
+        url: app:/playground
+        steps: [{click_text: "Listen only"}, {click: '#send button[type="submit"]'}, {wait_for_text: "401"}]
+    predict: "The key is valid and the queue exists. Will the send fail when the client connects, or only when it tries to send?"
+    wait: 30
+    verify: make verify-least-privilege
+    look_for:
+      - signal: logs
+        where: "Dashboard › Order log"
+        query: '{k8s_cluster_name="lab-servicebus", service_name="sblab-web"} |= "ServiceBusAuthorizationError"'
+        expect: "A `servicebus.error type=ServiceBusAuthorizationError` line: Unauthorized access, 'Send' claim(s) are required."
+      - signal: logs
+        where: "Dashboard › Requests refused for missing rights (in range)"
+        query: 'sum(count_over_time({k8s_cluster_name="lab-servicebus", service_name="sblab-web"} |= "ServiceBusAuthorizationError" [$__range]))'
+        expect: "1 or more."
+    shots:
+      - name: refused
+        phase: after
+        url: "app:/playground"
+        steps: [{click_text: "Listen only"}, {click: '#send button[type="submit"]'}, {wait_for_text: "401"}]
+        selector: "#send-result"
+        alt: "Playground send result showing 401 ServiceBusAuthorizationError for the listen-only credential"
+        caption: "Service Bus refuses the send: the listen-only policy has no Send right."
+      - name: count
+        phase: after
+        url: "grafana:/d/azure-service-bus-lab/?orgId=1&kiosk&from=${start}&to=${to}"
+        selector: '[data-viz-panel-key="panel-14"]'
+        alt: "Requests refused for missing rights stat panel at one"
+        caption: "Each refused request is a log line, and so a number on the dashboard."
+brief: |
+  "Can you a lab with a ui deployed which will let me play around with azure service bus .like using to
+  send something in the queue, consume it ,etc . Similarly for topics. Add a real use case to getter
+  better understanding of azure service bus"
+  Answers (2026-10-21): real Azure namespace (Standard, billable; emulator rejected because SQL Server
+  Linux is x86-only and the DGX is arm64); lab code in a new repo the author created
+  (cloudutsukpilot/labs-azure, folder service-bus); use case: e-commerce orders (queue for orders with
+  retries and dead-lettering, topic fan-out to billing, shipping, email, fraud-check by SQL filter).

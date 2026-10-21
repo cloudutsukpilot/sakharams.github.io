@@ -1,0 +1,60 @@
+# Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-06-experiments.md
+# (include id: labs/azure-service-bus-lab/dead-letter), above experiment 5 (poison) and 6 (resubmit).
+# Facts from labs-azure/service-bus: infra/up.sh (orders: lock 30 s, max delivery count 3),
+# app/sblab/fulfillment.py (abandon on failure), app/sblab/web.py (api_resubmit). Emulator run
+# 2026-10-21: delivery_count 0, 1, 2, then MaxDeliveryCountExceeded.
+title: A poison order, three deliveries, then the dead-letter queue
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 420]
+
+lanes:
+  - { label: "Azure: queue orders", x: 8, y: 8, w: 560, h: 404 }
+  - { label: "k3d: shop", x: 584, y: 8, w: 408, h: 404 }
+
+nodes:
+  - { id: Q, label: "orders", sub: "active", x: 150, y: 110, w: 160, h: 62, shape: cylinder, icon: queue, color: amber }
+  - { id: D, label: "dead-letter", sub: "$DeadLetterQueue", x: 150, y: 320, w: 180, h: 62, shape: cylinder, icon: queue, color: red }
+  - { id: C, label: "count + 1", sub: "unlocked", x: 470, y: 200, w: 150, icon: clock, color: amber }
+  - { id: F, label: "fulfillment", sub: "charge card", x: 790, y: 110, w: 170, icon: "programming/python.svg", color: violet }
+  - { id: W, label: "shop-web", sub: "Resubmit button", x: 790, y: 320, w: 170, icon: "programming/python.svg", color: violet }
+
+edges:
+  - { id: QF, from: Q, to: F, points: [[230, 110], [705, 110]], label: "peek-lock", label_at: [470, 100], kind: event }
+  - { id: FC, from: F, to: C, points: [[790, 138], [790, 200], [545, 200]], label: "abandon", label_at: [680, 190], tone: warn }
+  - { id: CQ, from: C, to: Q, points: [[395, 200], [200, 200], [200, 141]], tone: warn }
+  - { id: QD, from: Q, to: D, points: [[150, 141], [150, 289]], label: "3rd abandon", label_at: [80, 270], tone: fail }
+  - { id: DW, from: D, to: W, points: [[240, 320], [705, 320]], label: "receive + copy", label_at: [470, 310], kind: event }
+  - { id: WQ, from: W, to: Q, points: [[790, 292], [790, 255], [100, 255], [100, 141]], label: "new MessageId", label_at: [470, 247], tone: ok, kind: event }
+
+steps:
+  - lights: [Q]
+    title: An order nobody can pay
+    text: "The card 4000-0000-0000-0002 is always declined. The order sits in the orders queue like any other."
+  - edges: [QF]
+    title: Delivery 1 (count 0)
+    text: "A fulfillment pod locks it. The Python SDK reports delivery_count 0: the AMQP header counts earlier attempts."
+  - edges: [FC]
+    title: Abandon gives it back
+    text: "Payment fails, the worker abandons. Service Bus releases the lock at once instead of waiting 30 s for it to expire."
+  - edges: [CQ]
+    title: Count goes up
+    text: "The message is available again with its delivery count one higher. Any receiver can take it next."
+  - edges: [QF]
+    title: Delivery 2 (count 1)
+    text: "The same message comes back, maybe to another pod. Nothing about it changed, so it fails the same way."
+  - edges: [FC, CQ]
+    title: Abandon again
+    text: "Count 2 now. A retry only helps when the failure is temporary; this one isn't."
+  - edges: [QF, FC]
+    title: Delivery 3, abandon 3
+    text: "The queue's max delivery count is 3, set in infra/up.sh. This is the last delivery Service Bus will try."
+  - edges: [QD]
+    title: Service Bus dead-letters it
+    text: "No code moves it: the broker puts it in orders/$DeadLetterQueue with reason MaxDeliveryCountExceeded."
+  - edges: [DW]
+    title: Someone looks at it
+    text: "Resubmit receives the dead letter in peek-lock mode. Nothing expires there; it waits for a person or a tool."
+  - edges: [WQ]
+    title: A fixed copy goes back
+    text: "shop-web sends a copy with manualApproval=true and a new MessageId (the old one is still in the 10-minute dedupe window), then completes the dead letter."

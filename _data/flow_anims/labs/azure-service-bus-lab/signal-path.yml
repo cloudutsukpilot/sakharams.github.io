@@ -1,0 +1,44 @@
+# Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-03-set-up-infrastructure.md
+# (include id: labs/azure-service-bus-lab/signal-path), the Observability Stack section.
+# Facts from labs-azure/service-bus (app/Dockerfile, app/sblab/telemetry.py, web.py's entity poller,
+# k8s/app/app.yaml) and the lab contract v2 description in the learning-lab skill (lab-anatomy.md).
+title: How the lab's traces, metrics and logs reach mon
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 430]
+
+lanes:
+  - { label: "The lab: Azure namespace and k3d lab-servicebus", x: 8, y: 8, w: 620, h: 414 }
+  - { label: "mon (homelab platform)", x: 644, y: 8, w: 348, h: 414 }
+
+nodes:
+  - { id: SB, label: "Service Bus", sub: "management API", x: 120, y: 90, w: 170, icon: "cloud/azure/services/service-bus.svg", color: pink }
+  - { id: W, label: "shop-web", sub: "entity poller", x: 120, y: 220, w: 170, icon: "programming/python.svg", color: violet }
+  - { id: K, label: "workers", sub: "2 Deployments", x: 120, y: 350, w: 170, icon: "programming/python.svg", color: violet }
+  - { id: A, label: "agent collector", sub: "monitoring ns", x: 440, y: 285, w: 180, icon: gear, color: green }
+  - { id: G, label: "OTLP gateway", sub: "labs token", x: 810, y: 285, w: 180, icon: server, color: green }
+  - { id: GR, label: "Grafana", sub: "folder Labs", x: 810, y: 110, w: 180, icon: "devops/monitoring/grafana-18.svg", color: green }
+
+edges:
+  - { id: SW, from: SB, to: W, label: "every 5 s", label_at: [195, 160], proto: HTTPS, port: 443, proto_at: [120, 160] }
+  - { id: WA, from: W, to: A, points: [[205, 220], [440, 220], [440, 257]], proto: OTLP, port: 4318, proto_at: [320, 220] }
+  - { id: KA, from: K, to: A, points: [[205, 350], [440, 350], [440, 313]], proto: OTLP, port: 4318, proto_at: [320, 350] }
+  - { id: AG, from: A, to: G, proto: OTLP, port: 443, proto_at: [625, 285] }
+  - { id: GG, from: G, to: GR, label: "Mimir, Loki, Tempo", label_at: [880, 200], kind: data }
+
+steps:
+  - lights: [SB, K]
+    title: Counts come from Azure
+    text: "Receiving can't tell you how many messages wait. shop-web asks the management API for every entity's counts every 5 s; the workers count what they settle."
+  - edges: [SW]
+    title: Counts become a gauge
+    text: "The poller's numbers are exported as sblab_entity_messages{entity, state}: active, deadletter and scheduled for each queue and subscription."
+  - edges: [WA, KA]
+    title: Every pod pushes OTLP
+    text: "opentelemetry-instrument wraps each process. The monitoring pack's agent collector adds the pod's labels and k8s.cluster.name = lab-servicebus."
+  - edges: [AG]
+    title: Off to mon
+    text: "It forwards everything to mon's OTLP gateway with the shared labs token. The lab runs no Grafana, Prometheus, Loki or Tempo of its own."
+  - edges: [GG]
+    title: One dashboard, filtered by cluster
+    text: "Metrics land in Mimir, logs in Loki, traces in Tempo. The lab's dashboard filters every query on cluster lab-servicebus."

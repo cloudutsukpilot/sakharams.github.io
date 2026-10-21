@@ -1,0 +1,83 @@
+# Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-01-overview.md
+# (include id: labs/azure-service-bus-lab/architecture), reused in part 7.
+# One order: checkout → orders queue → fulfillment → order-events topic → subscriptions → subscribers.
+# Facts from labs-azure/service-bus (infra/up.sh, app/sblab/*.py, k8s/app/app.yaml) and the emulator run.
+title: One order through the Service Bus lab, queue then topic
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 740]
+
+lanes:
+  - { label: "k3d lab-servicebus (DGX): checkout and fulfillment", x: 8, y: 8, w: 984, h: 160 }
+  - { label: "Azure Service Bus namespace (Standard)", x: 8, y: 184, w: 984, h: 370 }
+  - { label: "k3d lab-servicebus: subscribers, and the platform", x: 8, y: 570, w: 984, h: 162 }
+
+nodes:
+  - { id: B, label: "Browser", sub: "Shop page", x: 100, y: 96, icon: browser, color: blue }
+  - { id: W, label: "shop-web", sub: "checkout", x: 370, y: 96, icon: "programming/python.svg", color: violet }
+  - { id: F, label: "fulfillment", sub: "×1..3 pods", x: 700, y: 96, icon: "programming/python.svg", color: violet }
+  - { id: Q, label: "queue orders", sub: "dedupe 10 min", x: 370, y: 300, w: 160, h: 62, shape: cylinder, icon: queue, color: amber }
+  - { id: T, label: "topic", sub: "order-events", x: 700, y: 300, w: 160, h: 62, icon: "cloud/azure/services/service-bus.svg", color: pink }
+  - { id: S1, label: "billing", sub: "subject", x: 110, y: 470, w: 150, icon: queue, color: amber }
+  - { id: S2, label: "shipping", sub: "subject", x: 300, y: 470, w: 150, icon: queue, color: amber }
+  - { id: S3, label: "fraud-review", sub: "total > 500", x: 490, y: 470, w: 165, icon: queue, color: amber }
+  - { id: S4, label: "email", sub: "2 subjects", x: 685, y: 470, w: 150, icon: queue, color: amber }
+  - { id: S5, label: "analytics", sub: "everything", x: 880, y: 470, w: 150, icon: queue, color: amber }
+  - { id: R, label: "subscribers", sub: "4 receivers", x: 400, y: 660, w: 170, icon: "programming/python.svg", color: violet }
+  - { id: M, label: "mon Grafana", sub: "Mimir Loki Tempo", x: 820, y: 660, w: 190, icon: "devops/monitoring/grafana-18.svg", color: green }
+
+edges:
+  - { id: BW, from: B, to: W, proto: HTTP, port: 8095 }
+  - { id: WQ, from: W, to: Q, proto: AMQP, port: 5671, proto_at: [370, 240] }
+  - { id: QF, from: Q, to: F, points: [[450, 285], [540, 285], [540, 96], [625, 96]], label: "peek-lock", label_at: [560, 210], kind: event }
+  - { id: FT, from: F, to: T, proto: AMQP, port: 5671 }
+  - { id: T1, from: T, to: S1, points: [[640, 331], [640, 390], [110, 390], [110, 442]], kind: event }
+  - { id: T2, from: T, to: S2, points: [[660, 331], [660, 405], [300, 405], [300, 442]], kind: event }
+  - { id: T3, from: T, to: S3, points: [[680, 331], [680, 420], [490, 420], [490, 442]], kind: event }
+  - { id: T4, from: T, to: S4, points: [[700, 331], [700, 442]], kind: event }
+  - { id: T5, from: T, to: S5, points: [[760, 331], [760, 400], [880, 400], [880, 442]], kind: event, dashed: true }
+  - { id: R1, from: S1, to: R, points: [[110, 498], [110, 660], [315, 660]], kind: event }
+  - { id: R2, from: S2, to: R, points: [[300, 498], [300, 640], [315, 640]], kind: event }
+  - { id: R3, from: S3, to: R, points: [[440, 498], [440, 632]], kind: event }
+  - { id: R4, from: S4, to: R, points: [[655, 498], [655, 600], [380, 600], [380, 632]], kind: event }
+  - { id: RM, from: R, to: M, proto: OTLP, port: 4318, dashed: true }
+
+modes:
+  - { id: small, label: "A 120 USD order" }
+  - { id: big, label: "Make it an 800 USD order" }
+
+steps:
+  - lights: [B]
+    title: A customer places an order
+    text: "The Shop page posts the order to shop-web's checkout API through the lab's ingress on 127.0.0.1:8095."
+  - edges: [BW]
+    title: Checkout takes it
+    text: "Checkout gives the order an id (ord-xxxxxx), which also becomes the message's MessageId, and puts a traceparent in its properties."
+  - edges: [WQ]
+    title: Send to the queue, return at once
+    text: "One AMQP send to the orders queue with the send-only key. Checkout answers the browser now: nothing has been charged yet."
+  - edges: [QF]
+    title: One worker locks it
+    text: "A fulfillment pod receives in peek-lock mode: the order is hidden from other pods for 30 s while this one works on it."
+  - edges: [FT]
+    title: Charge, publish, complete
+    text: "The worker charges the card, publishes OrderConfirmed to the order-events topic, then completes the queue message so it is deleted."
+  - edges: [T1, T2, T4, T5]
+    when: small
+    title: The topic makes copies
+    text: "Each subscription's rule is checked against the message's properties. billing, shipping, email and analytics match; fraud-review wants total > 500, so it gets nothing."
+  - edges: [T1, T2, T3, T4, T5]
+    when: big
+    title: Five copies this time
+    text: "At 800 USD fraud-review's SQL filter matches too, and its rule action adds riskLevel = 'high' to that copy only."
+  - edges: [R1, R2, R4]
+    when: small
+    title: Each subscription is its own queue
+    text: "The subscribers pod holds one receiver per subscription. analytics has none, so its copy waits there until its time to live."
+  - edges: [R1, R2, R3, R4]
+    when: big
+    title: Each subscription is its own queue
+    text: "The subscribers pod holds one receiver per subscription, fraud-review's included. analytics has none, so its copy waits."
+  - edges: [RM]
+    title: Every pod reports to mon
+    text: "Shipping also publishes OrderShipped back to the topic (email's second copy). All pods send traces, metrics and logs over OTLP to mon."
