@@ -1,0 +1,73 @@
+# Animated flow diagram for _posts/projects/sql-blocking-agent/2026-10-05-12-cicd-and-release-management.md
+# (include id: projects/sql-blocking-agent/cicd-pipeline). From .github/workflows ci.yaml, release.yaml,
+# promote.yaml and pr-preview-teardown.yaml, plus versions.yaml as the per-environment version record.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: SQL Blocking Agent CI/CD and promotion
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 380]
+
+lanes:
+  - { label: "Build: pull request and main", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Release and promote with Argo CD", x: 8, y: 205, w: 984, h: 167 }
+
+nodes:
+  - { id: PR, label: "Pull request", x: 90, y: 75, w: 136, shape: terminal, icon: git, icon_pos: corner }
+  - { id: PREV, label: "PR preview\nin dev", x: 254, y: 75, w: 136, icon: git, icon_pos: corner }
+  - { id: MAIN, label: "Merge to\nmain", x: 418, y: 75, w: 136, icon: git }
+  - { id: CI, label: "Build, scan,\npush image", x: 582, y: 75, w: 136, icon: shield, icon_pos: corner }
+  - { id: CHART, label: "Helm chart\nto registry", x: 746, y: 75, w: 136, icon: "devops/orchestration/helm-18.svg", icon_pos: corner }
+  - { id: REL, label: "Release", sub: "bump + retag", x: 910, y: 75, w: 136, icon: rocket, icon_pos: corner }
+
+  - { id: DEV, label: "Promote to\ndevelopment", x: 130, y: 290, w: 150, icon: rocket }
+  - { id: APR, label: "Prod\napproval", x: 320, y: 290, w: 130, h: 88, shape: diamond }
+  - { id: VPR, label: "versions.yaml\nPR", x: 510, y: 290, w: 150, icon: git, icon_pos: corner }
+  - { id: ARGO, label: "Argo CD\nsync", x: 700, y: 290, w: 150, icon: package }
+  - { id: PROD, label: "Production\n(dry-run)", x: 890, y: 290, w: 150, shape: terminal, tone: ok }
+
+edges:
+  - { id: E1, from: PR, to: PREV }
+  - { id: E2, from: PREV, to: MAIN }
+  - { id: E3, from: MAIN, to: CI }
+  - { id: E4, from: CI, to: CHART }
+  - { id: E5, from: CHART, to: REL }
+  - { id: WRAP, from: REL, to: DEV, points: [[910, 103], [910, 165], [35, 165], [35, 290], [55, 290]] }
+  - { id: E7, from: DEV, to: APR }
+  - { id: E8, from: APR, to: VPR, label: "yes", label_at: [410, 280] }
+  - { id: E9, from: VPR, to: ARGO }
+  - { id: E10, from: ARGO, to: PROD }
+
+steps:
+  - lights: [PR]
+    title: A pull request
+    text: A change under sql-blocking-agent/ opens a PR, linked to its ticket. CI builds a preview and runs SonarQube, which also runs the 240 unit tests.
+  - edges: [E1]
+    title: Preview in development
+    text: CI can build a preview image and chart for the PR and deploy it to the development environment, so the change runs against real SQL before merge. Closing the PR tears it down.
+  - edges: [E2]
+    title: Merge to main
+    text: After review, the change merges. Only paths under sql-blocking-agent/ trigger the build.
+  - edges: [E3]
+    title: Build, scan, push
+    text: Shared reusable workflows build the Docker image, run SonarQube analysis with the unit tests and push the image to the JFrog registry.
+  - edges: [E4]
+    title: Package the chart
+    text: Changed Helm charts are detected, packaged and pushed to the same registry, so image and chart travel together.
+  - edges: [E5]
+    title: Release
+    text: The release workflow bumps the development version in versions.yaml, retags the tested image with that version, publishes the chart and creates a GitHub release.
+  - edges: [WRAP]
+    title: Promote to development
+    text: The promote workflow validates the release and deploys it to development through Argo CD, asking before it replaces an active PR preview.
+  - edges: [E7]
+    title: Production approval
+    text: Promoting to production runs in the protected production GitHub environment, so a reviewer has to approve it.
+  - edges: [E8]
+    title: A PR, not a push
+    text: The workflow updates the production version in versions.yaml and opens a pull request. Production changes are reviewed as Git changes.
+  - edges: [E9]
+    title: GitOps sync
+    text: Once that PR merges, Argo CD syncs the production release on AKS from Git. Nobody runs kubectl against production.
+  - edges: [E10]
+    title: Production, in dry-run
+    text: Production runs one replica in loop mode. Today it detects, analyzes and reports, but no real KILL is executed.

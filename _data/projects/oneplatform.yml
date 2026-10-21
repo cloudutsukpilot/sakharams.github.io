@@ -1,0 +1,72 @@
+# Project playbook card for /tags/oneplatform/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company name, GitHub org names, hostnames, vault/registry/subscription names, ticket IDs, internal
+# business-unit and product names, and colleagues' names are deliberately left out (public repo).
+# The portal's internal name is replaced with "OnePlatform" at the author's request.
+# The feature catalog lives in _data/project_features/oneplatform.yml.
+# Hidden from the Projects tab (_includes/projects-catalog.html skips cards with hidden: true).
+hidden: true
+name: OnePlatform
+tag: OnePlatform
+summary: An internal developer portal on Backstage, backed by a .NET middleware, that turns Azure and
+  GitHub requests, access reviews, monitoring, licensing and FinOps into self-service, role-gated
+  workflows for engineering, operations and leadership.
+status: Live
+created: '2026-10-05'
+category: platform-engineering
+clouds: [azure]
+facts:
+- label: Type
+  value: Internal developer portal (Backstage)
+- label: Stack
+  value: TypeScript, React, Node.js, .NET 10, PostgreSQL
+- label: Hosting
+  value: AKS via Helm and Argo CD, Azure Functions
+- label: Scope
+  value: 80 features, 45+ templates
+- label: Features
+  value: Feature catalog
+  url: /posts/projects/oneplatform/03-product-planning/#feature-catalog
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/oneplatform/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: user-journey, title: "Self-service request", url: /posts/projects/oneplatform/04-user-experience-and-design/#user-flows, diagram: projects/oneplatform/self-service-request, format: animated}
+- {type: system-context, title: "System architecture", url: /posts/projects/oneplatform/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/oneplatform/system-architecture, format: animated}
+- {type: other, title: "Backend PHI filtering", url: /posts/projects/oneplatform/06-security-and-privacy/#privacy-and-data-protection-requirements, diagram: projects/oneplatform/phi-filtering, format: animated}
+- {type: data-flow, title: "FinOps FOCUS import", url: /posts/projects/oneplatform/07-data-and-integration/#data-validation-and-quality, diagram: projects/oneplatform/finops-import, format: animated}
+- {type: other, title: "Feature lifecycle", url: /posts/projects/oneplatform/09-implementation/#feature-development, diagram: projects/oneplatform/feature-lifecycle, format: animated}
+- {type: cicd, title: "Release and promotion", url: /posts/projects/oneplatform/12-cicd-and-release-management/#build-automation, diagram: projects/oneplatform/release-promotion, format: animated}
+brief: |
+  Author's request (2026-10-05): "Please refer to the 2 repos under /home/sakharam/gitrepos/backstage
+  and understand the project which is based on the Spotify's backstage open source projects. I need to
+  create a project based on the implementation (what is implemented in the 2 repos) and create
+  architecture, documentation, etc based on skill. I also need a list of features that are added to the
+  [portal name redacted]/backstage portal, which I can later expand to show how each feature has requirements gathered,
+  designed, implemented and tested before it was released and any benefits."
+
+  Author's answers (2026-10-05):
+  - Disclosure: anonymize. Remove all company names, hostnames, etc. Name the portal "OnePlatform".
+  - Role: team member / lead on the platform team ("we" for the team's work).
+  - Feature list: a data file plus a catalog section in Product Planning, expandable per feature.
+  - Status: Live.
+
+  Facts taken from the two repositories (portal monorepo and .NET middleware), not from the author:
+  - Portal: Backstage 1.5x on the new backend and frontend systems, Node 24, React 18, TypeScript,
+    PostgreSQL 16, Yarn 4 monorepo; ~45 custom frontend/backend plugins, ~50 custom scaffolder actions,
+    45+ software templates. Repo history starts Jan 2024; ~1,600 commits; ~100 commits a month in 2026.
+  - Middleware: .NET 10 ASP.NET Core API (container on AKS) + Azure Functions v4 timer/HTTP jobs +
+    shared services library; EF Core on PostgreSQL (and read-only/dynamic SQL Server); JWT client auth.
+  - Identity: Entra ID SSO (primary) and GitHub App auth (secondary); 13 role groups in Entra; custom
+    permission policy with environment scoping and hard blocks; backend PHI redaction by usage location.
+  - Integrations: Azure ARM/Graph/Monitor/Cost, GitHub REST/GraphQL, Jira Cloud, SonarQube, Artifactory,
+    Datadog, Statuspage, Ansible, Zscaler, SMTP, Temporal, Terraform via GitHub Actions.
+  - Delivery: Docker image -> registry, Argo CD auto-deploys dev from a charts repo; promote workflows
+    bump staging/prod values; middleware via Helm + manual-dispatch workflows; EF migrations applied manually.
+  - Tests (portal, at one recorded green run): 2,693 unit, 356 integration (Testcontainers PostgreSQL),
+    30 Playwright E2E; SonarQube gate. Middleware: ~1,850 xUnit tests, Testcontainers integration lane.
+  - Every non-trivial feature has PLAN / DESIGN / IMPLEMENTATION / ARCHITECTURE docs produced through
+    repository AI prompts (feature-planner, feature-implement, change-request).
+  - Not in the repos (left as open questions in the posts): user counts, adoption numbers, SLOs, DR targets, budget, team
+    size and structure, sponsor names, original business case.

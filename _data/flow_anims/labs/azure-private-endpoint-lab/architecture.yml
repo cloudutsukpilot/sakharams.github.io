@@ -1,0 +1,79 @@
+# Animated flow diagram for _posts/labs/azure-private-endpoint-lab/2026-10-10-01-overview.md
+# (include id: labs/azure-private-endpoint-lab/architecture), reused in part 7.
+# One SDK call to <account>.openai.azure.com from the DGX: first the DNS lookup, then the request.
+# Facts from ~/gitrepos/azure/azure-private-endpoint-lab (infra/, dgx/render.sh) and the 2026-10-10 run.
+title: DGX Spark to Azure Private Endpoint, DNS and request paths
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 540]
+
+lanes:
+  - { label: "DGX Spark (home network)", x: 8, y: 8, w: 290, h: 524 }
+  - { label: "Azure VNet 10.60.0.0/16", x: 330, y: 8, w: 662, h: 524 }
+
+nodes:
+  - { id: APP, label: "App / SDK", sub: "pe-probe", x: 150, y: 80, w: 150, h: 56, icon: server }
+  - { id: RES, label: "systemd-resolved", sub: "127.0.0.53", x: 150, y: 200, w: 150, h: 56 }
+  - { id: WG, label: "wg0", sub: "10.200.0.2", x: 150, y: 330, w: 150, h: 56 }
+  - { id: HOME, label: "Home router DNS", sub: "every other name", x: 150, y: 460, w: 150, h: 56, icon: globe, icon_pos: corner }
+  - { id: VM, label: "WireGuard VM", sub: "wg0 10.200.0.1", x: 450, y: 344, w: 150, h: 56, icon: "cloud/azure/compute/non-serverless/virtualmachine.svg", icon_pos: corner }
+  - { id: DM, label: "dnsmasq", sub: "10.200.0.1:53", x: 450, y: 200, w: 150, h: 56 }
+  - { id: AD, label: "Azure DNS", sub: "168.63.129.16", x: 660, y: 200, w: 150, h: 56, icon: globe, icon_pos: corner }
+  - { id: ZN, label: "Private DNS zone", sub: "privatelink.*", x: 870, y: 200, w: 160, h: 62, shape: cylinder, icon: globe, icon_pos: corner }
+  - { id: NAT, label: "MASQUERADE", sub: "src 10.60.2.4", x: 660, y: 344, w: 150, h: 56 }
+  - { id: PE, label: "Private endpoint", sub: "10.60.1.4-6", x: 870, y: 344, w: 160, h: 56, icon: router, icon_pos: corner }
+  - { id: FD, label: "Foundry account", sub: "public access off", x: 870, y: 460, w: 160, h: 56, shape: terminal }
+
+edges:
+  - { id: APP_RES, from: APP, to: RES, label: "lookup" }
+  - { id: RES_HOME, from: RES, to: HOME, points: [[75, 200], [42, 200], [42, 460], [75, 460]], dashed: true }
+  - { id: RES_WG, from: RES, to: WG, label: "~openai.azure.com" }
+  - { id: WG_VM, from: WG, to: VM, points: [[225, 344], [375, 344]], label: "UDP 51820", label_at: [300, 334] }
+  - { id: VM_DM, from: VM, to: DM, label: ":53" }
+  - { id: DM_AD, from: DM, to: AD, label: "forward" }
+  - { id: AD_ZN, from: AD, to: ZN, label: "linked" }
+  - { id: APP_WG, from: APP, to: WG, points: [[225, 80], [268, 80], [268, 318], [225, 318]], label: "HTTPS", label_at: [272, 150] }
+  - { id: VM_NAT, from: VM, to: NAT }
+  - { id: NAT_PE, from: NAT, to: PE }
+  - { id: PE_FD, from: PE, to: FD }
+
+steps:
+  - lights: [APP]
+    title: An SDK call needs an IP
+    text: "Your code calls https://<account>.openai.azure.com. Before any packet leaves, the name has to become an address."
+  - edges: [APP_RES]
+    title: Ask the local resolver
+    text: "glibc sends the lookup to systemd-resolved on 127.0.0.53, which picks a DNS server per link by matching routing domains."
+  - edges: [RES_HOME]
+    title: Most names stay at home
+    text: "Names that match no routing domain go to your router's DNS as before. Only three Azure AI domains are routed elsewhere."
+  - edges: [RES_WG]
+    title: Azure AI names go to wg0
+    text: "openai.azure.com matches the ~openai.azure.com routing domain on wg0, whose DNS server is 10.200.0.1 at the other end of the tunnel."
+  - edges: [WG_VM]
+    title: Through the tunnel
+    text: "WireGuard wraps the query in UDP to the VM's public IP on 51820. The NSG accepts that port from your home IP only."
+  - edges: [VM_DM]
+    title: dnsmasq picks it up
+    text: "dnsmasq listens on the VM's tunnel address only and has one upstream: Azure DNS."
+  - edges: [DM_AD]
+    title: Forward to Azure DNS
+    text: "168.63.129.16 answers only from inside Azure. It is the one resolver that sees the private zones linked to this VNet."
+  - edges: [AD_ZN]
+    title: The private zone answers
+    text: "The public CNAME points into privatelink.openai.azure.com. Because that zone is linked to the VNet, the answer is 10.60.1.5, not a public IP."
+  - edges: [APP_WG]
+    title: The request goes into wg0
+    text: "With 10.60.1.5 in hand the SDK connects to it. wg-quick routed 10.60.0.0/16 via wg0 (the AllowedIPs); nothing else uses the tunnel."
+  - edges: [WG_VM]
+    title: Encrypted to the VM
+    text: "Same tunnel, same UDP port. The VM decrypts the packet and sees a TCP SYN from 10.200.0.2 to 10.60.1.5:443."
+  - edges: [VM_NAT]
+    title: Forward and NAT
+    text: "ip_forward passes the packet on and MASQUERADE rewrites the source to 10.60.2.4, so the VNet needs no route back to 10.200.0.0/24."
+  - edges: [NAT_PE]
+    title: Into the private endpoint
+    text: "The private endpoint has one IP per public name: .4 cognitiveservices, .5 openai, .6 services.ai."
+  - edges: [PE_FD]
+    title: The account says 200
+    text: "Traffic through the private endpoint is allowed even with public network access disabled. The same call over the internet gets 403."

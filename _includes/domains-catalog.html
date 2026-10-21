@@ -1,0 +1,27 @@
+{% comment %}
+  Domains tab: one card per business domain from _data/domains.yml. Active domains link to their
+  learning-path page and show how many posts are written; planned ones show as "coming soon".
+{% endcomment %}
+<div class="domains">
+  <div class="dm-grid">
+    {%- for d in site.data.domains %}
+    {%- assign d_posts = site.posts | where: "domain", d.id -%}
+    {%- assign d_soon = d_posts | where: "coming_soon", true | size -%}
+    {%- assign d_ready = d_posts | size | minus: d_soon -%}
+    <article class="dm-card{% if d.status != 'active' %} is-planned{% endif %}">
+      <h2 class="dm-card-title">
+        <i class="{{ d.icon }}" aria-hidden="true"></i>
+        {% if d.status == 'active' %}<a href="{{ d.url | relative_url }}">{{ d.title }}</a>{% else %}{{ d.title }}{% endif %}
+      </h2>
+      <p class="dm-card-summary">{{ d.summary }}</p>
+      <p class="dm-card-meta">
+        {%- if d.status == 'active' -%}
+        {{ d_posts | size }} topics in the learning path · {{ d_ready }} written, {{ d_soon }} coming soon
+        {%- else -%}
+        <span class="dm-badge">Coming soon</span>
+        {%- endif -%}
+      </p>
+    </article>
+    {%- endfor %}
+  </div>
+</div>

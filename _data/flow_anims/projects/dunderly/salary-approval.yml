@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-02-requirements-gathering.md
+# (include id: projects/dunderly/salary-approval). The salary-change journey: a manager raises a
+# request, the API validates it, the HR manager approves or rejects, and an approved change lands as
+# an effective-dated salary row that the next payroll run picks up.
+title: Dunderly salary change approval
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 280]
+modes:
+  - { id: approve, label: "HR manager approves" }
+  - { id: reject, label: "Simulate a rejected request" }
+
+nodes:
+  - { id: MGR, label: "Manager", x: 80, y: 80, w: 120, shape: terminal, icon: user }
+  - { id: REQ, label: "Raise request", sub: "amount, date", x: 250, y: 80, w: 140 }
+  - { id: VAL, label: "Validate", sub: "band, period", x: 430, y: 80, w: 140, icon: check, icon_pos: corner }
+  - { id: HRM, label: "HR\ndecides", x: 610, y: 80, w: 130, h: 88, shape: diamond }
+  - { id: SAL, label: "Salary record", sub: "effective-dated", x: 840, y: 80, w: 150 }
+  - { id: PAY, label: "Next payroll\nrun", x: 840, y: 230, w: 150, icon: function, icon_pos: corner }
+  - { id: REJ, label: "Rejected", sub: "reason required", x: 610, y: 230, w: 150, tone: fail, icon: cross, icon_pos: corner }
+
+edges:
+  - { id: MGRREQ, from: MGR, to: REQ }
+  - { id: REQVAL, from: REQ, to: VAL }
+  - { id: VALHRM, from: VAL, to: HRM }
+  - { id: HRMSAL, from: HRM, to: SAL, label: "approve", tone: ok }
+  - { id: SALPAY, from: SAL, to: PAY }
+  - { id: HRMREJ, from: HRM, to: REJ, label: "reject", tone: fail }
+
+steps:
+  - lights: [MGR]
+    title: A manager starts it
+    text: Only a manager can propose a salary change, and only for their own direct reports. HR can raise one on anyone's behalf.
+  - edges: [MGRREQ]
+    title: Raise the request
+    text: The manager enters the new amount, the effective date and a justification. The request is saved as Draft until they submit it.
+  - edges: [REQVAL]
+    title: Validate the rules
+    text: The API checks the pay band, that the effective date isn't in a payroll period that's already closed, and that no other request is open for that employee.
+  - edges: [VALHRM]
+    title: Submitted to HR
+    text: The request becomes Submitted and the HR manager is notified. Increases above the threshold are flagged for extra scrutiny.
+  - edges: [HRMSAL]
+    when: approve
+    title: Approved
+    text: Approval writes a new effective-dated salary row. The old row stays in history (temporal table), and an audit event records who approved what and when.
+  - edges: [SALPAY]
+    when: approve
+    title: Paid from the next run
+    text: The first payroll run whose period covers the effective date includes the new salary. After that run is approved, the request is read-only.
+  - edges: [HRMREJ]
+    when: reject
+    title: Rejected
+    text: A rejection needs a written reason, which the manager sees. Nothing changes in the salary data, and the manager can raise a new request later.

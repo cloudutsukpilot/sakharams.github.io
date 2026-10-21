@@ -1,0 +1,79 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-application-integration-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: queues
+    title: Message queues
+    aws:
+      - ref: Amazon SQS
+        summary: Fully managed queues with no capacity to provision. Standard queues give near-unlimited throughput with at-least-once delivery; FIFO queues give ordering and exactly-once processing. Dead-letter queues, delay queues and long polling built in.
+    azure:
+      - ref: Service Bus
+        summary: Enterprise message broker with queues and topics, sessions for ordered processing, transactions, duplicate detection, scheduled messages and dead-lettering. Supports AMQP 1.0 and JMS 2.0 on Premium.
+      - ref: Queue Storage
+        summary: Simple, very cheap queues inside a storage account for basic work distribution. Up to 64 KB messages and no ordering guarantees; use Service Bus when you need broker features.
+    gcp:
+      - ref: Pub/Sub
+        summary: Pub/Sub covers queue-style work distribution with pull subscriptions, ordering keys, exactly-once delivery and dead-letter topics. Cloud Tasks handles explicit task dispatch with rate limiting and scheduling.
+
+  - id: pubsub
+    title: Pub/sub and notifications
+    aws:
+      - ref: Amazon SNS
+        summary: Topics that fan messages out to SQS queues, Lambda functions, HTTP endpoints, email, SMS and mobile push. FIFO topics preserve order into FIFO queues; message filtering routes subsets to subscribers.
+    azure:
+      - ref: Service Bus
+        name: Service Bus topics
+        summary: Topics with subscriptions and SQL-like filter rules for durable enterprise fan-out, with all of Service Bus's reliability features.
+      - ref: Notification Hubs
+        summary: Push notifications at scale to iOS, Android, Windows and web, with tagging and templates to target user segments.
+    gcp:
+      - ref: Pub/Sub
+        summary: A global topic with many subscriptions (push or pull), message filtering, replay with seek, and direct BigQuery and Cloud Storage subscriptions that write messages without code. Firebase Cloud Messaging handles mobile push.
+
+  - id: events
+    title: Event routing
+    aws:
+      - ref: Amazon EventBridge
+        summary: Serverless event bus receiving events from AWS services, SaaS partners and your apps, routed by content-based rules to 20+ targets. Pipes connects sources to targets with filtering and enrichment; Scheduler runs cron-style jobs at scale.
+    azure:
+      - ref: Event Grid
+        summary: Push-based event routing for Azure resource events (blob created, resource changed) and custom topics, using CloudEvents. Namespaces add MQTT broker support and pull delivery.
+    gcp:
+      - ref: Eventarc
+        summary: Routes events from Google Cloud services (via Cloud Audit Logs or direct sources), Pub/Sub and third parties to Cloud Run, GKE, Workflows and Cloud Run functions, using CloudEvents.
+
+  - id: streaming
+    title: Event streaming ingestion
+    aws:
+      - ref: Amazon Kinesis
+        name: Kinesis Data Streams
+        summary: Ordered, replayable streams of records sharded for throughput, retained for 24 hours up to a year. On-demand mode scales automatically. Amazon MSK provides managed Apache Kafka for Kafka-native workloads.
+    azure:
+      - ref: Event Hubs
+        summary: Big-data streaming platform that ingests millions of events per second, with partitions, consumer groups, capture to Data Lake, and a Kafka-compatible endpoint so Kafka clients work unchanged.
+    gcp:
+      - ref: Pub/Sub
+        summary: Pub/Sub handles high-volume event ingestion with automatic scaling and no partitions to manage. Google Cloud Managed Service for Apache Kafka is available for Kafka-native workloads.
+
+  - id: workflow
+    title: Workflow orchestration
+    aws:
+      - ref: AWS Step Functions
+        summary: Visual state machines that coordinate Lambda, ECS, Glue and 200+ AWS services with retries, error handling, parallel branches and human approval steps. Standard workflows run up to a year; Express workflows suit high-volume, short runs.
+    azure:
+      - ref: Logic Apps
+        summary: Low-code workflows with 1,400+ connectors for SaaS, on-premises and Azure services. Consumption (multi-tenant, pay per action) or Standard (single-tenant, VNet-integrated, runs locally). Durable Functions is the code-first alternative.
+    gcp:
+      - ref: Workflows
+        summary: Serverless orchestration in YAML or JSON that calls Google Cloud APIs and any HTTP service, with retries, callbacks and parallel steps. Billed per step; Cloud Composer (Airflow) covers data-pipeline orchestration.
+
+  - id: api
+    title: API gateways and management
+    aws:
+      - ref: Amazon API Gateway
+        summary: Create REST, HTTP and WebSocket APIs in front of Lambda, containers or any HTTP backend, with authorisers (IAM, Cognito, Lambda), throttling, usage plans and API keys. HTTP APIs are cheaper and faster for simple proxies.
+    azure:
+      - ref: API Management
+        summary: Full API management with a gateway, developer portal, policies (transform, rate limit, validate JWT), versioning and a self-hosted gateway for hybrid. Consumption and v2 tiers cover small to enterprise use, including AI gateway policies for LLM APIs.
+    gcp:
+      - ref: API Gateway
+        summary: Lightweight managed gateway for Cloud Run, Cloud Run functions and App Engine using OpenAPI specs, with API keys and JWT auth. **Apigee** is Google's full enterprise API management platform.

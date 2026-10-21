@@ -1,0 +1,96 @@
+# Learning lab framework: the parts every hands-on lab is written in.
+#
+# A lab is a runnable repo (code, k3d cluster, observability stack, a Makefile with one target per
+# experiment) plus one post per part below, under _posts/labs/<slug>/. The lab card and its
+# experiments live in _data/labs/<slug>.yml. The tag page /tags/<slug>/ renders the index
+# (_includes/lab-index.html) from this file and the card.
+#
+# Each `topics` entry becomes a `## Topic` heading with an `{: #<topic | slugify> }` anchor in that
+# part's post. The index deep-links to those anchors and htmlproofer fails on a dead one, so renaming
+# a topic means updating every existing lab (run check.py for each). Part 6 also gets one
+# `## Experiment N: <title>` + `{: #exp-<id> }` section per experiment in the card.
+#
+# Created and checked by the cloudutsuk-learning-lab skill (.claude/skills/cloudutsuk-learning-lab/).
+
+parts:
+  - id: 1
+    slug: overview
+    title: Overview and Architecture
+    icon: fas fa-map-signs
+    summary: What you build, what you need, and how requests and signals travel through it.
+    topics:
+      - What You Will Build
+      - Prerequisites
+      - Architecture
+      - Building Blocks
+      - What You Will Learn
+
+  - id: 2
+    slug: write-the-code
+    title: Write the Code
+    icon: fas fa-code
+    summary: The application and its instrumentation, file by file.
+    topics:
+      - Repository Layout
+      - The Application
+      - Instrumentation
+      - Build the Image
+
+  - id: 3
+    slug: set-up-infrastructure
+    title: Set Up the Infrastructure
+    icon: fas fa-server
+    summary: The cluster, the app manifests and the observability stack that receives the signals.
+    topics:
+      - The Cluster
+      - Application Manifests
+      - Observability Stack
+      - Ports and Endpoints
+
+  - id: 4
+    slug: deploy
+    title: Deploy
+    icon: fas fa-rocket
+    summary: Bring everything up, check the rollout and smoke-test the endpoints.
+    topics:
+      - Bring It Up
+      - Verify the Rollout
+      - Smoke Test
+      - Common Failures
+
+  - id: 5
+    slug: monitor
+    title: Monitor
+    icon: fas fa-chart-line
+    summary: A tour of the dashboard, the query behind each panel, and how long each signal takes to arrive.
+    topics:
+      - Open the Dashboard
+      - Panel by Panel
+      - Explore Queries
+      - Signal Timing
+
+  - id: 6
+    slug: experiments
+    title: Experiments
+    icon: fas fa-flask
+    summary: Perform an action, predict the signal, then check the dashboard and explain what changed.
+    experiments: true
+    topics:
+      - How to Run an Experiment
+
+  - id: 7
+    slug: understand-and-review
+    title: Understand and Review
+    icon: fas fa-graduation-cap
+    summary: What the experiments proved, where this setup stops, and what production would change.
+    topics:
+      - The Full Signal Path
+      - What the Experiments Showed
+      - Limits of This Setup
+      - Taking It to Production
+      - Tear Down
+      - Go Further
+
+# Every part ends with this section (a few questions with folded answers).
+closing:
+  title: Check Your Understanding

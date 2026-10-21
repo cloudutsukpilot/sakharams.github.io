@@ -1,0 +1,73 @@
+# Project playbook card for /tags/dunderly/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Dunderly is a fictional company from the author's 2023 architecture case study. Facts that the
+# original post did not give are written in the posts as labelled "Assumption" callouts (the author
+# asked for an "ideal scenario"), and questions only a real client could answer stay as open questions.
+name: Dunderly HR System
+tag: Dunderly
+summary: 'An Azure-hosted HR system for Dunderly, a paper supplies company: employee records, salary-change
+  approvals, vacation balances and a monthly payroll file for the legacy on-premises payment system.'
+status: Planning
+created: '2026-10-07'
+category: solution-architecture
+clouds: [azure]
+facts:
+- label: Type
+  value: Internal HR web application (architecture case study)
+- label: Stack
+  value: .NET (ASP.NET Core API, Blazor WebAssembly, Azure Functions), Azure SQL, Blob Storage
+- label: Hosting
+  value: Azure, single region (West Europe), on-premises payment system
+- label: Scale
+  value: 250 employees growing to 500, ~10 concurrent users, ~25.5 GB
+- label: Integration
+  value: Monthly payroll file to a legacy C++ payment system
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/dunderly/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: other, title: "Dunderly salary change approval", url: /posts/projects/dunderly/02-requirements-gathering/#user-journeys-and-use-cases, diagram: projects/dunderly/salary-approval, format: animated}
+- {type: system-context, title: "Architecture", url: /posts/projects/dunderly/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/dunderly/system-architecture, format: animated}
+- {type: other, title: "Dunderly document upload and malware scan", url: /posts/projects/dunderly/06-security-and-privacy/#input-validation-and-secure-coding, diagram: projects/dunderly/document-upload, format: animated}
+- {type: data-flow, title: "Dunderly monthly payroll run", url: /posts/projects/dunderly/07-data-and-integration/#external-systems-and-third-party-integrations, diagram: projects/dunderly/payroll-run, format: animated}
+- {type: cicd, title: "Dunderly CI/CD pipeline", url: /posts/projects/dunderly/12-cicd-and-release-management/#build-automation, diagram: projects/dunderly/cicd-pipeline, format: animated}
+- {type: other, title: "Dunderly go-live cutover", url: /posts/projects/dunderly/13-deployment-and-go-live/#cutover-and-rollback-plan, diagram: projects/dunderly/go-live-cutover, format: animated}
+- {type: incident, title: "Dunderly support escalation", url: /posts/projects/dunderly/16-support-and-maintenance/#incident-response, diagram: projects/dunderly/support-escalation, format: animated}
+brief: |
+  Author's request: "Please update the post "Architectures - Dunderly" as a project and add any
+  missing information based on a ideal scenario that would be implemented for a Paper Supplies
+  company. Add animated diagrams wherever possible/appropiate and convert it into a cloudutsuk
+  project structure. Ask any questions for clarification"
+
+  Answers to clarifying questions: fill gaps with labelled assumptions (questions only a real client
+  could answer stay open); modernize the 2023 stack and show the delta from the original with
+  ADRs; delete the original post; name "Dunderly HR System", tag "Dunderly", status Planning.
+
+  Source: the 2023 case study post (_posts/architect/case-studies/azure/2023-07-15-dunderly.md,
+  now removed). Company: Dunderly sells paper supplies (printer paper, envelopes, etc.) and needs a
+  new HR system for managing employees, salaries, vacations and payments.
+  Functional requirements: web based; CRUD on employees; manage salaries (a manager asks for an
+  employee's salary change, the HR manager approves or rejects); manage vacation days; use an
+  external payment system.
+  Non-functional: classic information system, not a lot of users or data, interface to an external
+  system. Clarified: 10 concurrent users; 250 employees, expected to grow to 500 in 5 years; the
+  payment system is a legacy C++ system hosted in the company's server farm, input is files only,
+  one file a month; 1 employee is ~1 MB of data plus ~10 scanned documents (contract, reviews) of
+  ~5 MB each, ~51 MB per employee, 25.5 GB total at 500 employees; relational and unstructured data;
+  not mission critical.
+  Components: Employee service (CRUD), Salary service (approval workflow), Vacation service, View
+  service (static HTML/CSS/JS), Payment interface (monthly file), single shared data store (data is
+  shared between services), Logging service (queue, fire and forget).
+  Technology: client wants Azure and .NET. 2023 choices: Static Web Apps Standard for the view
+  service; App Service Standard for each of the three APIs (Functions rejected as "lightweight");
+  Azure SQL Gen5 2 vCore General Purpose reserved; Storage Account hot tier for documents; Log
+  Analytics / Azure Monitor for logging; App Service WebJob for the payment interface (no built-in
+  redundancy, runs monthly, add monitoring); encryption at rest (AES-256) and TLS in transit;
+  Application Gateway WAF v2 in front of the APIs; App Service access restrictions from the gateway
+  VNet; Storage and SQL firewalls allowing App Service outbound IPs. API tables for employees,
+  documents, salary requests and vacation days.
+  2023 cost estimate (image): West Europe (Static Web Apps in Central US); Azure Monitor $10.57,
+  Static Web Apps $9.00, 3 x App Service S1 Windows $73.00 each, Azure SQL GP Gen5 1-2 vCore 3-year
+  reserved 5 GB $256.63, Storage LRS hot 25 GB $0.71, Application Gateway WAF v2 $352.15; total
+  $848.07 per month, no upfront cost.

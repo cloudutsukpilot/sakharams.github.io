@@ -1,0 +1,66 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-devops-developer-tools.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: repos
+    title: Source code repositories
+    aws:
+      - name: AWS CodeCommit
+        icon: codecommit
+        summary: Managed private Git repositories integrated with IAM. AWS stopped onboarding new customers in 2024, then returned CodeCommit to general availability in November 2025, with Git LFS support on the roadmap.
+    azure:
+      - ref: Azure DevOps
+        name: Azure Repos (Azure DevOps)
+        summary: Unlimited private Git repositories with branch policies, required reviewers, build validation and pull requests, as part of Azure DevOps Services. GitHub (also Microsoft) is the strategic direction for new projects.
+    gcp:
+      - name: Secure Source Manager
+        summary: A regionally deployed, single-tenant managed Git service with IAM integration and VPC Service Controls support. It replaced Cloud Source Repositories, which closed to new customers in 2024.
+
+  - id: ci
+    title: Continuous integration and builds
+    aws:
+      - ref: AWS CodeBuild
+        summary: Fully managed build service that runs builds in containers you choose and bills per build minute. Can serve as GitHub Actions and GitLab runners, with Lambda compute for fast short builds and reserved capacity fleets.
+    azure:
+      - ref: Azure DevOps
+        name: Azure Pipelines (Azure DevOps)
+        summary: YAML or classic pipelines for any language and platform, with Microsoft-hosted agents on Linux, Windows and macOS or self-hosted agents, environments with approvals, and deep Azure integration.
+    gcp:
+      - ref: Cloud Build
+        summary: Serverless builds defined as container steps in `cloudbuild.yaml`, with triggers from GitHub, GitLab, Bitbucket and Secure Source Manager. Private pools run builds inside your VPC; SLSA build provenance is generated automatically.
+
+  - id: cd
+    title: Continuous delivery and deployment
+    aws:
+      - ref: AWS CodePipeline
+        summary: Release pipelines that orchestrate source, build, test and deploy stages, with V2 pipelines adding Git-based triggers and variables. Integrates with CodeBuild, CodeDeploy, CloudFormation, ECS and third-party tools.
+      - ref: AWS CodeDeploy
+        summary: Automated deployments to EC2, on-premises servers, Lambda and ECS, with in-place, rolling and blue/green strategies and automatic rollback on alarms.
+    azure:
+      - ref: Azure DevOps
+        name: Azure Pipelines release stages
+        summary: Multi-stage YAML pipelines deploy to App Service, AKS, VMs and more, with environments, approvals and checks, deployment strategies (rolling, canary) and service connections using workload identity federation.
+    gcp:
+      - ref: Cloud Deploy
+        summary: Managed continuous delivery to GKE, Cloud Run and GKE Enterprise, with promotion across targets, approvals, canary and parallel deployments, rollbacks and deployment verification.
+
+  - id: cli
+    title: Command-line tools
+    aws:
+      - ref: AWS CLI
+        summary: The unified `aws` CLI (v2) for every AWS service, with SSO sign-in through IAM Identity Center, profiles, output filtering with JMESPath queries, and a browser-based AWS CloudShell.
+    azure:
+      - ref: Azure CLI
+        summary: The cross-platform `az` CLI with extensions, interactive mode and JMESPath queries. Azure PowerShell (the Az module) is the PowerShell alternative, and Azure Cloud Shell gives both in the browser.
+    gcp:
+      - ref: gcloud CLI
+        summary: The `gcloud` CLI from the Google Cloud SDK, alongside `gsutil` (now superseded by `gcloud storage`) and `bq`. Cloud Shell provides a browser terminal with tools preinstalled and a built-in editor.
+
+  - id: devenv
+    title: Development and test environments
+    aws:
+      note: No dedicated dev/test lab service. Teams typically publish approved environments with **AWS Service Catalog** or CloudFormation templates, and use EC2 instance scheduling and budgets to control cost.
+    azure:
+      - ref: DevTest Labs
+        summary: Self-service labs of VMs from approved images and formulas, with auto-shutdown, cost thresholds and per-user limits. Microsoft Dev Box offers managed developer workstations for the same need.
+    gcp:
+      - name: Cloud Workstations
+        summary: Fully managed, container-based development environments accessed through the browser or a local IDE, defined centrally by admins and running inside your VPC.

@@ -1,0 +1,44 @@
+{
+  "uid": "__SLUG__",
+  "title": "__NAME__",
+  "tags": ["lab"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate (replace with the lab's key metric)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(up[1m]))" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Key number in range",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(up)" }]
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Logs",
+      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "{service_name=\"__SERVICE__\"}" }]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Traces (click an ID for the waterfall)",
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [{ "refId": "A", "queryType": "traceql", "query": "{ resource.service.name = \"__SERVICE__\" }", "limit": 20 }]
+    }
+  ]
+}

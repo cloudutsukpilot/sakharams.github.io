@@ -1,0 +1,100 @@
+{%- comment -%}
+  Labs tab: one tile per hands-on lab, grouped by category.
+  Data: _data/lab_catalog.yml (categories) and _data/labs/<slug>.yml (lab cards; `lab_category` places
+  them). Each tile links to the lab index (/tags/<slug>/), to every written part
+  (_data/lab_framework.yml parts, posts with `lab: <slug>` and `lab_part`) and to its experiments.
+  Created by the cloudutsuk-learning-lab skill; styles in _sass/lab.scss (.labs-catalog).
+{%- endcomment -%}
+{%- assign catalog = site.data.lab_catalog -%}
+{%- assign framework = site.data.lab_framework -%}
+{%- assign known_ids = catalog.categories | map: "id" -%}
+{%- assign lab_count = site.data.labs | size -%}
+
+<div class="labs-catalog">
+  <p class="lc-intro">
+    {{ lab_count }} hands-on lab{% if lab_count != 1 %}s{% endif %}. Each one is runnable code you deploy on your own
+    machine, a set of experiments that each do one thing, and real screenshots of what the dashboards
+    showed when the lab was run. Pick a lab and start at part 1, or jump straight to its experiments.
+  </p>
+
+  <nav class="lc-jump" aria-label="Lab categories">
+    {%- for cat in catalog.categories %}
+    <a href="#{{ cat.id }}"><i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}</a>
+    {%- endfor %}
+  </nav>
+
+  {%- assign sections = known_ids | push: "__other" -%}
+  {%- for sid in sections -%}
+    {%- if sid == "__other" -%}
+      {%- assign cat = nil -%}
+    {%- else -%}
+      {%- assign cat = catalog.categories | where: "id", sid | first -%}
+    {%- endif -%}
+
+    {%- capture tiles -%}
+      {%- for entry in site.data.labs -%}
+        {%- assign slug = entry[0] -%}{%- assign lab = entry[1] -%}
+        {%- if sid == "__other" -%}
+          {%- if known_ids contains lab.lab_category -%}{%- continue -%}{%- endif -%}
+        {%- elsif lab.lab_category != sid -%}{%- continue -%}{%- endif -%}
+        {%- assign lab_posts = site.posts | where: "lab", slug -%}
+        {%- assign exp_post = lab_posts | where: "lab_part", 6 | first -%}
+        {%- assign lab_url = '/tags/' | append: slug | append: '/' -%}
+        <article class="lc-tile">
+          <div class="lc-tile-head">
+            <span class="lc-kind"><i class="fas fa-flask" aria-hidden="true"></i> Lab</span>
+            {%- if lab.status %}<span class="lc-status">{{ lab.status }}</span>{% endif %}
+          </div>
+          <h3 class="lc-tile-title"><a href="{{ lab_url | relative_url }}">{{ lab.name }}</a></h3>
+          {%- if lab.summary %}<p class="lc-tile-summary">{{ lab.summary }}</p>{% endif %}
+          <div class="lc-chips">
+            {%- if lab.level %}<span><i class="fas fa-signal" aria-hidden="true"></i> {{ lab.level }}</span>{% endif -%}
+            {%- if lab.duration %}<span><i class="far fa-clock" aria-hidden="true"></i> {{ lab.duration }}</span>{% endif -%}
+            {%- if lab.platform.runtime %}<span><i class="fas fa-server" aria-hidden="true"></i> {{ lab.platform.runtime }}</span>{% endif -%}
+            {%- if lab.experiments.size > 0 %}<span><i class="fas fa-vial" aria-hidden="true"></i> {{ lab.experiments.size }} experiments</span>{% endif -%}
+          </div>
+          <ol class="lc-parts">
+            {%- for part in framework.parts -%}
+              {%- assign post = lab_posts | where: "lab_part", part.id | first -%}
+              <li>
+                {%- if post -%}
+                  <a href="{{ post.url | relative_url }}">{{ part.title }}</a>
+                {%- else -%}
+                  <span class="lc-pending">{{ part.title }}</span>
+                {%- endif -%}
+              </li>
+            {%- endfor -%}
+          </ol>
+          {%- if exp_post and lab.experiments.size > 0 %}
+          <div class="lc-exps">
+            <span class="lc-exps-label">Experiments:</span>
+            {%- for exp in lab.experiments %}
+            <a href="{{ exp_post.url | relative_url }}#exp-{{ exp.id }}">{{ exp.title }}</a>{% unless forloop.last %}<span aria-hidden="true">·</span>{% endunless %}
+            {%- endfor %}
+          </div>
+          {%- endif %}
+          <div class="lc-tile-foot">
+            <a class="lc-open" href="{{ lab_url | relative_url }}">Open lab <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          </div>
+        </article>
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    {%- assign trimmed = tiles | strip -%}
+    {%- if cat or trimmed != "" %}
+  <section class="lc-section"{% if cat %} id="{{ cat.id }}"{% endif %}>
+    <h2 class="lc-section-title">
+      {%- if cat -%}<i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}{%- else -%}More labs{%- endif -%}
+    </h2>
+    {%- if cat.blurb %}<p class="lc-section-blurb">{{ cat.blurb }}</p>{% endif %}
+    {%- if trimmed != "" %}
+    <div class="lc-grid">
+      {{ tiles }}
+    </div>
+    {%- else %}
+    <p class="lc-empty">No labs here yet.</p>
+    {%- endif %}
+  </section>
+    {%- endif -%}
+  {%- endfor %}
+</div>

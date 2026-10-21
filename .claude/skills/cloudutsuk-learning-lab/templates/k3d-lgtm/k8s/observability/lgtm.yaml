@@ -1,0 +1,96 @@
+# Loki + Grafana + Tempo + Prometheus (+ Pyroscope) in one container (grafana/otel-lgtm).
+# Local development only: data lives in emptyDirs and is gone after a restart or `make down`.
+# Datasource UIDs inside Grafana: prometheus, loki, tempo, pyroscope.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm
+spec:
+  selector:
+    app: lgtm
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  type: NodePort
+  selector:
+    app: lgtm
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 30030
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lgtm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: lgtm
+  template:
+    metadata:
+      labels:
+        app: lgtm
+    spec:
+      containers:
+        - name: lgtm
+          image: grafana/otel-lgtm:0.35.0
+          ports:
+            - containerPort: 3000
+            - containerPort: 4317
+            - containerPort: 4318
+          readinessProbe:
+            exec:
+              command: [cat, /tmp/ready]
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+          volumeMounts:
+            - { name: tempo-data, mountPath: /data/tempo }
+            - { name: grafana-data, mountPath: /data/grafana }
+            - { name: loki-data, mountPath: /data/loki }
+            - { name: loki-storage, mountPath: /loki }
+            - { name: p8s-storage, mountPath: /data/prometheus }
+            - { name: pyroscope-storage, mountPath: /data/pyroscope }
+            # The dashboard JSON is mounted as a directory, NOT with subPath: subPath mounts never see
+            # ConfigMap updates, so an edited dashboard would only appear after restarting this pod
+            # (which wipes all telemetry). Grafana's file provider rescans the directory instead.
+            - name: lab-dashboard-json
+              mountPath: /otel-lgtm/lab-dashboards
+              readOnly: true
+            - name: lab-dashboard
+              mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/lab-dashboard.yaml
+              subPath: dashboard-provider.yaml
+              readOnly: true
+      volumes:
+        - { name: tempo-data, emptyDir: {} }
+        - { name: grafana-data, emptyDir: {} }
+        - { name: loki-data, emptyDir: {} }
+        - { name: loki-storage, emptyDir: {} }
+        - { name: p8s-storage, emptyDir: {} }
+        - { name: pyroscope-storage, emptyDir: {} }
+        - name: lab-dashboard
+          configMap:
+            name: lab-dashboard
+        - name: lab-dashboard-json
+          configMap:
+            name: lab-dashboard
+            items:
+              - { key: dashboard.json, path: dashboard.json }

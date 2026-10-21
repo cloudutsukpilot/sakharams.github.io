@@ -1,0 +1,39 @@
+<!--
+  Toolbar for interview question posts, inserted once by _plugins/interview_index.rb before the first
+  question card. Expand/collapse all cards, and open the card a URL hash points to (links from the
+  /tags/interview-questions/ index). Without JavaScript the toolbar stays hidden and cards still work.
+-->
+<div class="iq-post-toolbar" hidden>
+  <span class="text-muted">Answers:</span>
+  <button type="button" data-iq-toggle="open"><i class="fas fa-angles-down fa-fw" aria-hidden="true"></i> Expand all</button>
+  <button type="button" data-iq-toggle="close"><i class="fas fa-angles-up fa-fw" aria-hidden="true"></i> Collapse all</button>
+</div>
+<script>
+(function () {
+  var bar = document.currentScript.previousElementSibling;
+  bar.hidden = false;
+  bar.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-iq-toggle]');
+    if (!btn) return;
+    var open = btn.getAttribute('data-iq-toggle') === 'open';
+    document.querySelectorAll('details.iq-card').forEach(function (d) { d.open = open; });
+  });
+
+  function openTarget() {
+    var id = decodeURIComponent(location.hash.slice(1));
+    var el = id && document.getElementById(id);
+    if (!el) return;
+    var d = el.closest('details');
+    if (d && !d.open) {
+      d.open = true;
+      el.scrollIntoView();
+    }
+  }
+  window.addEventListener('hashchange', openTarget);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', openTarget);
+  } else {
+    openTarget();
+  }
+})();
+</script>

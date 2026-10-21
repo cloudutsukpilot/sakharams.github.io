@@ -29,8 +29,20 @@ assets/js/dist
 .DS_Store
 
 
-test/
+test
 
+# Python
+venv
+.venv
+__pycache__/
+*.py[cod]
 
 
 **/vendor/*
+
+# Private, local-only posts (see CLAUDE.md "Private posts")
+_posts/private/
+
+# Image-generation skills (.claude/skills/cloudutsuk-image-*)
+.env
+hero-preview/

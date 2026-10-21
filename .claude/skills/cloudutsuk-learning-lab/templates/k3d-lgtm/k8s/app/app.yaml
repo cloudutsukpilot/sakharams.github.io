@@ -1,0 +1,65 @@
+# Starting point only: replace the container, ports, probes and any sidecars with what the lab's
+# app needs. Keep the names in sync with the collector's file_log path and scrape target.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __APP__
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: __APP__
+  template:
+    metadata:
+      labels:
+        app: __APP__
+    spec:
+      containers:
+        - name: app
+          image: __APP__:dev            # built locally and imported with `k3d image import`
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: __SERVICE__
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc.cluster.local:4318
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: __APP__
+spec:
+  selector:
+    app: __APP__
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: __APP__
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: __APP__
+                port:
+                  name: http

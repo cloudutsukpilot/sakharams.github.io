@@ -1,0 +1,26 @@
+{% comment %}
+  Architecture decision log table for a project playbook.
+  Usage: {% include project-adr-log.html project="<slug>" %}
+  Data: _data/project_adrs/<slug>.yml, written by .claude/skills/cloudutsuk-project/scripts/sync_adrs.py.
+  Each row links to its section (#adr-NNNN) in the project's ADR post (`project_adrs: true`).
+{% endcomment %}
+{% assign adr_log = site.data.project_adrs[include.project] %}
+{% assign adr_post = site.posts | where: 'project', include.project | where: 'project_adrs', true | first %}
+{% if adr_log %}
+<div class="table-wrapper adr-log">
+  <table>
+    <thead>
+      <tr><th>ADR</th><th>Decision</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for adr in adr_log.adrs %}
+        <tr>
+          <td class="text-nowrap">{% if adr_post %}<a href="{{ adr_post.url | relative_url }}#{{ adr.anchor }}">{{ adr.id }}</a>{% else %}{{ adr.id }}{% endif %}</td>
+          <td>{{ adr.title }}</td>
+          <td class="text-nowrap">{% assign st = adr.status | split: ' ' | first %}<span class="adr-status adr-status-{{ st }}">{{ adr.status | capitalize }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

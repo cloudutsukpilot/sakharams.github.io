@@ -1,0 +1,148 @@
+# Animated flow diagram for _posts/devops/build-tools/2026-10-01-language-build-ecosystem.md
+# (include id: devops/build-tools/generic-build-pipeline).
+# Rendered by _includes/flow-anim.html + assets/js/flow-anim.js. Coordinates are in viewBox units;
+# node x/y is the centre. Edges without `points` run from the source's right edge to the target's
+# left edge (with an elbow when the rows differ). A step lights the targets of its edges.
+title: The generic build pipeline
+accent: "#F97316"
+accent2: "#8B5CF6"
+viewbox: [1000, 500]
+modes:
+  - { id: pass, label: "Gate passes" }
+  - { id: fail, label: "Simulate a failing gate" }
+
+lanes:
+  - { label: "Build", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Verify, package and publish", x: 8, y: 205, w: 984, h: 287 }
+
+nodes:
+  - {
+      id: A,
+      label: "Source +\nlockfile",
+      x: 100,
+      y: 75,
+      w: 150,
+      h: 56,
+      shape: terminal, icon: git
+    }
+  - { id: B, label: "Restore\ndependencies", x: 300, y: 75, w: 150, h: 56, icon: package, icon_pos: corner }
+  - { id: C, label: "Lint and\nformat check", x: 500, y: 75, w: 150, h: 56, icon: check, icon_pos: corner }
+  - { id: D, label: "Compile /\nbundle", x: 700, y: 75, w: 150, h: 56, icon: package }
+  - { id: E, label: "Unit tests +\ncoverage", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner }
+  - { id: F, label: "SAST", x: 130, y: 270, w: 150, h: 46, icon: shield }
+  - { id: G, label: "SCA + licences", x: 130, y: 340, w: 150, h: 46, icon: shield, icon_pos: corner }
+  - { id: H, label: "Secrets scan", x: 130, y: 410, w: 150, h: 46, icon: key, icon_pos: corner }
+  - {
+      id: I,
+      label: "Quality\ngate",
+      x: 320,
+      y: 340,
+      w: 110,
+      h: 84,
+      shape: diamond,
+    }
+  - {
+      id: X,
+      label: "Fail the build",
+      x: 320,
+      y: 452,
+      w: 140,
+      h: 42,
+      tone: fail, icon: cross, icon_pos: corner
+    }
+  - { id: J, label: "Package\nartifact", x: 490, y: 340, w: 130, h: 56, icon: package }
+  - { id: K, label: "SBOM +\nsigning", x: 665, y: 340, w: 130, h: 56, icon: cert }
+  - {
+      id: L,
+      label: "Artifact\nrepository",
+      x: 830,
+      y: 340,
+      w: 120,
+      h: 66,
+      shape: cylinder, icon: bucket, icon_pos: corner
+    }
+  - { id: M, label: "Container\nimage scan", x: 830, y: 450, w: 150, h: 50, icon: shield }
+
+edges:
+  - { id: AB, from: A, to: B }
+  - { id: BC, from: B, to: C }
+  - { id: CD, from: C, to: D }
+  - { id: DE, from: D, to: E }
+  - {
+      id: EF,
+      from: E,
+      to: F,
+      points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]],
+    }
+  - {
+      id: EG,
+      from: E,
+      to: G,
+      points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]],
+    }
+  - {
+      id: EH,
+      from: E,
+      to: H,
+      points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]],
+    }
+  - { id: FI, from: F, to: I }
+  - { id: GI, from: G, to: I }
+  - { id: HI, from: H, to: I }
+  - {
+      id: IX,
+      from: I,
+      to: X,
+      points: [[320, 382], [320, 431]],
+      label: "fail",
+      label_at: [334, 410],
+      tone: fail,
+    }
+  - { id: IJ, from: I, to: J, label: "pass", label_at: [400, 330] }
+  - { id: JK, from: J, to: K }
+  - { id: KL, from: K, to: L }
+  - { id: LM, from: L, to: M, points: [[830, 373], [830, 425]] }
+
+# `when: <mode id>` limits a step to one run mode; the checkbox switches to the second mode.
+steps:
+  - lights: [A]
+    title: Source + lockfile
+    text: A commit triggers the build. The lockfile pins every dependency version so each run resolves the same graph.
+  - edges: [AB]
+    title: Restore dependencies
+    text: Are dependencies pinned and reachable? The package manager restores them from the lockfile, ideally through a private registry proxy.
+  - edges: [BC]
+    title: Lint and format check
+    text: Does the code follow the agreed style and avoid obvious bugs? Linters, formatters and type checkers fail fast and cheaply.
+  - edges: [CD]
+    title: Compile / bundle
+    text: Does it build, reproducibly? The compiler, build tool or bundler produces the build output.
+  - edges: [DE]
+    title: Unit tests + coverage
+    text: Does it behave correctly, and how much is covered? The test framework runs and a coverage report is produced.
+  - edges: [EF, EG, EH]
+    title: Security scans in parallel
+    text: SAST checks our code for vulnerable patterns, SCA checks our dependencies for known CVEs and bad licences, and a secrets scanner looks for committed keys or tokens.
+  - edges: [FI, GI, HI]
+    title: Quality gate
+    text: Test, coverage and scan results are evaluated against the agreed thresholds in one place.
+  - edges: [IX]
+    when: fail
+    title: Fail the build
+    text: The gate fails, so the pipeline stops here. Nothing is packaged, signed or published.
+  - edges: [IJ]
+    when: pass
+    title: Package artifact
+    text: The gate passes and the build output is packaged as an artifact (JAR, wheel, npm package, binary or image).
+  - edges: [JK]
+    when: pass
+    title: SBOM + signing
+    text: What exactly did we ship, and can we prove it? An SBOM is generated and the artifact is signed.
+  - edges: [KL]
+    when: pass
+    title: Artifact repository
+    text: The signed artifact and its SBOM are published to the artifact repository.
+  - edges: [LM]
+    when: pass
+    title: Container image scan
+    text: Images are scanned again in the registry, so CVEs disclosed after the build are still caught.

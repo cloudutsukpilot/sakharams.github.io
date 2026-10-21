@@ -1,0 +1,679 @@
+# The project playbook framework: the 18 areas every Cloudutsuk project playbook covers.
+#
+# Single source of truth for:
+#   - the cloudutsuk-project skill (.claude/skills/cloudutsuk-project/) that scaffolds and checks posts,
+#   - the project index shown on /tags/<project>/ (_includes/project-index.html via _layouts/tag.html),
+#   - the in-post navigation bar (_includes/project-nav.html).
+#
+# Each area becomes ONE post per project (front matter `project_step: <id>`), and each topic becomes
+# one `##` section in that post, with the anchor `{: #<topic | slugify> }` so the index can deep-link.
+# Renaming a topic changes its anchor: re-run the skill's check script on every existing project.
+#
+# Fields: id (order, never reuse), slug (filename part), title, icon (Font Awesome), phase,
+# summary (one line, shown on the index card), tags (added to each post), topics.
+
+phases:
+  - id: discover
+    title: Discover and Define
+  - id: design
+    title: Design
+  - id: build
+    title: Build and Test
+  - id: ship
+    title: Ship
+  - id: run
+    title: Run and Support
+  - id: govern
+    title: Govern and Improve
+
+areas:
+  - id: 1
+    slug: vision-and-business-context
+    title: Vision and Business Context
+    icon: fas fa-bullseye
+    phase: discover
+    summary: Why the project exists, who it serves and how success is measured.
+    tags: [Vision, Business]
+    topics:
+      - Business problem and opportunity
+      - Goals, objectives, and expected outcomes
+      - Stakeholders, sponsors, and decision-makers
+      - Target users and personas
+      - Success metrics and business KPIs
+      - Scope, assumptions, constraints, and dependencies
+
+  - id: 2
+    slug: requirements-gathering
+    title: Requirements Gathering
+    icon: fas fa-clipboard-list
+    phase: discover
+    summary: What the system must do, how well it must do it, and what is in the first release.
+    tags: [Requirements]
+    topics:
+      - Functional requirements
+      - Non-functional requirements
+      - User journeys and use cases
+      - Acceptance criteria
+      - Business rules
+      - Reporting and analytics requirements
+      - Accessibility and localization requirements
+      - Regulatory, legal, and compliance requirements
+      - Prioritization and release scope
+
+  - id: 3
+    slug: product-planning
+    title: Product Planning
+    icon: fas fa-map-signs
+    phase: discover
+    summary: Roadmap, MVP, milestones, budget and the rules for changing the plan.
+    tags: [Planning, Roadmap]
+    topics:
+      - Product roadmap
+      - MVP definition
+      - Release milestones
+      - Backlog structure
+      - Prioritization approach
+      - Budget and resource planning
+      - Risk and dependency management
+      - Change-control process
+
+  - id: 4
+    slug: user-experience-and-design
+    title: User Experience and Design
+    icon: fas fa-pencil-ruler
+    phase: design
+    summary: How users move through the product and what they see on every screen.
+    tags: [UX, Design]
+    topics:
+      - Information architecture
+      - User flows
+      - Wireframes and prototypes
+      - Visual design and design system
+      - Interaction patterns
+      - Responsive behavior
+      - Accessibility design
+      - Usability testing
+      - Content and messaging
+
+  - id: 5
+    slug: technical-architecture
+    title: Technical Architecture
+    icon: fas fa-sitemap
+    phase: design
+    summary: Components, technology choices, integrations, hosting and the decisions behind them.
+    tags: [Architecture]
+    topics:
+      - System context and component architecture
+      - Technology and framework selection
+      - API and integration architecture
+      - Data architecture and data models
+      - Identity and access architecture
+      - Hosting and deployment model
+      - Scalability and performance strategy
+      - Resilience and disaster recovery
+      - Architectural decision records
+
+  - id: 6
+    slug: security-and-privacy
+    title: Security and Privacy
+    icon: fas fa-user-shield
+    phase: design
+    summary: Threats, controls, secrets, privacy obligations and how incidents are handled.
+    tags: [Security, Privacy]
+    topics:
+      - Threat modeling
+      - Authentication and authorization
+      - Secrets and key management
+      - Encryption requirements
+      - Network security
+      - Input validation and secure coding
+      - Vulnerability and dependency management
+      - Privacy and data-protection requirements
+      - Audit logging
+      - Security testing and incident response
+
+  - id: 7
+    slug: data-and-integration
+    title: Data and Integration
+    icon: fas fa-database
+    phase: design
+    summary: Who owns the data, how it moves, how it is kept, and how it is migrated.
+    tags: [Data, Integration]
+    topics:
+      - Data ownership and classification
+      - Data retention and deletion
+      - Database schema and migrations
+      - Data validation and quality
+      - Import and export requirements
+      - External systems and third-party integrations
+      - Event and messaging contracts
+      - Backup and restore strategy
+      - Data migration and reconciliation
+
+  - id: 8
+    slug: development-preparation
+    title: Development Preparation
+    icon: fas fa-tools
+    phase: build
+    summary: Repository, standards, local setup and the workflow every change goes through.
+    tags: [Development, Workflow]
+    topics:
+      - Repository and branching strategy
+      - Coding standards
+      - Project structure
+      - Local development setup
+      - Environment configuration
+      - Dependency management
+      - Feature flags
+      - Documentation standards
+      - Development workflow and code review process
+
+  - id: 9
+    slug: implementation
+    title: Implementation
+    icon: fas fa-code
+    phase: build
+    summary: How the work is sliced into iterations and built, reviewed and documented.
+    tags: [Implementation]
+    topics:
+      - Sprint or iteration planning
+      - Feature development
+      - API and UI implementation
+      - Database and infrastructure implementation
+      - Integration development
+      - Technical debt tracking
+      - Code reviews
+      - Developer documentation
+
+  - id: 10
+    slug: quality-assurance
+    title: Quality Assurance
+    icon: fas fa-vial
+    phase: build
+    summary: The test strategy, from unit tests to user acceptance, and the data and environments it needs.
+    tags: [Testing, QA]
+    topics:
+      - Unit testing
+      - Integration testing
+      - Contract testing
+      - End-to-end testing
+      - Regression testing
+      - Performance and load testing
+      - Security testing
+      - Accessibility testing
+      - Compatibility testing
+      - User acceptance testing
+      - Test data and test environment management
+
+  - id: 11
+    slug: infrastructure-and-environments
+    title: Infrastructure and Environments
+    icon: fas fa-server
+    phase: build
+    summary: Every environment from dev to production, built as code and kept in step.
+    tags: [Infrastructure, IaC]
+    topics:
+      - Development environment
+      - Test or QA environment
+      - Staging environment
+      - Production environment
+      - Infrastructure as code
+      - Networking and DNS
+      - Compute, storage, and databases
+      - Configuration and secret management
+      - Environment parity
+      - Capacity and quota planning
+
+  - id: 12
+    slug: cicd-and-release-management
+    title: CI/CD and Release Management
+    icon: fas fa-infinity
+    phase: ship
+    summary: The pipeline from commit to production, with gates, versioning and rollback.
+    tags: [CICD, Release]
+    topics:
+      - Build automation
+      - Automated test execution
+      - Static analysis and security scanning
+      - Artifact and container management
+      - Deployment automation
+      - Database deployment strategy
+      - Approval gates
+      - Versioning and release notes
+      - Rollback and roll-forward procedures
+      - Release calendar
+
+  - id: 13
+    slug: deployment-and-go-live
+    title: Deployment and Go-Live
+    icon: fas fa-rocket
+    phase: ship
+    summary: Readiness, runbooks, cutover and the decision to launch.
+    tags: [Deployment, GoLive]
+    topics:
+      - Production readiness review
+      - Go-live checklist
+      - Deployment runbook
+      - Data migration plan
+      - Smoke tests
+      - Monitoring and alert validation
+      - Support team readiness
+      - User and stakeholder communications
+      - Cutover and rollback plan
+      - Launch decision and sign-off
+
+  - id: 14
+    slug: operations-and-observability
+    title: Operations and Observability
+    icon: fas fa-chart-line
+    phase: run
+    summary: Monitoring, logs, traces, alerts and the targets the service is held to.
+    tags: [Observability, Operations]
+    topics:
+      - Application and infrastructure monitoring
+      - Logging and log retention
+      - Metrics and dashboards
+      - Distributed tracing
+      - Health checks
+      - Alerting and escalation
+      - Availability and performance targets
+      - Operational runbooks
+      - Incident and problem management
+      - Capacity and cost monitoring
+
+  - id: 15
+    slug: documentation-and-knowledge-transfer
+    title: Documentation and Knowledge Transfer
+    icon: fas fa-book
+    phase: run
+    summary: The documents, guides and training that let other people run and use the system.
+    tags: [Documentation]
+    topics:
+      - Product documentation
+      - User guides
+      - API documentation
+      - Architecture documentation
+      - Deployment instructions
+      - Operations runbooks
+      - Troubleshooting guides
+      - Support procedures
+      - Onboarding documentation
+      - Training materials
+
+  - id: 16
+    slug: support-and-maintenance
+    title: Support and Maintenance
+    icon: fas fa-life-ring
+    phase: run
+    summary: Who supports it, to what standard, and how it is patched, upgraded and recovered.
+    tags: [Support, Maintenance]
+    topics:
+      - Support model and ownership
+      - Service-level objectives
+      - Incident response
+      - Bug triage
+      - Patch and upgrade management
+      - Dependency updates
+      - Security remediation
+      - Performance optimization
+      - Backup verification
+      - Disaster recovery testing
+      - Technical debt management
+
+  - id: 17
+    slug: governance-and-compliance
+    title: Governance and Compliance
+    icon: fas fa-balance-scale
+    phase: govern
+    summary: Who decides, what must be audited, and the evidence that proves it.
+    tags: [Governance, Compliance]
+    topics:
+      - Project governance
+      - Decision-making and approval authorities
+      - Audit requirements
+      - Access reviews
+      - License management
+      - Compliance reporting
+      - Data governance
+      - Vendor and third-party management
+      - Policy enforcement
+      - Evidence collection
+
+  - id: 18
+    slug: continuous-improvement
+    title: Continuous Improvement
+    icon: fas fa-sync-alt
+    phase: govern
+    summary: Learning from users, incidents and costs, and planning the end of life.
+    tags: [Improvement]
+    topics:
+      - Product analytics
+      - User feedback
+      - Retrospectives
+      - Reliability reviews
+      - Cost optimization
+      - Security reviews
+      - Architecture reviews
+      - Roadmap refinement
+      - Decommissioning and end-of-life planning
+
+# Diagrams lane: the standard diagram types every project playbook can show, rendered as their own
+# lane on the project index (/tags/<project>/), with a "Diagrams" link in the phase bar. A project lists
+# the diagrams it has drawn in `diagrams:` of _data/projects/<slug>.yml:
+#   - {type: <id below, or other>, title: "...", url: /posts/projects/<slug>/<post>/#<anchor>,
+#      diagram: projects/<slug>/<name>  (flow-anim id, when animated), format: animated|mermaid|image}
+# Types the project hasn't drawn yet show as "Not drawn yet". `area` is where the diagram usually lives;
+# `format` is the recommended one (animated = cloudutsuk-flow-anim, mermaid for static structures).
+diagrams:
+  title: Diagrams
+  icon: fas fa-diagram-project
+  summary: Every diagram of the project in one place, each linking to the section that explains it.
+  types:
+    - id: system-context
+      title: System architecture
+      icon: fas fa-sitemap
+      area: 5
+      format: animated
+      summary: Components, where they run and how a request moves through them.
+    - id: network
+      title: Network topology
+      icon: fas fa-network-wired
+      area: 5
+      format: animated
+      summary: Networks and subnets, protocols and ports, TLS points, DNS and the way in and out.
+    - id: data-flow
+      title: Data flow
+      icon: fas fa-shuffle
+      area: 7
+      format: animated
+      summary: How data is collected, transformed, stored and served, end to end.
+    - id: sequence
+      title: Request sequence
+      icon: fas fa-right-left
+      area: 5
+      format: animated
+      summary: One important request, call by call, including retries and failure paths.
+    - id: identity
+      title: Identity and access flow
+      icon: fas fa-user-shield
+      area: 6
+      format: animated
+      summary: How people and services authenticate, and where authorization is decided.
+    - id: threat-model
+      title: Threat model
+      icon: fas fa-shield-halved
+      area: 6
+      format: mermaid
+      summary: Trust boundaries, entry points and the threats considered at each one.
+    - id: data-model
+      title: Data model
+      icon: fas fa-database
+      area: 7
+      format: mermaid
+      summary: Entities, relationships and ownership (ER diagram).
+    - id: deployment
+      title: Deployment topology
+      icon: fas fa-server
+      area: 11
+      format: animated
+      summary: Environments, clusters and hosts, and what is deployed where.
+    - id: cicd
+      title: CI/CD pipeline
+      icon: fas fa-infinity
+      area: 12
+      format: animated
+      summary: From commit to production, with the gates and the rollback path.
+    - id: observability
+      title: Telemetry and alerting
+      icon: fas fa-chart-line
+      area: 14
+      format: animated
+      summary: How metrics, logs and traces flow, and how an alert reaches a person.
+    - id: incident
+      title: Incident response
+      icon: fas fa-fire-extinguisher
+      area: 14
+      format: animated
+      summary: Detection, triage, mitigation and follow-up for a production incident.
+    - id: user-journey
+      title: User journey
+      icon: fas fa-route
+      area: 4
+      format: animated
+      summary: The main path a user takes, screen by screen.
+
+# Interview prep: one extra post per project (not an area, so it's not counted in "N of 18" and not in
+# the prev/next chain). Front matter `project_interview: true`; file `<date>-<slug>.md`.
+# The question bank is GENERIC and shared by every project: the answers make it specific. Each category
+# is one `##` section with the anchor `{: #<title | slugify> }` (the index tile deep-links to it), and
+# each question is one `<details markdown="1">` block whose `<summary>` is the question text (`q`) verbatim,
+# containing one role answer per entry in the question's `roles` list.
+# Projects may add up to two extra questions per category after the bank's questions.
+# Rewording a question or renaming a category: update every project's interview post, then run check.py.
+interview:
+  slug: interview-questions
+  title: Interview Questions
+  icon: fas fa-user-tie
+  summary: The project as you would discuss it in an interview, answered from architect, developer, DevOps and SRE perspectives, with links back to the playbook.
+  tags: [Interview Prep, Architecture]
+  # Perspectives an answer can be given from. Each question lists the roles it is answered for
+  # (architect always first). In the post, each role is a <div class="iq-role" data-role="<id>">
+  # inside the question's <details>; _includes/project-iq-roles.html turns them into tabs and adds a
+  # page-level role filter. Guidance per role: .claude/skills/cloudutsuk-project/references/roles.md.
+  roles:
+    - id: architect
+      title: Architect
+      icon: fas fa-compass-drafting
+      focus: Design, trade-offs, decisions and the reasoning behind them.
+    - id: developer
+      title: Developer
+      icon: fas fa-code
+      focus: Framework concepts and how the code actually works, with snippets and common commands.
+    - id: devops
+      title: DevOps
+      icon: fas fa-infinity
+      focus: Build, packaging, environments, secrets, CI/CD and GitOps, with the commands.
+    - id: sre
+      title: SRE
+      icon: fas fa-heart-pulse
+      focus: Reliability, SLIs and SLOs, monitoring, alerting, capacity and incident handling.
+  categories:
+    - title: Project Overview and Your Role
+      icon: fas fa-id-badge
+      questions:
+        - q: "Walk me through a frontend or backend application you designed and built end to end."
+          roles: [architect, developer, devops]
+        - q: "What business problem did it solve, and how did you know it was working?"
+          roles: [architect]
+        - q: "What was your role, and which architectural decisions did you own?"
+          roles: [architect, developer, devops]
+        - q: "Who were the users and stakeholders, and how did their needs shape the design?"
+          roles: [architect]
+
+    - title: System Design and Architecture
+      icon: fas fa-sitemap
+      questions:
+        - q: "If you had to design this application from scratch on a whiteboard, with a frontend, a backend and a data store, how would you approach it?"
+          roles: [architect, developer]
+        - q: "What are the main components, and how are responsibilities split between them?"
+          roles: [architect, developer, devops]
+        - q: "Which non-functional requirements drove the architecture the most?"
+          roles: [architect, sre]
+        - q: "Which architectural options did you consider and reject, and why?"
+          roles: [architect]
+        - q: "Monolith, modular monolith or microservices, what did you choose and why?"
+          roles: [architect, developer, devops]
+
+    - title: Technology Choices
+      icon: fas fa-layer-group
+      questions:
+        - q: "Which technologies did you use across the stack, and why those?"
+          roles: [architect, developer, devops]
+        - q: "How do you evaluate and choose between competing technologies?"
+          roles: [architect, developer]
+        - q: "Where did you build, and where did you buy or reuse?"
+          roles: [architect, devops]
+
+    - title: Frontend Architecture
+      icon: fas fa-desktop
+      questions:
+        - q: "How is the frontend (or user-facing interface) structured, in terms of framework, routing, components and state?"
+          roles: [architect, developer]
+        - q: "How does the user interface handle loading, errors and large data sets?"
+          roles: [architect, developer]
+        - q: "How do you keep the frontend fast and accessible?"
+          roles: [architect, developer, sre]
+        - q: "How is the frontend built, configured per environment and served?"
+          roles: [architect, developer, devops]
+
+    - title: Backend and API Design
+      icon: fas fa-server
+      questions:
+        - q: "How do CRUD operations work in the backend, from request to persisted data?"
+          roles: [architect, developer]
+        - q: "How did you design the API, in terms of style, resources, versioning, pagination and errors?"
+          roles: [architect, developer]
+        - q: "How is the backend structured internally, and where does background work run?"
+          roles: [architect, developer, devops]
+        - q: "How do you validate input and keep operations safe to repeat?"
+          roles: [architect, developer, sre]
+
+    - title: Database and Data Modeling
+      icon: fas fa-database
+      questions:
+        - q: "Which data store did you choose, and why?"
+          roles: [architect, developer, devops]
+        - q: "How is the data modeled, and how did the access patterns shape the model?"
+          roles: [architect, developer]
+        - q: "How were schema changes and data migrations handled?"
+          roles: [architect, developer, devops]
+        - q: "How do you handle data retention, backup and restore?"
+          roles: [architect, devops, sre]
+
+    - title: Frontend, Backend and Database Communication
+      icon: fas fa-right-left
+      questions:
+        - q: "How does the frontend connect to the backend?"
+          roles: [architect, developer, devops]
+        - q: "Trace a single user request from the browser to the data store and back."
+          roles: [architect, developer, sre]
+        - q: "How does the backend connect to the data store, and how are connections, timeouts and concurrency handled?"
+          roles: [architect, developer, sre]
+        - q: "Where do you cache, and how do you keep cached data correct?"
+          roles: [architect, developer, sre]
+        - q: "Where did you use synchronous and where asynchronous communication, and why?"
+          roles: [architect, developer]
+
+    - title: Integrations and Background Processing
+      icon: fas fa-plug
+      questions:
+        - q: "Which external systems does the application integrate with, and how?"
+          roles: [architect, developer]
+        - q: "How do you handle rate limits, retries and partial failures from external APIs?"
+          roles: [architect, developer, sre]
+        - q: "How are scheduled and background jobs designed and coordinated?"
+          roles: [architect, developer, devops]
+
+    - title: Security and Identity
+      icon: fas fa-shield-halved
+      questions:
+        - q: "How do users authenticate, and how is authorization enforced?"
+          roles: [architect, developer, devops]
+        - q: "How are secrets and credentials managed?"
+          roles: [architect, developer, devops]
+        - q: "How is sensitive data protected, and which compliance constraints applied?"
+          roles: [architect, devops]
+        - q: "Which threats did you design against?"
+          roles: [architect, developer, devops]
+
+    - title: Performance and Scalability
+      icon: fas fa-gauge-high
+      questions:
+        - q: "What load does the system handle, where are the bottlenecks, and how does it scale?"
+          roles: [architect, sre]
+        - q: "How would the design change at ten times the users or data?"
+          roles: [architect, devops, sre]
+        - q: "How did you measure and improve performance?"
+          roles: [architect, developer, sre]
+
+    - title: Reliability and Resilience
+      icon: fas fa-life-ring
+      questions:
+        - q: "What are the failure modes, and how does the system degrade when a part fails?"
+          roles: [architect, sre]
+        - q: "What are the availability and recovery targets, and how are backup and disaster recovery handled?"
+          roles: [architect, devops, sre]
+        - q: "How do you make jobs and deployments safe to retry?"
+          roles: [architect, developer, devops]
+
+    - title: Testing and Quality
+      icon: fas fa-vial
+      questions:
+        - q: "What is your testing strategy across the frontend, backend and data?"
+          roles: [architect, developer]
+        - q: "How do you test integrations with external systems?"
+          roles: [architect, developer, devops]
+        - q: "Which quality gates does code pass before it merges and ships?"
+          roles: [architect, developer, devops]
+
+    - title: Infrastructure and Environments
+      icon: fas fa-cloud
+      questions:
+        - q: "Where and how is the application hosted, and why there?"
+          roles: [architect, devops, sre]
+        - q: "Which environments exist, and how close is local development to production?"
+          roles: [architect, developer, devops]
+        - q: "How is the infrastructure provisioned and configured?"
+          roles: [architect, devops]
+
+    - title: CI/CD and Deployment
+      icon: fas fa-rocket
+      questions:
+        - q: "Walk me through the pipeline from commit to production."
+          roles: [architect, devops]
+        - q: "Which deployment strategy do you use, and how do you roll back?"
+          roles: [architect, devops, sre]
+        - q: "How do data and schema changes ship alongside application changes?"
+          roles: [architect, developer, devops]
+        - q: "How do you manage configuration and versions across environments?"
+          roles: [architect, developer, devops]
+
+    - title: Monitoring and Observability
+      icon: fas fa-chart-line
+      questions:
+        - q: "How do you know the system is healthy in production?"
+          roles: [architect, devops, sre]
+        - q: "What do you log, measure and alert on?"
+          roles: [architect, developer, sre]
+        - q: "Walk me through how you would troubleshoot a production issue in this system."
+          roles: [architect, devops, sre]
+
+    - title: Cost, Maintenance and Support
+      icon: fas fa-coins
+      questions:
+        - q: "What drives the cost of running the system, and how do you keep it under control?"
+          roles: [architect, devops, sre]
+        - q: "How is the system maintained and supported after go-live?"
+          roles: [architect, devops, sre]
+
+    - title: Leadership, Stakeholders and Governance
+      icon: fas fa-people-group
+      questions:
+        - q: "How did you communicate the architecture and progress to stakeholders and executives?"
+          roles: [architect]
+        - q: "How do you document and govern architectural decisions?"
+          roles: [architect]
+        - q: "How did you bring other engineers onto the project?"
+          roles: [architect, developer]
+
+    - title: Lessons Learned and Trade-offs
+      icon: fas fa-lightbulb
+      questions:
+        - q: "What was the hardest technical problem, and how did you solve it?"
+          roles: [architect, developer]
+        - q: "What would you do differently if you started again?"
+          roles: [architect, developer, devops]
+        - q: "What technical debt exists today, and how would you pay it down?"
+          roles: [architect, developer, devops]
+        - q: "Where does the system go next, and how does the architecture support that?"
+          roles: [architect]

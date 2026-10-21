@@ -1,0 +1,71 @@
+# Animated flow diagram for _posts/projects/productivity-dashboard/2026-10-05-05-technical-architecture.md
+# (include id: projects/productivity-dashboard/system-architecture). Replaces the Mermaid system-context
+# diagram; same nodes and edges. Rendered by _includes/flow-anim.html + assets/js/flow-anim.js.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Productivity Dashboard system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 420]
+
+lanes:
+  - { label: "External services", x: 8, y: 8, w: 180, h: 400 }
+  - { label: "Kubernetes namespace: productivity", x: 218, y: 8, w: 622, h: 400 }
+
+nodes:
+  - { id: GH, label: "GitHub API", x: 98, y: 100, icon: "devops/cicd/github-18.svg" }
+  - { id: JR, label: "Jira Cloud API", x: 98, y: 190, icon: api, icon_pos: corner }
+  - { id: AI, label: "Azure OpenAI", x: 98, y: 301, icon: "cloud/azure/services/openai.svg", icon_pos: corner }
+  - { id: COL, label: "Collectors", sub: "github · jira · epic", x: 318, y: 150, w: 160, icon: "devops/cicd/github-18.svg", icon_pos: corner }
+  - { id: FS, label: "Azure File\nShare /data", x: 510, y: 150, w: 110, h: 70, shape: cylinder, icon: cloud, icon_pos: corner }
+  - { id: GEN, label: "AI generators", sub: "user·team·epic·POD", x: 318, y: 301, w: 160, icon: users, icon_pos: corner }
+  - { id: UI, label: "productivity-ui", sub: "FastAPI :9000 + React", x: 730, y: 150, w: 170 }
+  - { id: RD, label: "Redis", x: 760, y: 280, w: 100, h: 60, shape: cylinder, icon: bolt }
+  - { id: U, label: "Browser", x: 925, y: 150, w: 100, shape: terminal, icon: browser, icon_pos: corner }
+
+edges:
+  - { id: GHCOL, from: GH, to: COL }
+  - { id: JRCOL, from: JR, to: COL }
+  - { id: COLFS, from: COL, to: FS }
+  - { id: FSGEN, from: FS, to: GEN, points: [[495, 185], [495, 290], [398, 290]] }
+  - { id: GENFS, from: GEN, to: FS, points: [[398, 312], [525, 312], [525, 185]] }
+  - { id: GENAI, from: GEN, to: AI, points: [[238, 290], [173, 290]] }
+  - { id: AIGEN, from: AI, to: GEN, points: [[173, 312], [238, 312]] }
+  - { id: FSUI, from: FS, to: UI, label: "read-only" }
+  - { id: UIRD, from: UI, to: RD, points: [[760, 178], [760, 250]], label: "cache" }
+  - { id: UU, from: U, to: UI, points: [[875, 150], [815, 150]] }
+  - { id: UIGEN, from: UI, to: GEN, dashed: true, label: "refresh: create Job", points: [[665, 178], [665, 380], [318, 380], [318, 329]] }
+
+steps:
+  - lights: [GH, JR, U]
+    title: Where the work happens
+    text: People's work lives in GitHub and Jira; readers reach the summaries from a browser. Nobody types a status update.
+  - edges: [GHCOL, JRCOL]
+    title: Collect daily activity
+    text: The GitHub, Jira and epic-data collectors pull each person's activity for the day.
+  - edges: [COLFS]
+    title: Raw activity as JSON
+    text: Collectors write github.json, jira.json and epic metadata per person and date to the Azure File Share.
+  - edges: [FSGEN]
+    title: Generators read the share
+    text: The user, team, epic and POD generators read the collected JSON. They never call each other; the schedule orders them.
+  - edges: [GENAI]
+    title: Prompt the model
+    text: Prompts from each generator's prompts/ folder go to Azure OpenAI through one BaseAIClient class.
+  - edges: [AIGEN]
+    title: Summary comes back
+    text: The model returns the summary. The same client can point at OpenAI or a local model in development.
+  - edges: [GENFS]
+    title: Summaries of summaries
+    text: Each generator writes summary.md per user, team, epic, POD and period. The team generator waits for user summaries first.
+  - edges: [UU]
+    title: Someone opens the dashboard
+    text: A manager opens the dashboard; FastAPI on port 9000 serves the React app and the read-mostly API.
+  - edges: [FSUI, UIRD]
+    title: Read files, cache in Redis
+    text: The API reads summaries read-only from the share and memoizes reads and search results in Redis.
+  - edges: [UIGEN]
+    title: Refresh on demand
+    text: The Refresh button makes the API create a one-shot Kubernetes Job that regenerates that summary.
+  - edges: [GENFS]
+    title: Fresh summary on the share
+    text: The Job writes a new summary.md; the UI polls the refresh status and shows it.

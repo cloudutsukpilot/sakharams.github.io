@@ -1,0 +1,136 @@
+{% comment %}
+  Projects tab: project tiles grouped by category, with a cloud filter.
+  Data: _data/project_catalog.yml (categories, clouds, non-playbook projects) and
+  _data/projects/<slug>.yml (playbooks; `category` and `clouds` place them) and
+  _data/labs/<slug>.yml (hands-on labs from the cloudutsuk-learning-lab skill, placed the same way).
+  Without JavaScript every tile shows and the filter bar stays hidden.
+{% endcomment %}
+{%- assign catalog = site.data.project_catalog -%}
+{%- assign known_ids = catalog.categories | map: "id" -%}
+
+{%- comment -%} Cards with `hidden: true` are left off this page (their tag pages still build). {%- endcomment -%}
+{%- assign hidden_n = 0 -%}
+{%- for e in site.data.projects %}{% if e[1].hidden %}{% assign hidden_n = hidden_n | plus: 1 %}{% endif %}{% endfor -%}
+{%- capture tile_count -%}{{ site.data.projects.size | minus: hidden_n | plus: catalog.extra.size | plus: site.data.labs.size }}{%- endcapture -%}
+
+<div class="projects-catalog">
+  <p class="pc-intro">
+    {{ tile_count }} projects, grouped by what they solve. <strong>Playbooks</strong> walk a project
+    through all 18 areas of delivery, from vision to decommissioning, with interview prep; <strong>labs</strong>
+    are runnable builds you deploy and observe yourself; the others are solution designs and hands-on builds.
+  </p>
+
+  <nav class="pc-jump" aria-label="Project categories">
+    {%- for cat in catalog.categories %}
+    {%- assign cat_n = catalog.extra | where: "category", cat.id | size -%}
+    {%- for e in site.data.projects %}{% if e[1].category == cat.id and e[1].hidden != true %}{% assign cat_n = cat_n | plus: 1 %}{% endif %}{% endfor -%}
+    {%- for e in site.data.labs %}{% if e[1].category == cat.id %}{% assign cat_n = cat_n | plus: 1 %}{% endif %}{% endfor -%}
+    {%- if cat_n > 0 %}
+    <a href="#{{ cat.id }}"><i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}</a>
+    {%- endif %}
+    {%- endfor %}
+  </nav>
+
+  <div class="pc-filter" role="group" aria-label="Filter projects by cloud" hidden>
+    <span class="pc-filter-label">Cloud:</span>
+    <button type="button" class="pc-filter-btn is-active" data-filter="all" aria-pressed="true">All</button>
+    {%- for c in catalog.clouds %}
+    <button type="button" class="pc-filter-btn" data-filter="{{ c.id }}" aria-pressed="false"><i class="{{ c.icon }}" aria-hidden="true"></i> {{ c.title }}</button>
+    {%- endfor %}
+    <button type="button" class="pc-filter-btn" data-filter="multi" aria-pressed="false"><i class="fas fa-layer-group" aria-hidden="true"></i> Multi-cloud</button>
+  </div>
+
+  {%- assign sections = catalog.categories | map: "id" | push: "__other" -%}
+  {%- for sid in sections -%}
+    {%- if sid == "__other" -%}
+      {%- assign cat = nil -%}
+    {%- else -%}
+      {%- assign cat = catalog.categories | where: "id", sid | first -%}
+    {%- endif -%}
+
+    {%- capture tiles -%}
+      {%- for entry in site.data.projects -%}
+        {%- assign slug = entry[0] -%}{%- assign p = entry[1] -%}
+        {%- if p.hidden -%}{%- continue -%}{%- endif -%}
+        {%- if sid == "__other" -%}
+          {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
+        {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}
+        {%- assign proj_posts = site.posts | where: "project", slug -%}
+        {%- assign iq = proj_posts | where: "project_interview", true | size -%}
+        {%- assign areas = proj_posts | size | minus: iq -%}
+        {%- assign stack = p.facts | where: "label", "Stack" | first -%}
+        {%- assign arch = p.facts | where: "label", "Architecture" | first -%}
+        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds
+            summary=p.summary slug=slug kind="Playbook" areas=areas iq=iq stack=stack.value arch=arch.url -%}
+      {%- endfor -%}
+      {%- for entry in site.data.labs -%}
+        {%- assign slug = entry[0] -%}{%- assign p = entry[1] -%}
+        {%- if sid == "__other" -%}
+          {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
+        {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}
+        {%- assign lab_parts = site.posts | where: "lab", slug | where_exp: "x", "x.lab_part" | size -%}
+        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds
+            summary=p.summary slug=slug kind="Lab" lab=true areas=lab_parts experiments=p.experiments.size
+            stack=p.platform.runtime -%}
+      {%- endfor -%}
+      {%- for p in catalog.extra -%}
+        {%- if sid == "__other" -%}
+          {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
+        {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}
+        {%- include projects-catalog-tile.html name=p.name url=p.url status=p.status clouds=p.clouds
+            summary=p.summary kind=p.kind links=p.links -%}
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    {%- assign trimmed = tiles | strip -%}
+    {%- if trimmed != "" %}
+  <section class="pc-section"{% if cat %} id="{{ cat.id }}"{% endif %}>
+    <h2 class="pc-section-title">
+      {%- if cat -%}<i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}{%- else -%}More projects{%- endif -%}
+    </h2>
+    {%- if cat.blurb %}<p class="pc-section-blurb">{{ cat.blurb }}</p>{% endif %}
+    <div class="pc-grid">
+      {{ tiles }}
+    </div>
+  </section>
+    {%- endif -%}
+  {%- endfor %}
+
+  <p class="pc-empty" hidden>No projects target this cloud yet.</p>
+</div>
+
+<script>
+  (function () {
+    var root = document.querySelector('.projects-catalog');
+    if (!root) return;
+    var bar = root.querySelector('.pc-filter');
+    var buttons = bar.querySelectorAll('.pc-filter-btn');
+    var empty = root.querySelector('.pc-empty');
+    bar.hidden = false;
+
+    function apply(filter) {
+      var shown = 0;
+      root.querySelectorAll('.pc-section').forEach(function (section) {
+        var visible = 0;
+        section.querySelectorAll('.pc-tile').forEach(function (tile) {
+          var clouds = (tile.dataset.clouds || '').split(' ');
+          var match = filter === 'all' || clouds.indexOf(filter) !== -1;
+          tile.hidden = !match;
+          if (match) visible++;
+        });
+        section.hidden = visible === 0;
+        shown += visible;
+      });
+      empty.hidden = shown !== 0;
+      buttons.forEach(function (b) {
+        var on = b.dataset.filter === filter;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { apply(b.dataset.filter); });
+    });
+  })();
+</script>

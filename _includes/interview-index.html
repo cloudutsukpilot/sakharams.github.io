@@ -1,0 +1,183 @@
+<!--
+  Interview question index, rendered on /tags/<tag>/ by _layouts/tag.html for the tag named in
+  _data/interview_index.yml. Expects `iq` (site.data.interview_questions, built by
+  _plugins/interview_index.rb), `iq_config` (site.data.interview_index) and the tag `page`.
+  Domains → topic sections → one card per difficulty (Beginner … Expert, then Scenario · Beginner …),
+  each listing its questions with a link straight to the answer.
+  Filters: free text, level and kind. Without JavaScript every card shows all its questions.
+-->
+{% assign others = page.posts | where_exp: 'p', 'p.interview_domain == nil' %}
+{% assign preview = 5 %}
+
+<div id="page-tag" class="interview-index">
+  <header class="iq-hero">
+    <h1>
+      <i class="fas fa-user-tie fa-fw" aria-hidden="true"></i>
+      {{ page.title }}
+    </h1>
+    <p class="iq-hero-stats">
+      <strong>{{ iq.count }}</strong> questions
+      <span aria-hidden="true">·</span>
+      {% assign live = iq.domains | where_exp: 'd', 'd.count > 0' %}
+      <strong>{{ live.size }}</strong> domains
+    </p>
+    {% if iq_config.summary %}<p class="iq-summary">{{ iq_config.summary }}</p>{% endif %}
+  </header>
+
+  <nav class="iq-domain-nav" aria-label="Domains">
+    {% for d in iq.domains %}
+      <a class="iq-domain-chip{% if d.count == 0 %} is-empty{% endif %}" href="#domain-{{ d.id }}">
+        <i class="{{ d.icon }} fa-fw" aria-hidden="true"></i>
+        <span>{{ d.name }}</span>
+        <span class="iq-chip-count">{% if d.count > 0 %}{{ d.count }}{% else %}soon{% endif %}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <div class="iq-controls" hidden>
+    <input class="iq-search" type="search" placeholder="Search questions (e.g. DNS, HPA, rollback, drift)" aria-label="Search questions">
+    <div class="iq-seg" role="group" aria-label="Difficulty" data-filter="level">
+      <button type="button" class="is-active" data-value="">All levels</button>
+      {% for l in iq.levels %}
+        <button type="button" class="iq-dot iq-level-{{ l }}" data-value="{{ l }}">{{ l | capitalize }}</button>
+      {% endfor %}
+    </div>
+    <div class="iq-seg" role="group" aria-label="Question type" data-filter="kind">
+      <button type="button" class="is-active" data-value="">All types</button>
+      <button type="button" data-value="theory">Concepts</button>
+      <button type="button" data-value="scenario">Scenarios</button>
+    </div>
+  </div>
+  <p class="iq-empty text-muted" hidden>No questions match these filters.</p>
+
+  {% for d in iq.domains %}
+    <section class="iq-domain{% if d.count == 0 %} is-empty{% endif %}" id="domain-{{ d.id }}">
+      <header class="iq-domain-head">
+        <span class="iq-domain-icon"><i class="{{ d.icon }} fa-fw" aria-hidden="true"></i></span>
+        <div>
+          <h2>{{ d.name }} {% if d.count > 0 %}<span class="iq-count">{{ d.count }}</span>{% endif %}</h2>
+          {% if d.summary %}<p>{{ d.summary }}</p>{% endif %}
+        </div>
+      </header>
+
+      {% if d.count == 0 %}
+        <p class="iq-soon text-muted">No questions yet. This section is coming soon.</p>
+      {% endif %}
+
+      {% for t in d.topics %}
+        <div class="iq-topic" id="topic-{{ t.slug }}">
+          <div class="iq-topic-head">
+            <h3>{{ t.name }} <span class="iq-count">{{ t.count }}</span></h3>
+            <span class="iq-topic-posts">
+              {% for p in t.posts %}
+                <a href="{{ p.url | relative_url }}"><i class="fas fa-book-open fa-fw" aria-hidden="true"></i> {{ p.title }}</a>
+              {% endfor %}
+            </span>
+          </div>
+
+          <div class="iq-grid">
+            {% for g in t.groups %}
+              <article class="iq-level-card iq-level-{{ g.level }}{% if g.kind == 'scenario' %} is-scenario{% endif %}" data-level="{{ g.level }}" data-kind="{{ g.kind }}">
+                <header>
+                  <span class="iq-lc-kind">
+                    {% if g.kind == 'scenario' %}<i class="fas fa-fire-flame-curved fa-fw" aria-hidden="true"></i> Scenario{% else %}<i class="fas fa-book fa-fw" aria-hidden="true"></i> Concepts{% endif %}
+                  </span>
+                  <h4>{{ g.label }}</h4>
+                  <span class="iq-lc-count">{{ g.count }}</span>
+                </header>
+                <ol class="iq-lc-list">
+                  {% for q in g.questions %}
+                    <li{% if forloop.index > preview %} class="iq-extra"{% endif %} data-q="{{ q.text | append: ' ' | append: t.name | append: ' ' | append: d.name | downcase | escape }}">
+                      <a href="{{ q.url | relative_url }}">{{ q.text | escape }}</a>
+                    </li>
+                  {% endfor %}
+                </ol>
+                {% if g.count > preview %}
+                  {% assign more = g.count | minus: preview %}
+                  <button type="button" class="iq-lc-more" data-more="Show {{ more }} more" hidden>Show {{ more }} more</button>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+
+  {% if others.size > 0 %}
+    <section class="iq-domain" id="other-posts">
+      <header class="iq-domain-head"><div><h2>Other posts tagged {{ page.title }}</h2></div></header>
+      <ul class="content ps-0">
+        {% for post in others %}
+          <li class="d-flex justify-content-between px-md-3">
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <span class="dash flex-grow-1"></span>
+            {% include datetime.html date=post.date class='text-muted small text-nowrap' lang=lang %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    const root = document.querySelector('.interview-index');
+    if (!root) return;
+    root.classList.add('js');
+    const controls = root.querySelector('.iq-controls');
+    controls.hidden = false;
+    const input = root.querySelector('.iq-search');
+    const empty = root.querySelector('.iq-empty');
+    const cards = [...root.querySelectorAll('.iq-level-card')];
+    const state = { level: '', kind: '' };
+
+    root.querySelectorAll('.iq-lc-more').forEach((btn) => {
+      btn.hidden = false;
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.iq-level-card');
+        const open = card.classList.toggle('is-expanded');
+        btn.textContent = open ? 'Show less' : btn.dataset.more;
+      });
+    });
+
+    root.querySelectorAll('.iq-seg').forEach((seg) => {
+      seg.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        seg.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn));
+        state[seg.dataset.filter] = btn.dataset.value;
+        apply();
+      });
+    });
+
+    function apply() {
+      const q = input.value.trim().toLowerCase();
+      root.classList.toggle('is-searching', q !== '');
+      let total = 0;
+      cards.forEach((card) => {
+        let shown = 0;
+        card.querySelectorAll('li[data-q]').forEach((li) => {
+          const hit = !q || li.dataset.q.includes(q);
+          li.hidden = !hit;
+          if (hit) shown++;
+        });
+        const ok = shown > 0 &&
+          (!state.level || card.dataset.level === state.level) &&
+          (!state.kind || card.dataset.kind === state.kind);
+        card.hidden = !ok;
+        if (ok) total += shown;
+      });
+      const filtering = q || state.level || state.kind;
+      root.querySelectorAll('.iq-topic').forEach((t) => {
+        t.hidden = !t.querySelector('.iq-level-card:not([hidden])');
+      });
+      root.querySelectorAll('.iq-domain[id^="domain-"]').forEach((d) => {
+        d.hidden = filtering && !d.querySelector('.iq-topic:not([hidden])');
+      });
+      empty.hidden = total > 0;
+    }
+
+    input.addEventListener('input', apply);
+  })();
+</script>

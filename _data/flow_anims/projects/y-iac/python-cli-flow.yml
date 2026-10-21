@@ -1,0 +1,92 @@
+# Animated flow diagram for _posts/projects/y-iac/2026-10-05-05-technical-architecture.md
+# (include id: projects/y-iac/python-cli-flow). Part 1 of "how one run works": what the Python CLI
+# does with the command, the consumer's YAML files and the environment before Terragrunt runs.
+# Source: entrypoint.py, src/<org>_iac/cli/app.py and docs/getting-started/12-cli-init-reconfigure-flow.md.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: "Y-IaC part 1: how the Python CLI prepares a run"
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 510]
+
+lanes:
+  - { label: "Inputs in the consumer repo", x: 8, y: 8, w: 984, h: 122 }
+  - { label: "Shared Python CLI (Y-IaC src/ package)", x: 8, y: 165, w: 984, h: 140 }
+  - { label: "Stack generation", x: 8, y: 360, w: 984, h: 140 }
+
+nodes:
+  - { id: CMD, label: "python\nentrypoint.py", x: 90, y: 75, w: 136, shape: terminal, icon: "programming/python.svg", icon_pos: corner }
+  - { id: SM, label: "Shared module\ncheckout", x: 254, y: 75, w: 136, h: 60, shape: cylinder }
+  - { id: CV, label: "common_vars\n.yaml", x: 418, y: 75, w: 136, h: 60, shape: cylinder, icon: file, icon_pos: corner }
+  - { id: RES, label: "resources\n.yaml", x: 582, y: 75, w: 136, h: 60, shape: cylinder, icon: file }
+  - { id: CFG, label: "config.yaml", x: 746, y: 75, w: 136, h: 60, shape: cylinder, icon: file, icon_pos: corner }
+  - { id: ENV, label: ".env or CI\nsecrets", x: 910, y: 75, w: 136, h: 60, shape: cylinder, icon: key, icon_pos: corner }
+
+  - { id: EP, label: "Entrypoint\nstub", x: 90, y: 240, w: 136 }
+  - { id: BOOT, label: "Bootstrap\nsync", x: 254, y: 240, w: 136, icon: package }
+  - { id: PARSE, label: "Parse\narguments", x: 418, y: 240, w: 136, icon: code }
+  - { id: VAL, label: "Validate", sub: "arg_validation", x: 582, y: 240, w: 136, icon: check, icon_pos: corner }
+  - { id: EXP, label: "Export env\nvariables", x: 746, y: 240, w: 136 }
+  - { id: AUTH, label: "Authenticate", sub: "environment/", x: 910, y: 240, w: 136, icon: lock, icon_pos: corner }
+
+  - { id: GEN, label: "Stack\ngenerator", x: 130, y: 430 }
+  - { id: STK, label: "terragrunt\n.stack.hcl", x: 320, y: 430, h: 62, shape: cylinder }
+  - { id: TGG, label: "terragrunt\nstack generate", x: 510, y: 430 }
+  - { id: MRG, label: "Merge\ncommon_vars", x: 700, y: 430, icon: git }
+  - { id: DAG, label: "Dependency\nwaves", x: 890, y: 430, shape: terminal, icon: package }
+
+edges:
+  - { id: CMDEP, from: CMD, to: EP }
+  - { id: SMBOOT, from: SM, to: BOOT }
+  - { id: EPBOOT, from: EP, to: BOOT }
+  - { id: BOOTPARSE, from: BOOT, to: PARSE }
+  - { id: PARSEVAL, from: PARSE, to: VAL }
+  - { id: CVVAL, from: CV, to: VAL, points: [[418, 105], [418, 142], [545, 142], [545, 212]] }
+  - { id: RESVAL, from: RES, to: VAL }
+  - { id: VALEXP, from: VAL, to: EXP }
+  - { id: CFGEXP, from: CFG, to: EXP }
+  - { id: CFGAUTH, from: CFG, to: AUTH, points: [[795, 105], [795, 148], [875, 148], [875, 212]] }
+  - { id: ENVAUTH, from: ENV, to: AUTH }
+  - { id: EXPAUTH, from: EXP, to: AUTH }
+  - { id: AUTHGEN, from: AUTH, to: GEN, points: [[910, 268], [910, 335], [35, 335], [35, 430], [55, 430]] }
+  - { id: GENSTK, from: GEN, to: STK }
+  - { id: STKTGG, from: STK, to: TGG }
+  - { id: TGGMRG, from: TGG, to: MRG }
+  - { id: MRGDAG, from: MRG, to: DAG }
+
+steps:
+  - lights: [CMD, SM, CV, RES, CFG, ENV]
+    title: One command, five inputs
+    text: "In infra-aws you run python entrypoint.py --cloud aws --environment dev --stack hello-world --terragrunt plan. Everything else the run needs is already on disk or in the environment."
+  - edges: [CMDEP]
+    title: The stub finds the platform
+    text: The identical entrypoint stub finds the shared module (sibling folder locally, ./terragrunt_shared_module in CI), adds src/ to sys.path and calls cli/app.py.
+  - edges: [EPBOOT, SMBOOT]
+    title: Bootstrap sync
+    text: A content hash decides whether the shared module changed. If so it is copied in, the stub is refreshed and root.hcl, the CI workflow, Taskfile and .gitignore are written.
+  - edges: [BOOTPARSE]
+    title: Parse arguments
+    text: argparse reads cloud, environment, stack and action. Unknown tokens such as -reconfigure become Terraform passthrough flags, and a dispatch target is chosen.
+  - edges: [PARSEVAL, CVVAL, RESVAL]
+    title: Validate before anything runs
+    text: The stack folder must exist, the provider and stack must fit, the target account comes from common_vars.yaml, and resources.yaml is linted for duplicates.
+  - edges: [VALEXP, CFGEXP]
+    title: Export environment variables
+    text: CLOUD, ENVIRONMENT, TARGET_ACCOUNT and STACK are exported, plus gate settings (OPA, Trivy or Wiz, Infracost) and state-lock settings from config.yaml and common_vars.yaml.
+  - edges: [EXPAUTH, CFGAUTH, ENVAUTH]
+    title: Authenticate
+    text: The backend entry is matched on the repo name, credentials are pre-flighted, and ARM_* (or AWS, GCP) plus BACKEND_* variables are set from .env, the CLI login or CI secrets.
+  - edges: [AUTHGEN]
+    title: Hand over to the Terragrunt handler
+    text: The handler resolves environments/aws/dev/hello-world, clears the cache on -reconfigure, checks terragrunt is installed and starts the stack generator.
+  - edges: [GENSTK]
+    title: YAML becomes a stack file
+    text: One unit block per resource type in resources.yaml (or the category files), with source = cloud/<cloud>/terragrunt/<type> and the declared instances as values.
+  - edges: [STKTGG]
+    title: Terragrunt expands the units
+    text: terragrunt stack generate copies each unit template into .terragrunt-stack/<type>/ as terragrunt.hcl, next to a generated terragrunt.values.hcl.
+  - edges: [TGGMRG]
+    title: Merge common_vars
+    text: Environment and stack common_vars.yaml are merged into .terragrunt-stack/common_vars.yaml. common_tags merge key by key, so a stack tag never drops a cost-centre tag.
+  - edges: [MRGDAG]
+    title: Dependency waves
+    text: Dependency blocks in the generated units are sorted into execution waves and printed. Then terragrunt stack run plan starts, which is part 2.

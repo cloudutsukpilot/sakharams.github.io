@@ -1,0 +1,84 @@
+# Animated CI pipeline for _posts/devops/build-tools/python/2026-10-01-pip-setuptools-build.md
+# (include id: devops/build-tools/python/pip-ci-pipeline). The stages follow the generic build pipeline in
+# _data/flow_anims/devops/build-tools/generic-build-pipeline.yml; labels name the real tool.
+title: "CI pipeline with pip and build"
+accent: "#F97316"
+accent2: "#8B5CF6"
+viewbox: [1000, 500]
+modes:
+  - {id: pass, label: "Gate passes"}
+  - {id: fail, label: "Simulate a failing gate"}
+
+lanes:
+  - {label: "Build with pip and build", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Verify, package and publish", x: 8, y: 205, w: 984, h: 287}
+
+nodes:
+  - {id: A, label: "Source", sub: "pyproject.toml", x: 100, y: 75, w: 150, h: 56, shape: terminal, icon: git, icon_pos: corner}
+  - {id: B, label: "Install", sub: "pip install", x: 300, y: 75, w: 150, h: 56, icon: package}
+  - {id: C, label: "Lint + format", sub: "ruff", x: 500, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: D, label: "Install project", sub: "pip install -e", x: 700, y: 75, w: 150, h: 56, icon: package, icon_pos: corner}
+  - {id: E, label: "Test + coverage", sub: "pytest-cov", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner}
+  - {id: F, label: "SAST", sub: "Bandit", x: 130, y: 270, w: 150, h: 46, icon: shield}
+  - {id: G, label: "SCA", sub: "pip-audit", x: 130, y: 340, w: 150, h: 46, icon: shield}
+  - {id: H, label: "Secrets", sub: "Gitleaks", x: 130, y: 410, w: 150, h: 46, icon: key}
+  - {id: I, label: "Quality\ngate", x: 320, y: 340, w: 110, h: 84, shape: diamond}
+  - {id: X, label: "Fail the build", x: 320, y: 452, w: 140, h: 42, tone: fail, icon: cross, icon_pos: corner}
+  - {id: J, label: "Package", sub: "python -m build", x: 492, y: 340, w: 146, h: 56, icon: "programming/python.svg", icon_pos: corner}
+  - {id: K, label: "SBOM + sign", sub: "cyclonedx-py", x: 662, y: 340, w: 146, h: 56, icon: cert}
+  - {id: L, label: "PyPI / index", sub: "twine upload", x: 830, y: 340, w: 140, h: 66, shape: cylinder, icon: bucket, icon_pos: corner}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]]}
+  - {id: EG, from: E, to: G, points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]]}
+  - {id: EH, from: E, to: H, points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]]}
+  - {id: FI, from: F, to: I}
+  - {id: GI, from: G, to: I}
+  - {id: HI, from: H, to: I}
+  - {id: IX, from: I, to: X, points: [[320, 382], [320, 431]], label: "fail", label_at: [334, 410], tone: fail}
+  - {id: IJ, from: I, to: J, label: "pass", label_at: [396, 330]}
+  - {id: JK, from: J, to: K}
+  - {id: KL, from: K, to: L}
+
+steps:
+  - lights: [A]
+    title: "Source + pyproject.toml"
+    text: "A commit triggers CI. pyproject.toml declares the project and build backend, and requirements.txt (compiled by pip-tools) pins versions with hashes."
+  - edges: [AB]
+    title: "Install"
+    text: "pip install -r requirements.txt --require-hashes in a fresh venv installs exactly the locked versions; CI caches ~/.cache/pip."
+  - edges: [BC]
+    title: "Lint and format"
+    text: "ruff check . && ruff format --check . lint and check formatting; mypy or Pyright add type checking."
+  - edges: [CD]
+    title: "Install the project"
+    text: "pip install -e \".[dev]\" installs the project and its dev tools, so tests run against the real package metadata."
+  - edges: [DE]
+    title: "Test and coverage"
+    text: "pytest --cov=src --cov-fail-under=80 runs the tests and fails if line coverage drops below 80%."
+  - edges: [EF, EG, EH]
+    title: "Security scans in parallel"
+    text: "bandit -r src -ll checks our code, pip-audit checks the dependencies against known vulnerabilities, and Gitleaks scans for secrets."
+  - edges: [FI, GI, HI]
+    title: "Quality gate"
+    text: "Lint, tests with the 80% coverage gate and both scanners are required checks; one failure stops the pipeline."
+  - edges: [IX]
+    when: fail
+    title: "Fail the build"
+    text: "A failed check stops the pipeline at the gate, so nothing is packaged, signed or published."
+  - edges: [IJ]
+    when: pass
+    title: "Build the distributions"
+    text: "python -m build creates the wheel (.whl) and sdist (.tar.gz) in dist/, and twine check validates their metadata."
+  - edges: [JK]
+    when: pass
+    title: "SBOM and signing"
+    text: "cyclonedx-py writes sbom.json from requirements.txt, and the distributions are signed with Sigstore cosign."
+  - edges: [KL]
+    when: pass
+    title: "Publish"
+    text: "twine upload publishes dist/ to PyPI or a private index (Artifactory, Nexus, devpi)."

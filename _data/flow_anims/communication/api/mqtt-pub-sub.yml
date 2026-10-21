@@ -1,0 +1,48 @@
+# Animated flow diagram for _posts/communication/api/2026-10-06-mqtt.md
+# (include id: communication/api/mqtt-pub-sub). Topic-based routing through a broker, with a
+# Last Will and Testament mode.
+title: MQTT publish and subscribe through a broker
+accent: "#38BDF8"
+accent2: "#F472B6"
+viewbox: [1000, 310]
+modes:
+  - {id: normal, label: "Normal operation"}
+  - {id: lwt, label: "Simulate a sensor dropping offline"}
+
+nodes:
+  - {id: T, label: "Temp sensor", sub: "plant/1/temp", x: 120, y: 80, w: 170, h: 56}
+  - {id: M, label: "Pump controller", sub: "plant/1/alarm", x: 120, y: 230, w: 170, h: 56}
+  - {id: B, label: "MQTT broker", sub: "topic routing", x: 470, y: 155, w: 170, h: 76, shape: cylinder, icon: queue}
+  - {id: D, label: "Dashboard", sub: "plant/+/temp", x: 840, y: 65, w: 190, h: 52, icon: chart}
+  - {id: A, label: "Alerting", sub: "plant/+/alarm", x: 840, y: 155, w: 190, h: 52, icon: bell}
+  - {id: S, label: "Time-series DB", sub: "plant/#", x: 840, y: 245, w: 190, h: 52, shape: cylinder, icon: database}
+
+edges:
+  - {id: TB, from: T, to: B, label: "QoS 0"}
+  - {id: MB, from: M, to: B, label: "QoS 1"}
+  - {id: BD, from: B, to: D}
+  - {id: BA, from: B, to: A}
+  - {id: BS, from: B, to: S}
+
+steps:
+  - lights: [T, M]
+    title: Clients connect
+    text: Devices open a TCP connection to the broker on port 1883, or 8883 with TLS, with a client ID, a keep-alive interval and a Last Will message.
+  - edges: [TB]
+    title: Publish a reading
+    text: "The sensor publishes 21.7 to plant/1/temp with QoS 0: fire and forget, no acknowledgement. Subscribers registered topic filters earlier."
+  - edges: [BD, BS]
+    title: Broker routes by topic
+    text: The broker matches the topic against every subscription and forwards a copy to the dashboard and the time-series store. Alerting is not subscribed to temp.
+  - edges: [MB]
+    when: normal
+    title: Publish an alarm
+    text: The pump controller publishes to plant/1/alarm with QoS 1, so the broker must acknowledge with PUBACK and the controller resends until it does.
+  - edges: [BA, BS]
+    when: normal
+    title: Alarm fans out
+    text: Alerting and the time-series DB both match plant/1/alarm. A retained flag would also keep the last value for subscribers that join later.
+  - edges: [BA, BS]
+    when: lwt
+    title: Broker publishes the will
+    text: The sensor loses power. After 1.5 times the keep-alive with no packet, the broker publishes its Last Will (plant/1/alarm = sensor offline) for it.

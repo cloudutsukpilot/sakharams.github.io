@@ -1,0 +1,35 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-iot-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: connectivity
+    title: Device connectivity and messaging
+    aws:
+      - ref: AWS IoT Core
+        summary: Managed MQTT, MQTT over WebSockets and HTTPS broker for billions of devices, with X.509 certificate auth, device shadows for desired/reported state, a rules engine that routes messages to AWS services, and fleet provisioning.
+    azure:
+      - ref: IoT Hub
+        summary: Bi-directional device messaging over MQTT, AMQP and HTTPS with per-device identity, device twins, direct methods, message routing and the Device Provisioning Service for zero-touch onboarding. Event Grid namespaces offer a standards-based MQTT broker alternative.
+    gcp:
+      note: Google retired **Cloud IoT Core** in August 2023. Use a partner platform (or a self-managed MQTT broker on GKE) that publishes device data into **Pub/Sub**, then process it with Dataflow and store it in BigQuery or Bigtable.
+
+  - id: edge
+    title: Edge runtimes
+    aws:
+      - ref: AWS IoT Greengrass
+        summary: Open-source edge runtime that deploys components (Lambda functions, containers, ML models) to devices, works offline, syncs with the cloud when connected, and manages fleets remotely. AWS Outposts covers full AWS infrastructure on-premises.
+    azure:
+      - ref: IoT Edge
+        summary: Runs containerised modules (including Azure services such as Stream Analytics and AI models) on edge devices, managed from IoT Hub, with offline operation and secure device-to-cloud communication. Azure Arc extends management to edge Kubernetes and servers.
+    gcp:
+      note: No dedicated IoT edge runtime. **Google Distributed Cloud** brings Google Cloud infrastructure to edge and on-premises sites, and GKE or open-source runtimes run containerised workloads on gateways.
+
+  - id: twins
+    title: Digital twins and industrial data
+    aws:
+      - name: AWS IoT SiteWise
+        icon: iot-sitewise
+        summary: Collects, organises and models industrial equipment data at scale, with asset models, computed metrics and monitoring portals. AWS ended support for IoT Analytics and IoT Events in 2026, so check the AWS lifecycle page before adopting adjacent IoT services.
+    azure:
+      - ref: Digital Twins
+        summary: Builds graph models of buildings, factories, energy networks and cities using the Digital Twins Definition Language (DTDL), kept up to date from IoT Hub and queried for relationships and live state.
+    gcp:
+      note: No first-party digital-twin service. Teams model assets in BigQuery or Spanner Graph and use partner industrial platforms for twins and OT connectivity.

@@ -1,0 +1,84 @@
+# Animated CI pipeline for _posts/devops/build-tools/android/2026-10-01-android-gradle-build.md
+# (include id: devops/build-tools/android/android-gradle-ci-pipeline). The stages follow the generic build pipeline in
+# _data/flow_anims/devops/build-tools/generic-build-pipeline.yml; labels name the real tool.
+title: "CI pipeline with the Android Gradle Plugin"
+accent: "#F97316"
+accent2: "#8B5CF6"
+viewbox: [1000, 500]
+modes:
+  - {id: pass, label: "Gate passes"}
+  - {id: fail, label: "Simulate a failing gate"}
+
+lanes:
+  - {label: "Build with the Android Gradle Plugin", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Verify, package and publish", x: 8, y: 205, w: 984, h: 287}
+
+nodes:
+  - {id: A, label: "Source", sub: "build.gradle.kts", x: 100, y: 75, w: 150, h: 56, shape: terminal, icon: git, icon_pos: corner}
+  - {id: B, label: "Resolve deps", sub: "Google Maven", x: 300, y: 75, w: 150, h: 56, icon: package, icon_pos: corner}
+  - {id: C, label: "Lint + format", sub: "./gradlew lint", x: 500, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: D, label: "Compile", sub: "assembleDebug", x: 700, y: 75, w: 150, h: 56, icon: code, icon_pos: corner}
+  - {id: E, label: "Test + coverage", sub: "testDebugUnitTest", x: 900, y: 75, w: 150, h: 56, icon: check, icon_pos: corner}
+  - {id: F, label: "SAST", sub: "mobsfscan", x: 130, y: 270, w: 150, h: 46, icon: shield}
+  - {id: G, label: "SCA", sub: "Dependency-Check", x: 130, y: 340, w: 150, h: 46, icon: shield, icon_pos: corner}
+  - {id: H, label: "Secrets", sub: "Gitleaks", x: 130, y: 410, w: 150, h: 46, icon: key}
+  - {id: I, label: "Quality\ngate", x: 320, y: 340, w: 110, h: 84, shape: diamond}
+  - {id: X, label: "Fail the build", x: 320, y: 452, w: 140, h: 42, tone: fail, icon: cross, icon_pos: corner}
+  - {id: J, label: "App bundle", sub: "bundleRelease", x: 492, y: 340, w: 146, h: 56, icon: package, icon_pos: corner}
+  - {id: K, label: "Sign", sub: "upload key", x: 662, y: 340, w: 146, h: 56, icon: key}
+  - {id: L, label: "Google Play", sub: "Play Console", x: 830, y: 340, w: 140, h: 66, shape: cylinder, icon: phone, icon_pos: corner}
+
+edges:
+  - {id: AB, from: A, to: B}
+  - {id: BC, from: B, to: C}
+  - {id: CD, from: C, to: D}
+  - {id: DE, from: D, to: E}
+  - {id: EF, from: E, to: F, points: [[900, 103], [900, 165], [35, 165], [35, 270], [55, 270]]}
+  - {id: EG, from: E, to: G, points: [[900, 103], [900, 165], [35, 165], [35, 340], [55, 340]]}
+  - {id: EH, from: E, to: H, points: [[900, 103], [900, 165], [35, 165], [35, 410], [55, 410]]}
+  - {id: FI, from: F, to: I}
+  - {id: GI, from: G, to: I}
+  - {id: HI, from: H, to: I}
+  - {id: IX, from: I, to: X, points: [[320, 382], [320, 431]], label: "fail", label_at: [334, 410], tone: fail}
+  - {id: IJ, from: I, to: J, label: "pass", label_at: [396, 330]}
+  - {id: JK, from: J, to: K}
+  - {id: KL, from: K, to: L}
+
+steps:
+  - lights: [A]
+    title: "Source + build scripts"
+    text: "A commit triggers CI. settings.gradle.kts, the module build.gradle.kts files and libs.versions.toml define the app; gradlew pins Gradle."
+  - edges: [AB]
+    title: "Resolve dependencies"
+    text: "Gradle and the Android Gradle Plugin resolve dependencies from Google Maven and Maven Central; setup-gradle caches them."
+  - edges: [BC]
+    title: "Lint and format"
+    text: "./gradlew lint runs Android Lint (including security checks), and ktlintCheck and detekt cover Kotlin style and smells."
+  - edges: [CD]
+    title: "Compile"
+    text: "./gradlew assembleDebug compiles Kotlin and Java, merges resources and builds a debug APK."
+  - edges: [DE]
+    title: "Test and coverage"
+    text: "./gradlew testDebugUnitTest runs the JVM unit tests (including Robolectric), and koverXmlReport records coverage."
+  - edges: [EF, EG, EH]
+    title: "Security scans in parallel"
+    text: "mobsfscan and the Android Lint security checks cover our code, ./gradlew dependencyCheckAnalyze checks dependencies, and Gitleaks scans for secrets."
+  - edges: [FI, GI, HI]
+    title: "Quality gate"
+    text: "Tests, coverage and every scanner are required checks, so a single failure stops the pipeline here."
+  - edges: [IX]
+    when: fail
+    title: "Fail the build"
+    text: "A failed check stops the pipeline at the gate, so nothing is packaged, signed or published."
+  - edges: [IJ]
+    when: pass
+    title: "Build the app bundle"
+    text: "./gradlew bundleRelease builds the release .aab, shrunk by R8; keep mapping.txt to read crash reports."
+  - edges: [JK]
+    when: pass
+    title: "Sign"
+    text: "The bundle is signed with the upload keystore decoded from CI secrets; Play App Signing re-signs it with the app signing key."
+  - edges: [KL]
+    when: pass
+    title: "Upload to Google Play"
+    text: "The signed .aab is uploaded to Google Play, which signs and delivers optimised APKs to each device."

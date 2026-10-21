@@ -1,0 +1,54 @@
+# Animated flow diagram for _posts/projects/sql-blocking-agent/2026-10-05-04-user-experience-and-design.md
+# (include id: projects/sql-blocking-agent/approval-flow). The loop-mode human-in-the-loop journey:
+# src/orchestrator/router.py (approval API) and approve.py (CLI). Default timeout 300 s.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: SQL Blocking Agent human approval flow
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 260]
+grid: { x0: 90, y0: 70, dx: 164, dy: 140, w: 136, h: 56 }
+modes:
+  - { id: approve, label: "The DBA approves" }
+  - { id: timeout, label: "Simulate a deny or a 300 s timeout" }
+
+nodes:
+  - { id: K, label: "KILL\ndecided", col: 0, row: 0, shape: terminal }
+  - { id: P, label: "Pending", sub: "8-char ID", col: 1, row: 0 }
+  - { id: B, label: "Evidence\nbanner", col: 2, row: 0 }
+  - { id: D, label: "DBA", col: 3, row: 0, w: 76, h: 76, shape: circle }
+  - { id: Q, label: "Decision", col: 4, row: 0, w: 120, h: 84, shape: diamond }
+  - { id: A, label: "KILL runs", sub: "then validate", col: 5, row: 0, tone: ok, icon: check, icon_pos: corner }
+  - { id: X, label: "ALERT_ONLY", sub: "no kill", col: 4, row: 1, h: 50, tone: fail, icon: bell, icon_pos: corner }
+
+edges:
+  - { id: KP, from: K, to: P }
+  - { id: PB, from: P, to: B }
+  - { id: BD, from: B, to: D }
+  - { id: DQ, from: D, to: Q }
+  - { id: QA, from: Q, to: A, label: "yes", tone: ok }
+  - { id: QX, from: Q, to: X, label: "no / timeout", label_at: [672, 162], tone: fail }
+
+steps:
+  - lights: [K]
+    title: A KILL is proposed
+    text: Determination returned KILL after every hard gate passed. With REQUIRE_HUMAN_APPROVAL=true (mandatory in production) nothing runs yet.
+  - edges: [KP]
+    title: Pending approval
+    text: The approval router registers the request with a short ID, keyed to the cycle's correlation ID, and starts the timeout clock (300 seconds by default).
+  - edges: [PB]
+    title: Evidence for the reviewer
+    text: The banner shows server, SPID, login, database, wait time, victims, risk, KB scenario, log usage, plan availability, safety rating and the reasoning.
+  - edges: [BD]
+    title: The DBA reviews
+    text: "From another terminal: python approve.py list, then show <id> for the full detail. The same data is on GET /pending/{id}."
+  - edges: [DQ]
+    title: Decide
+    text: approve.py approve <id> with an optional note, or deny <id> with a reason. Notes and reasons go into the decision reason and the audit trail.
+  - edges: [QA]
+    when: approve
+    title: Approved
+    text: The Action node issues the KILL on a clean autocommit connection, then validates that the session is gone and the chain cleared.
+  - edges: [QX]
+    when: timeout
+    title: Denied or no answer
+    text: A deny, or silence until the timeout, downgrades the decision to ALERT_ONLY. No response always means no kill. The RCA report still goes out.

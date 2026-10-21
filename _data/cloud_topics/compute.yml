@@ -1,0 +1,63 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-compute-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: vms
+    title: Virtual machines
+    aws:
+      - ref: Amazon EC2
+        summary: The original cloud VM service, with the largest catalogue of instance families (general purpose, compute, memory, GPU, Arm-based Graviton). Pay On-Demand, commit with Savings Plans, or use Spot for up to ~90% off interruptible capacity.
+    azure:
+      - ref: Virtual Machines
+        summary: Windows and Linux VMs in sizes from burstable B-series to GPU N-series. Strongest story for Windows Server and SQL Server thanks to Azure Hybrid Benefit, which lets you reuse existing licences. Spot VMs and reservations cut cost.
+    gcp:
+      - ref: Compute Engine
+        summary: VMs with predefined or fully custom machine shapes (pick vCPU and memory independently). Sustained-use discounts apply automatically, committed-use discounts for 1 or 3 years, and Spot VMs for batch work. Live migration keeps VMs running through host maintenance.
+
+  - id: autoscaling
+    title: Autoscaling groups of VMs
+    aws:
+      - ref: Amazon EC2
+        name: EC2 Auto Scaling groups
+        summary: Groups of identical instances built from a launch template. Scale on CloudWatch metrics, schedules or predictive scaling, spread across Availability Zones, and register instances with a load balancer automatically. Mixed-instance policies blend On-Demand and Spot.
+    azure:
+      - ref: VM Scale Sets
+        summary: Scale Sets manage a fleet of VMs as one resource. Flexible orchestration mode lets you mix VM sizes and Spot with regular capacity; autoscale rules come from Azure Monitor metrics or schedules. Also the node-pool engine underneath AKS.
+    gcp:
+      - ref: Compute Engine
+        name: Managed instance groups (MIGs)
+        summary: MIGs create identical VMs from an instance template, autoscale on CPU, load-balancer utilisation or custom metrics, and auto-heal instances that fail health checks. Regional MIGs spread across zones; rolling updates replace instances gradually.
+
+  - id: functions
+    title: Serverless functions
+    aws:
+      - ref: AWS Lambda
+        summary: Run code in response to events (API calls, S3 uploads, queue messages, schedules) with no servers to manage. Billed per request and per millisecond of compute; up to 15 minutes per invocation and 10 GB of memory. Container images and SnapStart reduce cold-start pain.
+    azure:
+      - ref: Azure Functions
+        summary: Event-driven functions with rich triggers and bindings (HTTP, queues, Event Grid, Cosmos DB, timers). The Flex Consumption plan scales to zero with faster scale-out; Premium and Dedicated plans keep instances warm. Durable Functions adds stateful workflows in code.
+    gcp:
+      - ref: Cloud Run functions
+        summary: Formerly Cloud Functions, now built on Cloud Run. Write a single function, trigger it from HTTP or Eventarc events, and get Cloud Run features (concurrency, larger instances, longer timeouts) underneath. Billed per request and compute time, scales to zero.
+
+  - id: paas
+    title: Managed application platforms
+    aws:
+      - ref: AWS Elastic Beanstalk
+        summary: Upload a Java, .NET, Node.js, Python, Go, PHP or Ruby app (or a Docker image) and Beanstalk provisions EC2, load balancing, autoscaling and monitoring for you. You can still see and tweak the underlying resources, which is both its strength and its complexity.
+    azure:
+      - ref: App Service
+        summary: The most mature PaaS of the three. Hosts web apps and APIs on Windows or Linux with deployment slots, autoscale, custom domains, managed certificates, VNet integration and easy CI/CD from GitHub or Azure DevOps. Priced per App Service plan, not per app.
+    gcp:
+      - ref: App Engine
+        summary: Google's original PaaS. Standard environment scales to zero for supported runtimes; Flexible runs containers on VMs. Still supported, but Google steers most new web workloads to Cloud Run, which offers the same simplicity with any container.
+
+  - id: batch
+    title: Batch computing
+    aws:
+      - ref: AWS Batch
+        summary: Submit containerised jobs to queues and Batch provisions the right EC2, Spot or Fargate capacity, runs them (including array jobs and dependencies), then scales back to zero. You pay only for the underlying compute.
+    azure:
+      - ref: Azure Batch
+        summary: Pools of VMs that run large-scale parallel and HPC jobs, with task scheduling, retries and autoscaling formulas. Supports Spot VMs, containers and MPI workloads; common for rendering, simulations and financial risk models.
+    gcp:
+      - ref: Batch
+        summary: A fully managed job scheduler that provisions Compute Engine VMs (including Spot and GPUs), runs scripts or containers, and tears everything down when jobs finish. Integrates with Cloud Logging and Workflows for pipelines.

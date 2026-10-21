@@ -343,6 +343,160 @@ Read More at [DevOps Introduction](/posts/devops/devops)
     </div>
 </div>
 <!-- CI/CD End -->
+<!-- Build Ecosystem Start -->
+<div class="card categories">
+    <div
+    id="h_10"
+    class="card-header d-flex justify-content-between hide-border-bottom"
+    >
+    <span>
+        <img alt="Build Ecosystem" src="/assets/img/icons/miscellaneous/coding-18.svg" />
+        <a
+        href="/posts/devops/build-tools/language-build-ecosystem"
+        class="ml-1 mr-2"
+        >Build Ecosystem by Programming Language</a
+        >
+    </span>
+    <a
+        href="#l_10"
+        data-toggle="collapse"
+        aria-expanded="true"
+        aria-label="h_10-trigger"
+        class="category-trigger hide-border-bottom"
+    >
+        <i class="fas fa-fw fa-angle-down"></i>
+    </a>
+    </div>
+    <div id="l_10" class="collapse show" aria-expanded="true">
+    <div class="container d-flex flex-wrap align-items-top">
+        <div class="d-flex flex-column w-50">
+        <div class="p-2">
+            <img alt="Maven" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/java/maven-build"
+            class="ml-1 mr-2"
+            >Java - Maven</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Gradle" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/java/gradle-build"
+            class="ml-1 mr-2"
+            >Java - Gradle</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="npm, pnpm and Yarn" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/javascript/npm-pnpm-yarn-build"
+            class="ml-1 mr-2"
+            >JavaScript - npm, pnpm and Yarn</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="JavaScript Bundlers" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/javascript/javascript-bundlers-build"
+            class="ml-1 mr-2"
+            >JavaScript - Vite, webpack and esbuild</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="pip and setuptools" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/python/pip-setuptools-build"
+            class="ml-1 mr-2"
+            >Python - pip and setuptools</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="uv and Poetry" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/python/uv-poetry-build"
+            class="ml-1 mr-2"
+            >Python - uv and Poetry</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Go" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/go/go-build"
+            class="ml-1 mr-2"
+            >Go - Go Toolchain and GoReleaser</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="DotNet" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/dotnet/dotnet-build"
+            class="ml-1 mr-2"
+            >.NET - dotnet CLI and MSBuild</a
+            >
+        </div>
+        </div>
+        <div class="d-flex flex-column">
+        <div class="p-2">
+            <img alt="CMake" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/cpp/cmake-build"
+            class="ml-1 mr-2"
+            >C/C++ - CMake, Conan and vcpkg</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Make and Autotools" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/cpp/make-autotools-build"
+            class="ml-1 mr-2"
+            >C/C++ - Make and Autotools</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Cargo" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/rust/cargo-build"
+            class="ml-1 mr-2"
+            >Rust - Cargo</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Bundler and Rake" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/ruby/bundler-rake-build"
+            class="ml-1 mr-2"
+            >Ruby - Bundler and Rake</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Composer" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/php/composer-build"
+            class="ml-1 mr-2"
+            >PHP - Composer</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Xcode and SwiftPM" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/swift/xcode-swiftpm-build"
+            class="ml-1 mr-2"
+            >Swift (iOS) - Xcode and SwiftPM</a
+            >
+        </div>
+        <div class="p-2">
+            <img alt="Android Gradle" src="/assets/img/icons/miscellaneous/folder-18.svg" />
+            <a
+            href="/posts/devops/build-tools/android/android-gradle-build"
+            class="ml-1 mr-2"
+            >Android - Gradle and AGP</a
+            >
+        </div>
+        </div>
+    </div>
+    </div>
+</div>
+<!-- Build Ecosystem End -->
 <!-- IAC Start -->
 <div class="card categories">
     <div

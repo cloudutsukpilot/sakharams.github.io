@@ -1,0 +1,43 @@
+# Example: systems connected by protocols. Shows box icons (built-in and a library logo), role colours
+# from the icons, `proto`/`port` pills on every system-to-system arrow, and communication kinds derived
+# from `proto` (HTTPS/HTTP request, PostgreSQL data, Kafka event, OTLP telemetry) with the legend.
+# Each pill needs a straight segment about its width + 20 long, hence the 105-175 unit gaps.
+title: Order request path with protocols and ports
+accent: "#38BDF8"
+accent2: "#8B5CF6"
+viewbox: [1000, 330]
+
+nodes:
+  - {id: B, label: "Browser", x: 70, y: 150, w: 120, h: 56, shape: terminal, icon: browser}
+  - {id: LB, label: "Load\nbalancer", x: 310, y: 150, w: 140, h: 56, icon: balancer}
+  - {id: API, label: "Orders API", sub: "FastAPI", x: 560, y: 150, w: 150, h: 56, icon: api}
+  - {id: PG, label: "PostgreSQL", x: 875, y: 150, w: 150, h: 66, shape: cylinder, icon: "databases/postgresql-18.svg"}
+  - {id: K, label: "Kafka", sub: "orders topic", x: 875, y: 50, w: 150, h: 50, icon: queue}
+  - {id: O, label: "OTel\nCollector", x: 560, y: 285, w: 150, h: 50, icon: chart}
+
+edges:
+  - {id: BL, from: B, to: LB, proto: HTTPS, port: 443}
+  - {id: LA, from: LB, to: API, proto: HTTP, port: 8080}
+  - {id: AP, from: API, to: PG, proto: PostgreSQL, port: 5432}
+  - {id: AK, from: API, to: K, exit: top, enter: left, proto: Kafka, port: 9092}
+  - {id: AO, from: API, to: O, proto: OTLP, port: 4317, dashed: true}
+
+steps:
+  - lights: [B]
+    title: Browser
+    text: The shopper submits an order from the browser.
+  - edges: [BL]
+    title: HTTPS to the load balancer
+    text: The request travels over HTTPS on port 443; TLS terminates at the load balancer.
+  - edges: [LA]
+    title: Forward to the API
+    text: The load balancer forwards plain HTTP on port 8080 to a healthy Orders API instance inside the private network.
+  - edges: [AP]
+    title: Write the order
+    text: The API stores the order in PostgreSQL over the PostgreSQL wire protocol on port 5432.
+  - edges: [AK]
+    title: Publish an event
+    text: An OrderCreated event goes to the Kafka topic on port 9092, so other services react asynchronously.
+  - edges: [AO]
+    title: Export telemetry
+    text: Traces and metrics for the request are exported to the OpenTelemetry Collector over OTLP gRPC on port 4317.

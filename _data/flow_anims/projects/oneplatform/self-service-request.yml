@@ -1,0 +1,56 @@
+# Animated flow diagram for _posts/projects/oneplatform/2026-10-05-04-user-experience-and-design.md
+# (include id: projects/oneplatform/self-service-request). The common OnePlatform user flow: pick a
+# template, fill a guarded form, backend permission check, scaffolder task, act on Azure/GitHub/
+# Terraform, notification. Second mode: the request is denied. Source: the portal's scaffolder data
+# flow diagram. Coordinates are in viewBox units; node x/y is the centre.
+title: OnePlatform self-service request
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 290]
+modes:
+  - { id: allow, label: "Request allowed" }
+  - { id: deny, label: "Simulate a role that isn't allowed" }
+
+nodes:
+  - { id: USER, label: "Engineer", x: 80, y: 90, w: 90, h: 70, shape: circle }
+  - { id: FORM, label: "Template form", sub: "pickers, checks", x: 260, y: 90, w: 160 }
+  - { id: PERM, label: "Allowed?", x: 460, y: 90, w: 130, h: 88, shape: diamond }
+  - { id: TASK, label: "Scaffolder task", sub: "validate, act", x: 660, y: 90, w: 160, icon: check, icon_pos: corner }
+  - { id: ACT, label: "Azure, GitHub\nor Terraform", x: 870, y: 90, w: 160, h: 60, icon: "devops/cicd/github-18.svg", icon_pos: corner }
+  - { id: DENY, label: "403, nothing\ncalled", x: 460, y: 235, w: 150, shape: terminal, tone: fail }
+  - { id: NOTE, label: "Notification", sub: "+ task log", x: 870, y: 235, w: 160, shape: terminal, tone: ok, icon: bell }
+
+edges:
+  - { id: E1, from: USER, to: FORM }
+  - { id: E2, from: FORM, to: PERM }
+  - { id: EOK, from: PERM, to: TASK, label: "yes", tone: ok }
+  - { id: ENO, from: PERM, to: DENY, label: "no", tone: fail }
+  - { id: E4, from: TASK, to: ACT }
+  - { id: E5, from: ACT, to: NOTE }
+
+steps:
+  - lights: [USER]
+    title: Pick a template
+    text: The engineer opens Create, which lists only the templates and dashboards their role can use.
+  - edges: [E1]
+    title: A guarded form
+    text: Pickers offer only valid choices (allowed subscriptions, environments, vaults, teams) and check names and existence before submit.
+  - edges: [E2]
+    title: Backend decides
+    text: On submit, the permission policy checks role, environment scope and hard blocks again. The form hiding an option is UX; this is the control.
+  - edges: [EOK]
+    when: allow
+    title: The task runs
+    text: A scaffolder task runs the template's custom actions in order, validating prerequisites before anything changes.
+  - edges: [E4]
+    when: allow
+    title: Act and wait
+    text: Actions call Azure or GitHub with the portal's own identities, or dispatch a Terraform workflow and wait for it to finish.
+  - edges: [E5]
+    when: allow
+    title: Result finds you
+    text: The outcome arrives as a sidebar notification with a link to the run. Every input and step stays in the task log.
+  - edges: [ENO]
+    when: deny
+    title: Denied
+    text: The API returns 403 and no external system is called. The user sees the standard unauthorized view naming what access is needed.

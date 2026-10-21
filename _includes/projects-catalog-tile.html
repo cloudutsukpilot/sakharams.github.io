@@ -1,0 +1,42 @@
+{%- comment -%}
+  One project tile on the Projects tab (see projects-catalog.html).
+  Params: name, url (or slug for a playbook → /tags/<slug>/), status, clouds, summary, kind,
+  and optionally areas, iq, stack, arch (playbooks), lab=true with areas (parts written) and
+  experiments (labs), or links (other projects).
+{%- endcomment -%}
+{%- if include.slug -%}{%- capture tile_url -%}/tags/{{ include.slug }}/{%- endcapture -%}{%- else -%}{%- assign tile_url = include.url -%}{%- endif -%}
+{%- assign tile_clouds = include.clouds | join: " " -%}
+{%- if include.clouds.size > 1 -%}{%- assign tile_clouds = tile_clouds | append: " multi" -%}{%- endif -%}
+{%- assign status_class = include.status | default: "" | slugify -%}
+<article class="pc-tile" data-clouds="{{ tile_clouds }}">
+  <div class="pc-tile-head">
+    <span class="pc-kind">{% if include.lab %}<i class="fas fa-flask" aria-hidden="true"></i>{% elsif include.slug %}<i class="fas fa-book-open" aria-hidden="true"></i>{% else %}<i class="fas fa-drafting-compass" aria-hidden="true"></i>{% endif %} {{ include.kind }}</span>
+    {%- if include.status %}<span class="pc-status pc-status-{{ status_class }}">{{ include.status }}</span>{% endif %}
+  </div>
+  <h3 class="pc-tile-title"><a href="{{ tile_url | relative_url }}">{{ include.name }}</a></h3>
+  {%- if include.summary %}<p class="pc-tile-summary">{{ include.summary }}</p>{% endif %}
+  {%- if include.stack %}<p class="pc-tile-stack"><i class="fas fa-layer-group" aria-hidden="true"></i> {{ include.stack }}</p>{% endif %}
+  <div class="pc-tile-clouds">
+    {%- for cid in include.clouds -%}
+      {%- assign c = site.data.project_catalog.clouds | where: "id", cid | first -%}
+      <span class="pc-cloud"><i class="{{ c.icon }}" aria-hidden="true"></i> {{ c.title | default: cid }}</span>
+    {%- endfor -%}
+  </div>
+  {%- if include.links %}
+  <div class="pc-tile-links">
+    {%- for l in include.links %}<a href="{{ l.url | relative_url }}">{{ l.label }}</a>{% endfor -%}
+  </div>
+  {%- endif %}
+  <div class="pc-tile-foot">
+    {%- if include.lab -%}
+      <span>{{ include.areas }} of {{ site.data.lab_framework.parts | size }} parts{% if include.experiments > 0 %} · {{ include.experiments }} experiments{% endif %}</span>
+      <a class="pc-open" href="{{ tile_url | relative_url }}">Open lab <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    {%- elsif include.slug -%}
+      <span>{{ include.areas }} of 18 areas{% if include.iq > 0 %} · Interview prep{% endif %}</span>
+      {%- if include.arch %}<a href="{{ include.arch | relative_url }}">Architecture</a>{% endif -%}
+      <a class="pc-open" href="{{ tile_url | relative_url }}">Open playbook <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    {%- else -%}
+      <a class="pc-open" href="{{ tile_url | relative_url }}">Read the overview <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    {%- endif -%}
+  </div>
+</article>

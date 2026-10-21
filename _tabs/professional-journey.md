@@ -11,70 +11,114 @@ order: 11
 2. [Career Timeline](#a_0)
 3. [Skills and Competencies](#skills-and-competencies)
 4. [Honors & Awards](#honors--awards)
-5. [Current Role](#veritas-technologies-pvt-ltd-current-role)
-6. [Previous Roles and Experiences](#previous-roles-and-experiences)
-7. Professional Development
-8. Future Aspirations
-9. Conclusion
+5. [Organizational Contributions](#organizational-contributions)
+6. [Current Role](#evolent-current-role)
+7. [Previous Roles and Experiences](#previous-roles-and-experiences)
+8. Professional Development
+9. Future Aspirations
+10. Conclusion
 
 ### Introduction
 
-- As a *Cloud, DevOps & Security Architect*, I am a results-driven Cloud and DevOps Architect with a passion for designing and implementing cutting-edge solutions to drive business success. 
-- With ~13 years of hands-on experience in the field, I have honed my expertise in crafting scalable, secure, and high-performance cloud-based infrastructures that empower organizations to thrive in the digital age. 
-- I hold certifications across Cloud, DevOps, and Security domains, which have played a crucial role in my growth as an architect.
+- I am a *Cloud & Platform Architect* with 15+ years of experience designing, building and running cloud, DevOps, SRE, observability and security platforms across Azure, AWS and GCP, most recently as Principal Platform Engineer at Evolent.
+- My focus is enterprise platform engineering: GitHub Enterprise and CI/CD standardization, infrastructure-as-code with Terraform and Terragrunt, Kubernetes with GitOps, DevSecOps, cloud landing zones, and compliance (FedRAMP, SOC, PCI DSS, HIPAA, CIS).
+- I design and build AI-driven internal products, such as an agentic SQL incident responder, AI-generated work summaries, a DevOps health scorecard and a Backstage developer portal, and I lead AI enablement across IT.
+- I hire, coach and grow DevOps teams, and I bring a strong database engineering foundation to every platform I build. I hold certifications across Cloud, DevOps, Security and AI.
 
 <br/>
 
-<!-- Notes Start -->
-<div class="card categories" align="center">
-    <!-- top-category -->
-    <div id="a_0" class="card-header d-flex justify-content-between hide-border-bottom">
-        <span class="ms-2 align-items-center" style="flex-grow: 1;">
-            <img alt="Notes" src="/assets/img/icons/miscellaneous/coding-18.svg" />
-            <h2 class="mx-2" style="font-size: 1.2rem; display: inline;">Career Timeline</h2>
-        </span>
-    </div>
-    <!-- .card-header -->
-    <!-- Sub-categories -->
-    <div id="0_111" class="collapse show" aria-expanded="false">
-        <ul class="list-group">
-            <li class="list-group-item d-flex justify-content-center align-items-center">
-                <div class="d-flex align-items-center">
-                    <img alt="Veritas Technologies LLC" src="/assets/img/tabs/professional-journey/veritas.jpg" />
-                    <a href="#a_01" class="mx-2" style="font-size: 1.2rem;">Veritas Technologies</a>
-                </div>
-                <div class="d-flex align-items-center">
-                    <img alt="Xoriant Solutions Pvt Ltd" src="/assets/img/tabs/professional-journey/xoriant.jpg" />
-                    <a href="#b_01" class="mx-2" style="font-size: 1.2rem;">Xoriant Solutions</a>
-                </div>
-                <div class="d-flex align-items-center">
-                    <img alt="SS&C Technologies" src="/assets/img/tabs/professional-journey/ssc-technologies.jpg" />
-                    <a href="#c_01" class="mx-2" style="font-size: 1.2rem;">SS&C Technologies</a>
-                </div>
-            </li>
-            <li class="list-group-item d-flex justify-content-center align-items-center">
-                <div class="d-flex align-items-center">
-                    <img alt="Datavail" src="/assets/img/tabs/professional-journey/datavail.jpg" />
-                    <a href="#d_01" class="mx-2" style="font-size: 1.2rem;">Datavail</a>
-                </div>
-                <div class="d-flex align-items-center">
-                    <img alt="Wipro" src="/assets/img/tabs/professional-journey/wipro.jpg" />
-                    <a href="#e_01" class="mx-2" style="font-size: 1.2rem;">Wipro</a>
-                </div>
-            </li>
-        </ul>
-    </div>
-</div>
-<!-- Notes End -->
+<!-- Career Timeline Start (styles: .career-timeline in assets/css/jekyll-theme-chirpy.scss) -->
+<h3 id="a_0">Career Timeline</h3>
 
-
-| Organisation                         | Designation           | From     | To       | Duration        |
-|--------------------------------------|-----------------------|----------|----------|-----------------|
-| `Veritas Technologies, Pune` | Principal SRE         | Dec 2023 | Present  | 8 Months        |
-| `Xoriant Solutions, Pune`  | Senior Technical Lead | Aug 2019 | Dec 2023 | 4 Yrs. 4 Months |
-| `SS&C Technologies, Navi Mumbai`     | Manager | Sep 2017 | Aug 2019 | 1 Yr. 11 Months |
-| `Datavail Infotech, Mumbai`  | Senior Database Administrator | Feb 2017 | Sep 2017 | 7 Months |
-| `Wipro, Navi Mumbai`             | Technical Consultant  | Oct 2011 | Feb 2017 | 5 Yrs. 4 Months |
+<ol class="career-timeline">
+    <li class="current">
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="Evolent" src="/assets/img/tabs/professional-journey/evolent.jpg" />
+                <span class="ct-company">Evolent</span>
+                <span class="ct-badge">Current</span>
+                <span class="ct-meta">Pune · Sep 2024 - Present · 2 Yrs. 1 Month</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">Principal Platform Engineer</span><span class="ct-dates">Sep 2026 - Present · 1 Month</span></li>
+                <li><span class="ct-role">Director</span><span class="ct-dates">Jan 2026 - Aug 2026 · 8 Months</span></li>
+                <li><span class="ct-role">Principal DevOps Engineer</span><span class="ct-dates">Sep 2024 - Dec 2025 · 1 Yr. 4 Months</span></li>
+            </ul>
+            <a class="ct-more" href="#evolent-current-role">Details ↓</a>
+        </div>
+    </li>
+    <li>
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="Veritas Technologies" src="/assets/img/tabs/professional-journey/veritas.jpg" />
+                <span class="ct-company">Veritas Technologies</span>
+                <span class="ct-meta">Pune · Dec 2023 - Aug 2024 · 9 Months</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">Principal SRE</span><span class="ct-dates">Cloud, DevOps & Security Architect</span></li>
+            </ul>
+            <a class="ct-more" href="#veritas-technologies-pvt-ltd">Details ↓</a>
+        </div>
+    </li>
+    <li>
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="Xoriant Solutions" src="/assets/img/tabs/professional-journey/xoriant.jpg" />
+                <span class="ct-company">Xoriant Solutions</span>
+                <span class="ct-meta">Pune · Aug 2019 - Dec 2023 · 4 Yrs. 5 Months</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">Senior Technical Lead</span><span class="ct-dates">Apr 2023 - Dec 2023 · 9 Months</span></li>
+                <li><span class="ct-role">Technical Lead</span><span class="ct-dates">Apr 2021 - Apr 2023 · 2 Yrs. 1 Month</span></li>
+                <li><span class="ct-role">Senior Software Engineer</span><span class="ct-dates">Aug 2019 - Mar 2021 · 1 Yr. 8 Months</span></li>
+            </ul>
+            <a class="ct-more" href="#xoriant-solutions-pvt-ltd">Details ↓</a>
+        </div>
+    </li>
+    <li>
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="SS&C Technologies" src="/assets/img/tabs/professional-journey/ssc-technologies.jpg" />
+                <span class="ct-company">SS&C Technologies</span>
+                <span class="ct-meta">Navi Mumbai · Sep 2017 - Aug 2019 · 2 Yrs.</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">Manager</span><span class="ct-dates">Jan 2019 - Aug 2019 · 8 Months</span></li>
+                <li><span class="ct-role">Associate Manager</span><span class="ct-dates">Sep 2017 - Jan 2019 · 1 Yr. 5 Months</span></li>
+            </ul>
+            <a class="ct-more" href="#ssc-technologies-ltd">Details ↓</a>
+        </div>
+    </li>
+    <li>
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="Datavail" src="/assets/img/tabs/professional-journey/datavail.jpg" />
+                <span class="ct-company">Datavail Infotech</span>
+                <span class="ct-meta">Mumbai · Feb 2017 - Sep 2017 · 7 Months</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">Senior Database Administrator</span></li>
+            </ul>
+            <a class="ct-more" href="#datavail-infotech-pvt-ltd">Details ↓</a>
+        </div>
+    </li>
+    <li>
+        <div class="ct-card">
+            <div class="ct-head">
+                <img alt="Wipro" src="/assets/img/tabs/professional-journey/wipro.jpg" />
+                <span class="ct-company">Wipro</span>
+                <span class="ct-meta">Navi Mumbai · Oct 2011 - Feb 2017 · 5 Yrs. 5 Months</span>
+            </div>
+            <ul class="ct-roles">
+                <li><span class="ct-role">SQL Server Technical Lead & Trainer</span><span class="ct-dates">Mar 2016 - Feb 2017 · 1 Yr.</span></li>
+                <li><span class="ct-role">SQL Server Technical Consultant</span><span class="ct-dates">Oct 2012 - Apr 2016 · 3 Yrs. 7 Months</span></li>
+                <li><span class="ct-role">Exchange Server / Office 365 Technical Consultant</span><span class="ct-dates">Oct 2011 - Sep 2012 · 1 Yr.</span></li>
+            </ul>
+            <a class="ct-more" href="#wipro-ltd">Details ↓</a>
+        </div>
+    </li>
+</ol>
+<!-- Career Timeline End -->
 
 ### Skills and Competencies
 
@@ -84,19 +128,20 @@ order: 11
 | -------- | ------------------- |
 | `Cloud` | AWS, Azure, GCP |
 | `Orchestration Tools` | Docker, Kubernetes, AKS, EKS, GKE, Git, Helm |
-| `Security` | SonarQube, Qualys, Trivy, Microsoft Defender, Azure Sentinel, Falco |
-| `CI/CD` | Azure DevOps, Jenkins, GitLab CI/CD, GitHub Actions, Argo CD, Jenkins |
-| `Infrastructure as Code` | Terraform, ARM, AWS CloudFormation |
+| `Security` | SonarQube, Qualys, Trivy, Microsoft Defender, Azure Sentinel, Wiz, GitHub Advanced Security, Mend, Falco |
+| `CI/CD` | GitHub Actions, Azure DevOps, Jenkins, GitLab CI/CD, Argo CD |
+| `Infrastructure as Code` | Terraform, Terragrunt, ARM, AWS CloudFormation, Packer |
 | `Configuration Management` | Ansible, Puppet |
-| `Automation/Scripting` | PowerShell, Shell Scripting, Python |
-| `Monitoring Tools` | Prometheus, Grafana, Datadog, Loki, Splunk, fluentd, Jaeger, OpenTelemetry, OpenMetrics |
+| `Automation/Scripting` | PowerShell, Shell Scripting, Python, Go, TypeScript |
+| `Monitoring Tools` | Prometheus, Grafana, Datadog, Loki, Tempo, Mimir, Splunk, Fluentd, Jaeger, OpenTelemetry, OpenMetrics |
 | `Database` | Microsoft SQL Server, PostgreSQL |
 | `Virtualization` | Hyper-V, VMWare, Docker |
-| `Operating Systems` | Windows Server, Linux (Ubuntu, CentOS) |
+| `Operating Systems` | Windows Server, Windows Client, Linux (Ubuntu, CentOS), macOS |
 | `ITSM Tools` | ServiceNow, JIRA |
 | `IAM` | Active Directory/Entra ID, ADFS, DirSync, DNS, DHCP, SSO |
-| `Mail & Calendar Services` | Exchange Server, Office 365, EAS |
-| `AI Tools` | ChatGPT, GitHub Copilot, Azure AI Services |
+| `Mail & Calendar Services` | Exchange Server, M365 |
+| `AI Services` | ChatGPT, GitHub Copilot, Amazon Q, Azure OpenAI, Microsoft Foundry, GCP Enterprise Agent Platform |
+| `AI Frameworks` | Pydantic AI, LangGraph, MCP, Skills |
 
 <br/>
 
@@ -205,8 +250,65 @@ order: 11
 - `SS&C Technologies`
     + `Ace It Award` -  Nov 2018 
 
+- `Hackathon`
+    + 1st prize in Xoriant Hackathon 2021 for the `Closed-Loop Incident Management` project.
+
+- `Community`
+    + Regional Mentor & Speaker at the DataPlatformGeeks community for the Mumbai region (2018-2019), including a session on SQL Server Query Store.
+
+### Organizational Contributions
+
+- Defined Evolent's platform engineering standards for GitHub Enterprise, CI/CD, infrastructure-as-code, DevSecOps and SRE, and drove their adoption across the healthcare product lines.
+- Built internal platforms used across Evolent (a DevOps health scorecard, an AI work-summary dashboard, an agentic SQL incident responder and a shared IaC platform) and contributed to the internal developer portal, giving engineering teams self-service and leadership clear visibility.
+- Built AI capability across Evolent IT: led the AIOps/MLOps enablement program and an enterprise Agentic AI training program, drove GitHub Copilot adoption, and contributed to the Corporate AI Landing Zone.
+- Grew DevOps talent at Evolent through the DevOps Learning Series and a DevOps internship program.
+- Collaborated with clients to understand their requirements and provided technical expertise in designing cloud, DevOps and security solutions.
+- Conducted presales activities, including product demonstrations, workshops, effort estimations and presentations, to showcase cloud, DevOps and security services.
+- Delivered multiple proof-of-concept (POC) projects and helped create SoWs for new clients.
+- Led the Microsoft Partnership program at Xoriant to earn the certifications the organization needed.
+- Delivered training on Terraform and SIMAC (Security, Infrastructure and Monitoring as Code) across Xoriant's Security Practices business unit.
+
 
 ### Work Experience:
+
+<!-- Evolent Start -->
+<div class="card categories" align="center">
+    <!-- top-category -->
+    <div id="ev_01" class="card-header d-flex justify-content-between hide-border-bottom">
+    <span class="ms-2 align-items-center" style="flex-grow: 1;">
+        <img alt="Notes" src="/assets/img/tabs/professional-journey/evolent.jpg" />
+        <h3 class="mx-2" style="font-size: 1.2rem; display: inline;">Evolent</h3>
+    </span>
+    </div>
+    <!-- .card-header -->
+      <!-- Sub-categories -->
+    <div id="ev_011" class="collapse show" aria-expanded="false">
+        <ul class="list-group align-items-center">
+            <li class="list-group-item">
+            <a href="javascript:void(0);" class="mx-2">Platform Engineering</a>
+            <a href="javascript:void(0);" class="mx-2">GitHub Enterprise</a>
+            <a href="javascript:void(0);" class="mx-2">Terraform & Terragrunt</a>
+            <a href="javascript:void(0);" class="mx-2">DevSecOps</a>
+            <a href="javascript:void(0);" class="mx-2">GHAS & Wiz</a>
+            </li>
+            <li class="list-group-item">
+            <a href="javascript:void(0);" class="mx-2">SRE Standards</a>
+            <a href="javascript:void(0);" class="mx-2">DORA Metrics</a>
+            <a href="javascript:void(0);" class="mx-2">Developer Portal</a>
+            <a href="javascript:void(0);" class="mx-2">GCP Landing Zone</a>
+            <a href="javascript:void(0);" class="mx-2">CIS Benchmarks</a>
+            </li>
+            <li class="list-group-item">
+            <a href="javascript:void(0);" class="mx-2">Agentic AI</a>
+            <a href="javascript:void(0);" class="mx-2">Azure OpenAI</a>
+            <a href="javascript:void(0);" class="mx-2">AIOps/MLOps</a>
+            <a href="javascript:void(0);" class="mx-2">GitHub Copilot</a>
+            <a href="javascript:void(0);" class="mx-2">Team Management</a>
+            </li>
+        </ul>
+    </div>
+</div>
+<!-- Evolent End-->
 
 <!-- Veritas Technologies Start -->
 <div class="card categories" align="center">
@@ -397,9 +499,40 @@ order: 11
 
 
 
-### Veritas Technologies Pvt Ltd (Current Role)
+### Evolent (Current Role)
 - `Location`: Pune, India
-- **`Role`: Cloud, DevOps and Security Architect**
+- **`Role`: Principal Platform Engineer** (Sep 2026 - Present)
+    + Previously `Director` (Jan 2026 - Aug 2026) and `Principal DevOps Engineer` (Sep 2024 - Dec 2025)
+- `Team Size`: 8
+- `Description`:
+    + Leading the Platform function within Global IT Service Delivery - Platform Engineering. Driving standardization of source control, CI/CD, infrastructure-as-code, DevSecOps and cloud-native platforms across Evolent's healthcare product lines.
+- `Internal Platforms`:
+    + **DevOps Health Scorecard**: Designed and developed a scorecard (Python cronjobs, FastAPI, React, Redis on AKS) that measures DevOps best-practice adoption across four GitHub organizations daily and trends it for leadership.
+    + **AI Work-Summary Dashboard**: Designed and developed a platform that collects GitHub and Jira activity and uses Azure OpenAI to generate daily, weekly and monthly summaries for people, teams, epics and PODs.
+    + **Agentic SQL Incident Responder**: Designed and developed an agentic AI responder for SQL Server blocking chains, using deterministic detection and safety gates, Pydantic AI on Azure AI Foundry for root-cause explanation, and human approval before any KILL.
+    + **Shared IaC Platform**: Designed and developed a shared Terraform/Terragrunt platform with 20 providers onboarded and 175 modules, plus a YAML-driven Python CLI and reusable GitHub Actions, giving every infrastructure repo validated, policy-gated plans and approved applies.
+    + **Internal Developer Portal**: Contributed to the Backstage-based portal (TypeScript/React, .NET middleware, PostgreSQL on AKS) that delivers Azure and GitHub requests, access reviews, monitoring, licensing and FinOps as self-service workflows.
+- `Responsibilities`:
+    + **GitHub Enterprise**: Led standardization across multiple organizations: naming conventions, branch protection rulesets, repository settings, Entra ID/SCIM integration, reusable workflows, self-hosted runners and custom images. Also drove enterprise-wide GitHub Copilot licensing and adoption.
+    + **DevSecOps**: Strengthened DevSecOps with reusable SonarQube and Mend workflows and container-registry scanning. Led the GitHub Advanced Security (GHAS) pilot and rollout, including hands-on training content, and the move from Mend to Wiz & GHAS.
+    + **SRE Standards**: Defined the SRE standards for Evolent, covering SLIs/SLOs, monitoring and alerting, incident response and post-incident reviews.
+    + **DORA Metrics**: Implemented DORA metrics with Apache DevLake on AKS, integrating CI/CD and incident-management tools with Grafana dashboards to measure delivery performance across product teams.
+    + **GCP Landing Zone**: Designed the GCP landing zone, including the resource hierarchy, network topology, IAM and organization policy guardrails.
+    + **Cloud Architecture**: Designed cloud architecture for Evolent applications, covering compute, networking, security, high availability and cost.
+    + **Server Build Automation**: Drove server build automation and standardization across business units: golden images and security governance using Ansible and Packer, plus CIS Benchmark hardening for Linux and Windows servers.
+    + **Application Support**: Supported the Go microservices of an AI-driven authorization application, including builds, Azure OpenAI deployments, operationalization and production troubleshooting.
+    + Provided platform engineering support to product and business initiatives: AppSec, AKS and UAT for a utilization-management modernization, JFrog and Key Vault for a unified reporting platform, observability (AKS monitoring, Datadog, Prometheus, LogFire evaluation) and Disaster Recovery exercises.
+    + **AI Enablement**: Led the AIOps/MLOps enablement program and an enterprise Agentic AI training program (vendor selection, curriculum, rollout), and contributed to the Corporate AI Landing Zone.
+    + **People Leadership**: Managed a team of 8 DevOps engineers, including hiring, 1:1 coaching and performance reviews. Ran the DevOps Learning Series and established a DevOps internship program.
+- `Environment`: Azure, GCP, AKS, k3d, Azure OpenAI, Azure AI Foundry, Pydantic AI, Backstage, GitHub Enterprise, GitHub Actions, GHAS, GitHub Copilot, Terraform, Terragrunt, Ansible, Packer, Helm, Argo CD, Jenkins, Azure DevOps/TFS, SonarQube, Mend, Wiz, CIS Benchmarks, JFrog Artifactory, Apache DevLake, FastAPI, Redis, PostgreSQL, Microsoft SQL Server, Grafana, Prometheus, Datadog, Zscaler ZPA, Jira, Linux, Windows Server
+- `Languages`: Python, Go, TypeScript/React, PowerShell, Bash
+
+
+### Previous Roles and Experiences
+
+### Veritas Technologies Pvt Ltd
+- `Location`: Pune, India
+- **`Role`: Principal SRE (Cloud, DevOps and Security Architect)** (Dec 2023 - Aug 2024)
 - `Team Size`: 8
 - `Description`: 
     + As an architect, I design and implement secure cloud solutions for Veritas products in Azure and AWS, ensuring compliance with FedRAMP and SOC standards, while developing DevSecOps strategies, integrating security into CI/CD pipelines, managing infrastructure as code, and fostering a culture of security awareness through continuous monitoring, proactive incident response, and collaboration with cross-functional teams.
@@ -421,9 +554,9 @@ order: 11
     + Successfully automated the journaling feature for a product by creating a Docker image, developing Terraform code for Azure infrastructure deployment, and utilizing a GitLab CI/CD pipeline for seamless integration into the .NET application.
 
 
-### Previous Roles and Experiences
-
 ### Xoriant Solutions Pvt Ltd
+- `Location`: Pune, India
+- `Roles`: `Senior Technical Lead` (Apr 2023 - Dec 2023), `Technical Lead` (Apr 2021 - Apr 2023), `Senior Software Engineer` (Aug 2019 - Mar 2021)
 
 #### `Project`: PCI and HIPAA Certification
 **`Role`: Cloud Security Architect**
@@ -541,7 +674,8 @@ order: 11
 
 ### SS&C Technologies Ltd.
 
-**`Role`: Manager – Cloud DBA Team**
+**`Role`: Manager – Cloud DBA Team** (Jan 2019 - Aug 2019)
+- `Previous Roles`: `Associate Manager` (Sep 2017 - Jan 2019)
 - `Team Size`: 8
 - `Description`:	
     + Responsible for managing a fast-paced environment of 500+ SQL servers with leading-edge technology (SQL 2016/17, PowerShell & Cloud) with the help of dynamic team to support Advent Software’s Corporate and SaaS offerings of 500+ SQL Servers.
@@ -575,7 +709,8 @@ order: 11
     + Microsoft SQL Server, Azure, ServiceNow
 
 ### Wipro Ltd.
-**`Role`: Technical Lead (MS SQL and M365) – Microsoft Client**
+**`Role`: SQL Server Technical Lead & Trainer – Microsoft Client** (Mar 2016 - Feb 2017)
+- `Previous Roles`: `SQL Server Technical Consultant` (Oct 2012 - Apr 2016) and `Exchange Server / Office 365 Technical Consultant` (Oct 2011 - Sep 2012)
 - `Team Size`:	12
 - `Responsibilities`:	
     + Working as Technical Lead managing a team of technical consultants representing Microsoft to all customers across the globe.

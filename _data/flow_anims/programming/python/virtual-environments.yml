@@ -1,0 +1,33 @@
+# Animated flow diagram for _posts/programming/python/2026-10-08-python-at-a-glance.md
+# (include id: programming/python/virtual-environments).
+title: Global installs vs virtual environments
+accent: "#FACC15"
+accent2: "#3B82F6"
+viewbox: [1000, 350]
+modes:
+  - { id: venv, label: "One virtual environment per project" }
+  - { id: global, label: "Show what happens without a venv" }
+nodes:
+  - { id: PA, label: "Project A", sub: "needs pkg 1.x", x: 110, y: 60 }
+  - { id: PB, label: "Project B", sub: "needs pkg 2.x", x: 110, y: 290 }
+  - { id: G, label: "Global\nsite-packages", x: 500, y: 175, w: 160, h: 70, shape: cylinder, tone: warn }
+  - { id: X, label: "Project A breaks", sub: "ImportError", x: 830, y: 175, w: 170, tone: fail }
+  - { id: VA, label: "A/.venv", sub: "pkg 1.x", x: 500, y: 60, h: 60, shape: cylinder }
+  - { id: VB, label: "B/.venv", sub: "pkg 2.x", x: 500, y: 290, h: 60, shape: cylinder }
+  - { id: OA, label: "A runs", x: 830, y: 60, tone: ok }
+  - { id: OB, label: "B runs", x: 830, y: 290, tone: ok }
+edges:
+  - { id: PAG, from: PA, to: G, points: [[110, 88], [110, 165], [420, 165]], label: "pip install", label_at: [270, 155] }
+  - { id: PBG, from: PB, to: G, points: [[110, 262], [110, 185], [420, 185]] }
+  - { id: GX, from: G, to: X, tone: fail }
+  - { id: PAV, from: PA, to: VA, label: "pip install" }
+  - { id: PBV, from: PB, to: VB, label: "pip install" }
+  - { id: VAO, from: VA, to: OA, tone: ok }
+  - { id: VBO, from: VB, to: OB, tone: ok }
+steps:
+  - { lights: [PA, PB], title: "Two projects, one machine", text: "Project A was written against version 1.x of a package. Project B needs 2.x of the same package." }
+  - { edges: [PAG], when: global, title: "A installs globally", text: "Without a venv, pip install puts pkg 1.x into one shared site-packages that every project sees." }
+  - { edges: [PBG], when: global, title: "B overwrites it", text: "Installing pkg 2.x for Project B replaces 1.x in the same folder. Only one version can live there." }
+  - { edges: [GX], when: global, title: "Project A breaks", text: "Project A now imports 2.x, which removed something it relied on. Nothing changed in A's code, yet it fails." }
+  - { edges: [PAV, PBV], when: venv, title: "One venv per project", text: "python -m venv .venv gives each project its own folder and its own site-packages. pip installs into the active one." }
+  - { edges: [VAO, VBO], when: venv, title: "Both run", text: "A keeps 1.x and B keeps 2.x. Neither can see the other's packages, so upgrades in one never break the other." }

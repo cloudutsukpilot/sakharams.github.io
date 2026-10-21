@@ -1,0 +1,42 @@
+# Animated flow for _posts/architect/system-design/2025-04-01-system-design-building-blocks.md, section "24. WebSockets"
+# (include id: architect/system-design/websocket-connection).
+title: "WebSocket: upgrade once, then push both ways"
+accent: "#60A5FA"
+accent2: "#FBBF24"
+viewbox: [1000, 240]
+
+nodes:
+  - {id: A, label: "Browser A", shape: site, icon: laptop, x: 170, y: 115}
+  - {id: S, label: "Server", sub: "wss://", shape: site, icon: server, x: 500, y: 115}
+  - {id: B, label: "Browser B", shape: site, icon: phone, x: 830, y: 115}
+
+edges:
+  - {id: up, from: A, to: S, label: "GET + Upgrade", curve: 0.15}
+  - {id: sw, from: S, to: A, label: "101 Switching", curve: 0.15}
+  - {id: wsb, from: B, to: S, label: "socket open", curve: 0, arrow: false, flow: true, badge: true}
+  - {id: send, from: A, to: S, label: "chat message", curve: 0.35}
+  - {id: bcast, from: S, to: B, label: "broadcast", curve: 0.2}
+  - {id: push, from: S, to: A, label: "price update", curve: 0.35}
+
+steps:
+  - lights: [A, B]
+    title: "Two clients, one chat"
+    text: "Both browsers want live updates. With plain HTTP they would have to poll, and most polls come back empty."
+  - edges: [up]
+    title: "Ask to upgrade"
+    text: "Browser A sends an ordinary HTTP GET with Upgrade: websocket and Connection: Upgrade headers."
+  - edges: [sw]
+    title: "101 Switching Protocols"
+    text: "The server agrees. The same TCP connection now carries WebSocket frames instead of HTTP requests."
+  - edges: [wsb]
+    title: "Connections stay open"
+    text: "Browser B did the same handshake. Each client now holds one long-lived connection to the server."
+  - edges: [send]
+    title: "Client sends instantly"
+    text: "A sends a chat message as a small frame. No new request, no headers to repeat."
+  - edges: [bcast]
+    title: "Server pushes to others"
+    text: "The server forwards it to B straight away. B never asked; the server can write whenever it has news."
+  - edges: [push]
+    title: "Push without a request"
+    text: "The server can also push its own events, like a price change, to any open connection at any time."

@@ -1,0 +1,48 @@
+{% comment %}
+  Flow animation: an animated, step-through flow diagram.
+  Usage in a post: {% include flow-anim.html id="devops/build-tools/generic-build-pipeline" %}
+  The id is the data file's path under _data/flow_anims/ without .yml; the folders mirror the post's
+  folders under _posts/ (like assets/img/). assets/js/flow-anim.js draws the SVG and runs the player.
+  The step list below is the no-JavaScript fallback; the script hides it once the diagram is ready.
+  A data file with `map:` also gets its land outline (_data/flow_maps/<map.name, default world>.json).
+  Keep this file free of blank lines and indentation so kramdown passes it through as one HTML block.
+{% endcomment %}
+{%- assign anim = site.data.flow_anims -%}
+{%- assign flw_parts = include.id | split: "/" -%}
+{%- for part in flw_parts -%}{%- assign anim = anim[part] -%}{%- endfor -%}
+{%- assign flw_dom_id = include.id | replace: "/", "--" -%}
+{%- if anim.nodes %}
+<figure class="flw" id="flw-{{ flw_dom_id }}" data-icon-base="{{ '/assets/img/icons/' | relative_url }}" style="--flw-accent: {{ anim.accent | default: '#38BDF8' }}; --flw-accent2: {{ anim.accent2 | default: '#8B5CF6' }};">
+<div class="flw-scroll">
+<svg class="flw-svg" viewBox="0 0 {{ anim.viewbox[0] }} {{ anim.viewbox[1] }}" role="img" aria-label="{{ anim.title | escape }}: animated flow diagram"></svg>
+</div>
+<figcaption class="flw-caption" aria-live="polite" hidden>
+<span class="flw-counter"></span>
+<strong class="flw-step-title"></strong>
+<span class="flw-step-text"></span>
+</figcaption>
+<div class="flw-controls" hidden>
+<button type="button" class="flw-btn flw-btn-primary" data-act="play" aria-label="Play"><i class="fas fa-play" aria-hidden="true"></i></button>
+<button type="button" class="flw-btn" data-act="prev" aria-label="Previous step"><i class="fas fa-backward-step" aria-hidden="true"></i></button>
+<button type="button" class="flw-btn" data-act="next" aria-label="Next step"><i class="fas fa-forward-step" aria-hidden="true"></i></button>
+<button type="button" class="flw-btn" data-act="restart" aria-label="Restart"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+<button type="button" class="flw-btn" data-act="speed" aria-label="Playback speed">1&times;</button>
+<div class="flw-dots" role="group" aria-label="Steps"></div>
+{%- if anim.modes.size > 1 %}
+<label class="flw-toggle"><input type="checkbox" data-act="mode"> {{ anim.modes[1].label | escape }}</label>
+{%- endif %}
+</div>
+<ol class="flw-fallback">
+{%- for step in anim.steps %}
+<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}</li>
+{%- endfor %}
+</ol>
+<script type="application/json" class="flw-data">{{ anim | jsonify | replace: '<', '\u003c' }}</script>
+{%- if anim.map %}{%- assign flw_map = site.data.flow_maps[anim.map.name] | default: site.data.flow_maps.world %}
+<script type="application/json" class="flw-map-data">{{ flw_map | jsonify }}</script>
+{%- endif %}
+</figure>
+<script defer src="{{ '/assets/js/flow-anim.js' | relative_url }}"></script>
+{%- else %}
+<p class="prompt-danger">Flow animation not found: no data at <code>_data/flow_anims/{{ include.id }}.yml</code>.</p>
+{%- endif %}

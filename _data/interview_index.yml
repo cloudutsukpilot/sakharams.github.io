@@ -1,0 +1,74 @@
+# Interview question index, rendered on /tags/<tag | slugify>/ by _layouts/tag.html
+# (_includes/interview-index.html) as domain → topic → one card per difficulty level
+# (Beginner … Expert, then Scenario · Beginner … Scenario · Expert).
+#
+# _plugins/interview_index.rb collects every top-level numbered question ("1. ...") from posts with
+# `interview_domain:` front matter. Per post:
+#   interview_domain: devops           # default domain (an id below)
+#   interview_topic: Kubernetes        # default topic section inside the domain
+#   interview_level: intermediate      # default level when a heading doesn't name one
+#   interview_sections:                # optional, keyed by heading text (without a trailing colon)
+#     "Incident Triage & Production Troubleshooting":
+#       domain: sre
+#       topic: Incident Response
+#       kind: scenario                 # theory (default) | scenario; "scenario" in a heading sets it too
+#       level: advanced                # beginner | intermediate | advanced | expert
+#       questions:                     # per-question overrides, keyed by the question's number
+#         3: { level: expert }
+#
+# A heading with a level word ("Beginner", "Basic", "Scenarios: Expert") sets the level on its own.
+# Topics listed under a domain come first, in that order; others follow alphabetically. A domain with
+# no questions yet is still shown, marked as coming soon.
+
+tag: Interview Questions
+summary: >-
+  Interview question banks grouped by domain and topic, with each topic split into difficulty cards:
+  concept questions from beginner to expert, then production scenarios. Every question links straight
+  to its answer.
+
+domains:
+  - id: devops
+    name: DevOps
+    icon: fas fa-infinity
+    summary: Containers, orchestration, infrastructure as code and CI/CD.
+    topics: [General DevOps, Git & Version Control, CI/CD & Release, Docker, Kubernetes, Terraform, Infrastructure as Code, Jenkins, GitLab]
+  - id: sre
+    name: SRE & Reliability
+    icon: fas fa-heart-pulse
+    summary: Incident response, observability and SLOs, chaos engineering and the data layer in production.
+    topics: [Incident Response, Observability & SLOs, Capacity & Performance, Chaos Engineering, Data Layer, Leadership & Behavioural]
+  - id: cloud
+    name: Cloud
+    icon: fas fa-cloud
+    summary: Cloud fundamentals, compute and scaling, resilience across zones and regions, cost, and identity.
+    topics: [Cloud Fundamentals, Compute & Scaling, Resilience & Multi-Region, Cost & FinOps, Cloud Identity & Access]
+  - id: networking
+    name: Networking
+    icon: fas fa-network-wired
+    summary: Fundamentals, DNS, load balancing and TLS, service mesh and cloud networking.
+    topics: [Networking Fundamentals, DNS, Load Balancing & TLS, Service Mesh, Cloud Networking]
+  - id: devsecops
+    name: DevSecOps
+    icon: fas fa-shield-halved
+    summary: Security built into the pipeline and the platform.
+    topics: [DevSecOps Fundamentals, Pipeline Security, Secrets Management, Cloud & IaC Security, Container & Kubernetes Security]
+  - id: architect
+    name: Architect
+    icon: fas fa-sitemap
+    summary: Cloud security architecture, identity, data protection, and the judgment behind the role.
+    topics: [Cloud Security Architecture, Identity & Access, Data Protection, Leadership & Communication]
+  - id: system-design
+    name: System Design
+    icon: fas fa-diagram-project
+    summary: Designing scalable, reliable systems from building blocks.
+    topics: [System Design Fundamentals, Data & Storage, Caching & Messaging, Classic Design Problems]
+  - id: ai-infra
+    name: AI Infrastructure
+    icon: fas fa-microchip
+    summary: GPUs on Kubernetes, training and inference platforms.
+    topics: [AI Infrastructure Fundamentals, GPU Scheduling, Distributed Training, Inference & Serving, GPU Observability & Cost]
+  - id: programming
+    name: Programming
+    icon: fas fa-code
+    summary: Programming languages - core concepts, idioms, debugging scenarios and coding exercises.
+    topics: [Python, Python Coding]

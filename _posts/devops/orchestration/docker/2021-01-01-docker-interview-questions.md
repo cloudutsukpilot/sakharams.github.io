@@ -4,6 +4,8 @@ title: "Docker Interview Questions"
 categories: [devops, orchestration, docker]
 tags: [DevOps, Orchestration, Docker, Interview Questions]
 image: /assets/img/devops/docker/docker-posts.jpg
+interview_domain: devops
+interview_topic: Docker
 ---
 
 ## Introduction

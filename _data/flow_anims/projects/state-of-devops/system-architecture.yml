@@ -1,0 +1,81 @@
+# Animated flow diagram for _posts/projects/state-of-devops/2026-10-05-05-technical-architecture.md
+# (include id: projects/state-of-devops/system-architecture). Replaces the Mermaid system-context
+# diagram; same nodes and edges. Rendered by _includes/flow-anim.html + assets/js/flow-anim.js.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: State of DevOps system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 490]
+
+lanes:
+  - { label: "External systems", x: 8, y: 8, w: 180, h: 474 }
+  - { label: "cronjobs namespace", x: 218, y: 8, w: 200, h: 362 }
+  - { label: "state-of-devops namespace", x: 622, y: 120, w: 220, h: 250 }
+
+nodes:
+  - { id: GH, label: "GitHub", sub: "4 orgs + enterprise", x: 98, y: 75, w: 160, icon: "devops/cicd/github-18.svg", icon_pos: corner }
+  - { id: JF, label: "JFrog", sub: "Artifactory", x: 98, y: 165 }
+  - { id: AZ, label: "Azure Cost\nManagement", x: 98, y: 255, icon: "cloud/azure/services/cost-management.svg" }
+  - { id: KV, label: "Azure\nKey Vault", x: 98, y: 440, icon: "cloud/azure/security/keyvault.svg" }
+  - { id: COL, label: "Collectors", x: 318, y: 75 }
+  - { id: ANA, label: "Analyzers", x: 318, y: 200 }
+  - { id: AGG, label: "Aggregators", x: 318, y: 325 }
+  - { id: TM, label: "Microsoft\nTeams", x: 520, y: 75, w: 130, icon: message }
+  - { id: FS, label: "Azure File\nShare /data", x: 520, y: 200, w: 110, h: 70, shape: cylinder, icon: cloud, icon_pos: corner }
+  - { id: API, label: "FastAPI :8000", sub: "serves React SPA", x: 722, y: 200, w: 140, icon: browser, icon_pos: corner }
+  - { id: RD, label: "Redis", x: 722, y: 315, w: 120, h: 60, shape: cylinder, icon: bolt }
+  - { id: USR, label: "Browser", x: 915, y: 200, w: 110, shape: terminal, icon: browser, icon_pos: corner }
+  - { id: ESO, label: "External Secrets\nOperator", x: 318, y: 440, icon: key, icon_pos: corner }
+
+edges:
+  - { id: GHCOL, from: GH, to: COL }
+  - { id: GHANA, from: GH, to: ANA }
+  - { id: JFANA, from: JF, to: ANA }
+  - { id: AZANA, from: AZ, to: ANA }
+  - { id: COLTM, from: COL, to: TM, label: "notify", dashed: true }
+  - { id: COLFS, from: COL, to: FS, points: [[318, 103], [318, 130], [490, 130], [490, 165]] }
+  - { id: ANAFS, from: ANA, to: FS, points: [[393, 190], [465, 190]] }
+  - { id: FSANA, from: FS, to: ANA, points: [[465, 212], [393, 212]] }
+  - { id: FSAGG, from: FS, to: AGG, points: [[505, 235], [505, 315], [393, 315]] }
+  - { id: AGGFS, from: AGG, to: FS, points: [[393, 337], [540, 337], [540, 235]] }
+  - { id: FSAPI, from: FS, to: API, label: "read-only" }
+  - { id: USRAPI, from: USR, to: API, points: [[860, 200], [792, 200]] }
+  - { id: APIRD, from: API, to: RD, label: "cache" }
+  - { id: KVESO, from: KV, to: ESO, dashed: true }
+  - { id: ESOAGG, from: ESO, to: AGG, label: "secrets", dashed: true }
+  - { id: ESOAPI, from: ESO, to: API, dashed: true, points: [[393, 452], [870, 452], [870, 225], [792, 225]] }
+
+steps:
+  - lights: [GH, JF, AZ, KV, USR]
+    title: The outside world
+    text: GitHub (four orgs plus the enterprise), JFrog, Azure Cost Management and Key Vault feed the system; readers reach it from a browser.
+  - edges: [GHCOL]
+    title: Collect once, centrally
+    text: The central GitHub collector pulls repository data once a day, so every other job reuses it instead of calling the same APIs again.
+  - edges: [COLFS, COLTM]
+    title: Write and notify
+    text: Collectors write dated JSON to the Azure File Share and post a summary to a Microsoft Teams webhook.
+  - edges: [FSANA, GHANA, JFANA, AZANA]
+    title: Analyzers read and enrich
+    text: Each analyzer reads the shared cache, then fetches only the extra detail its domain needs from GitHub, JFrog or Azure.
+  - edges: [ANAFS]
+    title: One folder per domain
+    text: Analyzers write structured JSON under /data/devops-state/<domain>/<org>/<date>/. No analyzer calls another one.
+  - edges: [FSAGG]
+    title: Aggregators read results
+    text: The trends analyzer and summary generator read every domain's output for the day.
+  - edges: [AGGFS]
+    title: Pre-compute the Home page
+    text: They write trend series and one home-overview.json, so the dashboard never aggregates on a request.
+  - edges: [USRAPI]
+    title: Someone opens the dashboard
+    text: A stakeholder opens State of DevOps in the browser. One FastAPI service on port 8000 serves the React app and its read-mostly REST API.
+  - edges: [FSAPI, APIRD]
+    title: Read files, cache in Redis
+    text: The API reads the share read-only and memoizes expensive aggregations in Redis. It never calls a job, so the UI stays up when jobs fail.
+  - edges: [KVESO]
+    title: Secrets from Key Vault
+    text: Tokens and keys live in Azure Key Vault. The External Secrets Operator syncs them into the cluster.
+  - edges: [ESOAGG, ESOAPI]
+    title: Secrets in both namespaces
+    text: Kubernetes secrets land in the cronjobs and state-of-devops namespaces, so no credential is baked into an image or a Helm value.

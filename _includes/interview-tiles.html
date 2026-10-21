@@ -1,0 +1,19 @@
+<!--
+  Topic × difficulty tiles for an interview post: include this file (interview-tiles.html) in the post.
+  Built from page.iq_tiles, which _plugins/interview_index.rb fills from the post's own questions. Each tile
+  jumps to the section holding that topic's questions at that level.
+-->
+{%- if page.iq_tiles and page.iq_tiles.size > 0 -%}
+<nav class="iq-tiles" aria-label="Questions by topic and difficulty">
+{%- for t in page.iq_tiles -%}
+<div class="iq-tiles-topic">
+<a class="iq-tiles-name" href="{{ t.url }}">{{ t.name }} <span class="iq-count">{{ t.count }}</span></a>
+<div class="iq-tiles-row">
+{%- for g in t.groups -%}
+<a class="iq-tile iq-level-{{ g.level }}" href="{{ g.url }}"><span class="iq-tile-level">{{ g.label }}</span><span class="iq-tile-count">{{ g.count }}</span><span class="iq-tile-meta">{% if g.scenarios == g.count %}scenario{% if g.count > 1 %}s{% endif %}{% elsif g.scenarios > 0 %}{{ g.scenarios }} scenario · {{ g.count | minus: g.scenarios }} concept{% else %}concept{% if g.count > 1 %}s{% endif %}{% endif %}</span></a>
+{%- endfor -%}
+</div>
+</div>
+{%- endfor -%}
+</nav>
+{%- endif -%}

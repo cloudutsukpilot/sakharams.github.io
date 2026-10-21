@@ -1,0 +1,94 @@
+{% comment %}
+  Project playbook navigation bar for a post with `project:` and `project_step:` front matter.
+  Usage in a post: an include tag for project-nav.html (written by the cloudutsuk-project scaffold).
+  Links back to the project index (/tags/<project>/) and to the previous and next written areas.
+  On the interview post (`project_interview: true`) it links back to the index and to area 1 instead.
+  On the ADR post (`project_adrs: true`) it links back to the index and to area 5 (Technical Architecture).
+  On the Lessons Learned post (`project_lessons: true`) it links back to the index and to area 18
+  (Continuous Improvement) once that is written.
+{% endcomment %}
+{% if page.project and page.project_lessons %}
+  {% assign nav_project = site.data.projects[page.project] %}
+  {% assign nav_ci = site.posts | where: 'project', page.project | where: 'project_step', 18 | first %}
+  <nav class="project-nav" aria-label="Project navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.project | append: '/' | relative_url }}">
+      <i class="fas fa-th-large fa-fw" aria-hidden="true"></i>
+      {{ nav_project.name | default: page.project }}: project index
+    </a>
+    <span class="project-nav-step text-muted">Lessons Learned</span>
+    {% if nav_ci %}
+      <span class="project-nav-links">
+        <a href="{{ nav_ci.url | relative_url }}" title="{{ nav_ci.title }}">
+          <i class="fas fa-angle-left" aria-hidden="true"></i> Continuous Improvement
+        </a>
+      </span>
+    {% endif %}
+  </nav>
+{% elsif page.project and page.project_adrs %}
+  {% assign nav_project = site.data.projects[page.project] %}
+  {% assign nav_arch = site.posts | where: 'project', page.project | where: 'project_step', 5 | first %}
+  <nav class="project-nav" aria-label="Project navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.project | append: '/' | relative_url }}">
+      <i class="fas fa-th-large fa-fw" aria-hidden="true"></i>
+      {{ nav_project.name | default: page.project }}: project index
+    </a>
+    <span class="project-nav-step text-muted">Architecture Decision Records</span>
+    {% if nav_arch %}
+      <span class="project-nav-links">
+        <a href="{{ nav_arch.url | relative_url }}" title="{{ nav_arch.title }}">
+          <i class="fas fa-angle-left" aria-hidden="true"></i> Technical Architecture
+        </a>
+      </span>
+    {% endif %}
+  </nav>
+{% elsif page.project and page.project_interview %}
+  {% assign nav_project = site.data.projects[page.project] %}
+  {% assign nav_first = site.posts | where: 'project', page.project | where: 'project_step', 1 | first %}
+  <nav class="project-nav" aria-label="Project navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.project | append: '/' | relative_url }}">
+      <i class="fas fa-th-large fa-fw" aria-hidden="true"></i>
+      {{ nav_project.name | default: page.project }}: project index
+    </a>
+    <span class="project-nav-step text-muted">{{ site.data.project_framework.interview.title }}</span>
+    {% if nav_first %}
+      <span class="project-nav-links">
+        <a href="{{ nav_first.url | relative_url }}" title="{{ nav_first.title }}">
+          Read the playbook <i class="fas fa-angle-right" aria-hidden="true"></i>
+        </a>
+      </span>
+    {% endif %}
+  </nav>
+{% elsif page.project and page.project_step %}
+  {% assign nav_project = site.data.projects[page.project] %}
+  {% assign nav_posts = site.posts | where: 'project', page.project | where_exp: 'p', 'p.project_step' | sort: 'project_step' %}
+  {% assign nav_prev = nil %}
+  {% assign nav_next = nil %}
+  {% for p in nav_posts %}
+    {% if p.project_step == page.project_step %}
+      {% assign i_prev = forloop.index0 | minus: 1 %}
+      {% if i_prev >= 0 %}{% assign nav_prev = nav_posts[i_prev] %}{% endif %}
+      {% assign nav_next = nav_posts[forloop.index] %}
+    {% endif %}
+  {% endfor %}
+  <nav class="project-nav" aria-label="Project navigation">
+    <a class="project-nav-index" href="{{ '/tags/' | append: page.project | append: '/' | relative_url }}">
+      <i class="fas fa-th-large fa-fw" aria-hidden="true"></i>
+      {{ nav_project.name | default: page.project }}: project index
+    </a>
+    <span class="project-nav-step text-muted">
+      Part {{ page.project_step }} of {{ site.data.project_framework.areas | size }}
+    </span>
+    <span class="project-nav-links">
+      {% if nav_prev %}
+        <a href="{{ nav_prev.url | relative_url }}" title="{{ nav_prev.title }}">
+          <i class="fas fa-angle-left" aria-hidden="true"></i> Previous
+        </a>
+      {% endif %}
+      {% if nav_next %}
+        <a href="{{ nav_next.url | relative_url }}" title="{{ nav_next.title }}">
+          Next <i class="fas fa-angle-right" aria-hidden="true"></i>
+        </a>
+      {% endif %}
+    </span>
+  </nav>
+{% endif %}

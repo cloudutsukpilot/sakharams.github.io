@@ -1,0 +1,796 @@
+# Lessons learned while building the Cloudutsuk Platform: one entry per problem that cost real time
+# or would bite again. Written as each problem is solved; rendered by _includes/project-lessons-log.html
+# on the Lessons Learned post. Public: no IDs, tokens, emails or private repo links
+# (check with .claude/skills/cloudutsuk-project/scripts/lessons.py cloudutsuk-platform).
+#
+# Fields: id (L + 3 digits, never reused), date, step (where in the build), title (the lesson as one
+# sentence), tags, symptom (what was seen), cause (why), fix (what changed), lesson (what to do next
+# time), adrs (optional, related ADR ids).
+lessons:
+  - id: L001
+    date: 2026-10-11
+    step: "Phase 0, step 3: DGX prerequisites"
+    title: "`docker container prune` also removes containers you only just stopped"
+    tags: [docker, housekeeping]
+    symptom: "After stopping docker-model-runner and then pruning the exited containers, the model runner was gone."
+    cause: "Prune removes every stopped container, including ones stopped a minute earlier on purpose."
+    fix: "Reinstalled the runner, stopped it with a restart policy of `no`; its models volume had survived."
+    lesson: "Prune by name or label, not globally, and keep anything you only want paused out of the prune list."
+
+  - id: L002
+    date: 2026-10-11
+    step: "Phase 0, step 4: GPU spike"
+    title: "On the GB10, GPU memory is shared with the host and invisible to container limits"
+    tags: [gpu, vllm, capacity]
+    symptom: "vLLM's `--gpu-memory-utilization 0.1` took about 12 GB, and the container's memory metrics didn't show it."
+    cause: "The GB10 has one pool of unified memory: the fraction is of the whole 121 GB, and CUDA allocations aren't charged to the container's cgroup."
+    fix: "Admission control uses the host's MemAvailable instead of container metrics; model sizes are budgeted as fractions of the pool."
+    lesson: "On unified-memory machines, budget GPU memory against the host, never against container limits."
+    adrs: ["0010", "0017", "0026"]
+
+  - id: L003
+    date: 2026-10-11
+    step: "Phase 0, step 6: network and core cluster"
+    title: "The community k3d Terraform provider panics when an update check fails"
+    tags: [k3d, terraform]
+    symptom: "Creating the cluster with the k3d provider crashed with a Go panic before anything was created."
+    cause: "The provider calls the k3s update channel at plan time; that host served an untrusted certificate and the error path panicked. The provider also can't set host aliases."
+    fix: "A small module renders a k3d config file and runs the k3d CLI from Terraform, next to a separate Docker network module."
+    lesson: "For thin wrappers around a CLI, generating the CLI's own config file is more robust than a lightly maintained provider."
+    adrs: ["0006"]
+
+  - id: L004
+    date: 2026-10-11
+    step: "Phase 0, step 7: OpenBao"
+    title: "OpenBao 2.x only accepts audit devices declared in its config file"
+    tags: [openbao, security]
+    symptom: "Enabling a file audit device through the API failed: 'cannot enable audit device via API'."
+    cause: "Since 2.0, OpenBao refuses API-created audit devices, which closed a route to code execution through the audit path."
+    fix: "An `audit \"file\" \"stdout\"` block in the server config sends the audit log to the pod's stdout."
+    lesson: "Configure OpenBao audit devices declaratively; Vault-era tutorials that use the API no longer work."
+    adrs: ["0023"]
+
+  - id: L005
+    date: 2026-10-11
+    step: "Phase 0, step 7: OpenBao"
+    title: "Keep unseal keys off the screen: pipe them from a root-only file to the API"
+    tags: [openbao, secrets]
+    symptom: "Initialising and unsealing by hand would print the keys and root token in the terminal and shell history."
+    cause: "`bao operator init` prints everything it creates, and unseal keys passed as arguments show up in process lists."
+    fix: "Root-only scripts call the HTTP API through a localhost port-forward: init writes its response straight to a 0600 file, unseal pipes each key from that file to curl."
+    lesson: "Design secret bootstrap so no secret is ever printed or passed as an argument, then test it against a throwaway instance first."
+    adrs: ["0023"]
+
+  - id: L006
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Chart downloads from GitHub release assets time out intermittently; OCI registries don't"
+    tags: [helm, supply-chain]
+    symptom: "Terraform's Helm provider failed with 'context deadline exceeded' fetching charts, while curl fetched the same file in under a second."
+    cause: "Chart repositories hosted on GitHub Pages redirect the download to GitHub's release-asset host, which stalled now and then for the provider's client."
+    fix: "Charts come from each project's OCI registry instead (same digests); the one chart without an OCI copy is retried."
+    lesson: "Prefer OCI chart sources, and mirror charts locally once the registry exists."
+    adrs: ["0034"]
+
+  - id: L007
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Shared Helm defaults keyed on release names leak into every consumer"
+    tags: [helm, terragrunt]
+    symptom: "External Secrets pods stayed Pending: they were pinned to a node pool that doesn't exist on k3d."
+    cause: "The shared IaC module applies default values to any release with a known name; those defaults were written for another organisation's managed clusters."
+    fix: "A `shared_values: false` switch per release; the first, never-deployed release was uninstalled because Helm kept the old fields when patching it."
+    lesson: "Check what a shared module injects before the first install, and uninstall a failed first release rather than upgrading over it."
+
+  - id: L008
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Terraform's kubernetes_manifest can't handle the External Secrets v2 SecretStore schema"
+    tags: [terraform, external-secrets]
+    symptom: "Planning the ClusterSecretStore failed with 'attribute \"gcp\" not set' under the Vault provider's auth block."
+    cause: "kubernetes_manifest builds a typed value from the CRD; optional auth blocks with required fields inside can't be represented."
+    fix: "The ClusterSecretStore is a raw resource in a small Helm release, which leaves validation to the API server."
+    lesson: "For CRDs with deep optional schemas, deliver the object through Helm (or kubectl) rather than kubernetes_manifest."
+    adrs: ["0023"]
+
+  - id: L009
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Inside k3d nodes, the Docker network gateway's port 53 is Docker's DNS, not yours"
+    tags: [k3d, dns, networking]
+    symptom: "The host resolved internal names through PowerDNS on the gateway, but every pod got NXDOMAIN from the same address."
+    cause: "k3d's DNS fix points each node at the gateway and redirects that address's port 53 to Docker's embedded resolver, which forwards to the LAN router."
+    fix: "Core's CoreDNS forwards the internal zone to PowerDNS's cluster IP (a fixed ClusterIP service); other clusters will use a different gateway port."
+    lesson: "Test DNS from a pod, not only from the host: k3d rewrites name resolution inside its nodes."
+    adrs: ["0024", "0030"]
+
+  - id: L010
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "A Service's cluster IP can't be changed in place, and Terraform won't notice a deleted one"
+    tags: [kubernetes, helm, terraform]
+    symptom: "Setting a fixed clusterIP changed nothing; after deleting the Service, Terraform reported no changes and didn't recreate it."
+    cause: "clusterIP is immutable, the chart only sets it on ClusterIP-type services, and the Helm provider only re-applies on a release change."
+    fix: "A separate ClusterIP service with the fixed address; a real values change triggered the upgrade that recreated the deleted Service."
+    lesson: "Choose fixed service addresses at creation, and expect to force a Helm upgrade after deleting objects by hand."
+
+  - id: L011
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "k3s Traefik ignores a fixed ingress address until publishedService is off"
+    tags: [traefik, k3s, external-dns]
+    symptom: "Ingresses kept the node's address, so ExternalDNS would have pointed names at an address that changes."
+    cause: "k3s enables publishedService, which wins over a fixed address, and this chart version has no value for the fixed address at all."
+    fix: "A HelmChartConfig turns publishedService off and passes `--providers.kubernetesingress.ingressendpoint.ip` as an extra argument."
+    lesson: "Read the rendered Deployment arguments, not the values, to confirm a k3s HelmChartConfig took effect."
+
+  - id: L012
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "The PowerDNS image keeps its empty database inside the image"
+    tags: [powerdns, storage]
+    symptom: "Mounting host storage over the database folder would have left PowerDNS with no database; a new zone also had a placeholder SOA."
+    cause: "The official image ships the SQLite file in /var/lib/powerdns, and `pdnsutil create-zone` writes a placeholder primary name in the SOA."
+    fix: "An init container copies the database to host storage on first start, creates the zone and sets a real SOA once."
+    lesson: "Check what an image ships in the paths you mount over, and query the SOA after creating a zone."
+    adrs: ["0024"]
+
+  - id: L013
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "A Cloudflare token that can read DNS fails DNS-01 with an 'authentication error'"
+    tags: [cloudflare, cert-manager, tls]
+    symptom: "cert-manager found the zone but every attempt to create the challenge record failed with error 10000, 'Authentication error'."
+    cause: "The token had DNS read but not DNS edit; reads succeed, so the error looks like a bad token rather than a missing permission."
+    fix: "Give the token Zone > DNS > Edit on the one zone (plus Zone > Zone > Read)."
+    lesson: "Test a new token's write permission before handing it to cert-manager; account tokens verify at the account endpoint, not the user one."
+    adrs: ["0024"]
+
+  - id: L014
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Folder-per-release is a requirement of the IaC entrypoint, not a style choice"
+    tags: [terragrunt, helm]
+    symptom: "Two releases in one folder: only the first was installed, and a helper release failed because its namespace already existed."
+    cause: "The entrypoint filters releases by the folder name passed as the resource, and the module creates (and owns) every release namespace except system ones."
+    fix: "One release per folder, named like the folder; helper releases that hold only cluster-scoped objects live in kube-system."
+    lesson: "Follow the reference repo's layout exactly; run plan before apply, because only plan generates the stack file."
+
+  - id: L015
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "External Secrets doesn't quickly re-check a secret store that failed while OpenBao was sealed"
+    tags: [external-secrets, openbao, recovery]
+    symptom: "After OpenBao was reinstalled and unsealed, the ClusterSecretStore stayed 'InvalidProviderConfig: unable to create client' and OpenBao saw no login attempts."
+    cause: "The store was validated while OpenBao was down, and the operator waits a long time before validating it again; existing secrets kept working meanwhile."
+    fix: "Annotating the store made the operator validate it again at once, and it turned Valid."
+    lesson: "After any unseal (reboots included), nudge the secret stores; the boot unit should do this right after unseal.sh."
+    adrs: ["0023", "0025"]
+
+  - id: L016
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "A cluster module that rebuilds on any config change needs an in-place path for load-balancer ports"
+    tags: [k3d, terraform]
+    symptom: "Typing an internal name in the browser failed ('refused to connect'): the browser tried HTTP, and port 80 wasn't published. Adding it to the cluster config would have deleted and recreated the whole core cluster."
+    cause: "The module hashes the rendered k3d config and replaces the cluster on any change, because k3d can't change most settings in place; load-balancer ports are one of the few it can."
+    fix: "A separate `load_balancer_ports` list, kept out of the rebuild hash and reconciled with `k3d node edit --port-add/--port-delete`; tested on a throwaway cluster first. Existing clusters planned with no changes."
+    lesson: "When adding an in-place path to a 'replace on change' resource, keep the old hash input unchanged, or every existing instance is rebuilt on the next apply."
+
+  - id: L017
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Terragrunt wrappers that map fields one by one silently drop new module inputs"
+    tags: [terragrunt, terraform]
+    symptom: "After adding a new module input and setting it in resources.yaml, the apply ran but did nothing ('ports already match')."
+    cause: "The Terragrunt unit builds the module input field by field with try(); a field it doesn't list never reaches Terraform, and no error is raised."
+    fix: "Added the field to the wrapper's mapping."
+    lesson: "When a module gains an input, update its Terragrunt wrapper in the same change, and check the plan shows the new value before applying."
+
+  - id: L018
+    date: 2026-10-11
+    step: "Phase 0, step 8: certificates and DNS"
+    title: "Traefik chart v34+ ignores the old HTTP-to-HTTPS redirect values without an error"
+    tags: [traefik, k3s, helm]
+    symptom: "After setting `ports.web.redirections` in the k3s HelmChartConfig, plain HTTP still served the page instead of redirecting."
+    cause: "Chart v34 moved the setting to `ports.web.http.redirections`; unknown values are accepted and ignored."
+    fix: "Moved the block under `http`; HTTP now answers 301 to HTTPS."
+    lesson: "For k3s HelmChartConfig changes, compare against the bundled chart version's values.yaml and confirm the rendered container arguments."
+
+  - id: L019
+    date: 2026-10-11
+    step: "Phase 0, step 10: Zot registry"
+    title: "External Secrets' `htpasswd` template function needs the hash type as a third argument"
+    tags: [external-secrets, zot]
+    symptom: "The ExternalSecret for the registry's htpasswd file stayed 'SecretSyncedError: could not update secret', and the Helm apply timed out waiting for it."
+    cause: "The template engine's htpasswd function takes user, password and hash type; examples written for older versions pass only two, and the error is only in the operator's log."
+    fix: "`{{ htpasswd \"puller\" .puller \"bcrypt\" }}` for each account."
+    lesson: "When an ExternalSecret won't sync, read the operator's log for the template error before suspecting the secret store."
+
+  - id: L020
+    date: 2026-10-11
+    step: "Phase 0, step 10: Zot registry"
+    title: "Anonymous registry access can work for containerd and still fail for the Docker CLI"
+    tags: [zot, docker, containerd]
+    symptom: "An anonymous `docker pull` from the mirror failed with 'no basic auth credentials', while curl, and a pod pulling the same image, worked."
+    cause: "The Docker CLI first calls `/v2/`, which the registry answers with 401 when no credentials are sent; containerd asks for the manifest directly, which anonymous access allows."
+    fix: "Kept anonymous pulls for the cluster nodes, which is what they're for; people log in with the read-only account."
+    lesson: "Test a registry with the client that will use it (containerd for clusters), and read the registry's request log to see which call is refused."
+    adrs: ["0034"]
+
+  - id: L021
+    date: 2026-10-11
+    step: "Phase 0, step 10: Zot registry"
+    title: "Zot rejects Docker-format manifests unless docker2s2 compatibility is on"
+    tags: [zot, docker, oci]
+    symptom: "Pushing a test image with the Docker CLI failed with 'manifest invalid', although login and permissions were fine."
+    cause: "Zot is OCI-native and refuses Docker v2 schema 2 manifests by default; the Docker CLI pushes that format."
+    fix: "`http.compat: [\"docker2s2\"]` in Zot's config; BuildKit in CI pushes OCI manifests anyway."
+    lesson: "Check which manifest format each client pushes before assuming an access-control problem."
+    adrs: ["0034"]
+
+  - id: L022
+    date: 2026-10-11
+    step: "Phase 0, step 12: the mon cluster"
+    title: "A secret store checked before CoreDNS loads a new forwarding rule stays invalid until it's rechecked"
+    tags: [external-secrets, coredns, k3s, dns]
+    symptom: "In the new mon cluster the OpenBao ClusterSecretStore reported InvalidProviderConfig, 'lookup bao.core.home.cloudutsuk.com: no such host', although a test pod resolved the name a minute later."
+    cause: "The DNS forwarding (k3s's coredns-custom ConfigMap) and the secret store were applied seconds apart. CoreDNS picks the ConfigMap up on its next reload, the store's first check ran before that, and the operator backs off before trying again."
+    fix: "Annotated the store and its ExternalSecrets with a new `force-sync` value; it turned Valid and the secret synced at once."
+    lesson: "On a new cluster, apply the DNS glue before the secret store and check name resolution from a pod first; if the store failed earlier, force a recheck instead of waiting for the backoff."
+    adrs: ["0023", "0024"]
+
+  - id: L023
+    date: 2026-10-11
+    step: "Phase 0, step 11: Keycloak"
+    title: "`GROUPS` is a reserved bash variable: a script that sets it gets the user's Unix group ids"
+    tags: [bash, keycloak]
+    symptom: "The realm script created ten Keycloak groups named 1000, 27, 29… instead of platform-admins and viewers."
+    cause: "Bash fills `GROUPS` with the current user's group ids and silently ignores assignments to it, so the loop iterated over those ids."
+    fix: "Renamed the array to `REALM_GROUPS`, deleted the stray groups and re-ran the script."
+    lesson: "Avoid bash's special names (GROUPS, HOSTNAME, UID, RANDOM, SECONDS, PWD) for script variables, and check the result of a first run, not just its exit code."
+
+  - id: L024
+    date: 2026-10-11
+    step: "Phase 0, step 11: Keycloak"
+    title: "Admin consent for a new Entra app fails until its service principal has propagated"
+    tags: [entra, azure]
+    symptom: "The app registration script created the app, its service principal and a secret, but tenant-wide admin consent failed, even for a Global Administrator."
+    cause: "A just-created service principal takes several seconds to be visible to the consent API."
+    fix: "The script retries consent for up to a minute; the grant was then confirmed through Microsoft Graph (consent type AllPrincipals)."
+    lesson: "Retry Entra calls that depend on an object created a moment earlier, and verify the grant afterwards rather than trusting the exit code."
+    adrs: ["0028"]
+
+  - id: L025
+    date: 2026-10-11
+    step: "Phase 0, step 12: the mon cluster"
+    title: "A k3s argument that ends in a colon must be quoted, or YAML turns it into a map and the API server never starts"
+    tags: [k3s, k3d, yaml, oidc]
+    symptom: "After adding the OIDC settings for Keycloak, recreating the mon cluster hung for five minutes and k3d rolled it back with 'failed to get ready'; the rollback deleted the container and its logs."
+    cause: "In the k3s drop-in, `- oidc-username-prefix=oidc:` ends in a colon, so YAML reads it as a one-key map. k3s passed it on as `--[{oidc-username-prefix=oidc <nil>}]` and kube-apiserver exited with 'unknown flag'."
+    fix: "Quoted every value in the drop-in. The cluster was created without the drop-in first, and the drop-in added with a restart of the running node, which kept the logs readable (use `k3d cluster stop/start` for that, see L026)."
+    lesson: "Quote every k3s `*-arg` value in YAML. Add risky settings as drop-ins on a running cluster, not at creation, because k3d's rollback leaves nothing to debug."
+    adrs: ["0006", "0028"]
+
+  - id: L026
+    date: 2026-10-11
+    step: "Phase 0, step 12: the platform and ai clusters"
+    title: "`docker restart` silently drops k3d's host aliases; only `k3d cluster start` writes them"
+    tags: [k3d, docker, dns, oidc]
+    symptom: "After installing the OIDC drop-in with a node restart, the API servers of mon, platform and ai logged 'lookup auth.core.home.cloudutsuk.com: no such host' every few seconds, although the host alias was set when each cluster was created. mon's sign-in had only been checked by impersonation, so nobody noticed."
+    cause: "k3d writes host aliases into the node's /etc/hosts when it creates or starts a node. Docker regenerates /etc/hosts on every container start, so a `docker restart`, a Docker daemon restart or a host reboot (k3d nodes restart on their own) drops them. The registry alias goes the same way, and the Zot mirror then quietly falls back to pulling from upstream."
+    fix: "Restarted the clusters with `k3d cluster stop/start`, and added `host/k3s/node-hosts.sh`, which re-applies each node's aliases from the label k3d keeps them in (`k3d.cluster.start.hostaliases`) without a restart; the boot unit runs it. The API server retries the issuer, so OIDC recovers once the alias is back."
+    lesson: "Restart k3d nodes with k3d, never with docker. Check that a name resolves inside the node after a restart, not only after creation, and test sign-in with a real token rather than impersonation."
+    adrs: ["0006", "0028", "0034"]
+
+  - id: L027
+    date: 2026-10-11
+    step: "Phase 0, step 12: the platform and ai clusters"
+    title: "A locally built image kept its tag after its inputs changed, so the GPU cluster came up without time-slicing"
+    tags: [k3d, gpu, docker, images]
+    symptom: "The new ai cluster advertised 1 GPU instead of the 4 time-sliced replicas the spike had proven; the device plugin ran with an empty sharing config and no ConfigMap."
+    cause: "The node image bakes the device-plugin manifest in. It was built during the spike before time-slicing was added to that manifest (which the spike then applied by hand), and the build script skipped rebuilding because the tag already existed."
+    fix: "The build script now ends the tag in a hash of the Dockerfile and the manifest and warns when the cluster stack names another tag. The image was rebuilt and the ai cluster recreated on it (4 GPUs, External Secrets and the store re-applied)."
+    lesson: "Tag locally built images by their content, not just by upstream versions, and check what a cluster actually runs against what the repo says, not just that it started."
+    adrs: ["0010", "0022"]
+
+  - id: L028
+    date: 2026-10-11
+    step: "Phase 0, step 13: Argo CD"
+    title: "Three ways app-template's raw resources bite: empty bodies, its own service account, and `tpl` eating other templates"
+    tags: [helm, app-template, external-secrets, argocd]
+    symptom: "Raw-resource releases for Argo CD failed or rendered wrong: a YAML parse error on a ServiceAccount, then 'serviceaccounts already exists' on the first install, then ExternalSecrets whose templated values (the cluster token, the repository URL) came out as empty strings."
+    cause: "app-template renders a manifest with nothing but apiVersion and kind as a bare `{}` line; it also creates a default service account named after the release, which clashed with ours; and it runs every string through `tpl`, so External Secrets' own `{{ .key }}` markers were rendered (to nothing) by Helm."
+    fix: "Gave the ServiceAccount a real field, set `global.createDefaultServiceAccount: false`, and escaped ESO's markers as {{`{{ .key }}`}}. Every change was checked with `helm template` before the plan."
+    lesson: "Render raw-resource values with `helm template` before planning, and grep the output for empty values. Any other tool's template syntax inside app-template values needs escaping."
+    adrs: ["0036", "0038"]
+
+  - id: L029
+    date: 2026-10-11
+    step: "Phase 0, step 11: Keycloak"
+    title: "Two different tools are called `kubelogin`; kubectl's OIDC sign-in needs int128's, not Azure's"
+    tags: [kubernetes, oidc, keycloak, tooling]
+    symptom: "`kubelogin` was already on the DGX, but `kubectl oidc-login` was 'unknown command', and `kubelogin --help` talked about Azure Active Directory."
+    cause: "Azure's AKS sign-in helper and int128's generic OIDC plugin share the binary name. kubectl only finds plugins named `kubectl-<name>`, so neither was usable as `kubectl oidc-login`."
+    fix: "Installed int128/kubelogin v1.36.4 (checksum verified) as `~/.local/bin/kubectl-oidc_login`, leaving Azure's tool where it was, and made the kubeconfig call `kubectl oidc-login get-token`."
+    lesson: "Check what a binary is with `--help` before relying on its name, and install kubectl plugins under their `kubectl-` name so they can't clash."
+    adrs: ["0028"]
+
+  - id: L030
+    date: 2026-10-11
+    step: "Phase 0, step 15: backups"
+    title: "The module's Helm provider validates a chart's objects before installing it, so a chart can't create objects of kinds its own CRDs define"
+    tags: [helm, terraform, velero, crds]
+    symptom: "Installing Velero failed with 'no matches for kind BackupStorageLocation in version velero.io/v1, ensure CRDs are installed first', although the chart ships those CRDs."
+    cause: "The shared module turns on the Helm provider's `manifest` experiment, which renders the release and checks every object against the live API before Helm runs. Helm would install the chart's `crds/` first, but the check happens earlier."
+    fix: "Split the release: `velero` installs the server, node agent and CRDs; `velero-config` (raw resources in kube-system) holds the backup locations and schedules and is applied after it. The same split as external-secrets and secret-stores."
+    lesson: "When a chart creates objects of its own CRD kinds, put those objects in a second release applied after the first."
+    adrs: ["0036", "0039"]
+
+  - id: L031
+    date: 2026-10-11
+    step: "Phase 0, step 15: backups"
+    title: "Helm's Go client can time out on a download that curl gets in a tenth of a second; keep charts in your own registry"
+    tags: [helm, zot, github, network]
+    symptom: "Planning the Velero release failed with 'Unable to locate chart velero ... Client.Timeout exceeded while awaiting headers' on GitHub's release-asset host, while curl fetched the same URL in 0.1 s."
+    cause: "Not found for certain; the failure was intermittent and only hit the Go HTTP client on that host. The chart repository's index points at GitHub release assets, so every plan depends on that path."
+    fix: "Downloaded the chart with curl, checked it against the index digest, pushed it to Zot (`charts/velero`, anonymous read like `mirror/*`) and pointed the release at `oci://registry.core.home.cloudutsuk.com/charts`."
+    lesson: "Pin third-party charts in the platform's own registry after checking their digest; installs then don't depend on someone else's download host."
+    adrs: ["0034", "0039"]
+
+  - id: L032
+    date: 2026-10-11
+    step: "Phase 0, step 15: backups"
+    title: "bjw-s app-template doesn't mount the service-account token unless you ask for it"
+    tags: [app-template, kubernetes, openbao]
+    symptom: "The dump pod's OpenBao login failed with 'open /var/run/secrets/kubernetes.io/serviceaccount/token: no such file or directory'."
+    cause: "app-template 5.x sets `automountServiceAccountToken: false` in its default pod options, so pods have no token even with a service account."
+    fix: "Set `defaultPodOptions.automountServiceAccountToken: true` for the one pod that logs in to OpenBao with its token."
+    lesson: "For any app-template pod that authenticates with its service account (OpenBao, the Kubernetes API), turn the token mount on explicitly."
+    adrs: ["0023"]
+
+  - id: L033
+    date: 2026-10-11
+    step: "Phase 0, step 15: backups"
+    title: "The shared module owns each release's namespace, so a second release can't share it"
+    tags: [helm, terraform, namespaces]
+    symptom: "Installing the Velero UI into the `velero` namespace failed with 'namespaces \"velero\" already exists'."
+    cause: "The module creates the namespace of every release it applies and keeps it in that release's state; `velero` already belonged to the Velero release."
+    fix: "Gave the UI its own namespace, `velero-ui` (its chart grants itself a Role in `velero`). Objects that must live in another release's namespace go in a kube-system release with an explicit namespace, like `velero-config` and `argocd-root`."
+    lesson: "Give every release its own namespace; put helper objects for another release's namespace in a kube-system release."
+    adrs: ["0036"]
+
+  - id: L034
+    date: 2026-10-11
+    step: "Phase 1, step 1: ARC runners"
+    title: "A new runner scale set picks up every job that was queued for its name, however old"
+    tags: [github-actions, arc, ci]
+    symptom: "The moment the `homelab` scale set registered, it scaled to three runners and started Terragrunt plan jobs from runs queued the day before, including a push to `main`."
+    cause: "The IaC workflow had named `homelab` as its runner since Phase 0, so its runs waited in the queue for a runner with that label. GitHub hands queued jobs to the first matching runner that comes online, even on the wrong scale set."
+    fix: "Let the plans run on the build runners, where they fail early with no state backend or cluster access, so no apply can follow. `infra-local` moves to its own `homelab-iac` set in step 1b."
+    lesson: "Before registering a runner label, list the queued runs that target it and cancel any stale ones. Point a workflow at a runner only once that runner exists."
+    adrs: ["0019", "0040"]
+
+  - id: L035
+    date: 2026-10-11
+    step: "Phase 1, step 1: ARC runners"
+    title: "On GitHub's free plan, private repos have no branch protection and orgs have no custom runner groups"
+    tags: [github, security, ci]
+    symptom: "Branch protection on `main` returned 'Upgrade to GitHub Pro or make this repository public', and only the Default runner group existed."
+    cause: "Both features are paid for private repositories."
+    fix: "Limited the host-access scale set by registering it with `infra-local` alone instead of with a runner group. ADR 0040 relies on who has write access to that repo, not on branch protection."
+    lesson: "Check which plan features a design depends on before writing them into an ADR. A repo-scoped ARC scale set stands in for a runner group restricted to selected repos."
+    adrs: ["0019", "0040"]
+
+  - id: L036
+    date: 2026-10-11
+    step: "Phase 1, step 1b: IaC runner"
+    title: "Lossy DNS over Wi-Fi looks like a different failure in every tool"
+    tags: [dns, networking, dgx]
+    symptom: "In one hour: `git push` couldn't resolve github.com, Docker Hub pulls timed out, `az` failed on graph.microsoft.com, Terraform couldn't reach the state blob, and the entrypoint started an interactive `az login` because its session check failed."
+    cause: "The DGX is on Wi-Fi, and its UDP DNS lookups were being dropped: the router answered 3 of 5, Google's IPv6 resolver 1 of 5. Tailscale's resolver (100.100.100.100) answered all 5."
+    fix: "Retried network steps. Pulled the Docker Hub images inside a k3d node, which goes through the Zot mirror, and loaded them into Docker. The host's resolver settings weren't changed."
+    lesson: "When unrelated tools fail with name or timeout errors at once, test each resolver with `dig` before debugging the tools. Put the DGX on wired Ethernet, or make a reliable resolver its first choice."
+
+  - id: L037
+    date: 2026-10-11
+    step: "Phase 1, step 5: Kyverno"
+    title: "Zot reports a failed upstream download as \"image is filtered out by sync config\""
+    tags: [zot, registry, networking]
+    symptom: "Every Kyverno pod in `platform`, `mon` and `ai` sat in ImagePullBackOff with a 502 from Zot, and Zot's log said \"failed to sync image: image is filtered out by sync config\" for `mirror/ghcr.io/kyverno/*`, although the ghcr.io mirror allows every repository (`prefix: \"**\"`)."
+    cause: "Zot had started the copy from ghcr.io, but GitHub's blob CDN (`pkg-containers.githubusercontent.com`) kept resetting the connection over the DGX's degraded link. Zot then tried its other mirrors, whose content rules don't match `ghcr.io` names, and reported the last error, the filter, instead of the download failure. It also copies every architecture in an image's index, so a slow link has several times more to fetch than the arm64 image alone."
+    fix: "None needed in the config: the kubelet keeps retrying, and the pods start once a sync completes. Kyverno's webhooks don't exist until its admission pod runs, and its policies only audit, so nothing was blocked meanwhile."
+    lesson: "When Zot says an image is filtered out but the content rule clearly matches, look for \"Failed to copy layer\" just before it: that's the real error. Test the upstream blob host from the DGX with `curl` before changing the sync config."
+    adrs: ["0034"]
+
+  - id: L038
+    date: 2026-10-12
+    step: "Phase 2, step 1: monitoring stack on mon"
+    title: "Mimir won't start as a non-root user until its activity log moves off the working directory"
+    tags: [mimir, kubernetes, security]
+    symptom: "Mimir exited at start-up with \"failed to create activity file: open ./metrics-activity.log: permission denied\" (error initialising module: activity-tracker), running as uid 1000 with a read-only root filesystem."
+    cause: "The activity tracker writes `metrics-activity.log` to the process's working directory by default, which isn't writable for a non-root user or a read-only root filesystem. Every data path in the config pointed at the data volume; this one isn't a storage setting, so it was easy to miss."
+    fix: "Set `activity_tracker.filepath: /data/metrics-activity.log`, on the same host folder as the rest of Mimir's data. Found in a local Docker smoke test before anything reached the cluster."
+    lesson: "Before deploying a Grafana store as non-root, grep its reference config for every `*path*` and `*dir*` default, not just the storage blocks, and run it once in Docker with the same uid and a read-only root."
+    adrs: ["0041"]
+
+  - id: L039
+    date: 2026-10-12
+    step: "Phase 2, step 1: monitoring stack on mon"
+    title: "Mimir's Alertmanager serves its API under the path of `external_url`, so a link to Grafana breaks it"
+    tags: [mimir, alertmanager, grafana]
+    symptom: "The ruler logged \"Error sending alerts ... bad response\" to `http://127.0.0.1:8080/alertmanager/api/v2/alerts`, Grafana's Alertmanager data source returned \"404 page not found\", and Watchdog never arrived, although every rule evaluated fine."
+    cause: "`alertmanager.external_url` was set to Grafana's alerting page so notifications would link there. Mimir uses that URL's path as the Alertmanager route prefix (it logs a warning that the prefix differs from `/alertmanager`), so the API moved to `/alerting/list/...` and the usual path 404'd."
+    fix: "Removed `alertmanager.external_url`. `ruler.external_url` (the link in each alert's generator URL) can point at Grafana, because it doesn't change any route."
+    lesson: "In Mimir, only set `alertmanager.external_url` to the URL Alertmanager is really served at. Read the start-up warnings: this one named the mismatch. Check Watchdog in Alertmanager as the last step of any alerting change."
+    adrs: ["0041"]
+
+  - id: L040
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "Argo CD's application controller runs out of memory when a big CRD set lands on every cluster"
+    tags: [argocd, kubernetes, memory]
+    symptom: "Twenty minutes after the monitoring pack's ApplicationSets were pushed, the new apps sat in \"Running\" with no progress and every other app stopped syncing. The application controller was in CrashLoopBackOff: OOMKilled at its 1Gi limit, 14 restarts."
+    cause: "The controller caches every resource of every managed cluster, CRD schemas included. The Prometheus Operator CRDs are some of the largest schemas around, and the pack put them, plus the OTel Operator's CRDs and two collectors, on three clusters at once. Steady state after the fix is about 1.1-1.3 GiB."
+    fix: "Raised the controller to 768Mi request and 2Gi limit in infra-local's Argo CD values and applied it. The first apply was killed by a 10-minute command timeout while Helm waited for the still-crashing pod, which left the release `pending-upgrade` and the state lease held: deleted the crashing pod so the StatefulSet rolled, deleted the pending release record, and re-applied with `--auto-release-lock`."
+    lesson: "Before adding an ApplicationSet that installs CRDs on every cluster, check the controller's memory headroom (`kubectl top`), because the cost multiplies by the number of clusters. Never wrap a Terragrunt apply in a short timeout: Helm's wait can outlast it, and an interrupted upgrade needs manual repair. A StatefulSet won't roll a pod that never becomes Ready; delete it."
+    adrs: ["0042"]
+
+  - id: L041
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "The OTel Operator refuses a target allocator on a collector in deployment mode"
+    tags: [opentelemetry, kubernetes]
+    symptom: "The monitoring pack's sync failed on every cluster: admission webhook \"vopentelemetrycollectorcreateupdatebeta.kb.io\" denied the request: the OpenTelemetry Collector mode is set to deployment, which does not support the target allocation deployment. Argo CD then kept retrying the old commit after the fix was pushed."
+    cause: "The target allocator hands scrape targets to stable collector identities, so the operator only allows it with statefulset (or daemonset) mode. A running sync operation retries its own revision, not the newest commit."
+    fix: "Set the cluster collector to `mode: statefulset`, then removed the stuck `operation` from each Application so the next sync used the new commit."
+    lesson: "Use statefulset mode for any OpenTelemetryCollector with `targetAllocator.enabled`. When Argo CD retries a failed sync after a fix is pushed, clear the operation instead of waiting out the backoff."
+    adrs: ["0042"]
+
+  - id: L042
+    date: 2026-10-12
+    step: "Phase 1, step 1b: IaC runner"
+    title: "A CI setup written for GitHub-hosted runners breaks three ways on an arm64 self-hosted runner"
+    tags: [github-actions, arc, python]
+    symptom: "Every Terragrunt plan job on the new `homelab-iac` runners failed in Setup Environment with 'pip: command not found' (exit 127), after Terraform and the other CLIs had installed fine. With that fixed, the next step failed: terragrunt and tflint gave 'Exec format error', and Terraform's wrapper said 'node: No such file or directory'."
+    cause: "`ghcr.io/actions/actions-runner` (Ubuntu 24.04) ships python3 3.12.3 without pip. The shared module skips `actions/setup-python` when python3's version already matches, so nothing installed pip. Ubuntu's system Python would refuse `pip install` anyway (PEP 668)."
+    fix: "The shared module's check now also requires `python3 -m pip`; otherwise setup-python installs its own Python into the runner's tool cache. Downloads now follow `uname -m`, the tool cache key includes the architecture, and the Terraform wrapper is off (nothing read its outputs)."
+    lesson: "On self-hosted runners, check for the tools a step actually calls, not just a version string. GitHub-hosted images hide gaps that the slim runner image exposes."
+    adrs: ["0040"]
+
+  - id: L043
+    date: 2026-10-12
+    step: "Phase 2, step 4: dashboards and alert rules as code"
+    title: "`or vector(0)` drops a cluster from multi-cluster recording rules"
+    tags: [prometheus, mimir, kubernetes-mixin]
+    symptom: "The API server dashboard showed write availability for platform and ai but \"No data\" for mon, although every input series existed for mon."
+    cause: "kubernetes-mixin's SLO rules write `sum by (cluster) (X or vector(0))`. `vector(0)` has no labels, so for a cluster with no samples of X (mon had no write 5xx errors at all) the fallback 0 can't match `cluster=\"mon\"` and the cluster drops out of the result. With one cluster per Prometheus that never shows; in one Mimir for every cluster it does."
+    fix: "The vendoring normaliser rewrites each `or vector(0)` to `or 0 * group by (cluster) (up{job=\"kube-apiserver\"})`, a 0 per cluster; 18 places. Also wrote vendored rules as YAML `|` blocks so such patches read as line diffs."
+    lesson: "When running single-cluster mixins against a multi-cluster store, grep their rules for `vector(0)` and `absent(` and make the fallbacks carry the cluster label. Check every dashboard per cluster (scripts/panel_check.py), not just the busiest one."
+
+  - id: L044
+    date: 2026-10-12
+    step: "Phase 1, step 2: BuildKit and the reusable build workflow"
+    title: "A newline from `jq -r` turned a working registry password into a 401"
+    tags: [github-actions, buildkit, zot]
+    symptom: "The first `main` build signed in to OpenBao, built the image and then failed the push: Zot answered every blob HEAD with 401 Unauthorized after its 5-second failed-login delay. The same account's password worked with curl from the host."
+    cause: "The workflow built the Docker config's `auth` value with `jq -r '\"\\(.username):\\(.password)\"' | base64`. `jq -r` ends its output with a newline, so the encoded credential was `user:password` plus a newline, which bcrypt rejects. `$(...)` strips trailing newlines, a pipe doesn't."
+    fix: "`jq -j` (no newline) before `base64 -w0`."
+    lesson: "When piping a secret into base64 or a hash, use `jq -j` or `printf %s`, never `jq -r` or `echo`. A 401 with the right password usually means extra bytes."
+    adrs: ["0043"]
+
+  - id: L045
+    date: 2026-10-12
+    step: "Phase 1, step 4: security gates in the reusable workflow"
+    title: "uv read the caller's pyproject.toml while installing the scanners"
+    tags: [github-actions, uv, python]
+    symptom: "The scanner install worked in homelab-gitops' own check but failed in the first homelab-services pull request: uv found no version of sse-starlette==3.5.0, although the hash-locked requirements file listed it."
+    cause: "The reusable workflow runs in the caller's checkout. uv picks up `pyproject.toml` from the working directory, and homelab-services' `[tool.uv] exclude-newer` date (2026-09-27) applied to the tool install too. sse-starlette 3.5.0 had been published a day later, so the cut-off filtered it out. It was also under two weeks old, so the lock itself was off by one day."
+    fix: "Install the tools with `UV_NO_CONFIG=1` and lock them with `--no-config` and an explicit `--exclude-newer <date>T00:00:00Z`."
+    lesson: "Anything a reusable workflow installs runs inside someone else's repo. Turn off project-level config discovery (uv, pip, npm, git) for tool installs, and test the workflow from a caller, not only from its own repo."
+    adrs: ["0032", "0044"]
+
+  - id: L046
+    date: 2026-10-12
+    step: "Phase 1, step 4b: runner image with the CI tools baked in"
+    title: "Installing 400 MB of scanners per job took longer than the scans"
+    tags: [github-actions, arc, supply-chain]
+    symptom: "With the gates in place, the tool install step took 2 to 7.5 minutes, while all the scans together took about 30 seconds."
+    cause: "Runner pods are ephemeral, so every job downloaded about 400 MB. GitHub's release CDN served some connections at about 100 KB/s and others at 15 MB/s; the same 19 MB file took 1 s or 135 s. Parallel downloads and retries on slow transfers helped, but the step still took 2 minutes or more."
+    fix: "Baked the pinned tools into our own runner image (`platform/actions-runner`), built and signed by the same reusable workflow and rolled out by digest by hand. The action uses the baked tools when their manifest matches, otherwise it installs them in the job. The tools step went to under a second, and a full gated hello-world build to about 70 s."
+    lesson: "Time the setup steps, not only the scans. On ephemeral runners anything the jobs keep downloading belongs in the runner image. Build that image through your own pipeline, and don't let a bot roll it out, or a bad image can stop the CI that would fix it."
+    adrs: ["0044"]
+
+  - id: L047
+    date: 2026-10-12
+    step: "Phase 2, step 3: monitoring pack on every cluster"
+    title: "The shared module's Helm force_update default wipes Secrets that an app fills in at runtime"
+    tags: [helm, terraform, argocd]
+    symptom: "Hours after an Argo CD apply that only raised the controller's memory, the Argo CD UI failed with \"server.secretkey is missing\". argocd-secret had no data at all; its only field manager was terraform-provider-helm."
+    cause: "The shared Terragrunt module sets force_update = true on every Helm release by default, so Helm replaces objects instead of merging them. argocd-secret is rendered empty by the chart, and argocd-server writes server.secretkey and admin.password into it at first start; a forced upgrade replaced it with the empty copy. Syncing kept working (the controller doesn't read it); the UI and API broke once the server re-read the Secret."
+    fix: "Restarted argocd-server, which regenerates the missing keys (the break-glass password in argocd-initial-admin-secret still worked), and set force_update: false on the Argo CD release; the next upgrade kept all three keys. Then made false the shared module's default (28 places) and re-applied all 35 infra-local releases one at a time, each only after a plan that changed nothing but the flag; External Secrets' webhook certificate survived every upgrade."
+    lesson: "Any chart Secret that a controller fills in later (Argo CD's server key, External Secrets' webhook certificate, generated passwords) is lost on every forced Helm upgrade. Set force_update: false unless a release really needs replacement, and after applying a release check that the app still works, not just that Terraform finished."
+
+  - id: L048
+    date: 2026-10-12
+    step: "Phase 1, step 5: Kyverno and the image signature policy"
+    title: "Kyverno looked for an amd64 image in our arm64-only index"
+    tags: [kyverno, cosign, buildkit, arm64]
+    symptom: "The new signature policy reported an error, not a pass or fail, for hello-world: `no child with platform linux/amd64 in index`. Cosign verified the same digest fine from the host."
+    cause: "BuildKit's default provenance attestation wraps every image in an OCI index (the arm64 image plus an attestation manifest). Verifying an index makes Kyverno resolve it to a platform, and the library it uses defaults to linux/amd64, not the node's architecture. Our images have only arm64."
+    fix: "Build with `--provenance=false`, so every image is a single manifest and the signed digest is the one the pod runs; rebuilt hello-world and the runner image. The signed SBOM attestation stays."
+    lesson: "On an arm64-only platform, check what tools assume when they meet an image index. A single-architecture image doesn't need an index, and an index can hide such defaults until a policy turns them into errors."
+    adrs: ["0033", "0043"]
+
+  - id: L049
+    date: 2026-10-12
+    step: "Phase 1, step 6: PostSync smoke tests"
+    title: "Argo CD kept retrying the broken commit and ignored the fix"
+    tags: [argocd, gitops, testing]
+    symptom: "After a smoke test failed a sync, a revert was pushed, but the app stayed on the broken commit. Argo CD reported retry 5 of 10 for the old revision and kept the app OutOfSync with the fix."
+    cause: "An automated sync that fails is retried with the revision it started with, and no new sync starts while that operation runs. With 10 retries and backoff up to 10 minutes, a broken commit could hold the app for about an hour."
+    fix: "`syncPolicy.retry.refresh: true` (Argo CD 3.x): each retry syncs the latest commit. With it, a retry deployed the fix about a minute after it was pushed. The first time, the stuck operation was ended with `argocd app terminate-op`."
+    lesson: "When a sync can fail on purpose (hooks, smoke tests), set `retry.refresh` so a fix isn't queued behind retries of the broken commit, and test the recovery path, not only the failure."
+    adrs: ["0031"]
+
+  - id: L050
+    date: 2026-10-12
+    step: "Phase 1, step 5: Kyverno and the image signature policy"
+    title: "An empty label map kept Kyverno OutOfSync forever"
+    tags: [argocd, helm, kyverno]
+    symptom: "The three Kyverno apps synced successfully but stayed OutOfSync. The diff was `labels: {}` on 11 policies.kyverno.io CRDs, and an ignoreDifferences rule for empty maps cleared the CLI diff but not the controller's status."
+    cause: "The kyverno-api subchart renders `labels: {}` and `annotations: {}` when given none. Server-side apply drops empty maps, so the live CRDs never have them and the desired state always differs."
+    fix: "Gave the subchart a real label and annotation (`kyverno-api.labels`, `kyverno-api.annotations`) instead of ignoring the difference; all three apps went Synced."
+    lesson: "A permanent OutOfSync after a successful sync is usually an empty map or a defaulted field. Prefer making the rendered manifest match what the server stores over ignore rules, which the controller and the CLI may apply differently."
+    adrs: ["0033"]
+
+  - id: L051
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "Clean policy reports, yet admission ignored every exception"
+    tags: [kyverno, admission, ci]
+    symptom: "With all seven policies switched to Deny, the PolicyReports on all three clusters showed the excepted workloads as skipped and nothing failing. The next CI job never started: ARC's controller logged a denial of the runner pod for a read-only root, exactly what the runners' exception covers."
+    cause: "Kyverno's Helm chart ships with `features.policyExceptions.enabled: false`, so the admission controller runs with `--enablePolicyException=false`. The reports controller evaluated the CEL policies' exceptions anyway, so background results looked right while admission ignored them."
+    fix: "Turned the feature on in the Kyverno ApplicationSet, limited to the `kyverno` namespace (`policyExceptions: {enabled: true, namespace: kyverno}`). The waiting runner pod was admitted and the job ran; server-side dry runs then showed each exception admitting its workload and still denying look-alikes."
+    lesson: "Prove an exception at admission (a server-side dry run of the real pod), not from reports. Background scans and the admission webhook can run with different settings. Runner pods only appear when a job is queued, so test them before switching to Deny."
+    adrs: ["0033"]
+
+  - id: L052
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "Running pods reported digests no upstream registry has"
+    tags: [zot, registry, supply-chain]
+    symptom: "Pinning the add-ons by digest, the image digests in the pods' status didn't match the upstream index digest for the same tag for 9 of 20 images, nor their arm64 child. All 9 were images published as Docker-format manifest lists."
+    cause: "Zot's on-demand mirror stores a tag pulled through it as an OCI index, which converts Docker-format manifests and so changes the digests. The layers are identical. Pulling by the upstream digest works too: Zot fetches and keeps that manifest as published."
+    fix: "Pinned every image by the digest of its upstream index (`docker buildx imagetools inspect`), the same digest any other registry or mirror serves, after checking the arm64 children carry the same layers."
+    lesson: "Take pin digests from the source registry, not from `kubectl get pod`. Behind a converting mirror the running digest is the mirror's own, and a pin to it fails anywhere else."
+    adrs: ["0033", "0034"]
+
+  - id: L053
+    date: 2026-10-13
+    step: "Phase 1, step 5a: every Kyverno policy in Deny"
+    title: "A routine restart put Mimir into an OOM loop"
+    tags: [mimir, monitoring, kubernetes]
+    symptom: "After moving Mimir's data from a hostPath volume to a PV (same host folder), the pod restarted, became Ready, then was OOMKilled at its 2Gi limit again and again: 9 restarts in 40 minutes, about 45 minutes without metrics on mon."
+    cause: "On start the ingester replays its write-ahead log while every cluster's collectors resend the samples they buffered during the downtime. That peak is well above the ~1.3Gi Mimir uses in steady state. The StatefulSet then didn't roll out the raised limit, because it doesn't replace a pod that never became Ready."
+    fix: "Raised the memory limit to 3Gi and deleted the pod so the StatefulSet recreated it with the new spec. It came up Ready with no restarts."
+    lesson: "Size a stateful store's memory limit for its restart, not its steady state: catching up after downtime costs the most. For a StatefulSet stuck on a crash-looping pod, delete the pod after fixing the spec."
+    adrs: ["0041"]
+
+  - id: L054
+    date: 2026-10-13
+    step: "Phase 1, step 4c: unit tests in the pull request gate"
+    title: "The service had tests, and no CI job ever ran them"
+    tags: [ci, testing, github-actions]
+    symptom: "Writing the CI/CD post's testing matrix, the row for unit tests had no workflow step to point at. hello-world had pytest tests from day one, and every build had been green, but none of them ran the tests."
+    cause: "The reusable build workflow was built around the security gates and the image. The service's workflow only called it, and the testing ADR described tests on every PR, so it read as done."
+    fix: "Added a `test` job (Ruff and pytest from `uv.lock`) to the service's workflow and made the image job need it. A throwaway pull request with a broken assertion failed in 13 seconds and the image job never started."
+    lesson: "A gate isn't real until you've watched it fail. For every row of a testing or security matrix, find the job that runs it and make it go red once on purpose."
+    adrs: ["0031"]
+
+  - id: L055
+    date: 2026-10-13
+    step: "Phase 3, step 1: the portal image through CI"
+    title: "A Backstage upgrade failed on a patch file nobody had"
+    tags: [backstage, yarn, dependencies]
+    symptom: "Bumping Backstage from 1.53.0 to 1.55.2 stopped in `yarn install` with ENOENT on `.yarn/patches/got-npm-11.8.2-c1eb105458.patch`. The repo has no such file and no dependency on `got`, and none of the 63 direct Backstage dependencies referred to a patch."
+    cause: "`@yarnpkg/core` 4.9.2, pulled in by the Backstage CLI, was published with its own monorepo's `patch:` reference to `got` in its dependencies. That path only exists in yarn's repository, so no project can install it. Every 4.x before it asked for a plain `^11.7.0`."
+    fix: "Found the package by grepping yarn's metadata cache (`~/.yarn/berry/metadata`) for the patch name, then pinned `@yarnpkg/core` to 4.9.1 in the root `resolutions`."
+    lesson: "When an install fails on a dependency you never declared, search the package manager's cached registry metadata for the odd string. It names the transitive package in seconds, where reading dependency trees takes much longer."
+    adrs: ["0004"]
+
+  - id: L056
+    date: 2026-10-13
+    step: "Phase 3, step 1: the portal image through CI"
+    title: "The portal image couldn't read its own /app"
+    tags: [backstage, docker, containers]
+    symptom: "The first multi-stage portal image built cleanly, then failed at start with `Cannot find module '/app/packages/backend'`. Inside it, even `ls /app` as the node user gave Permission denied."
+    cause: "Backstage's backend bundle is a tarball whose top-level `./` entry is mode 700, from the temporary directory it was built in. Extracting it applies that mode to `/app` itself. Backstage's own Dockerfile extracts as the node user into a directory node owns, so mode 700 still lets the app read it. Ours extracted as root, which left `/app` as `drwx------ root` for a process running as uid 1000."
+    fix: "Extract with `tar xzf bundle.tar.gz --no-overwrite-dir`, which leaves `/app` as `WORKDIR` made it (755). The files stay root-owned and read-only to the app, which suits a read-only root filesystem."
+    lesson: "When the user that unpacks files differs from the user that runs the app, check the archive's top-level entry with `tar tv`. A 700 directory is harmless to its owner and fatal to everyone else."
+    adrs: ["0004"]
+
+  - id: L057
+    date: 2026-10-13
+    step: "Phase 2, step 4: the Platform dashboard folder"
+    title: "Upstream dashboards asked for counter names Mimir never stored"
+    tags: [observability, mimir, opentelemetry, grafana]
+    symptom: "After vendoring the External Secrets and cert-manager dashboards, several panels were empty while the metrics were clearly being scraped. `externalsecret_sync_calls_error` and `certmanager_controller_sync_call_count` didn't exist in Mimir at all."
+    cause: "Metrics travel from the scrape to Mimir as OTLP, and Mimir's OTLP ingest with metric suffixes on appends `_total` to every counter. Most exporters already name counters `_total`, so the earlier smoke test looked lossless; these two projects expose counters without it, so Mimir stored `..._count_total` and `..._error_total`."
+    fix: "The dashboard import renames the affected counters in dashboards and vendored alerts (`COUNTER_RENAMES` in `scripts/dashboards.py`), and a check lists every metric a dashboard queries that Mimir doesn't have."
+    lesson: "On an OTLP path into a Prometheus-style store, compare the metric names a dashboard asks for with the store's name list before reading its panels. A counter without `_total` changes name on the way."
+    adrs: ["0041", "0027"]
+
+  - id: L058
+    date: 2026-10-13
+    step: "Phase 2, step 4: platform alerts"
+    title: "New alert rules sat unloaded for ten minutes"
+    tags: [observability, mimir, alerting]
+    symptom: "The new rule files were in the mounted ConfigMap and the ruler's storage API listed them, but the rules API still showed the old 178 rules. Ten minutes later all 194 appeared at once."
+    cause: "Mimir's ruler re-syncs its rule storage every `ruler.poll_interval`, 10 minutes by default. The comment in our config, and ADR 0041, said every minute; nobody had timed it, because earlier rule changes had all come with a restart."
+    fix: "Set `ruler.poll_interval: 1m` and corrected the ADR. The next rule (VLLMNotServing) loaded within a minute."
+    lesson: "When a doc says how fast something reloads, time it once. 'It re-reads every minute' was a guess, and it only failed the first time nothing else restarted."
+    adrs: ["0041"]
+
+  - id: L059
+    date: 2026-10-13
+    step: "Phase 2, step 4a: the AI folder and vLLM alerts"
+    title: "An `up == 0` alert went quiet when the model server disappeared"
+    tags: [observability, alerting, vllm, kubernetes]
+    symptom: "The vLLM pod couldn't start for 15 minutes. VLLMTargetDown fired, then resolved at 08:21, while the model still wasn't serving: I had deleted the stuck pod to retry its image pull, and the new one hadn't started."
+    cause: "`up{job=~\"vllm.*\"} == 0` needs a scrape target. A pod that is stuck but exists stays a target, so `up` is 0; once the pod is gone there's no target and no `up` series, and the alert sees nothing wrong. A stopped model server is exactly that case."
+    fix: "Added VLLMNotServing: a vLLM Deployment that should have replicas but has had none available for 10 minutes, from kube-state-metrics. It fired at 08:19 during the same outage, reached Slack and resolved when the pod became ready. VLLMTargetDown stays for a server that is up but not answering."
+    lesson: "Alert on what should exist, not only on what reports itself broken. A down target and a missing target need different rules."
+    adrs: ["0027", "0026"]
+
+  - id: L060
+    date: 2026-10-13
+    step: "Phase 2, step 4a: the embeddings model in ai"
+    title: "The first pull of a 22 GB image timed out while the mirror copied it"
+    tags: [registry, zot, containers, vllm]
+    symptom: "The vLLM pod sat in ErrImagePull and ImagePullBackOff with `failed to resolve reference ... context canceled` on the manifest request to Zot. A manual `crictl pull` failed the same way."
+    cause: "Zot's on-demand mirror answers the first request for an image only after copying the whole image from upstream, here about 20 GB from nvcr.io at about 18 MiB/s. The kubelet and crictl gave up on the manifest request long before that. The copy carried on in the background."
+    fix: "Waited for Zot to finish (its `index.json` for the repository appears), then deleted the pod. The next pull, all from Zot, took 1 minute 44 seconds."
+    lesson: "Pre-sync very large images into the mirror before the first deploy, or expect a backoff loop on day one. For the chat model's image, sync it ahead of the Phase 5 deploy."
+    adrs: ["0034", "0010"]
+
+  - id: L061
+    date: 2026-10-13
+    step: "Phase 2, step 4: the Platform dashboard folder"
+    title: "Another session's commit carried my half-finished work"
+    tags: [git, process]
+    symptom: "My Platform-folder commit held 6 files instead of about 20. The dashboards, scripts and vendored alerts were already on `main`, in another session's commit titled 'Adding self service portal'."
+    cause: "Two sessions worked in the same checkout of homelab-gitops. The other one staged everything (`git add -A`) and committed while my files were written but not yet checked, so unreviewed work reached `main` under the wrong message."
+    fix: "Nothing broke: the files were the finished versions, and `dashboards.py --check` passed on `main`. Each session now stages by path and commits as soon as a check passes."
+    lesson: "In a checkout another session also uses, stage files by path, never with `-A` or `.`, and keep the time between writing and committing short."
+
+  - id: L062
+    date: 2026-10-13
+    step: "Phase 3, step 2: Keycloak sign-in for the portal"
+    title: "The deployed portal had only one plugin, and nothing said so"
+    tags: [backstage, docker, frontend]
+    symptom: "After the first real sign-in, the portal showed \"Error in extension 'nav-content:app'; caused by NotImplementedError: No implementation available for apiRef{plugin.notifications.service}\" and had no Settings page, so no way to sign out. The smoke test had passed on every deploy, and local runs were fine."
+    cause: "Backstage's new frontend system installs plugins it discovers at build time, from `app.packages: all` in app-config.yaml. The image's build stage copied the source but not app-config.yaml, so the build found no setting, discovered nothing, and only Catalog (named in App.tsx) was installed. The plugins' code was still in the bundle, which made the bundle look right. The custom sidebar then asked for the notifications API that no plugin had registered."
+    fix: "Copied the config files into the build stage, and made the build fail if the discovered-plugins list in the bundle is empty. A headless Chromium run of the image showed the full sidebar and Sign Out under Settings."
+    lesson: "A build that reads config needs the config in its context: check what each Docker stage copies, not only what the app needs at run time. And a smoke test over HTTP can't see a frontend that renders an error; load the page in a headless browser at least once per change to the build."
+    adrs: ["0004"]
+
+  - id: L063
+    date: 2026-10-14
+    step: "Phase 2, step 6: the eBPF lab joins the platform"
+    title: "The OpenTelemetry Operator crash-looped on Cilium because of its own NetworkPolicy"
+    tags: [kubernetes, cilium, opentelemetry, networking]
+    symptom: "On lab-ebpf, the first lab to get the monitoring pack, the operator timed out on its first API call (`dial tcp 10.101.0.1:443: i/o timeout`) and crash-looped, so its webhook had no endpoints and the collectors couldn't be created. The same chart ran fine on platform, mon and ai."
+    cause: "The operator's `operator.networkpolicy` feature gate writes a NetworkPolicy for itself that allows egress to the API server by the node's IP. Cilium, the lab's CNI, enforces NetworkPolicies but sees the API server as the `kube-apiserver` entity, not that address, so the rule never matched. k3s's default networking on the long-lived clusters matches by IP, which is why only the lab broke."
+    fix: "Labs (homelab/addons=monitoring) get both of the operator's NetworkPolicy gates off, through the ApplicationSet's templatePatch, and the policy left behind was deleted once."
+    lesson: "A component that writes its own NetworkPolicy assumes how your CNI matches addresses. Test an add-on on every CNI it will meet before calling it cluster-agnostic."
+    adrs: ["0042"]
+
+  - id: L064
+    date: 2026-10-14
+    step: "Phase 2, step 5: labs in the monitoring ApplicationSets"
+    title: "A templatePatch on valuesObject broke the whole ApplicationSet"
+    tags: [argocd, gitops]
+    symptom: "After adding a per-label templatePatch to the opentelemetry-operator ApplicationSet, it reported ErrorOccurred: `unable to find api field in struct RawExtension for the json field \"manager\"`, and stopped updating its apps on every cluster, not only the lab."
+    cause: "Argo CD stores `helm.valuesObject` as raw JSON, so a strategic merge patch can't descend into it. Rendering the patch fails for every generated app, and the ApplicationSet stops reconciling all of them."
+    fix: "The patch sets `helm.parameters` (a typed list it can merge) instead, for the operator's feature gates and the monitoring pack's token source. Checked with the ApplicationSet's conditions before and after."
+    lesson: "After changing an ApplicationSet, read its status conditions, not just the apps you meant to change. One bad template stops the set for every cluster."
+    adrs: ["0042"]
+
+  - id: L065
+    date: 2026-10-14
+    step: "Phase 2, step 6: the eBPF lab joins the platform"
+    title: "A host-network pod in a k3d lab could reach neither a Service nor mon's names"
+    tags: [kubernetes, cilium, dns, k3d, opentelemetry]
+    symptom: "OBI, which must run on the host network for trace-context propagation, couldn't send to the monitoring pack's agent: its Service IP timed out, host ports on the agent were refused, and sending straight to the gateway failed with `lookup otlp.mon.home.cloudutsuk.com on 172.30.0.1:53: no such host`."
+    cause: "In nested k3d with Cilium's kube-proxy replacement, host-network sockets get no Service or host-port translation. And inside a k3d node, 172.30.0.1:53 is Docker's resolver, which doesn't know the internal zone; PowerDNS answers on port 1053, which resolv.conf can't name. A pod on the pod network has neither problem."
+    fix: "OBI sends straight to mon's gateway with the labs token, `cluster_name` set in its Kubernetes enricher, and a host alias for the gateway at mon's fixed ingress address (ADR 0030). Its traces and RED metrics reached Tempo and Mimir under cluster lab-ebpf. The agent's host ports were reverted."
+    lesson: "Host networking opts a pod out of cluster DNS and Service routing. Before choosing an endpoint for a host-network sender, test from a host-network pod on that cluster, not from a normal one."
+    adrs: ["0024", "0042"]
+
+  - id: L066
+    date: 2026-10-14
+    step: "Phase 2, step 6: the OpenTelemetry lab moves to mon"
+    title: "nginx refused a valid Let's Encrypt certificate at its default verify depth"
+    tags: [nginx, tls]
+    symptom: "The Trace Lab page's proxy to mon's Grafana returned 502, with `upstream SSL certificate verify error: (20:unable to get local issuer certificate)` in nginx's log, although SNI was on and the CA bundle was mounted."
+    cause: "`proxy_ssl_verify_depth` defaults to 1, and a Let's Encrypt chain needs 2 (leaf, intermediate, root). With verification on, nginx stopped before it reached the trusted root."
+    fix: "Added `proxy_ssl_verify_depth 3` to the proxy settings the Makefile writes into Secret demo/grafana-proxy. All four `/grafana-api/` routes then returned 200."
+    lesson: "Turning on `proxy_ssl_verify` in nginx also needs `proxy_ssl_verify_depth`; the default only works for certificates signed directly by a root."
+
+  - id: L067
+    date: 2026-10-14
+    step: "Phase 2, step 6: the OpenTelemetry lab moves to mon"
+    title: "Queries that were right in a lab's own LGTM were wrong in a shared store"
+    tags: [observability, mimir, promql, labs]
+    symptom: "Moving the OpenTelemetry lab to mon, its dashboard, Trace Lab page, verify targets, card and posts all queried `traefik_entrypoint_requests_total{service_name=...}`. In mon that label doesn't exist, and every cluster has the metric."
+    cause: "The bundled grafana/otel-lgtm kept `service_name` as a metric label and held one cluster's data. Mimir's OTLP ingest turns `service.name` into `job`, and mon holds every cluster, so an unfiltered query sums the whole homelab."
+    fix: "Every query got the lab's cluster filter (`cluster`, `k8s_cluster_name`, `resource.k8s.cluster.name`) and PromQL uses `job`, rewritten by one script across the card's queries and Explore URLs, then the dashboard, page, Makefile and posts. All six verify targets passed against mon."
+    lesson: "When a lab moves to a shared backend, its queries move with it. Grep every place a query lives (dashboards, pages, scripts, posts, encoded URLs) and run each one against the new store."
+    adrs: ["0041", "0017"]
+
+  - id: L068
+    date: 2026-10-14
+    step: "Phase 3: platform operations (found while updating the doctor link page)"
+    title: "DNS over UDP filled core's load balancer, and took its HTTPS and API with it"
+    tags: [k3d, nginx, dns, networking]
+    symptom: "A refresh of the doctor link page showed core's Keycloak, PowerDNS and Zot red. Lookups for the internal zone timed out, TLS connections to core dropped with SSL_ERROR_SYSCALL, and `kubectl --context k3d-core` failed with EOF. `docker logs k3d-core-serverlb` had 483 \"1029 worker_connections are not enough\" alerts in 2 minutes, all for UDP 53. The core node itself answered normally when reached directly."
+    cause: "k3d v5.9.0's load balancer is nginx, rendered by confd from a template that proxies every port, UDP included, with `proxy_timeout 600` and no `proxy_responses`. nginx therefore kept each DNS query's UDP session (two connections, client and upstream) open for up to 10 minutes, so under one query a second filled all 1029 connections of a worker. HTTPS and the API share them. The container's open-file limit of 1024 also capped it below the setting. Load had grown with more clusters, labs and probes, and the failure came and went with it."
+    fix: "A host script, `host/k3s/lb-udp.sh`, patches each load balancer's confd template: UDP servers get `proxy_responses 1` and `proxy_timeout 10s`, TCP keeps 600 s, and `worker_rlimit_nofile 16384`, with 4096 connections. It writes confd's watched values file so nginx is checked and reloaded gracefully, retrying because confd can read the file mid-rewrite. The boot unit runs it, because a recreated load balancer comes back with k3d's defaults. Afterwards 9000 DNS queries at 300 a second were all answered with no connection alerts."
+    lesson: "When you proxy DNS over UDP through nginx, set `proxy_responses 1`: without it every query is a session that lives until the idle timeout, and connections run out at a trivial query rate. And look at what shares the proxy: here a DNS problem looked like Keycloak, OpenBao and the registry all failing at once."
+    adrs: ["0024", "0030"]
+
+  - id: L069
+    date: 2026-10-15
+    step: "Phase 5, step 1"
+    title: "gpt-oss loaded fine, then failed every request on a missing tokenizer file"
+    tags: [vllm, gpt-oss, kubernetes, security-context]
+    symptom: "vLLM 0.24 loaded gpt-oss-20b, reported its KV cache and \"Application startup complete\", and passed its health checks. Every chat request then returned HTTP 500: \"error downloading or loading vocab file: failed to download or load vocab file\". The same pod could download the file with Python."
+    cause: "gpt-oss's chat format (Harmony) loads the o200k_base tokenizer file on the first chat request, not at start, so health checks and the startup log can't catch a failure. NVIDIA's image points its tokenizer caches at /root/.cache, which the pod's uid 1000 can't read or write (mode 700). Pointing Harmony's own cache variable at a writable folder didn't help: its downloader still failed, with no more detail than that message."
+    fix: "An init container fetches o200k_base and cl100k_base once onto the models claim, checked against the SHA-256 hashes tiktoken pins, and `TIKTOKEN_ENCODINGS_BASE` makes Harmony load them from there without downloading. Chat, reasoning and tool calls then worked."
+    lesson: "A model server that's ready isn't necessarily able to answer. Make one real request part of the deploy check, and with a non-root, read-only pod, look for anything the image downloads on first use and supply it ahead of time."
+    adrs: ["0046", "0010"]
+
+  - id: L070
+    date: 2026-10-15
+    step: "Phase 3: platform operations (Grafana alerting pages)"
+    title: "Grafana showed no contact points although every alert reached Slack"
+    tags: [grafana, mimir, alertmanager, alerting]
+    symptom: "Grafana's Alerting → Contact points page was empty, with no notification policies, while Slack and healthchecks.io received every alert. The page had Grafana's built-in Alertmanager selected; switching to the \"Alertmanager\" data source (Mimir's) showed nothing either."
+    cause: "Two things. Grafana's built-in Alertmanager is a separate, unused one. And Mimir's Alertmanager ran on its fallback config file: it routes alerts with it, but its config API only returns configs uploaded through that API, and Grafana reads contact points and policies from the API alone. A first upload attempt then failed with HTTP 400, because Mimir validates an uploaded config by writing it under /tmp, which the read-only root filesystem refused."
+    fix: "An emptyDir at /tmp in Mimir's pod, and an `alertmanager-sync` Job in monitoring-base (PostSync hook and hourly CronJob) that posts the same Secret to `/api/v1/alerts` for tenant `anonymous` and checks the receivers by name without printing the config. Grafana then listed slack, healthchecks and null with the two routes. A changed webhook now applies without restarting Mimir."
+    lesson: "A fallback config is invisible to the tools that read the API. If a UI should show what a service runs, load the config through the API from Git, and say where edits made in the UI end up (here: overwritten within the hour)."
+    adrs: ["0041", "0009"]
+
+  - id: L071
+    date: 2026-10-15
+    step: "Phase 3, step 8a"
+    title: "Upstream LGTM dashboards looked empty because they're written for microservices"
+    tags: [grafana, mimir, loki, tempo, dashboards]
+    symptom: "After scraping Mimir, Loki and Tempo, their official mixin dashboards first showed data in under a third of their panels. Mimir / Reads had 6 of 62, and the panel check reported Loki / Writes with 0 of 0 panels."
+    cause: "Four things. The Loki and Tempo mixins select each microservice by job, container or pod (job=~\"$namespace/distributor\"), and here each runs as one process; Mimir's default job names include `mimir`, so only its container and pod matchers needed changing. Mimir's `latency_metrics` switch made the check pick native histograms, which nothing sends, while Grafana opens on classic. The mixins use Grafana's legacy `rows` layout, which the panel check didn't read. And their log panels select cluster, namespace and job, while log streams here carry OTel's k8s_* labels."
+    fix: "Scrape each component as job `monitoring/<service>`, the mixins' convention, and have `scripts/dashboards.py` point every per-component job, container and pod matcher at the single binary, and the LogQL at the k8s_* labels. `panel_check.py` now reads legacy rows, uses a variable's saved value and skips LogQL targets. What was still empty was then Kafka, memcached, sharding, object-store or error-only panels, each listed with its reason."
+    lesson: "Upstream dashboards encode a deployment shape. Before trusting \"no data\", compare the shape they assume with the one you run, and rewrite their selectors once, in the import script, so the rewrite comes back with every version bump."
+    adrs: ["0041", "0027"]
+
+  - id: L072
+    date: 2026-10-16
+    step: "Phase 3, step 8b"
+    title: "Hermes Agent's image wants root under s6; on a restricted cluster it runs without it, and its .env outranks the pod's env"
+    tags: [hermes, kubernetes, security-context, secrets]
+    symptom: "As uid 10000 with a read-only root, the image exited at once: \"/run belongs to uid 0 instead of 10000 ... we're lacking the privileges to fix it\". Once Hermes was running, its API answered 401 to the key the pod had from OpenBao."
+    cause: "The image's PID 1 is s6-overlay's /init, which expects root (it remaps the user and chowns the volume) and a /run it owns. The platform enforces restricted Pod Security and a read-only root. Separately, on first boot the image generates an API_SERVER_KEY into /opt/data/.env when its setup step doesn't see one, and Hermes prefers .env over the process environment."
+    fix: "shareProcessNamespace makes the pause container PID 1, so the image's entrypoint takes its documented non-PID-1 path: setup without s6, run in an init container. The gateway and the dashboard, which s6 would supervise, run as two containers on one volume, with emptyDirs for /run, /tmp and /dev/shm. The setup step gets the key from the Secret too, and deletes any API_SERVER_KEY line from .env on every start. Rehearsed first in Docker with --init, --user, --read-only and --cap-drop ALL."
+    lesson: "Before writing an exception for an image that wants root, look for the path it takes when something else is PID 1. And for apps that keep their own .env on the data volume, find out which source wins before you put a secret in the pod's environment."
+    adrs: ["0048", "0033"]
+
+  - id: L073
+    date: 2026-10-16
+    step: "Phase 5, step 1 (chat model change, ADR 0049)"
+    title: "A model's context ceiling and download size decide whether it starts, before any GPU memory question"
+    tags: [vllm, qwen, models, kubernetes]
+    symptom: "The first Qwen attempt (Qwen3-8B-FP8 at --max-model-len 65536) crash-looped within seconds: \"User-specified max_model_len (65536) is greater than the derived max_model_len (max_position_embeddings=40960 ...)\". Its LiteLLM entry also pointed at a Service name that didn't exist. The replacement, Qwen3.5-35B-A3B, then downloaded its 37.5 GB at about 10 MB/s, about an hour, while the startup probe allowed 40 minutes."
+    cause: "vLLM refuses a context longer than the model's config.json allows unless rope scaling (YaRN) is configured; Qwen3-8B's native window is 40,960 tokens. The startup probe was sized for gpt-oss's 13 GB download, and a probe that expires kills the pod mid-download."
+    fix: "Chose a model whose native context covers the need (Qwen3.5-35B-A3B: 262k, served at 128k) and kept the role-named app vllm-chat, so the Service, alerts, dashboards and LiteLLM's api_base didn't change. Raised the startup window to 90 minutes for the first download. Sized the slice from config.json: only 10 of 40 layers keep a KV cache, about 20 KB per token."
+    lesson: "Before switching models, read config.json (max_position_embeddings, layer types, KV heads) and the repository size: they decide whether vLLM starts at all and how long the first start takes. Name model apps after their role, not the model, so a model change touches one Deployment."
+    adrs: ["0049", "0046", "0010"]

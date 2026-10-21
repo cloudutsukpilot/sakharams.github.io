@@ -1,0 +1,54 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-cost-management-tools.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: analysis
+    title: Cost analysis and reporting
+    aws:
+      - ref: AWS Cost Explorer
+        summary: Interactive charts of cost and usage by service, account, tag and cost category, with forecasts, rightsizing and Savings Plans recommendations. Cost and Usage Reports (CUR 2.0) and Data Exports deliver line-item detail to S3 for analysis in Athena or QuickSight.
+    azure:
+      - ref: Cost Management + Billing
+        summary: Cost analysis views by subscription, resource group, tag and meter, with forecasts, anomaly alerts, scheduled exports to storage and the ability to analyse AWS costs too. Supports FOCUS-format exports.
+    gcp:
+      - ref: Cloud Billing
+        summary: Billing reports by project, service, SKU and label, with cost breakdown and cost table views. Export detailed billing data to BigQuery for custom analysis and Looker Studio dashboards.
+
+  - id: budgets
+    title: Budgets and alerts
+    aws:
+      - ref: AWS Budgets
+        summary: Cost, usage, reservation and Savings Plans budgets with email or SNS alerts on actual or forecast spend, and budget actions that can apply IAM or SCP policies or stop EC2 and RDS instances. Cost Anomaly Detection flags unusual spend with ML.
+    azure:
+      - ref: Budgets
+        summary: Budgets at management group, subscription or resource group scope, alerting at percentage thresholds of actual or forecast cost. Action groups can trigger automation such as shutting down VMs.
+    gcp:
+      - ref: Cloud Billing
+        name: Cloud Billing budgets
+        summary: Budgets per billing account, project or label with threshold alerts on actual or forecast spend. Programmatic notifications go to Pub/Sub, so a function can react, for example by capping usage. Budgets alert but don't cap spend by themselves.
+
+  - id: estimate
+    title: Price estimation
+    aws:
+      - name: AWS Pricing Calculator
+        summary: Build and share estimates for architectures across services, now also available in the console with your own discounts and commitments applied. The AWS Price List API exposes prices programmatically.
+    azure:
+      - ref: Pricing Calculator
+        summary: Estimate costs per product, region and tier, apply reservations and Hybrid Benefit, and export or share estimates. The Azure Retail Prices API gives programmatic access to list prices.
+    gcp:
+      - name: Google Cloud Pricing Calculator
+        icon: billing
+        summary: Estimate costs for Google Cloud products with configuration-level detail and committed-use options; the Cloud Billing Catalog API provides SKU prices programmatically.
+
+  - id: commitments
+    title: Commitment discounts
+    aws:
+      - name: Savings Plans and Reserved Instances
+        icon: savings-plans
+        summary: Compute Savings Plans discount EC2, Fargate and Lambda for a 1- or 3-year spend commitment, flexible across instance families and regions. Reserved Instances still apply to RDS, ElastiCache, Redshift and OpenSearch.
+    azure:
+      - name: Azure Reservations and savings plan for compute
+        icon: reservations
+        summary: Reservations give the deepest discounts for a specific VM size, database or service in a region. The savings plan for compute trades some discount for flexibility across VM sizes and regions. Both combine with Azure Hybrid Benefit.
+    gcp:
+      - name: Committed use discounts (CUDs)
+        icon: billing
+        summary: Resource-based CUDs commit to vCPU and memory in a region; spend-based (flexible) CUDs commit to an hourly spend across services. Sustained-use discounts apply automatically to eligible VMs without any commitment.

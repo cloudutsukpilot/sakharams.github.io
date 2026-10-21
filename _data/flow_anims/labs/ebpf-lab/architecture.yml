@@ -1,0 +1,85 @@
+# Animated flow diagram for _posts/labs/ebpf-lab/2026-10-11-01-overview.md
+# (include id: labs/ebpf-lab/architecture), reused in part 7.
+# One visit through web → api → redis, then what each eBPF tool sees and where its signals go.
+# Facts from ~/gitrepos/observability/ebpf-lab (captured 2026-10-14).
+title: eBPF Lab, request path and signal paths
+accent: "#22D3EE"
+accent2: "#A3E635"
+viewbox: [1000, 620]
+
+lanes:
+  - { label: "Request path (namespace demo)", x: 8, y: 8, w: 984, h: 168 }
+  - { label: "eBPF programs in the shared kernel", x: 8, y: 186, w: 984, h: 150 }
+  - { label: "Where the signals go", x: 8, y: 346, w: 984, h: 266 }
+
+nodes:
+  - { id: CL, label: "Browser, curl", sub: "host :8091", x: 95, y: 100, w: 150, h: 56, icon: browser, icon_pos: corner, color: blue }
+  - { id: WEB, label: "web", sub: "nginx", x: 295, y: 100, w: 150, h: 56, icon: server, color: violet }
+  - { id: API, label: "api ×2", sub: "Go, no OTel", x: 495, y: 100, w: 150, h: 56, icon: api, color: violet }
+  - { id: RD, label: "Redis", sub: "appendonly", x: 695, y: 100, w: 150, h: 62, shape: cylinder, icon: bolt, color: amber }
+  - { id: PV, label: "Static PV", sub: "/srv/homelab", x: 895, y: 100, w: 150, h: 62, shape: cylinder, icon: database, icon_pos: corner, color: amber }
+  - { id: CIL, label: "Cilium", sub: "tc on each veth", x: 150, y: 266, w: 160, h: 56, color: teal }
+  - { id: OBI, label: "OBI", sub: "HTTP + Redis", x: 390, y: 266, w: 150, h: 56, color: green }
+  - { id: TET, label: "Tetragon", sub: "kprobe on execve", x: 630, y: 266, w: 160, h: 56, color: rose }
+  - { id: FAL, label: "Falco", sub: "syscall rules", x: 860, y: 266, w: 150, h: 56, color: rose }
+  - { id: HUB, label: "Hubble UI", sub: "UI on :8092", x: 150, y: 430, w: 160, h: 56, icon: search, color: teal }
+  - { id: AGT, label: "Agent", sub: "tails pod logs", x: 630, y: 430, w: 160, h: 56, icon: chart, color: green }
+  - { id: FSK, label: "Falcosidekick", sub: "UI on :8093", x: 860, y: 430, w: 150, h: 56, icon: bell, icon_pos: corner, color: rose }
+  - { id: GW, label: "Gateway", sub: "OTLP, on mon", x: 390, y: 550, w: 150, h: 56, icon: balancer, color: green }
+  - { id: LG, label: "Mimir, Loki, Tempo", sub: "on mon", x: 630, y: 550, w: 170, h: 56, shape: cylinder, color: green }
+  - { id: GR, label: "Grafana", sub: "folder Labs", x: 860, y: 550, w: 150, h: 56, shape: terminal, icon: "devops/monitoring/grafana-18.svg", color: green }
+
+edges:
+  - { id: CL_WEB, from: CL, to: WEB, kind: request }
+  - { id: WEB_API, from: WEB, to: API, kind: request }
+  - { id: API_RD, from: API, to: RD, kind: data }
+  - { id: WEB_CIL, from: WEB, to: CIL, dashed: true, kind: telemetry }
+  - { id: API_OBI, from: API, to: OBI, dashed: true, kind: telemetry }
+  - { id: RD_PV, from: RD, to: PV, kind: data }
+  - { id: CIL_HUB, from: CIL, to: HUB, label: "flows" , kind: telemetry }
+  - { id: OBI_GW, from: OBI, to: GW, points: [[370, 294], [370, 522]], kind: telemetry, label: "OTLP, direct", label_at: [300, 470] }
+  - { id: TET_AGT, from: TET, to: AGT, kind: telemetry, label: "stdout" }
+  - { id: FAL_AGT, from: FAL, to: AGT, points: [[785, 280], [748, 280], [748, 430], [710, 430]], kind: telemetry }
+  - { id: FAL_FSK, from: FAL, to: FSK, kind: event }
+  - { id: AGT_GW, from: AGT, to: GW, points: [[550, 440], [420, 440], [420, 522]], kind: telemetry, label: "OTLP", label_at: [470, 430] }
+  - { id: GW_LG, from: GW, to: LG, kind: telemetry }
+  - { id: LG_GR, from: LG, to: GR, kind: telemetry }
+
+steps:
+  - lights: [CL]
+    title: A visit
+    text: "curl or the Count a visit button calls /api/visits on 127.0.0.1:8091, which k3d maps to NodePort 30091 on the server node."
+  - edges: [CL_WEB]
+    title: No kube-proxy
+    text: "Cilium's eBPF programs translate the NodePort to the web pod. k3s runs with no kube-proxy and no iptables Service rules."
+  - edges: [WEB_API]
+    title: nginx proxies /api
+    text: "nginx sends it to the api Service on HTTP :8080. Cilium picks one of two api pods on the pod's veth, sometimes on the other node, over VXLAN."
+  - edges: [API_RD]
+    title: INCR in Redis
+    text: "The Go API opens a connection, sends INCR visits to Redis :6379 in its own protocol and returns the count. It has no tracing, metrics or logging library."
+  - edges: [RD_PV]
+    title: Data on a static PV
+    text: "Redis appends every write to its AOF on a PVC bound to a static local PV, so the counter outlives the whole cluster."
+  - edges: [WEB_CIL, API_OBI]
+    lights: [CIL, OBI, TET, FAL]
+    title: eBPF sees it all
+    text: "Four eBPF tools watch from the kernel the k3d nodes share: packets (Cilium), HTTP and Redis calls (OBI), process executions (Tetragon, Falco)."
+  - edges: [CIL_HUB]
+    title: Flows in Hubble
+    text: "Cilium records every flow with its source and destination identity and verdict. Hubble Relay gathers both nodes for the UI."
+  - edges: [OBI_GW]
+    title: OBI to mon, directly
+    text: "OBI turns the traffic into RED metrics and spans and sends OTLP straight to mon's gateway, because a host-network pod can't reach the agent here."
+  - edges: [TET_AGT, FAL_AGT, FAL_FSK]
+    title: Security events
+    text: "Tetragon and Falco write JSON events to stdout; the platform's agent tails them like any pod log. Falcosidekick also shows Falco's in its UI."
+  - edges: [AGT_GW]
+    title: The monitoring pack
+    text: "The agent collector, installed by Argo CD when make up registered the lab, ships logs and metrics to the gateway with the labs token."
+  - edges: [GW_LG]
+    title: One cluster label
+    text: "The gateway turns k8s.cluster.name into cluster=lab-ebpf; Mimir, Loki and Tempo keep the lab's data next to every other cluster's."
+  - edges: [LG_GR]
+    title: The lab's dashboard
+    text: "Grafana on mon shows the eBPF lab dashboard in folder Labs, every query filtered on lab-ebpf."

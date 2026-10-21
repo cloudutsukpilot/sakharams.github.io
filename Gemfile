@@ -4,7 +4,10 @@ source "http://rubygems.org"
 
 gem "jekyll-theme-chirpy", "~> 7.2", ">= 7.2.4"
 
-gem "html-proofer", "~> 5.0", group: :test
+group :test do
+  gem "html-proofer", "~> 5.0"
+  gem "minitest", "~> 5.0"
+end
 
 gem 'csv'
 gem 'base64'

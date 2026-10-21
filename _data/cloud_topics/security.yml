@@ -1,0 +1,80 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-security-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: waf
+    title: Web application firewall and DDoS protection
+    aws:
+      - ref: AWS WAF
+        summary: Rules attached to CloudFront, ALB, API Gateway, AppSync or Cognito. AWS Managed Rules cover the OWASP Top 10, known bad IPs and bots; rate-based rules throttle abusive clients. Priced per web ACL, rule and request.
+      - ref: AWS Shield
+        summary: Shield Standard protects every AWS customer against common network-layer DDoS at no cost. Shield Advanced adds application-layer protection, cost protection for scaling during attacks, and access to the Shield Response Team.
+    azure:
+      - ref: Web Application Firewall
+        summary: Azure WAF policies run on Front Door (global, at the edge) or Application Gateway (regional), with Microsoft-managed rule sets based on OWASP CRS, bot protection and custom rules.
+      - ref: DDoS Protection
+        summary: Basic infrastructure protection is always on. DDoS Network Protection (per VNet) or IP Protection (per public IP) adds adaptive tuning, attack analytics, cost protection and rapid response support.
+    gcp:
+      - ref: Cloud Armor
+        summary: WAF and DDoS protection in one service, enforced at Google's edge for external load balancers. Preconfigured OWASP rules, rate limiting, bot management with reCAPTCHA, and Adaptive Protection that uses ML to spot layer 7 attacks.
+
+  - id: kms
+    title: Encryption key management
+    aws:
+      - ref: AWS KMS
+        summary: Create and control encryption keys used by almost every AWS service. Keys can be AWS managed or customer managed, with key policies, automatic rotation and CloudTrail logging of every use. CloudHSM provides dedicated single-tenant HSMs.
+    azure:
+      - ref: Key Vault
+        summary: Stores keys, secrets and certificates. Standard tier uses software-protected keys; Premium uses HSM-backed keys. Managed HSM is a fully managed, single-tenant, FIPS 140-3 Level 3 option for stricter requirements.
+    gcp:
+      - ref: Cloud KMS
+        summary: Software, HSM-backed (Cloud HSM) and external keys (Cloud EKM, where keys stay in a partner-managed system outside Google). Customer-managed encryption keys (CMEK) plug into most Google Cloud services.
+
+  - id: secrets
+    title: Secrets management
+    aws:
+      - ref: AWS Secrets Manager
+        summary: Stores database credentials, API keys and other secrets with fine-grained IAM policies, automatic rotation (built in for RDS and others) and cross-region replication. Systems Manager Parameter Store is a cheaper option for simple config and secrets.
+    azure:
+      - ref: Key Vault
+        summary: The same Key Vault holds secrets. Apps read them with managed identities, so no credentials live in code; App Service and Functions can reference secrets directly in app settings. Rotation is event-driven through Event Grid.
+    gcp:
+      - ref: Secret Manager
+        summary: Versioned secrets with IAM per secret, automatic or user-managed replication, rotation schedules that notify via Pub/Sub, and direct mounting into Cloud Run and GKE workloads.
+
+  - id: firewall
+    title: Managed network firewalls
+    aws:
+      - name: AWS Network Firewall
+        icon: network-firewall
+        summary: A stateful, managed network firewall and IPS for VPCs, with Suricata-compatible rules, domain filtering and TLS inspection. Usually deployed in an inspection VPC behind Transit Gateway.
+    azure:
+      - ref: Azure Firewall
+        summary: A stateful firewall-as-a-service with built-in high availability and autoscaling. Premium adds TLS inspection, IDPS and URL filtering. Typically sits in the hub VNet and is managed centrally with Firewall Manager policies.
+    gcp:
+      - ref: Cloud NGFW
+        summary: Firewall policies built into the VPC fabric, applied by secure tags across organisations and folders. The Enterprise tier adds intrusion prevention and TLS inspection without routing traffic through appliances.
+
+  - id: posture
+    title: Posture management and threat detection
+    aws:
+      - ref: AWS Security Hub
+        summary: The new Security Hub (GA December 2025) correlates findings from GuardDuty, Inspector and Security Hub CSPM into prioritised exposures. Security Hub CSPM (the original service) still runs best-practice and compliance checks.
+      - ref: Amazon GuardDuty
+        summary: Threat detection that analyses CloudTrail, VPC Flow Logs, DNS logs and runtime signals from EKS, ECS, EC2 and Lambda to find compromised credentials, crypto-mining, malware and suspicious behaviour.
+    azure:
+      - ref: Microsoft Defender for Cloud
+        summary: Combines posture management (secure score, recommendations, attack path analysis in Defender CSPM) with workload protection plans for servers, containers, databases, storage, Key Vault and more. Also covers AWS and Google Cloud accounts.
+    gcp:
+      - ref: Security Command Center
+        summary: Asset inventory, misconfiguration and vulnerability findings, threat detection (Event, Container and VM Threat Detection) and attack path simulation. Standard, Premium and Enterprise tiers; Enterprise adds multi-cloud and SIEM-style case management.
+
+  - id: siem
+    title: SIEM and security operations
+    aws:
+      note: AWS has no first-party SIEM. **Amazon Security Lake** centralises security logs in OCSF format for analysis in OpenSearch, Athena or a partner SIEM, and the new Security Hub handles finding correlation.
+    azure:
+      - ref: Microsoft Sentinel
+        summary: A cloud-native SIEM and SOAR built on Log Analytics. Data connectors for Microsoft, AWS, Google and hundreds of third-party sources, KQL analytics rules, hunting, workbooks and Logic Apps playbooks for automated response.
+    gcp:
+      - name: Google Security Operations
+        icon: security-operations
+        summary: Google's SIEM and SOAR (formerly Chronicle), with petabyte-scale log retention, YARA-L detections, Mandiant threat intelligence and Gemini-assisted investigation.

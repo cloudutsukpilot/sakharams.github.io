@@ -1,0 +1,345 @@
+# Cloud service comparison shown on the Cloud tab (_tabs/cloud.md via _includes/cloud-compare.html).
+#
+# One entry per service category (`overview:` is its cross-provider overview post); under each, the services each provider offers for it.
+#   name:  service name as the provider brands it
+#   what:  a few words on what it is (tile subtitle, and the placeholder post's description)
+#   post:  source path of the post the tile links to (resolved to its URL at build time, so
+#          folders with spaces or odd categories still link correctly)
+#   icon:  official service icon at assets/img/icons/cloud/<provider>/services/<icon>.svg
+# A provider with no service for a category gets `<provider>_note:` instead of a list.
+# Posts with `placeholder: true` in their front matter get a "Soon" badge on their tile.
+
+providers:
+  - id: aws
+    title: AWS
+    name: Amazon Web Services
+    logo: /assets/img/icons/cloud/aws/amazonwebservices-18.svg
+    overview: _posts/cloud/aws/2024-07-08-aws.md
+  - id: azure
+    title: Azure
+    name: Microsoft Azure
+    logo: /assets/img/icons/cloud/azure/azure-18.svg
+    overview: _posts/cloud/azure/2021-04-25-microsoft-azure.md
+  - id: gcp
+    title: Google Cloud
+    name: Google Cloud Platform
+    logo: /assets/img/icons/cloud/gcp/googlecloudplatform-18.svg
+    overview: _posts/cloud/gcp/2021-01-01-gcp.md
+
+categories:
+  - id: compute
+    title: Compute
+    overview: _posts/cloud/2026-10-09-cloud-compute-services.md
+    icon: fas fa-microchip
+    summary: Virtual machines, serverless functions and managed platforms that run your code.
+    aws:
+      - { name: Amazon EC2, what: Virtual machines, post: _posts/cloud/aws/compute/2026-10-08-amazon-ec2.md, icon: ec2 }
+      - { name: AWS Lambda, what: Serverless functions, post: _posts/cloud/aws/compute/2026-10-08-aws-lambda.md, icon: lambda }
+      - { name: AWS Elastic Beanstalk, what: Managed web app platform, post: _posts/cloud/aws/compute/2026-10-08-aws-elastic-beanstalk.md, icon: elastic-beanstalk }
+      - { name: AWS Batch, what: Batch computing jobs, post: _posts/cloud/aws/compute/2026-10-08-aws-batch.md, icon: batch }
+    azure:
+      - { name: Virtual Machines, what: Virtual machines, post: _posts/cloud/azure/compute/non-serverless/2021-01-01-azure-virtual-machines.md, icon: virtual-machines }
+      - { name: VM Scale Sets, what: Autoscaling groups of VMs, post: _posts/cloud/azure/compute/non-serverless/2021-01-01-azure-virtual-machine-scale-sets.md, icon: vm-scale-sets }
+      - { name: Azure Functions, what: Serverless functions, post: _posts/cloud/azure/compute/serverless/azure_functions/2024-11-12-azure-functions.md, icon: functions }
+      - { name: App Service, what: Managed web app platform, post: _posts/cloud/azure/compute/serverless/2021-01-01-azure-app-service.md, icon: app-service }
+      - { name: Azure Batch, what: Batch computing jobs, post: _posts/cloud/azure/compute/serverless/2021-01-01-azure-batch.md, icon: batch }
+    gcp:
+      - { name: Compute Engine, what: Virtual machines, post: _posts/cloud/gcp/compute/2026-10-08-compute-engine.md, icon: compute-engine }
+      - { name: Cloud Run functions, what: Serverless functions, post: _posts/cloud/gcp/compute/2026-10-08-cloud-run-functions.md, icon: cloud-functions }
+      - { name: App Engine, what: Managed web app platform, post: _posts/cloud/gcp/compute/2026-10-08-app-engine.md, icon: app-engine }
+      - { name: Batch, what: Batch computing jobs, post: _posts/cloud/gcp/compute/2026-10-08-gcp-batch.md, icon: batch }
+
+  - id: containers
+    title: Containers
+    overview: _posts/cloud/2026-10-09-cloud-container-services.md
+    icon: fab fa-docker
+    summary: Managed Kubernetes, serverless containers and image registries.
+    aws:
+      - { name: Amazon EKS, what: Managed Kubernetes, post: _posts/cloud/aws/containers/2026-10-08-amazon-eks.md, icon: eks }
+      - { name: Amazon ECS, what: AWS-native container orchestration, post: _posts/cloud/aws/containers/2026-10-08-amazon-ecs.md, icon: ecs }
+      - { name: AWS Fargate, what: Serverless container compute, post: _posts/cloud/aws/containers/2026-10-08-aws-fargate.md, icon: fargate }
+      - { name: Amazon ECR, what: Container image registry, post: _posts/cloud/aws/containers/2026-10-08-amazon-ecr.md, icon: ecr }
+    azure:
+      - { name: Azure Kubernetes Service (AKS), what: Managed Kubernetes, post: _posts/cloud/azure/containers/aks/2024-10-31-aks.md, icon: aks }
+      - { name: Container Apps, what: Serverless containers, post: _posts/cloud/azure/containers/2026-10-08-azure-container-apps.md, icon: container-apps }
+      - { name: Container Instances, what: Run a single container on demand, post: _posts/cloud/azure/containers/aci/2024-05-23-azure-container-instances.md, icon: container-instances }
+      - { name: Container Registry, what: Container image registry, post: _posts/cloud/azure/containers/acr/2024-05-23-azure-container-registry.md, icon: container-registry }
+      - { name: Azure Red Hat OpenShift, what: Managed OpenShift, post: _posts/cloud/azure/containers/openshift/2021-01-01-azure-red-hat-openshift.md, icon: openshift }
+    gcp:
+      - { name: Google Kubernetes Engine (GKE), what: Managed Kubernetes, post: _posts/cloud/gcp/containers/2026-10-08-google-kubernetes-engine.md, icon: gke }
+      - { name: Cloud Run, what: Serverless containers, post: _posts/cloud/gcp/containers/2026-10-08-cloud-run.md, icon: cloud-run }
+      - { name: Artifact Registry, what: Container and package registry, post: _posts/cloud/gcp/containers/2026-10-08-artifact-registry.md, icon: artifact-registry }
+
+  - id: storage
+    title: Storage
+    overview: _posts/cloud/2026-10-09-cloud-storage-services.md
+    icon: fas fa-hdd
+    summary: Object, block, file and archive storage.
+    aws:
+      - { name: Amazon S3, what: Object storage, post: _posts/cloud/aws/storage/2026-10-08-amazon-s3.md, icon: s3 }
+      - { name: Amazon EBS, what: Block storage for VMs, post: _posts/cloud/aws/storage/2026-10-08-amazon-ebs.md, icon: ebs }
+      - { name: Amazon EFS, what: Managed file shares (NFS), post: _posts/cloud/aws/storage/2026-10-08-amazon-efs.md, icon: efs }
+      - { name: S3 Glacier storage classes, what: Archive storage classes in S3, post: _posts/cloud/aws/storage/2026-10-08-amazon-s3-glacier.md, icon: s3-glacier }
+    azure:
+      - { name: Blob Storage, what: Object storage, post: _posts/cloud/azure/storage/2024-06-01-azure-blob-storage.md, icon: blob-storage }
+      - { name: Managed Disks, what: Block storage for VMs, post: _posts/cloud/azure/storage/2024-06-01-azure-disk-storage.md, icon: managed-disks }
+      - { name: Azure Files, what: Managed file shares (SMB/NFS), post: _posts/cloud/azure/storage/2024-06-01-azure-files.md, icon: files }
+      - { name: Archive Storage, what: Archive storage tier, post: _posts/cloud/azure/storage/2024-06-01-azure-archive-storage.md, icon: storage-accounts }
+      - { name: Azure NetApp Files, what: High-performance file storage, post: _posts/cloud/azure/storage/2024-06-01-azure-netapp-files.md, icon: netapp-files }
+    gcp:
+      - { name: Cloud Storage, what: Object storage (incl. Archive class), post: _posts/cloud/gcp/storage/2026-10-08-cloud-storage.md, icon: cloud-storage }
+      - { name: Persistent Disk, what: Block storage for VMs, post: _posts/cloud/gcp/storage/2026-10-08-persistent-disk.md, icon: persistent-disk }
+      - { name: Filestore, what: Managed file shares (NFS), post: _posts/cloud/gcp/storage/2026-10-08-filestore.md, icon: filestore }
+
+  - id: networking
+    title: Networking & Content Delivery
+    overview: _posts/cloud/2026-10-09-cloud-networking-services.md
+    icon: fas fa-network-wired
+    summary: Private networks, DNS, load balancing, CDN and hybrid connectivity.
+    aws:
+      - { name: Amazon VPC, what: Private virtual network, post: _posts/cloud/aws/networking/2026-10-08-amazon-vpc.md, icon: vpc }
+      - { name: Amazon Route 53, what: DNS, post: _posts/cloud/aws/networking/2026-10-08-amazon-route-53.md, icon: route-53 }
+      - { name: Elastic Load Balancing, what: L4/L7 load balancers, post: _posts/cloud/aws/networking/2026-10-08-elastic-load-balancing.md, icon: elb }
+      - { name: Amazon CloudFront, what: CDN and edge delivery, post: _posts/cloud/aws/networking/2026-10-08-amazon-cloudfront.md, icon: cloudfront }
+      - { name: AWS Direct Connect, what: Private line to on-premises, post: _posts/cloud/aws/networking/2026-10-08-aws-direct-connect.md, icon: direct-connect }
+      - { name: AWS Site-to-Site VPN, what: IPsec VPN to on-premises, post: _posts/cloud/aws/networking/2026-10-08-aws-site-to-site-vpn.md, icon: site-to-site-vpn }
+    azure:
+      - { name: Virtual Network, what: Private virtual network, post: _posts/cloud/azure/networking/2024-05-23-azure-virtual-networks.md, icon: virtual-network }
+      - { name: Azure DNS, what: DNS, post: _posts/cloud/azure/networking/2024-05-23-azure-dns.md, icon: dns }
+      - { name: Load Balancer, what: L4 load balancer, post: _posts/cloud/azure/networking/2024-05-23-azure-load-balancer.md, icon: load-balancer }
+      - { name: Application Gateway, what: L7 load balancer, post: _posts/cloud/azure/networking/2024-05-22-azure-application-gateway.md, icon: application-gateway }
+      - { name: Front Door, what: Global CDN and L7 edge, post: _posts/cloud/azure/networking/2024-05-23-azure-front-door.md, icon: front-door }
+      - { name: ExpressRoute, what: Private line to on-premises, post: _posts/cloud/azure/networking/2024-05-24-azure-expressroute.md, icon: expressroute }
+      - { name: VPN Gateway, what: IPsec VPN to on-premises, post: _posts/cloud/azure/networking/2024-05-23-azuure-virtual-network-gateway.md, icon: vpn-gateway }
+      - { name: Private Link, what: Private access to PaaS services, post: _posts/cloud/azure/networking/2024-05-23-azure-private-link.md, icon: private-link }
+    gcp:
+      - { name: Virtual Private Cloud (VPC), what: Private virtual network, post: _posts/cloud/gcp/networking/2026-10-08-gcp-vpc.md, icon: vpc }
+      - { name: Cloud DNS, what: DNS, post: _posts/cloud/gcp/networking/2026-10-08-cloud-dns.md, icon: cloud-dns }
+      - { name: Cloud Load Balancing, what: L4/L7 load balancers, post: _posts/cloud/gcp/networking/2026-10-08-cloud-load-balancing.md, icon: cloud-load-balancing }
+      - { name: Cloud CDN, what: CDN and edge delivery, post: _posts/cloud/gcp/networking/2026-10-08-cloud-cdn.md, icon: cloud-cdn }
+      - { name: Cloud Interconnect, what: Private line to on-premises, post: _posts/cloud/gcp/networking/2026-10-08-cloud-interconnect.md, icon: cloud-interconnect }
+      - { name: Cloud VPN, what: IPsec VPN to on-premises, post: _posts/cloud/gcp/networking/2026-10-08-cloud-vpn.md, icon: cloud-vpn }
+
+  - id: security
+    title: Security
+    overview: _posts/cloud/2026-10-09-cloud-security-services.md
+    icon: fas fa-shield-alt
+    summary: Web application firewalls, DDoS protection, keys and secrets, threat detection.
+    aws:
+      - { name: AWS WAF, what: Web application firewall, post: _posts/cloud/aws/security/2026-10-08-aws-waf.md, icon: waf }
+      - { name: AWS Shield, what: DDoS protection, post: _posts/cloud/aws/security/2026-10-08-aws-shield.md, icon: shield }
+      - { name: AWS KMS, what: Encryption key management, post: _posts/cloud/aws/security/2026-10-08-aws-kms.md, icon: kms }
+      - { name: AWS Secrets Manager, what: Secrets storage and rotation, post: _posts/cloud/aws/security/2026-10-08-aws-secrets-manager.md, icon: secrets-manager }
+      - { name: Amazon GuardDuty, what: Threat detection, post: _posts/cloud/aws/security/2026-10-08-amazon-guardduty.md, icon: guardduty }
+      - { name: AWS Security Hub, what: Security posture management, post: _posts/cloud/aws/security/2026-10-08-aws-security-hub.md, icon: security-hub }
+    azure:
+      - { name: Web Application Firewall, what: Web application firewall, post: _posts/cloud/azure/security/2026-10-08-azure-web-application-firewall.md, icon: waf }
+      - { name: DDoS Protection, what: DDoS protection, post: _posts/cloud/azure/networking/2024-05-23-azure-ddos-protection.md, icon: ddos-protection }
+      - { name: Key Vault, what: Keys, secrets and certificates, post: _posts/cloud/azure/security/2024-05-31-azure-key-vault.md, icon: key-vault }
+      - { name: Azure Firewall, what: Managed network firewall, post: _posts/cloud/azure/networking/2024-05-24-azure-firewall.md, icon: firewall }
+      - { name: Microsoft Defender for Cloud, what: Posture management and threat protection, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-28-microsoft-defender-for-cloud.md, icon: defender-for-cloud }
+      - { name: Microsoft Sentinel, what: Cloud SIEM and SOAR, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-29-microsoft-sentinel.md, icon: sentinel }
+    gcp:
+      - { name: Cloud Armor, what: WAF and DDoS protection, post: _posts/cloud/gcp/security/2026-10-08-cloud-armor.md, icon: cloud-armor }
+      - { name: Cloud KMS, what: Encryption key management, post: _posts/cloud/gcp/security/2026-10-08-cloud-kms.md, icon: cloud-kms }
+      - { name: Secret Manager, what: Secrets storage and rotation, post: _posts/cloud/gcp/security/2026-10-08-secret-manager.md, icon: secret-manager }
+      - { name: Cloud NGFW, what: Managed network firewall, post: _posts/cloud/gcp/security/2026-10-08-cloud-ngfw.md, icon: cloud-ngfw }
+      - { name: Security Command Center, what: Posture management and threat detection, post: _posts/cloud/gcp/security/2026-10-08-security-command-center.md, icon: security-command-center }
+
+  - id: identity
+    title: Identity & Governance
+    overview: _posts/cloud/2026-10-09-cloud-identity-governance-services.md
+    icon: fas fa-user-shield
+    summary: Who can do what, and how accounts, subscriptions and projects are organised and governed.
+    aws:
+      - { name: AWS IAM, what: Access control for AWS resources, post: _posts/cloud/aws/identity/2026-10-08-aws-iam.md, icon: iam }
+      - { name: AWS IAM Identity Center, what: Workforce single sign-on, post: _posts/cloud/aws/identity/2026-10-08-aws-iam-identity-center.md, icon: iam-identity-center }
+      - { name: AWS Organizations, what: Account hierarchy and policies, post: _posts/cloud/aws/identity/2026-10-08-aws-organizations.md, icon: organizations }
+    azure:
+      - { name: Microsoft Entra ID, what: Identity and single sign-on, post: _posts/cloud/azure/identity/2026-10-08-microsoft-entra-id.md, icon: entra-id }
+      - { name: Management Groups, what: Subscription hierarchy, post: _posts/cloud/azure/2024-05-28-azure-management-groups.md, icon: management-groups }
+      - { name: Azure Policy, what: Guardrails and compliance, post: _posts/cloud/azure/security/2024-05-28-azure-policies.md, icon: policy }
+    gcp:
+      - { name: Cloud IAM, what: Access control for Google Cloud resources, post: _posts/cloud/gcp/identity/2026-10-08-cloud-iam.md, icon: cloud-iam }
+      - { name: Cloud Identity, what: Identity and single sign-on, post: _posts/cloud/gcp/identity/2026-10-08-cloud-identity.md, icon: cloud-identity }
+      - { name: Resource Manager, what: Organisation, folder and project hierarchy, post: _posts/cloud/gcp/identity/2026-10-08-resource-manager.md, icon: resource-manager }
+
+  - id: databases
+    title: Databases
+    overview: _posts/cloud/2026-10-09-cloud-database-services.md
+    icon: fas fa-database
+    summary: Managed relational, NoSQL and in-memory databases.
+    aws:
+      - { name: Amazon RDS, what: Managed relational databases, post: _posts/cloud/aws/databases/2026-10-08-amazon-rds.md, icon: rds }
+      - { name: Amazon Aurora, what: Cloud-native MySQL/PostgreSQL, post: _posts/cloud/aws/databases/2026-10-08-amazon-aurora.md, icon: aurora }
+      - { name: Amazon DynamoDB, what: Serverless NoSQL key-value, post: _posts/cloud/aws/databases/2026-10-08-amazon-dynamodb.md, icon: dynamodb }
+      - { name: Amazon ElastiCache, what: Managed Redis/Valkey/Memcached, post: _posts/cloud/aws/databases/2026-10-08-amazon-elasticache.md, icon: elasticache }
+    azure:
+      - { name: Azure SQL Database, what: Managed SQL Server database, post: _posts/cloud/azure/databases/2024-06-01-azure-sql.md, icon: sql-database }
+      - { name: SQL Managed Instance, what: Near-full SQL Server instance, post: _posts/cloud/azure/databases/2024-06-01-azure-sql-managed-instance.md, icon: sql-managed-instance }
+      - { name: Database for PostgreSQL, what: Managed PostgreSQL, post: _posts/cloud/azure/databases/2024-06-01-azure-postgresql.md, icon: postgresql }
+      - { name: Cosmos DB, what: Globally distributed NoSQL, post: _posts/cloud/azure/databases/2024-06-01-azure-cosmos-db.md, icon: cosmos-db }
+      - { name: Azure Cache for Redis, what: Managed Redis (moving to Azure Managed Redis), post: _posts/cloud/azure/databases/2024-06-01-azure-cache-for-redis.md, icon: cache-redis }
+    gcp:
+      - { name: Cloud SQL, what: Managed MySQL/PostgreSQL/SQL Server, post: _posts/cloud/gcp/databases/2026-10-08-cloud-sql.md, icon: cloud-sql }
+      - { name: Spanner, what: Globally distributed relational, post: _posts/cloud/gcp/databases/2026-10-08-spanner.md, icon: spanner }
+      - { name: Firestore, what: Serverless document database, post: _posts/cloud/gcp/databases/2026-10-08-firestore.md, icon: firestore }
+      - { name: Bigtable, what: Wide-column NoSQL, post: _posts/cloud/gcp/databases/2026-10-08-bigtable.md, icon: bigtable }
+      - { name: Memorystore, what: Managed Redis/Valkey/Memcached, post: _posts/cloud/gcp/databases/2026-10-08-memorystore.md, icon: memorystore }
+
+  - id: analytics
+    title: Analytics & Big Data
+    overview: _posts/cloud/2026-10-09-cloud-analytics-services.md
+    icon: fas fa-chart-bar
+    summary: Data warehouses, Spark/Hadoop, streaming and ETL.
+    aws:
+      - { name: Amazon Redshift, what: Data warehouse, post: _posts/cloud/aws/analytics/2026-10-08-amazon-redshift.md, icon: redshift }
+      - { name: Amazon EMR, what: Managed Spark/Hadoop, post: _posts/cloud/aws/analytics/2026-10-08-amazon-emr.md, icon: emr }
+      - { name: Amazon Kinesis, what: Real-time data streaming, post: _posts/cloud/aws/analytics/2026-10-08-amazon-kinesis.md, icon: kinesis }
+      - { name: AWS Glue, what: Serverless ETL and data catalog, post: _posts/cloud/aws/analytics/2026-10-08-aws-glue.md, icon: glue }
+      - { name: Amazon Athena, what: Serverless SQL over S3, post: _posts/cloud/aws/analytics/2026-10-08-amazon-athena.md, icon: athena }
+    azure:
+      - { name: Synapse Analytics, what: Data warehouse and analytics, post: _posts/cloud/azure/analytics/2024-06-22-azure-synapse-analytics.md, icon: synapse }
+      - { name: Azure Databricks, what: Managed Spark lakehouse, post: _posts/cloud/azure/analytics/2024-06-22-azure-databricks.md, icon: databricks }
+      - { name: HDInsight, what: Managed Hadoop/Spark, post: _posts/cloud/azure/analytics/2024-06-22-azure-hdinsight.md, icon: hdinsight }
+      - { name: Stream Analytics, what: Real-time stream processing, post: _posts/cloud/azure/analytics/2024-06-22-azure-stream-analytics.md, icon: stream-analytics }
+      - { name: Data Factory, what: Data integration and ETL, post: _posts/cloud/azure/analytics/2024-06-22-azure-data-factory.md, icon: data-factory }
+      - { name: Data Explorer, what: Fast log and telemetry analytics, post: _posts/cloud/azure/analytics/2024-07-30-azure-data-explorer.md, icon: data-explorer }
+      - { name: Data Lake Storage, what: Storage for analytics, post: _posts/cloud/azure/analytics/2024-06-22-azure-data-lake-storage.md, icon: data-lake-storage }
+    gcp:
+      - { name: BigQuery, what: Serverless data warehouse, post: _posts/cloud/gcp/analytics/2026-10-08-bigquery.md, icon: bigquery }
+      - { name: Dataproc, what: Managed Spark/Hadoop, post: _posts/cloud/gcp/analytics/2026-10-08-dataproc.md, icon: dataproc }
+      - { name: Dataflow, what: Stream and batch processing (Beam), post: _posts/cloud/gcp/analytics/2026-10-08-dataflow.md, icon: dataflow }
+      - { name: Cloud Data Fusion, what: Visual data integration and ETL, post: _posts/cloud/gcp/analytics/2026-10-08-cloud-data-fusion.md, icon: data-fusion }
+
+  - id: ai-ml
+    title: AI & Machine Learning
+    overview: _posts/cloud/2026-10-09-cloud-ai-ml-services.md
+    icon: fas fa-brain
+    summary: ML platforms, foundation models and prebuilt AI APIs.
+    aws:
+      - { name: Amazon SageMaker AI, what: Build, train and deploy ML models, post: _posts/cloud/aws/ai-ml/2026-10-08-amazon-sagemaker-ai.md, icon: sagemaker }
+      - { name: Amazon Bedrock, what: Foundation models and agents, post: _posts/cloud/aws/ai-ml/2026-10-08-amazon-bedrock.md, icon: bedrock }
+      - { name: Amazon Rekognition, what: Image and video analysis, post: _posts/cloud/aws/ai-ml/2026-10-08-amazon-rekognition.md, icon: rekognition }
+    azure:
+      - { name: Azure Machine Learning, what: Build, train and deploy ML models, post: _posts/cloud/azure/ml/2021-01-01-azure-ml.md, icon: machine-learning }
+      - { name: Azure OpenAI, what: OpenAI foundation models, post: _posts/cloud/azure/ai/2021-01-01-azure-openai-service.md, icon: openai }
+      - { name: Azure AI services, what: Prebuilt vision, speech and language APIs, post: _posts/cloud/azure/ai/2021-01-01-azure-cognitive-services.md, icon: ai-services }
+      - { name: Azure AI Search, what: Search and RAG retrieval, post: _posts/cloud/azure/ai/2021-01-01-azure-cognitive-search.md, icon: ai-search }
+      - { name: Azure Bot Service, what: Conversational bots, post: _posts/cloud/azure/ai/2021-01-01-azure-bot-service.md, icon: bot-service }
+    gcp:
+      - { name: Vertex AI, what: ML platform and Gemini models, post: _posts/cloud/gcp/ai-ml/2026-10-08-vertex-ai.md, icon: vertex-ai }
+      - { name: Vision AI, what: Image and video analysis, post: _posts/cloud/gcp/ai-ml/2026-10-08-vision-ai.md, icon: vision-ai }
+      - { name: Dialogflow, what: Conversational agents, post: _posts/cloud/gcp/ai-ml/2026-10-08-dialogflow.md, icon: dialogflow }
+
+  - id: integration
+    title: Application Integration
+    overview: _posts/cloud/2026-10-09-cloud-application-integration-services.md
+    icon: fas fa-project-diagram
+    summary: Events, queues, pub/sub, workflows and API gateways.
+    aws:
+      - { name: Amazon EventBridge, what: Event bus and routing, post: _posts/cloud/aws/integration/2026-10-08-amazon-eventbridge.md, icon: eventbridge }
+      - { name: Amazon SQS, what: Message queues, post: _posts/cloud/aws/integration/2026-10-08-amazon-sqs.md, icon: sqs }
+      - { name: Amazon SNS, what: Pub/sub notifications, post: _posts/cloud/aws/integration/2026-10-08-amazon-sns.md, icon: sns }
+      - { name: AWS Step Functions, what: Workflow orchestration, post: _posts/cloud/aws/integration/2026-10-08-aws-step-functions.md, icon: step-functions }
+      - { name: Amazon API Gateway, what: Managed API front door, post: _posts/cloud/aws/integration/2026-10-08-amazon-api-gateway.md, icon: api-gateway }
+    azure:
+      - { name: Event Grid, what: Event routing, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-event-grid.md, icon: event-grid }
+      - { name: Service Bus, what: Enterprise message broker, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-service-bus.md, icon: service-bus }
+      - { name: Queue Storage, what: Simple message queues, post: _posts/cloud/azure/storage/2024-06-01-azure-queue-storage.md, icon: queue-storage }
+      - { name: Event Hubs, what: Event streaming ingestion, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-event-hub.md, icon: event-hubs }
+      - { name: Logic Apps, what: Workflow orchestration, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-logic-apps.md, icon: logic-apps }
+      - { name: API Management, what: Managed API front door, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-api-management.md, icon: api-management }
+      - { name: Notification Hubs, what: Mobile push notifications, post: _posts/cloud/azure/applicationintegration/2021-01-01-azure-notification-hubs.md, icon: notification-hubs }
+    gcp:
+      - { name: Eventarc, what: Event routing, post: _posts/cloud/gcp/integration/2026-10-08-eventarc.md, icon: eventarc }
+      - { name: Pub/Sub, what: Messaging and event streaming, post: _posts/cloud/gcp/integration/2026-10-08-pubsub.md, icon: pubsub }
+      - { name: Workflows, what: Workflow orchestration, post: _posts/cloud/gcp/integration/2026-10-08-workflows.md, icon: workflows }
+      - { name: API Gateway, what: Managed API front door, post: _posts/cloud/gcp/integration/2026-10-08-gcp-api-gateway.md, icon: api-gateway }
+
+  - id: management
+    title: Monitoring & Management
+    overview: _posts/cloud/2026-10-09-cloud-monitoring-management-services.md
+    icon: fas fa-tachometer-alt
+    summary: Metrics, logs, audit trails, infrastructure as code and operations tooling.
+    aws:
+      - { name: Amazon CloudWatch, what: Metrics, logs and alarms, post: _posts/cloud/aws/management/2026-10-08-amazon-cloudwatch.md, icon: cloudwatch }
+      - { name: AWS CloudTrail, what: API audit logs, post: _posts/cloud/aws/management/2026-10-08-aws-cloudtrail.md, icon: cloudtrail }
+      - { name: AWS CloudFormation, what: Infrastructure as code, post: _posts/cloud/aws/management/2026-10-08-aws-cloudformation.md, icon: cloudformation }
+      - { name: AWS Systems Manager, what: Fleet operations and patching, post: _posts/cloud/aws/management/2026-10-08-aws-systems-manager.md, icon: systems-manager }
+      - { name: AWS Trusted Advisor, what: Best-practice recommendations, post: _posts/cloud/aws/management/2026-10-08-aws-trusted-advisor.md, icon: trusted-advisor }
+    azure:
+      - { name: Azure Monitor, what: Metrics, logs and alerts, post: _posts/cloud/azure/monitoring/2024-05-28-azure-monitor.md, icon: monitor }
+      - { name: Application Insights, what: Application performance monitoring, post: _posts/cloud/azure/monitoring/2021-01-01-azure-application-insights.md, icon: application-insights }
+      - { name: Log Analytics, what: Log storage and KQL queries, post: _posts/cloud/azure/monitoring/2021-01-01-azure-log-analytics.md, icon: log-analytics }
+      - { name: Azure Resource Manager, what: Deployment and management layer (ARM/Bicep), post: _posts/cloud/azure/management/2026-10-08-azure-resource-manager.md, icon: resource-manager }
+      - { name: Azure Automation, what: Runbooks and update management, post: _posts/cloud/azure/applicationintegration/2024-06-02-azure-automation-account.md, icon: automation }
+      - { name: Azure Advisor, what: Best-practice recommendations, post: _posts/cloud/azure/monitoring/2021-01-01-azure-advisor.md, icon: advisor }
+    gcp:
+      - { name: Cloud Monitoring, what: Metrics, dashboards and alerts, post: _posts/cloud/gcp/management/2026-10-08-cloud-monitoring.md, icon: cloud-monitoring }
+      - { name: Cloud Logging, what: Log storage and queries, post: _posts/cloud/gcp/management/2026-10-08-cloud-logging.md, icon: cloud-logging }
+      - { name: Cloud Audit Logs, what: API audit logs, post: _posts/cloud/gcp/management/2026-10-08-cloud-audit-logs.md, icon: cloud-audit-logs }
+      - { name: Infrastructure Manager, what: Infrastructure as code (Terraform), post: _posts/cloud/gcp/management/2026-10-08-infrastructure-manager.md, icon: infrastructure-manager }
+
+  - id: devtools
+    title: DevOps & Developer Tools
+    overview: _posts/cloud/2026-10-09-cloud-devops-developer-tools.md
+    icon: fas fa-code-branch
+    summary: CI/CD pipelines, build services and command-line tools.
+    aws:
+      - { name: AWS CodePipeline, what: CI/CD pipelines, post: _posts/cloud/aws/devtools/2026-10-08-aws-codepipeline.md, icon: codepipeline }
+      - { name: AWS CodeBuild, what: Managed build service, post: _posts/cloud/aws/devtools/2026-10-08-aws-codebuild.md, icon: codebuild }
+      - { name: AWS CodeDeploy, what: Deployment automation, post: _posts/cloud/aws/devtools/2026-10-08-aws-codedeploy.md, icon: codedeploy }
+      - { name: AWS CLI, what: Command-line interface, post: _posts/cloud/aws/2022-01-01-aws-cli-commands-cheatsheet.md, icon: cli }
+    azure:
+      - { name: Azure DevOps, what: Repos, boards and pipelines, post: _posts/cloud/azure/developertools/2021-01-01-azure-devops-services.md, icon: devops }
+      - { name: DevTest Labs, what: Self-service dev/test environments, post: _posts/cloud/azure/developertools/2021-01-01-azure-devtest-labs.md, icon: devtest-labs }
+      - { name: Azure CLI, what: Command-line interface, post: _posts/cloud/azure/developertools/2021-01-01-azure-cli.md, icon: cli }
+    gcp:
+      - { name: Cloud Build, what: CI and managed builds, post: _posts/cloud/gcp/devtools/2026-10-08-cloud-build.md, icon: cloud-build }
+      - { name: Cloud Deploy, what: Continuous delivery, post: _posts/cloud/gcp/devtools/2026-10-08-cloud-deploy.md, icon: cloud-deploy }
+      - { name: gcloud CLI, what: Command-line interface, post: _posts/cloud/gcp/devtools/2026-10-08-gcloud-cli.md, icon: cloud-shell }
+
+  - id: iot
+    title: Internet of Things
+    overview: _posts/cloud/2026-10-09-cloud-iot-services.md
+    icon: fas fa-satellite-dish
+    summary: Device connectivity, edge runtimes and digital twins.
+    aws:
+      - { name: AWS IoT Core, what: Device connectivity and messaging, post: _posts/cloud/aws/iot/2026-10-08-aws-iot-core.md, icon: iot-core }
+      - { name: AWS IoT Greengrass, what: Edge runtime, post: _posts/cloud/aws/iot/2026-10-08-aws-iot-greengrass.md, icon: iot-greengrass }
+    azure:
+      - { name: IoT Hub, what: Device connectivity and messaging, post: _posts/cloud/azure/iot/2021-01-01-azure-iot-hub.md, icon: iot-hub }
+      - { name: IoT Edge, what: Edge runtime, post: _posts/cloud/azure/iot/2021-01-01-azure-iot-edge.md, icon: iot-edge }
+      - { name: Digital Twins, what: Models of physical environments, post: _posts/cloud/azure/iot/2021-01-01-azure-digital-twins.md, icon: digital-twins }
+    gcp_note: Google retired Cloud IoT Core in August 2023 and has no first-party replacement. Use a partner IoT platform that feeds Pub/Sub.
+
+  - id: cost
+    title: Cost Management
+    overview: _posts/cloud/2026-10-09-cloud-cost-management-tools.md
+    icon: fas fa-coins
+    summary: Cost analysis, budgets and estimates.
+    aws:
+      - { name: AWS Cost Explorer, what: Cost and usage analysis, post: _posts/cloud/aws/cost-management/2026-10-08-aws-cost-explorer.md, icon: cost-explorer }
+      - { name: AWS Budgets, what: Budgets and alerts, post: _posts/cloud/aws/cost-management/2026-10-08-aws-budgets.md, icon: budgets }
+    azure:
+      - { name: Cost Management + Billing, what: Cost and usage analysis, post: _posts/cloud/azure/financialmanagement/2021-01-01-azure-cost-management-and-billing.md, icon: cost-management }
+      - { name: Budgets, what: Budgets and alerts, post: _posts/cloud/azure/financialmanagement/2021-01-01-azure-budgets.md, icon: cost-management-billing }
+      - { name: Pricing Calculator, what: Cost estimates, post: _posts/cloud/azure/financialmanagement/2021-01-01-azure-pricing-calculator.md, icon: cost-management }
+    gcp:
+      - { name: Cloud Billing, what: Cost reports, budgets and alerts, post: _posts/cloud/gcp/cost-management/2026-10-08-cloud-billing.md, icon: billing }
+
+  - id: migration
+    title: Migration
+    overview: _posts/cloud/2026-10-09-cloud-migration-services.md
+    icon: fas fa-truck-moving
+    summary: Moving servers and databases into the cloud.
+    aws:
+      - { name: AWS Application Migration Service, what: Lift-and-shift servers, post: _posts/cloud/aws/migration/2026-10-08-aws-application-migration-service.md, icon: application-migration-service }
+      - { name: AWS Database Migration Service, what: Database migration, post: _posts/cloud/aws/migration/2026-10-08-aws-database-migration-service.md, icon: database-migration-service }
+    azure:
+      - { name: Azure Migrate, what: Lift-and-shift servers, post: _posts/cloud/azure/migration/2024-05-23-migrating-vms.md, icon: migrate }
+      - { name: Database Migration Service, what: Database migration, post: _posts/cloud/azure/migration/2024-05-23-migrating-data.md, icon: database-migration-service }
+    gcp:
+      - { name: Migrate to Virtual Machines, what: Lift-and-shift servers, post: _posts/cloud/gcp/migration/2026-10-08-migrate-to-virtual-machines.md, icon: migrate-to-vms }
+      - { name: Database Migration Service, what: Database migration, post: _posts/cloud/gcp/migration/2026-10-08-gcp-database-migration-service.md, icon: database-migration-service }

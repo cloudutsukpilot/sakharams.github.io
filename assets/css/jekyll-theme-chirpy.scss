@@ -1,11 +1,52 @@
 ---
 ---
 
+// Override of jekyll-theme-chirpy 7.6.0 `assets/css/jekyll-theme-chirpy.scss`.
+// `$main-content-max-width` is our addition (upstream default: 1250px).
+@use 'abstracts/variables' with (
+  $main-content-max-width: 1920px,
+  $theme: '{{ site.theme_mode }}'
+);
+
+/* prettier-ignore */
+@use 'main
 {%- if jekyll.environment == 'production' -%}
-@use "main.bundle";
-{%- else -%}
-@use "main";
+  .bundle
 {%- endif -%}
+';
+
+@use 'abstracts/breakpoints' as bp;
+@use 'expedition-map';
+@use 'flow-anim';
+@use 'diagram';
+@use 'project-index';
+@use 'lab';
+@use 'projects-catalog';
+@use 'interview-index';
+@use 'hot-topics';
+@use 'cloud-compare';
+@use 'domains';
+
+/* append your custom style below */
+
+// Fluid content width on wide screens. Chirpy pins the content column to
+// `$main-content-max-width` from 1650px up, leaving empty space on wide
+// monitors; with the larger limit above it grows with the window instead.
+// Two upstream rules assume the content is always exactly that wide, so they
+// are recomputed from the actual width here.
+@include bp.xxxl {
+  // Keep back-to-top inside the viewport while the content is narrower than the limit.
+  #back-to-top {
+    right: calc(
+      max((100vw - variables.$sidebar-width-large - variables.$main-content-max-width) / 2, 0px) + 2rem
+    );
+  }
+
+  // Align the search box with the side panel (a quarter of the content width).
+  search {
+    margin-right: calc(25% - variables.$search-max-width - 0.75rem);
+  }
+}
 
 .table-wrapper>table thead th,
 .table-wrapper>table tbody tr td {
@@ -111,6 +152,139 @@ pre.mermaid {
 // Prevent the underlying page from scrolling while a diagram overlay is open.
 body.mermaid-fullscreen-open {
     overflow: hidden;
+}
+
+// Vertical career timeline on the Professional Journey tab
+// (`_tabs/professional-journey.md`). Colours come from Chirpy's theme
+// variables so it follows light/dark mode.
+.career-timeline {
+    position: relative;
+    list-style: none;
+    margin: 1.5rem 0 2rem;
+    padding: 0 0 0 2rem;
+
+    // The vertical line
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0.5rem;
+        bottom: 0.5rem;
+        left: 0.55rem;
+        width: 2px;
+        background: var(--main-border-color);
+    }
+
+    > li {
+        position: relative;
+        margin-bottom: 1.25rem;
+
+        // The dot on the line
+        &::before {
+            content: '';
+            position: absolute;
+            top: 1.1rem;
+            left: -1.85rem;
+            width: 0.9rem;
+            height: 0.9rem;
+            border-radius: 50%;
+            background: var(--card-bg, var(--main-bg));
+            border: 3px solid var(--link-color);
+        }
+
+        &.current::before {
+            background: #2a9d8f;
+            border-color: #2a9d8f;
+            box-shadow: 0 0 0 4px rgba(42, 157, 143, 0.25);
+        }
+    }
+
+    .ct-card {
+        border: 1px solid var(--main-border-color);
+        border-radius: 0.6rem;
+        padding: 0.75rem 1rem;
+        background: var(--card-bg, transparent);
+    }
+
+    .ct-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem 0.75rem;
+
+        img {
+            height: 28px;
+            width: auto;
+            max-width: 110px;
+            border-radius: 4px;
+        }
+    }
+
+    .ct-company {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--heading-color);
+    }
+
+    .ct-meta {
+        margin-left: auto;
+        font-size: 0.85rem;
+        color: var(--text-muted-color);
+        white-space: nowrap;
+    }
+
+    .ct-badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.1rem 0.45rem;
+        border-radius: 1rem;
+        color: #fff;
+        background: #2a9d8f;
+    }
+
+    .ct-roles {
+        list-style: none;
+        margin: 0.6rem 0 0;
+        padding: 0;
+
+        li {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 0 1rem;
+            padding: 0.3rem 0 0.3rem 0.75rem;
+            border-left: 2px solid var(--main-border-color);
+            margin: 0;
+        }
+    }
+
+    .ct-role {
+        font-weight: 500;
+    }
+
+    .ct-dates {
+        font-size: 0.85rem;
+        color: var(--text-muted-color);
+    }
+
+    .ct-more {
+        display: inline-block;
+        margin-top: 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    @media (max-width: 576px) {
+        .ct-meta {
+            margin-left: 0;
+            width: 100%;
+            white-space: normal;
+        }
+
+        .ct-roles li {
+            flex-direction: column;
+        }
+    }
 }
 
 

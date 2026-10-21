@@ -1,9 +1,10 @@
-
 ---
 layout: post
 title: Microsoft Interactive Guides
 categories: [cloud, azure, interactive guides]
 tags: [Cloud, Azure, Interactive Guides]
+# Pinned to the original URL (the front matter was not parsed before 2026-10-01).
+permalink: /posts/microsoft-interactive-guides/
 ---
 
 

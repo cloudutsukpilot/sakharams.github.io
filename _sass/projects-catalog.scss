@@ -1,0 +1,239 @@
+// Projects tab: tiles grouped by category with a cloud filter (_includes/projects-catalog.html).
+// Same palette as the playbook index (_sass/project-index.scss); theme variables keep light and
+// dark mode working.
+
+.projects-catalog {
+  --pc-accent: #f472b6;
+  --pc-accent2: #facc15;
+  --pc-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --pc-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+  --pc-muted: color-mix(in srgb, var(--text-color) 70%, transparent);
+}
+
+.pc-intro {
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
+}
+
+.pc-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--pc-line);
+  font-size: 0.9rem;
+
+  i {
+    color: var(--pc-accent);
+    margin-right: 0.15rem;
+  }
+}
+
+.pc-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1rem 0 0.25rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.pc-filter-label {
+  font-size: 0.85rem;
+  color: var(--pc-muted);
+  margin-right: 0.25rem;
+}
+
+.pc-filter-btn {
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--pc-line);
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--pc-accent);
+  }
+
+  &.is-active {
+    border-color: var(--pc-accent);
+    background: color-mix(in srgb, var(--pc-accent) 14%, transparent);
+    font-weight: 600;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pc-accent);
+    outline-offset: 2px;
+  }
+}
+
+.pc-section {
+  margin-top: 2rem;
+  scroll-margin-top: 4rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.pc-section-title {
+  font-size: 1.3rem;
+  margin-bottom: 0.25rem;
+
+  i {
+    color: var(--pc-accent);
+    margin-right: 0.35rem;
+  }
+}
+
+.pc-section-blurb {
+  color: var(--pc-muted);
+  font-size: 0.92rem;
+  margin-bottom: 1rem;
+}
+
+.pc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.pc-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--pc-line);
+  border-top: 3px solid var(--pc-accent);
+  border-radius: 0.6rem;
+  background: var(--pc-card);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--heading-color) 10%, transparent);
+  }
+
+  &[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+.pc-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.pc-kind {
+  color: var(--pc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+
+  i {
+    color: var(--pc-accent);
+  }
+}
+
+.pc-status {
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--pc-line);
+  border-radius: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pc-status-live {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.pc-status-planning,
+.pc-status-in-progress {
+  border-color: var(--pc-accent2);
+  color: color-mix(in srgb, var(--pc-accent2) 75%, var(--heading-color));
+}
+
+.pc-tile-title {
+  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+
+  a {
+    color: var(--heading-color);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--pc-accent);
+    }
+  }
+}
+
+.pc-tile-summary {
+  font-size: 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.pc-tile-stack {
+  font-size: 0.82rem;
+  color: var(--pc-muted);
+  margin-bottom: 0.6rem;
+}
+
+.pc-tile-clouds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.pc-cloud {
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--pc-line);
+  border-radius: 1rem;
+  font-size: 0.78rem;
+}
+
+.pc-tile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.pc-tile-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.9rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--pc-line);
+  font-size: 0.82rem;
+  color: var(--pc-muted);
+}
+
+.pc-open {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.pc-empty {
+  margin-top: 1.5rem;
+  color: var(--pc-muted);
+}

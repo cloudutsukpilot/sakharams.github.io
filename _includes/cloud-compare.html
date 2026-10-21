@@ -1,0 +1,44 @@
+{%- comment -%}
+  Cloud service comparison on the Cloud tab: one section per category in _data/cloud_compare.yml,
+  each with an AWS | Azure | Google Cloud column of service tiles. Tiles link to the post named by
+  `post:` (looked up by source path); posts with `placeholder: true` get a "Soon" badge.
+  Icons are CSS backgrounds, not <img>, so refactor-content.html doesn't wrap them in popup links.
+{%- endcomment -%}
+{%- assign cc = site.data.cloud_compare -%}
+<div class="cloud-compare">
+<nav class="cc-jump" aria-label="Service categories">
+{%- for cat in cc.categories -%}
+<a href="#{{ cat.id }}"><i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}</a>
+{%- endfor -%}
+</nav>
+<p class="cc-legend"><span class="cc-soon">Soon</span> marks a service whose article is still a placeholder.</p>
+{%- for cat in cc.categories %}
+<section class="cc-section" id="{{ cat.id }}" aria-labelledby="{{ cat.id }}-title">
+<h3 class="cc-title" id="{{ cat.id }}-title"><i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}</h3>
+{%- assign cat_ov = site.posts | where: "path", cat.overview | first %}
+<p class="cc-summary">{{ cat.summary }}{% if cat_ov %} <a class="cc-overview" href="{{ cat_ov.url | relative_url }}">Read the {{ cat.title }} overview <i class="fas fa-arrow-right" aria-hidden="true"></i></a>{% endif %}</p>
+<div class="cc-grid">
+{%- for prov in cc.providers -%}
+{%- assign services = cat[prov.id] -%}
+{%- capture note_key -%}{{ prov.id }}_note{%- endcapture -%}
+{%- assign ov = site.posts | where: "path", prov.overview | first -%}
+<div class="cc-col cc-{{ prov.id }}">
+<div class="cc-col-head"><span class="cc-logo" style="background-image:url('{{ prov.logo | relative_url }}')" aria-hidden="true"></span><a href="{{ ov.url | relative_url }}">{{ prov.title }}</a></div>
+{%- if services -%}
+{%- for svc in services -%}
+{%- assign p = site.posts | where: "path", svc.post | first -%}
+{%- capture icon -%}/assets/img/icons/cloud/{{ prov.id }}/services/{{ svc.icon }}.svg{%- endcapture -%}
+<a class="cc-tile{% if p.placeholder %} is-placeholder{% endif %}" href="{{ p.url | relative_url }}">
+<span class="cc-icon" style="background-image:url('{{ icon | relative_url }}')" aria-hidden="true"></span>
+<span class="cc-text"><span class="cc-name">{{ svc.name }}</span><span class="cc-what">{{ svc.what }}{% if p.placeholder %} <span class="cc-soon">Soon</span>{% endif %}</span></span>
+</a>
+{%- endfor -%}
+{%- else -%}
+<p class="cc-note">{{ cat[note_key] }}</p>
+{%- endif -%}
+</div>
+{%- endfor -%}
+</div>
+</section>
+{%- endfor %}
+</div>

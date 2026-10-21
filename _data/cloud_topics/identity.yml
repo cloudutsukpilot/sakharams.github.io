@@ -1,0 +1,52 @@
+# Provider tabs for _posts/cloud/2026-10-09-cloud-identity-governance-services.md (see _includes/cloud-topic-tabs.html).
+topics:
+  - id: access
+    title: Access control for cloud resources
+    aws:
+      - ref: AWS IAM
+        summary: JSON policies attached to users, groups and roles define which actions are allowed on which resources, with conditions on tags, IP, MFA and more. Roles with short-lived credentials are the recommended pattern for people and workloads alike.
+    azure:
+      - name: Azure RBAC
+        icon: rbac
+        summary: Role assignments grant built-in or custom roles to Entra ID users, groups, service principals and managed identities at management group, subscription, resource group or resource scope. Permissions inherit downwards; deny assignments are rare.
+    gcp:
+      - ref: Cloud IAM
+        summary: Grant predefined or custom roles to principals (users, groups, service accounts, federated identities) on an organisation, folder, project or resource. IAM Conditions and deny policies add fine-grained control.
+
+  - id: workforce
+    title: Workforce identity and single sign-on
+    aws:
+      - ref: AWS IAM Identity Center
+        summary: Central sign-in for people across all AWS accounts in an organisation, using its own directory or federating with Entra ID, Okta or Google Workspace. Permission sets map groups to roles in each account.
+    azure:
+      - ref: Microsoft Entra ID
+        summary: Microsoft's cloud identity platform (formerly Azure AD) for Azure, Microsoft 365 and thousands of SaaS apps. Conditional Access, MFA, Privileged Identity Management for just-in-time admin, and External ID for customers and partners.
+    gcp:
+      - ref: Cloud Identity
+        summary: Identity and device management for Google Cloud and Google Workspace users, with SSO, 2-step verification and context-aware access. Workforce Identity Federation lets an external IdP sign people in without syncing accounts.
+
+  - id: hierarchy
+    title: Resource hierarchy
+    aws:
+      - ref: AWS Organizations
+        summary: Groups AWS accounts into organisational units (OUs) with consolidated billing. The account is the main isolation boundary on AWS. AWS Control Tower builds a governed landing zone on top of Organizations.
+    azure:
+      - ref: Management Groups
+        summary: Up to six levels of management groups above subscriptions, with policy and RBAC inherited downwards. Subscriptions are the billing and scale boundary; resource groups organise resources inside them.
+    gcp:
+      - ref: Resource Manager
+        summary: Organisation, then folders (nested up to ten levels), then projects. Projects are the main isolation and billing unit, and IAM and organisation policies inherit down the tree.
+
+  - id: guardrails
+    title: Policy guardrails
+    aws:
+      - ref: AWS Organizations
+        name: Service control policies (SCPs)
+        summary: SCPs cap the maximum permissions available in member accounts (for example, deny leaving the organisation or using unapproved regions). Resource control policies (RCPs) do the same on the resource side. AWS Config rules detect drift.
+    azure:
+      - ref: Azure Policy
+        summary: Audit, deny, modify or auto-deploy resources based on rules (allowed regions, required tags, mandatory diagnostics). Initiatives bundle policies into compliance baselines; remediation tasks fix existing resources.
+    gcp:
+      - ref: Resource Manager
+        name: Organization Policy Service
+        summary: Constraints applied at organisation, folder or project level (restrict resource locations, disable service account key creation, block public IPs). Custom constraints cover what the predefined ones don't.

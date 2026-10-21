@@ -3,6 +3,11 @@ layout: post
 title: Jenkins - Interview Questions
 categories: [devops, cicd, jenkins, interviewquestions]
 tags: [DevOps, CICD, Jenkins, Interview Questions]
+interview_domain: devops
+interview_topic: Jenkins
+interview_sections:
+  General Jenkins Questions: { level: beginner }
+  Troubleshooting and Optimization: { level: advanced }
 ---
 
 

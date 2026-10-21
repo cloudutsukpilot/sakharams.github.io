@@ -1,0 +1,85 @@
+# Animated flow diagram for _posts/projects/dunderly/2026-10-07-07-data-and-integration.md
+# (include id: projects/dunderly/payroll-run). The monthly payroll run: draft, review, four-eyes
+# approval, file and manifest, pull by the on-premises agent, checksum, hand-off and receipt.
+title: Dunderly monthly payroll run
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 450]
+modes:
+  - { id: ok, label: "File verified and delivered" }
+  - { id: bad, label: "Simulate a checksum mismatch" }
+
+lanes:
+  - { label: "Azure (HR system)", x: 8, y: 8, w: 984, h: 140 }
+  - { label: "On-premises server farm", x: 8, y: 190, w: 984, h: 250 }
+
+nodes:
+  - { id: TIMER, label: "Cutoff day", sub: "timer trigger", x: 90, y: 90, w: 130, shape: terminal, icon: clock, icon_pos: corner }
+  - { id: DRAFT, label: "Draft run", sub: "SQL snapshot", x: 270, y: 90, w: 140, icon: database, icon_pos: corner }
+  - { id: REVIEW, label: "Payroll review", sub: "variance report", x: 450, y: 90, w: 140, icon: chart, icon_pos: corner }
+  - { id: APPROVE, label: "HR\napproves", x: 630, y: 90, w: 130, h: 88, shape: diamond }
+  - { id: FILE, label: "Write file", sub: "file + manifest", x: 850, y: 90, w: 150, icon: file, icon_pos: corner }
+
+  - { id: AGENT, label: "Pickup agent", sub: "AzCopy", x: 130, y: 270, w: 150, icon: server, icon_pos: corner }
+  - { id: VERIFY, label: "Checksum\nok?", x: 320, y: 270, w: 130, h: 84, shape: diamond }
+  - { id: LEG, label: "Payment system", sub: "input folder", x: 510, y: 270, w: 150 }
+  - { id: RCPT, label: "Upload receipt", x: 700, y: 270, w: 140, icon: file, icon_pos: corner }
+  - { id: DONE, label: "Run\ndelivered", x: 885, y: 270, w: 140, shape: terminal, tone: ok }
+  - { id: QUAR, label: "Quarantine", sub: "never delivered", x: 320, y: 395, w: 150, tone: fail }
+  - { id: ALERT, label: "Alert on-call", sub: "no receipt", x: 700, y: 395, w: 150, tone: warn, icon: bell, icon_pos: corner }
+
+edges:
+  - { id: TD, from: TIMER, to: DRAFT }
+  - { id: DR, from: DRAFT, to: REVIEW }
+  - { id: RA, from: REVIEW, to: APPROVE }
+  - { id: AF, from: APPROVE, to: FILE, label: "approve" }
+  - { id: FAG, from: FILE, to: AGENT, label: "pull over HTTPS", label_at: [600, 157], points: [[850, 118], [850, 168], [35, 168], [35, 270], [55, 270]] }
+  - { id: AV, from: AGENT, to: VERIFY }
+  - { id: VL, from: VERIFY, to: LEG, label: "ok", tone: ok }
+  - { id: LR, from: LEG, to: RCPT }
+  - { id: RD, from: RCPT, to: DONE }
+  - { id: VQ, from: VERIFY, to: QUAR, label: "mismatch", tone: fail }
+  - { id: QA, from: QUAR, to: ALERT, label: "deadline passes", tone: warn }
+
+steps:
+  - lights: [TIMER]
+    title: Cutoff day
+    text: On the payroll cutoff day a timer-triggered Function starts the month's run. Salary changes approved after this point wait for next month.
+  - edges: [TD]
+    title: Draft the run
+    text: It snapshots active employees, effective-dated salaries and unpaid leave into a draft run, so later edits can't change what gets paid.
+  - edges: [DR]
+    title: Payroll review
+    text: The payroll operator compares totals and headcount with last month. Any line that moved more than the variance threshold needs an explanation.
+  - edges: [RA]
+    title: Four-eyes approval
+    text: The HR manager approves the run. Whoever prepared it can't approve it, and once approved the run is read-only.
+  - edges: [AF]
+    title: Write the file
+    text: A queue-triggered Function renders the legacy file layout plus a manifest (record count, control total, SHA-256). Re-running it for the same run ID is a no-op.
+  - edges: [FAG]
+    title: Pull from the farm
+    text: The on-premises pickup agent polls the outbound container and downloads new files over HTTPS. Nothing in Azure can reach into the server farm.
+  - edges: [AV]
+    title: Verify
+    text: The agent recomputes the SHA-256 and the record count and compares them with the manifest before it touches the payment system.
+  - edges: [VL]
+    when: ok
+    title: Hand to the payment system
+    text: The file lands in the payment system's input folder, the only interface the legacy C++ system offers.
+  - edges: [LR]
+    when: ok
+    title: Upload a receipt
+    text: The agent writes a small receipt blob back with the run ID, hash and pickup time.
+  - edges: [RD]
+    when: ok
+    title: Delivered
+    text: An Event Grid trigger marks the run Delivered in the HR system, so HR sees it on the payroll page instead of phoning IT.
+  - edges: [VQ]
+    when: bad
+    title: Quarantine
+    text: A mismatch means the file is moved aside and never reaches the payment system. No receipt is written.
+  - edges: [QA]
+    when: bad
+    title: Alert before payday
+    text: With no receipt by the deadline, an Azure Monitor alert pages the payroll on-call, days before payday, while there's still time to fix it.
