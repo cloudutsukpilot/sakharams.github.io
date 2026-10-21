@@ -61,9 +61,9 @@ Fallbacks when tasks fail:
 1. `actions/checkout@v5` → `ruby/setup-ruby@v1` (Ruby 3.3, `bundler-cache: true`).
 2. Build: `bundle exec jekyll b -d "_site${{ base_path }}"` with `JEKYLL_ENV=production`.
 3. Test: `bundle exec htmlproofer _site --disable-external --ignore-urls "…localhost…"`.
-4. `SonarSource/sonarqube-scan-action@v7` using `SONAR_TOKEN` — config in
+4. `SonarSource/sonarqube-scan-action@v8` using `SONAR_TOKEN` — config in
    [sonar-project.properties](sonar-project.properties).
-5. `actions/upload-pages-artifact@v4` → `actions/deploy-pages@v5`.
+5. `actions/upload-pages-artifact@v5` → `actions/deploy-pages@v5`.
 
 Any htmlproofer failure fails the deploy. Triage locally with the
 [htmlproofer-triage skill](.github/skills/htmlproofer-triage/SKILL.md) — it maps

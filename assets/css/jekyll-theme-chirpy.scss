@@ -287,6 +287,12 @@ body.mermaid-fullscreen-open {
     }
 }
 
+// AdSense: collapse slots that came back empty instead of leaving a blank
+// fixed-size box (Google's documented `data-ad-status` rule).
+ins.adsbygoogle[data-ad-status='unfilled'] {
+    display: none !important;
+}
+
 
 
 
