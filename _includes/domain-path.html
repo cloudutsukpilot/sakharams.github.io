@@ -1,0 +1,42 @@
+{% comment %}
+  A domain's learning path: levels → topics → posts.
+  Usage: {% include domain-path.html domain="healthcare" %}
+  Levels and topics come from _data/domain_paths/<domain>.yml; posts are every post with
+  `domain: <domain>` and `domain_topic: <topic id>`, sorted by `domain_order`.
+{% endcomment %}
+{%- assign dp = site.data.domain_paths[include.domain] -%}
+{%- assign dp_posts = site.posts | where: "domain", include.domain -%}
+{%- assign dp_n = 0 -%}
+
+<div class="domains domain-path">
+  <nav class="dm-jump" aria-label="Levels">
+    {%- for lvl in dp.levels %}
+    <a href="#{{ lvl.id }}">{{ lvl.title }}</a>
+    {%- endfor %}
+  </nav>
+
+  {%- for lvl in dp.levels %}
+  <section class="dm-level" id="{{ lvl.id }}">
+    <h2 class="dm-level-title">{{ lvl.title }}</h2>
+    <p class="dm-level-blurb">{{ lvl.blurb }}</p>
+
+    {%- assign lvl_topics = dp.topics | where: "level", lvl.id -%}
+    {%- for t in lvl_topics %}
+    {%- assign t_posts = dp_posts | where: "domain_topic", t.id | sort: "domain_order" -%}
+    <div class="dm-topic">
+      <h3 class="dm-topic-title" id="{{ t.id }}"><i class="{{ t.icon }}" aria-hidden="true"></i> {{ t.title }}</h3>
+      <ol class="dm-posts" start="{{ dp_n | plus: 1 }}">
+        {%- for p in t_posts %}
+        <li>
+          <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
+          {%- if p.coming_soon %} <span class="dm-badge">Coming soon</span>{% endif %}
+          <span class="dm-post-desc">{{ p.description }}</span>
+        </li>
+        {%- endfor %}
+      </ol>
+      {%- assign dp_n = dp_n | plus: t_posts.size -%}
+    </div>
+    {%- endfor %}
+  </section>
+  {%- endfor %}
+</div>

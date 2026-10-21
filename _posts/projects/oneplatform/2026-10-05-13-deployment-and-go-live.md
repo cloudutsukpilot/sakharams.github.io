@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Deployment and Go-Live"
 date: 2026-10-05 00:13:00 +0530

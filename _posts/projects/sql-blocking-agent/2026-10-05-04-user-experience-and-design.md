@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "SQL Blocking Agent: User Experience and Design"
 date: 2026-10-05 00:04:00 +0530

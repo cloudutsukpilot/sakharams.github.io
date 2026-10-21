@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Requirements Gathering"
 date: 2026-10-05 00:02:00 +0530

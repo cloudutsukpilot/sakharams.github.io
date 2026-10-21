@@ -1,0 +1,122 @@
+// Domains tab (_includes/domains-catalog.html) and a domain's learning path (_includes/domain-path.html).
+// Theme variables keep light and dark mode working.
+
+.domains {
+  --dm-accent: #14b8a6;
+  --dm-line: color-mix(in srgb, var(--heading-color) 14%, transparent);
+  --dm-card: color-mix(in srgb, var(--heading-color) 3%, var(--main-bg));
+  --dm-muted: color-mix(in srgb, var(--text-color) 70%, transparent);
+}
+
+.dm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.dm-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--dm-line);
+  border-top: 3px solid var(--dm-accent);
+  border-radius: 0.6rem;
+  background: var(--dm-card);
+
+  &.is-planned {
+    border-top-color: var(--dm-line);
+    opacity: 0.8;
+  }
+}
+
+.dm-card-title {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+
+  i {
+    color: var(--dm-accent);
+    margin-right: 0.35rem;
+  }
+}
+
+.dm-card-summary {
+  font-size: 0.92rem;
+  flex-grow: 1;
+}
+
+.dm-card-meta {
+  font-size: 0.82rem;
+  color: var(--dm-muted);
+  margin: 0;
+}
+
+.dm-badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--dm-accent);
+  background: color-mix(in srgb, var(--dm-accent) 14%, transparent);
+}
+
+.dm-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--dm-line);
+  font-size: 0.9rem;
+}
+
+.dm-level {
+  margin-top: 2rem;
+  scroll-margin-top: 4rem;
+}
+
+.dm-level-title {
+  font-size: 1.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.dm-level-blurb {
+  color: var(--dm-muted);
+  font-size: 0.92rem;
+}
+
+.dm-topic {
+  margin: 1rem 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--dm-line);
+  border-left: 3px solid var(--dm-accent);
+  border-radius: 0.5rem;
+  background: var(--dm-card);
+}
+
+.dm-topic-title {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  scroll-margin-top: 4rem;
+
+  i {
+    color: var(--dm-accent);
+    margin-right: 0.3rem;
+  }
+}
+
+.dm-posts {
+  margin: 0;
+  padding-left: 1.75rem;
+
+  li {
+    margin-bottom: 0.45rem;
+  }
+}
+
+.dm-post-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--dm-muted);
+}

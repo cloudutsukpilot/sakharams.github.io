@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: CI/CD and Release Management"
 date: 2026-10-05 00:12:00 +0530

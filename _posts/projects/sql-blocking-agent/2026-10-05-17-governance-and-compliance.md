@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "SQL Blocking Agent: Governance and Compliance"
 date: 2026-10-05 00:17:00 +0530

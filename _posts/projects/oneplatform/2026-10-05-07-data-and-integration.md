@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Data and Integration"
 date: 2026-10-05 00:07:00 +0530

@@ -3,6 +3,8 @@
 # `brief` is the author's own description and is the source of truth for the posts.
 # Company name, GitHub org, SMTP host, storage account, Platform One hostnames and server names are
 # deliberately left out (public repo).
+# Hidden from the Projects tab (_includes/projects-catalog.html skips cards with hidden: true).
+hidden: true
 name: SQL Blocking Agent
 tag: SQL Blocking Agent
 summary: An agentic SQL Server blocking-chain responder. Deterministic detection and safety gates

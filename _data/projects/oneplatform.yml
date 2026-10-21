@@ -5,6 +5,8 @@
 # business-unit and product names, and colleagues' names are deliberately left out (public repo).
 # The portal's internal name is replaced with "OnePlatform" at the author's request.
 # The feature catalog lives in _data/project_features/oneplatform.yml.
+# Hidden from the Projects tab (_includes/projects-catalog.html skips cards with hidden: true).
+hidden: true
 name: OnePlatform
 tag: OnePlatform
 summary: An internal developer portal on Backstage, backed by a .NET middleware, that turns Azure and
