@@ -794,3 +794,14 @@ lessons:
     fix: "Chose a model whose native context covers the need (Qwen3.5-35B-A3B: 262k, served at 128k) and kept the role-named app vllm-chat, so the Service, alerts, dashboards and LiteLLM's api_base didn't change. Raised the startup window to 90 minutes for the first download. Sized the slice from config.json: only 10 of 40 layers keep a KV cache, about 20 KB per token."
     lesson: "Before switching models, read config.json (max_position_embeddings, layer types, KV heads) and the repository size: they decide whether vLLM starts at all and how long the first start takes. Name model apps after their role, not the model, so a model change touches one Deployment."
     adrs: ["0049", "0046", "0010"]
+
+  - id: L074
+    date: 2026-10-21
+    step: "Phase 3, step 8c"
+    title: "The OTel operator pinned its API-server egress to a node IP, and a restart changed the IP: ai went blind for two days without an alert"
+    tags: [opentelemetry, kubernetes, networkpolicy, k3d, monitoring]
+    symptom: "Building the Platform status dashboard showed the ai cluster sending only kubelet and cAdvisor metrics: no kube-state-metrics, vLLM, LiteLLM, Velero or Kyverno series since a host restart two days earlier. The OTel operator, the cluster collector and its target allocator had crash-looped hundreds of times (\"dial tcp 10.41.0.1:443: connect: connection refused\"), and no alert had fired, not even for vllm-chat's own crash loop."
+    cause: "With the operator.networkpolicy and operand.networkpolicy feature gates on (the default), the operator writes NetworkPolicies that allow egress to the API server by the node's IP as it was at startup. k3d gave the ai node a different address on the homelab network after the restart, so the policies refused the operator's and the target allocator's API calls, and the operator can't fix a policy it can't reach the API to change. Labs already had the gates off for a related reason (Cilium, 2026-10-13). The agent collector, which needs no API, kept sending kubelet metrics, so ClusterStoppedReporting stayed quiet; kube-state-metrics-based alerts can't fire without kube-state-metrics."
+    fix: "Delete the stale policies so the operator starts, and turn the gates off (or keep node addresses fixed) for every cluster. The new Platform status dashboard has a Scrape coverage panel: every job each cluster should send, shown MISSING when it has no target at all."
+    lesson: "\"Up == 0\" alerts only see targets that still exist. Watch for expected series that disappear, per cluster, and never let a component write rules from addresses it saw once at startup on a network that renumbers."
+    adrs: ["0042", "0041"]

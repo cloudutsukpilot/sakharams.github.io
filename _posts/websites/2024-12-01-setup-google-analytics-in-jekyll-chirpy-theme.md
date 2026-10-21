@@ -19,11 +19,16 @@ Before clicking through the setup screens, it helps to know what you're creating
 
 ```mermaid
 %%{init: {"themeVariables": {"fontSize": "14px"}, "flowchart": {"useMaxWidth": false, "nodeSpacing": 30, "rankSpacing": 40, "padding": 8, "wrappingWidth": 150}}}%%
-flowchart LR
-  A["Account<br/>(you or your org)"] --> P["Property<br/>(one site or app)"]
-  P --> S["Web data stream<br/>(yourdomain.com)"]
-  S --> M["Measurement ID<br/>G-XXXXXXXXXX"]
-  M --> J["_config.yml<br/>analytics.google.id"]
+flowchart TB
+  subgraph GA["Google Analytics"]
+    direction LR
+    A["Account<br/>(you or your org)"] --> P["Property<br/>(one site or app)"] --> S["Web data stream<br/>(yourdomain.com)"]
+  end
+  subgraph SITE["Your Jekyll site"]
+    direction LR
+    M["Measurement ID<br/>G-XXXXXXXXXX"] --> J["_config.yml<br/>analytics.google.id"]
+  end
+  GA --> SITE
 ```
 
 An **account** is the top-level container, usually one per person or organisation. A **property** holds the reports for one site (or a site plus its app), along with its time zone and currency. A **data stream** is where data comes in from; for a blog that's a single Web stream for your domain. One account can hold many properties, so if you run several blogs, give each its own property rather than mixing them.
@@ -85,22 +90,9 @@ analytics:
 
 That's it. You don't need a custom include or a layout override. Chirpy's `head.html` loops over the `analytics:` providers and includes `_includes/analytics/google.html` for any provider with an `id`, and the whole block is wrapped in `{% raw %}{% if jekyll.environment == 'production' %}{% endraw %}`. So the tag is added on your live site and left out of local `jekyll serve` sessions automatically.
 
-Here's what happens when someone opens a page:
+Here's what happens when someone opens a page. Press **Play** to follow one page view from the HTML request to your Realtime report, switch the mode to **Simulate an ad blocker** to see where it stops, and click any arrow for the protocol exchange and the certificate that secures it:
 
-```mermaid
-%%{init: {"themeVariables": {"fontSize": "14px"}, "sequence": {"useMaxWidth": false}}}%%
-sequenceDiagram
-  participant B as Visitor's browser
-  participant S as Your site (GitHub Pages)
-  participant T as googletagmanager.com
-  participant G as Google Analytics
-  B->>S: GET /posts/...
-  S-->>B: HTML with gtag.js in the head
-  B->>T: Load gtag.js?id=G-XXXXXXXXXX
-  T-->>B: gtag library
-  B->>G: page_view event (+ scroll, clicks)
-  Note over G: Visible in Realtime within minutes
-```
+{% include diagram.html id="website/analytics/ga4-page-view" %}
 
 > Chirpy's `pageviews:` setting (the view counter shown on posts) is separate from analytics and currently only supports GoatCounter. Adding a GA4 ID won't show view counts on your posts.
 {: .prompt-tip }

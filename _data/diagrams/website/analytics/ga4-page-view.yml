@@ -1,0 +1,238 @@
+# Explorable diagram for _posts/websites/2024-12-01-setup-google-analytics-in-jekyll-chirpy-theme.md
+# (include id: website/analytics/ga4-page-view): what happens when someone opens a page.
+# Facts from the post (Chirpy 7.6.0 `_includes/analytics/google.html`, gtag.js, /g/collect, Realtime)
+# and the certificates actually served on 2026-10-21 (openssl s_client against each host).
+title: A GA4 page view on a Chirpy site
+accent: "#38BDF8"
+accent2: "#FBBF24"
+level: 1
+levels: [Overview, Components]
+min_zoom: 0.5
+
+certs:
+  le-cloudutsuk:
+    label: cloudutsuk.com
+    type: public
+    by: "GitHub Pages (custom domain with Enforce HTTPS)"
+    issuer: "Let's Encrypt YR2 → ISRG Root YR → ISRG Root X1; requested by GitHub for the custom domain"
+    valid: "Short-lived; the one served now expires 8 Dec 2026, and GitHub renews it automatically"
+    stored: "GitHub's Pages edge; nothing in the repo"
+    trust: "Public chain: every browser and OS trusts ISRG Root X1"
+    note: "Also covers www.cloudutsuk.com."
+  gts-ga:
+    label: "*.google-analytics.com"
+    type: public
+    by: "Google's edge for www.googletagmanager.com and the google-analytics.com collection hosts"
+    issuer: "Google Trust Services WE2 → GTS Root R4 → GlobalSign Root CA"
+    valid: "The one served now expires 21 Dec 2026; Google rotates it"
+    trust: "Public chain: browsers trust GTS Root R4 and GlobalSign Root CA"
+    note: "One certificate whose SAN list covers googletagmanager.com, www.googletagmanager.com, region1.google-analytics.com and more."
+  gts-google:
+    label: "*.google.com"
+    type: public
+    by: "Google's edge for analytics.google.com"
+    issuer: "Google Trust Services WE2 → GTS Root R4 → GlobalSign Root CA"
+    valid: "The one served now expires 21 Dec 2026; Google rotates it"
+    trust: "Public chain: browsers trust GTS Root R4 and GlobalSign Root CA"
+
+nodes:
+  - id: browser
+    label: Visitor's browser
+    sub: any device
+    icon: browser
+    status: external
+    facts:
+      summary: "Where the whole measurement happens: the page loads Google's tag, and the tag reports the visit."
+      how: "Fetches the HTML from GitHub Pages, then gtag.js from Google, then sends events to GA4. An ad blocker can stop the last two."
+      where: "the reader's device"
+      api: "None of its own: it calls cloudutsuk.com, googletagmanager.com and google-analytics.com"
+    children:
+      - id: page
+        label: Post page
+        sub: HTML built by Jekyll
+        icon: file
+        status: built
+        facts:
+          summary: "The static page Jekyll built in production mode, with the Google tag in its head."
+          how: "Chirpy's head.html includes `analytics/google.html` because `analytics.google.id` is set; the tag script loads with `defer`."
+          where: "browser tab"
+          when: "every page load"
+          url: {Example post: "https://cloudutsuk.com/posts/website/analytics/setup-google-analytics-in-jekyll-chirpy-theme/"}
+        config:
+          title: "Rendered head tag (Chirpy 7.6.0 _includes/analytics/google.html)"
+          lang: html
+          code: |
+            <script defer src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+            <script>
+              document.addEventListener('DOMContentLoaded', () => {
+                window.dataLayer = window.dataLayer || [];
+                function gtag() {
+                  dataLayer.push(arguments);
+                }
+
+                gtag('js', new Date());
+                gtag('config', 'G-XXXXXXXXXX');
+              });
+            </script>
+      - id: gtag
+        label: gtag.js
+        sub: Google tag, in the page
+        icon: code
+        status: external
+        facts:
+          summary: "Google's tag library: turns `gtag('config', …)` and enhanced measurement into GA4 events."
+          how: "Reads the `dataLayer` queue, then sends `page_view` and, with enhanced measurement on, scroll, outbound click and download events."
+          where: "browser tab · window.dataLayer"
+          when: "after DOMContentLoaded"
+          api: "`gtag('config', 'G-XXXXXXXXXX')`"
+
+  - id: pages
+    label: GitHub Pages
+    sub: cloudutsuk.com
+    icon: devops/cicd/github-18.svg
+    status: external
+    facts:
+      summary: "Hosts the static site that GitHub Actions built with `JEKYLL_ENV=production`, so the tag is in every page."
+      how: "Serves the `_site` artifact from the Pages workflow over HTTPS on the custom domain; there's no server code to run."
+      where: "GitHub's Pages edge"
+      when: "always on"
+      url: {Site: https://cloudutsuk.com}
+
+  - id: gtm
+    label: Google Tag Manager
+    sub: www.googletagmanager.com
+    icon: package
+    status: external
+    facts:
+      summary: "Serves the gtag.js library configured for your Measurement ID."
+      how: "`GET /gtag/js?id=G-XXXXXXXXXX` returns the script; the browser caches it, so repeat page views often skip the download."
+      where: "Google's edge"
+      when: "first page load, then cached"
+      api: "`https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX`"
+
+  - id: ga4
+    label: Google Analytics 4
+    sub: your property
+    icon: chart
+    status: external
+    facts:
+      summary: "Receives the events, attributes them to your property by Measurement ID, and turns them into reports."
+      how: "Events land on the collection endpoint, are processed into the property, and show in Realtime within minutes."
+      where: "Google"
+      url: {Google Analytics: https://analytics.google.com/}
+    children:
+      - id: collect
+        label: Collection endpoint
+        sub: /g/collect
+        icon: api
+        status: external
+        facts:
+          summary: "Where gtag.js sends every event, tagged with your Measurement ID as `tid`."
+          how: "Accepts the event over HTTPS and answers with an empty 204; you can see these requests in DevTools by filtering for `collect`."
+          where: "*.google-analytics.com"
+          when: "every event"
+          api: "`https://region1.google-analytics.com/g/collect`"
+      - id: property
+        label: GA4 property
+        sub: Realtime and reports
+        icon: database
+        status: external
+        facts:
+          summary: "Your property's reports: Realtime within minutes, standard reports after processing."
+          how: "Event data is kept for 2 months by default (14 if you change Data Retention); internal-traffic filters drop your own visits."
+          where: "analytics.google.com"
+          when: "Realtime: minutes · reports: a day or two"
+          url: {Google Analytics: https://analytics.google.com/}
+
+  - id: owner
+    label: You
+    sub: site owner
+    icon: user
+    status: built
+    facts:
+      summary: "You check that visits are arriving and read the reports."
+      how: "Open the property in Google Analytics and go to Reports → Realtime; visit your own live site from another device to see it move."
+      url: {Google Analytics: https://analytics.google.com/}
+
+edges:
+  - {id: page_html, from: page, to: pages, proto: HTTPS, port: 443, label: "GET /posts/…", certs: le-cloudutsuk,
+     why: "Every page view starts here: the browser asks GitHub Pages for the post and gets static HTML with the Google tag in its head."}
+  - {id: page_tag, from: page, to: gtm, proto: HTTPS, port: 443, label: "gtag.js?id=G-…", certs: gts-ga,
+     why: "Used when the page's deferred script tag runs: the browser downloads gtag.js for your Measurement ID (or reuses its cached copy)."}
+  - {id: page_gtag, from: page, to: gtag, kind: control, oneway: true, label: "gtag('config')", certs: {none: "In-process: JavaScript calls inside the same browser tab."},
+     why: "On DOMContentLoaded: the inline script fills dataLayer and calls gtag('config', 'G-…'), which starts the tag."}
+  - {id: gtag_collect, from: gtag, to: collect, proto: HTTPS, port: 443, label: page_view, certs: gts-ga,
+     why: "Every event (page_view, then scroll, clicks, downloads) is sent to /g/collect with your Measurement ID; GA answers 204."}
+  - {id: collect_prop, from: collect, to: property, kind: data, oneway: true, label: process, certs: {none: "Inside Google's own systems; not a hop you can see."},
+     why: "After collection: GA4 attributes the event to your property, where Realtime picks it up within minutes."}
+  - {id: owner_ga, from: owner, to: property, proto: HTTPS, port: 443, label: Realtime, certs: gts-google,
+     why: "Used when you verify the setup or read reports: you open analytics.google.com and the Realtime report."}
+
+scenarios:
+  - id: page-view
+    title: Someone opens a page
+    summary: "One page view, from the HTML request to your Realtime report."
+    modes: [{id: normal, label: Normal}, {id: blocked, label: Simulate an ad blocker}]
+    steps:
+      - title: Request the post
+        action: "Browser → GitHub Pages: GET /posts/… (HTTPS 443)"
+        text: "The reader opens a post. TLS uses the Let's Encrypt certificate GitHub provisioned for cloudutsuk.com."
+        path: [page_html]
+      - title: HTML comes back
+        action: "GitHub Pages → browser: static HTML with the Google tag in its head"
+        text: "Because the site was built with JEKYLL_ENV=production, Chirpy added the tag for analytics.google.id."
+        path: [~page_html]
+      - title: Tag is blocked
+        action: "Browser ✕ googletagmanager.com: request blocked by an extension"
+        text: "Ad blockers and privacy extensions block gtag.js. The page still works, but GA4 never hears about this visit."
+        lights: [page]
+        when: blocked
+        result: fail
+        outcome: "Blocked: no page_view sent"
+        at: page
+      - title: Load gtag.js
+        action: "Browser ↔ Google Tag Manager: GET /gtag/js?id=G-… (HTTPS 443)"
+        text: "The deferred script downloads gtag.js for your Measurement ID, or reuses the cached copy on later pages."
+        path: [page_tag, ~page_tag]
+        when: normal
+      - title: Start the tag
+        action: "Page → gtag.js: gtag('js', …) and gtag('config', 'G-…')"
+        text: "On DOMContentLoaded the inline script fills dataLayer and configures the tag with your Measurement ID."
+        path: [page_gtag]
+        when: normal
+      - title: Send page_view
+        action: "gtag.js ↔ /g/collect: page_view event, 204 back (HTTPS 443)"
+        text: "The event carries the page URL, title and tid=G-…. This is the request to look for in DevTools."
+        path: [gtag_collect, ~gtag_collect]
+        when: normal
+      - title: Into your property
+        action: "Collection endpoint → GA4 property: event processed"
+        text: "GA4 attributes the event to your property by Measurement ID."
+        path: [collect_prop]
+        when: normal
+      - title: You see it in Realtime
+        action: "You ↔ analytics.google.com: Reports → Realtime (HTTPS 443)"
+        text: "The visit shows in Realtime within minutes. Standard reports take longer to fill in."
+        path: [owner_ga, ~owner_ga]
+        when: normal
+        result: success
+        outcome: "Page view counted"
+
+  - id: scroll
+    title: The reader scrolls
+    summary: "Enhanced measurement sends more events without any extra code."
+    steps:
+      - title: Send scroll event
+        action: "gtag.js ↔ /g/collect: scroll event at 90% of the page, 204 back (HTTPS 443)"
+        text: "Enhanced measurement, on by default for the web stream, sends a scroll event to the same endpoint with the same Measurement ID."
+        path: [gtag_collect, ~gtag_collect]
+      - title: Into your property
+        action: "Collection endpoint → GA4 property: scroll event processed"
+        text: "GA4 attributes the scroll event to your property, next to the page_view from the same visit."
+        path: [collect_prop]
+      - title: You see it in Realtime
+        action: "You ↔ analytics.google.com: Realtime, event count by name (HTTPS 443)"
+        text: "The Realtime report's event card lists scroll alongside page_view."
+        path: [owner_ga, ~owner_ga]
+        result: success
+        outcome: "Scroll event recorded"
