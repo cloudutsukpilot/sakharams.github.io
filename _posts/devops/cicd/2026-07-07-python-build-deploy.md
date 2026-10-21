@@ -2,7 +2,7 @@
 layout: post
 title: Python Build and Deployment Tools Guide
 categories: [devops, cicd]
-tags: [Python, DevOps, CI/CD, Build Tools, Deployment]
+tags: [Python, DevOps, CI/CD, Build-Tools, Deployment]
 image:
   path: /assets/img/devops/cicd/python-build-deploy.webp
   alt: "Python Build and Deployment Tools Guide - DevOps hero image"

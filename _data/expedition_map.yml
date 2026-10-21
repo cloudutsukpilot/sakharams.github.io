@@ -71,6 +71,7 @@ routes:
   devops: devops
   artifacts: devops/artifacts
   platform engineering: devops/platform-engineering
+  platformengg: devops/platform-engineering
   cloud native: devops/cloud-native
   microservices: devops/microservices
   # Security

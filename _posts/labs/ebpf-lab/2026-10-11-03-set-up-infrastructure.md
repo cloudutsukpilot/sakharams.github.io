@@ -89,6 +89,7 @@ What each part does:
 
 `make node-prep` runs `scripts/node-prep.sh` after the cluster is created:
 
+{% raw %}
 ```bash
 # Cilium pins its maps in a BPF filesystem at /sys/fs/bpf and needs it to be a *shared* mount so
 # the pinned maps survive agent restarts and are visible to its other pods. A k3d node is a Docker
@@ -103,6 +104,7 @@ for n in $(docker ps --filter "label=k3d.cluster=$CLUSTER" --filter "label=k3d.r
   '
 done
 ```
+{% endraw %}
 
 Docker drops these mounts when a node container restarts, so run `make node-prep` again after a
 `k3d cluster start`.

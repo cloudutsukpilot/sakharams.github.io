@@ -2,7 +2,7 @@
 layout: post
 title: IAC - Crossplane
 categories: [devops, iac, crossplane]
-tags: [DevOps, IAC, Crossplane]
+tags: [DevOps, IaC, Crossplane]
 ---
 
 ## Introduction

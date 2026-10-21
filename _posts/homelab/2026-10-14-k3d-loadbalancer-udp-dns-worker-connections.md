@@ -199,6 +199,7 @@ So the fix is to patch the template once and write the values file:
 
 The template change is a small edit around the `proxy_timeout` line:
 
+{% raw %}
 ```text
   server {
     listen        {{ $port }} {{- if (eq $protocol "udp") }} udp{{- end -}};
@@ -212,6 +213,7 @@ The template change is a small edit around the `proxy_timeout` line:
     proxy_connect_timeout 2s;
   }
 ```
+{% endraw %}
 
 I wrapped it in an idempotent script that loops over every k3d load balancer and does the edit inside
 each container with `docker exec`. It only patches what isn't patched yet, then rewrites the values file

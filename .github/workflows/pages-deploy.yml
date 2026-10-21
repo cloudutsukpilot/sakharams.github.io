@@ -63,24 +63,34 @@ jobs:
         env:
           JEKYLL_ENV: "production"
 
+      # Fast (~5s): run before the ~2 min link check so content mistakes fail early.
+      - name: Test customizations
+        run: bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require File.expand_path(f) }'
+
       - name: Test site
         run: |
           bundle exec htmlproofer _site \
             \-\-disable-external \
             \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
 
-      - name: Test customizations
-        run: bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require File.expand_path(f) }'
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: "_site${{ steps.pages.outputs.base_path }}"
+
+  # Runs alongside build so the scan never delays a deploy.
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: "_site${{ steps.pages.outputs.base_path }}"
 
   deploy:
     environment:

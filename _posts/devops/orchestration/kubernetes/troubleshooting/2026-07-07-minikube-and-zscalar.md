@@ -30,10 +30,10 @@ I was moving our State-of-DevOps setup off k3d and onto minikube. On k3d, we
 mount a real Azure File Share into `/data` inside the cluster so cronjobs can
 share collected data with the dashboard. That means installing the Azure Files
 CSI driver into the cluster, the same way k3d does it in
-[`k3d/create-cluster.sh`](../../k3d/create-cluster.sh).
+`k3d/create-cluster.sh`.
 
 I copied that install step into
-[`minikube/create-cluster.sh`](../../minikube/create-cluster.sh), ran it, and
+`minikube/create-cluster.sh`, ran it, and
 smugly waited for a green tick. Instead I got:
 
 ```text

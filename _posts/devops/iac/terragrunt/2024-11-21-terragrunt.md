@@ -2,7 +2,7 @@
 layout: post
 title: Introduction to Terragrunt
 categories: [devops, iac, terragrunt]
-tags: [DevOps, IAC, Terragrunt]
+tags: [DevOps, IaC, Terragrunt]
 ---
 
 ## Introduction

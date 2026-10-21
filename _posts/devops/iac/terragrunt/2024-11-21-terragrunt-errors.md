@@ -2,7 +2,7 @@
 layout: post
 title: Terragrunt Errors
 categories: [devops, iac, terragrunt]
-tags: [DevOps, IAC, Terragrunt]
+tags: [DevOps, IaC, Terragrunt]
 ---
 
 ## Introduction
