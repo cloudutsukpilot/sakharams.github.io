@@ -19,8 +19,8 @@ category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
 lab_category: cloud       # Labs tab group (_data/lab_catalog.yml)
 clouds: [azure]
 repo:
-  path: /home/sakharam/gitrepos/labs-azure/service-bus   # absolute: the lab runner rejects ~
-  # Private for now: github.com/cloudutsukpilot/labs-azure (add `url:` once public)
+  path: /home/sakharam/gitrepos/azure-labs/service-bus   # absolute: the lab runner rejects ~
+  # Private for now: github.com/cloudutsukpilot/azure-labs (add `url:` once public)
 deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
   # `up` creates the Azure namespace first (az CLI, the runner's az login), then the k3d cluster.
   targets: {up: up, down: down, status: status}
@@ -309,5 +309,5 @@ brief: |
   better understanding of azure service bus"
   Answers (2026-10-21): real Azure namespace (Standard, billable; emulator rejected because SQL Server
   Linux is x86-only and the DGX is arm64); lab code in a new repo the author created
-  (cloudutsukpilot/labs-azure, folder service-bus); use case: e-commerce orders (queue for orders with
+  (cloudutsukpilot/azure-labs, one folder per Azure lab; this one is service-bus); use case: e-commerce orders (queue for orders with
   retries and dead-lettering, topic fan-out to billing, shipping, email, fraud-check by SQL filter).

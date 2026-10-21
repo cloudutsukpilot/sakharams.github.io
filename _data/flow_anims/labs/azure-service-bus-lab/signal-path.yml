@@ -1,6 +1,6 @@
 # Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-03-set-up-infrastructure.md
 # (include id: labs/azure-service-bus-lab/signal-path), the Observability Stack section.
-# Facts from labs-azure/service-bus (app/Dockerfile, app/sblab/telemetry.py, web.py's entity poller,
+# Facts from azure-labs/service-bus (app/Dockerfile, app/sblab/telemetry.py, web.py's entity poller,
 # k8s/app/app.yaml) and the lab contract v2 description in the learning-lab skill (lab-anatomy.md).
 title: How the lab's traces, metrics and logs reach mon
 accent: "#22D3EE"

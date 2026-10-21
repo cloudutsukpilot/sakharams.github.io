@@ -25,7 +25,7 @@ experiments show.
 {: #repository-layout }
 
 ```
-labs-azure/service-bus/
+azure-labs/service-bus/
   app/
     Dockerfile                one image for the three workloads
     requirements.txt          azure-servicebus 7.14.3, FastAPI, OpenTelemetry

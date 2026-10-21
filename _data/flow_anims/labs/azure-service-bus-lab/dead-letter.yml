@@ -1,6 +1,6 @@
 # Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-06-experiments.md
 # (include id: labs/azure-service-bus-lab/dead-letter), above experiment 5 (poison) and 6 (resubmit).
-# Facts from labs-azure/service-bus: infra/up.sh (orders: lock 30 s, max delivery count 3),
+# Facts from azure-labs/service-bus: infra/up.sh (orders: lock 30 s, max delivery count 3),
 # app/sblab/fulfillment.py (abandon on failure), app/sblab/web.py (api_resubmit). Emulator run
 # 2026-10-21: delivery_count 0, 1, 2, then MaxDeliveryCountExceeded.
 title: A poison order, three deliveries, then the dead-letter queue

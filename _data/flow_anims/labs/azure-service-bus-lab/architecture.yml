@@ -1,7 +1,7 @@
 # Animated flow diagram for _posts/labs/azure-service-bus-lab/2026-10-22-01-overview.md
 # (include id: labs/azure-service-bus-lab/architecture), reused in part 7.
 # One order: checkout → orders queue → fulfillment → order-events topic → subscriptions → subscribers.
-# Facts from labs-azure/service-bus (infra/up.sh, app/sblab/*.py, k8s/app/app.yaml) and the emulator run.
+# Facts from azure-labs/service-bus (infra/up.sh, app/sblab/*.py, k8s/app/app.yaml) and the emulator run.
 title: One order through the Service Bus lab, queue then topic
 accent: "#22D3EE"
 accent2: "#A3E635"
