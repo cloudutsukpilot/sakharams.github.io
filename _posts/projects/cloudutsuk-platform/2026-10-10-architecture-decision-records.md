@@ -457,6 +457,8 @@ everything else.
   above, because the host had far less free memory than this ADR budgeted ([ADR 0046](#adr-0046)).
 - **Replaced (2026-10-16):** Qwen3.5-35B-A3B in FP8, the newer generation of the Qwen candidate, for tool
   calling and context ([ADR 0049](#adr-0049)).
+- **Slices held only while serving (2026-10-22):** KEDA scales an idle model server to zero, so its slice
+  goes back to the host between uses; embeddings first, chat next ([ADR 0051](#adr-0051)).
 
 #### Considered options
 
@@ -471,12 +473,14 @@ everything else.
 - Good: The OpenAI API keeps clients portable.
 - Bad: The model takes about a third of the box's memory.
 - Bad: Time-slicing has no memory isolation; a mis-set utilization can starve the other model or the host.
-- Bad: GPU memory doesn't show in pod or container memory metrics (see ADR 0026).
+- Bad: GPU memory doesn't show in pod or container memory metrics (see ADR 0026). Since 2026-10-22 the host
+  exports it per process (`homelab_gpu_process_memory_bytes`, ADR 0051).
 
 #### Related
 
 - [ADR 0022](#adr-0022)
 - [ADR 0046](#adr-0046), [ADR 0049](#adr-0049)
+- [ADR 0051](#adr-0051)
 
 ## ADR-0011: Qdrant for vectors and Redis (RedisVL) for the semantic cache
 {: #adr-0011 }
@@ -746,6 +750,9 @@ forgotten cloud lab keeps billing; a double click could deploy the same lab twic
 - Lab contract v2 (2026-10-14, Phase 2 step 5): `deploy.ports` lists every host port the lab's k3d
   cluster publishes, its Kubernetes API port included; the blog's `check.py` fails a card that misses
   one, because two clusters can't bind the same host port.
+- Emulated deploys (2026-10-21, ADR 0050): a cloud lab whose card sets `deploy.emulated` can also be
+  deployed against the Floci emulators on the host. That deploy needs no cost confirmation and gets no
+  TTL; its destroy runs in the same mode.
 
 #### Considered options
 
@@ -939,6 +946,11 @@ same box don't add capacity.
   give each extra model a fixed memory slice, loading rarely used ones on demand; add a second box or
   a hosted model as another gateway backend. KEDA only once a second GPU node exists. `mon` alerts on
   vLLM queue depth and time to first token.
+- Amended (2026-10-22, [ADR 0051](#adr-0051)): KEDA came in earlier, to
+  scale the other way. With its HTTP add-on it takes an idle model server to zero and starts it on the next
+  request, so a model's slice is held only while it serves ("loading rarely used ones on demand" above).
+  LiteLLM reaches those models through the add-on's interceptor; callers don't change. Adding replicas
+  still waits for a second GPU node.
 
 #### Considered options
 
@@ -958,6 +970,7 @@ same box don't add capacity.
 - [ADR 0010](#adr-0010)
 - [ADR 0021](#adr-0021)
 - [ADR 0029](#adr-0029)
+- [ADR 0051](#adr-0051)
 
 ## ADR-0023: OpenBao as the local secret manager; External Secrets Operator in every cluster
 {: #adr-0023 }
@@ -2723,6 +2736,277 @@ family, Qwen, has a newer generation: Qwen3.5 (February 2026).
 #### Related
 
 - ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0046 (superseded), ADR 0048 (Hermes Agent)
+
+## ADR-0050: Emulated lab deploys: cloud labs against the Floci emulators on the host, at no cost
+{: #adr-0050 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-21 · `homelab-services`, `self-service-portal`, `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+A cloud lab (one whose card names Azure, AWS or GCP) can only be deployed from the portal into a real
+cloud account: it costs money, needs a cost confirmation and is destroyed at its TTL (ADR 0017). Trying
+a lab, demoing it, or letting a coding agent iterate on its Terraform all spend money and need the
+owner's cloud logins on the host.
+
+[Floci](https://floci.io) (MIT, no account or token) emulates AWS (126 services), Azure (29, including
+the ARM management plane, so `azurerm` Terraform applies) and GCP (27, `google` Terraform and gcloud),
+one small native container per cloud, multi-arch. It's a test double, not the cloud: credentials are
+accepted unchecked, IAM is mostly not enforced, and some services are simulated.
+
+#### Decision
+
+- **Emulators on the host, next to the lab runner.** `homelab-services/services/lab-runner/deploy/floci/compose.yaml`
+  runs `floci` (AWS), `floci-az` and `floci-gcp`, started by the runner's `install.sh` and restarted
+  by Docker at boot. They publish only on the homelab gateway, `172.30.0.1:4566`, `:4577` and `:4588`
+  (ADR 0030), because in dev mode they accept any credentials. Not in a cluster: the runner and `make`
+  run on the host, and lab clusters reach the gateway.
+- **Hardened and pinned.** Images through Zot's docker.io mirror (ADR 0034), pinned by index digest to
+  releases at least 14 days old (first: floci 2.2.0, floci-az 0.14.0, floci-gcp 0.10.0, all 2026-10-06).
+  They run as the images' non-root user with every capability dropped, a read-only root file system and
+  1 GB of memory each (about 130 MB used idle). **No Docker socket**: with it, anything on the bridge
+  could start containers on the host through an emulator. Docker-backed services (AWS Lambda, RDS, ECS;
+  Azure Functions; GCP Cloud SQL, Cloud Run, GKE) are therefore metadata-only or unavailable.
+- **Hybrid storage** (in memory, flushed every 5 s) in Docker volumes, so a lab deployed before a reboot
+  can still be destroyed.
+- **Opt-in per lab.** A card sets `deploy.emulated: true`; the portal then shows **Deploy emulated**
+  next to Deploy, and the runner API takes `emulated: true` on a deploy. An emulated deploy needs no cost
+  confirmation and gets no TTL. The runner refuses it (422) when an emulator for one of the card's
+  clouds isn't reachable.
+- **A destroy runs in the mode of its deploy**, recorded by the runner (`lab_state.emulated`), so a
+  request can't use `emulated` to skip the cost check of a lab running in the cloud.
+- **No real login reaches an emulated job.** The runner drops every passed-through `AWS_*`, `AZURE_*`,
+  `ARM_*`, `CLOUDSDK_*` and `GOOGLE_*` variable, gives `az`, `gcloud` and the AWS tools empty per-lab
+  config folders, sets throwaway AWS keys and `AWS_ENDPOINT_URL`, and passes `FLOCI_<CLOUD>_ENDPOINT`
+  and `LAB_CLOUD_MODE=emulated` for the lab's Makefile to point its Azure and GCP providers at. A
+  Makefile that forgets an endpoint fails against the real cloud rather than billing it.
+
+#### Considered options
+
+1. **LocalStack**: AWS only, and (per Floci's comparison) its community edition has needed an auth token since March 2026.
+2. **Azurite, the GCP SDK emulators, Moto**: data plane only or one service each; no Terraform apply of
+   a resource group, VNet or GKE cluster.
+3. **Floci in a cluster** (`platform`): the runner and `make` are on the host, Docker-backed services
+   would need a socket in a pod, and a cluster restart would drop emulated labs' state.
+4. **Floci on the host, opt-in per lab, no Docker socket** (chosen).
+
+#### Consequences
+
+- Good: Cloud labs can be tried and demoed for free, from the portal, without the owner's cloud logins.
+- Good: Coding agents can iterate on a lab's Terraform against the emulators.
+- Good: The same pinned emulators can serve CI and Testcontainers later (`testcontainers-floci` for the
+  `inventory` service's collectors, Phase 4).
+- Bad: Emulated behaviour can differ from the cloud (IAM, networking, simulated services). A lab that
+  teaches those still needs the real cloud.
+- Bad: Without the Docker socket, labs built on Lambda, Functions, RDS or GKE don't run fully emulated.
+- Bad: Lab Makefiles need an emulated path for Azure and GCP (endpoint overrides, the floci-az
+  certificate from `GET /_floci/tls-cert`); AWS needs nothing more than the runner's variables.
+- Bad: Three more images to bump, pinned twice a month at most.
+
+#### Related
+
+- [ADR 0017](#adr-0017)
+- [ADR 0030](#adr-0030)
+- [ADR 0034](#adr-0034)
+- [ADR 0031](#adr-0031)
+
+## ADR-0051: Scale idle model servers to zero with KEDA and its HTTP add-on, embeddings first
+{: #adr-0051 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-22 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Each vLLM server holds its whole `--gpu-memory-utilization` slice of the GB10's unified memory from start
+to stop, busy or not (ADR 0010): about 41 GiB for the chat model (0.36) and 12 GiB for embeddings (0.1).
+On 2026-10-22 the DGX had 84% of its 121.7 GiB in use and 8.4 GiB of swap out, and the host's GPU memory
+metric (infra-local `host/exporters`, `homelab_gpu_process_memory_bytes`) showed the two slices were
+53.6 GiB of that, more than every process's own memory combined (43 GiB).
+
+Most of that time the models were idle. Over the 25 hours of vLLM metrics available that day:
+
+| Model | Requests | Hours with none | Ready after a restart (weights cached) |
+|---|---|---|---|
+| `vllm-chat` | 85 | 18 of 25 | about 4 minutes |
+| `vllm-embeddings` | 0 | 25 of 25 | about 45 s |
+
+ADR 0022 put KEDA off until a second GPU node, as a way to add replicas. The need here is the opposite:
+fewer than one replica, so the memory goes back to the host while nobody calls. Callers already reach the
+models only through LiteLLM by name (ADR 0022), so the change sits between LiteLLM and vLLM. A wait on the
+first call after an idle period is acceptable to the owner.
+
+#### Decision
+
+- **KEDA 2.21.0** in `ai`, namespace `keda`, from its Helm chart (`clusters/ai/keda.yaml`). The chart is
+  only on `https://kedacore.github.io/charts`, which the `ai` AppProject now allows.
+- **The KEDA HTTP add-on 0.16.0** next to it (`apps/keda-http-add-on`). Its interceptor sits between
+  LiteLLM and a model server: it routes by Host header, reports pending requests to KEDA through its
+  external scaler and, while the Deployment is at zero, holds the request until a pod is ready. Plain KEDA
+  on a metric can wake a model only after a request has already failed.
+- **Rendered, not a Helm source:** the add-on's chart takes one image tag for its three images, so it
+  can't carry per-image digests (Kyverno `require-image-digest`, ADR 0033). It is rendered into git by
+  `scripts/render_keda_http_add_on.sh`, and Kustomize's `images:` pins the digests. No policy exception.
+- **Per model** (`apps/<model>/scale-to-zero.yaml`): an `InterceptorRoute` (the v1beta1 API; not the
+  older `HTTPScaledObject`) with its own readiness and response-header timeouts and a cap on held
+  requests; a `ScaledObject` from 0 to 1 with a cooldown; an `ExternalName` Service `<model>-proxy` for
+  the interceptor. LiteLLM's `api_base` points at the proxy name. The Deployment has no `replicas`, and its
+  Application ignores `/spec/replicas`, so Argo CD and KEDA don't fight.
+- **Embeddings first** (2026-10-22): `vllm-embeddings`, with a 15-minute cooldown, a 5-minute readiness
+  timeout and a 2-minute response-header timeout.
+- **Chat next**, once embeddings has run this way without trouble: the same three objects, a longer
+  readiness timeout (cold start about 4 minutes) and a longer response-header timeout (thinking before
+  the first byte of a non-streamed answer). Its callers' timeouts (Hermes, job-hunter) must allow for
+  a 5-minute first call, and that step updates this ADR.
+- `VLLMNotServing` keeps working unchanged: it only fires when the Deployment wants replicas
+  (`kube_deployment_spec_replicas > 0`) and none is ready, so a model at zero is quiet.
+
+#### Considered options
+
+1. **Keep every model always on**: no wait, but about 54 GiB held around the clock for a few requests a
+   day, on a host that is also a desktop.
+2. **KEDA with a Prometheus trigger on LiteLLM's request metrics**: no extra proxy, but at zero the call
+   fails immediately; only the failure wakes the model, and every caller would need minutes of retries.
+3. **KEDA's cron scaler** (models up in working hours): no proxy and no first-call wait inside the window,
+   but calls outside it fail, and Hermes and job-hunter run on their own schedules.
+4. **LiteLLM or a script starting the model**: LiteLLM has no scale-from-zero hook; a home-made waker
+   would be our own interceptor without the routing, metrics or timeouts.
+5. **KEDA plus the HTTP add-on** (chosen): requests wait instead of failing, callers don't change, and
+   each model's timeouts and cooldown sit in git next to it.
+
+#### Consequences
+
+- Good: An idle model gives its slice back: 12 GiB for embeddings now, about 46 GiB more with chat.
+- Good: Callers are unchanged; they still call LiteLLM by model name.
+- Good: Each model's cold-start behaviour (timeouts, held-request cap, cooldown) is in git.
+- Bad: The first call after an idle period waits for the model (about 45 s for embeddings, about 4
+  minutes for chat); a caller with a shorter timeout fails that call and must retry.
+- Bad: Memory isn't reserved while a model is down. If the host fills the freed memory, the model can't
+  start (vLLM fails to take its slice): watch "Where the memory goes" on the Fleet / DGX Spark dashboard.
+- Bad: One more hop, and a single interceptor pod; if it is down, the scaled models are unreachable
+  although their pods may be fine.
+- Bad: The add-on's manifests are rendered by hand; an upgrade is a script run and a review, not a version
+  bump in an Application.
+- Bad: Anything that checks a model's health through LiteLLM or the interceptor wakes it. Prometheus
+  scrapes the pods directly, which doesn't.
+
+#### Related
+
+- [ADR 0010](#adr-0010): the memory slices this frees
+- [ADR 0022](#adr-0022): the gateway and the earlier "KEDA only once a second GPU node exists"
+- [ADR 0033](#adr-0033): digests and admission
+- [ADR 0049](#adr-0049): the chat model, next in line
+
+## ADR-0052: Paperclip as the agent control plane in platform: our own signed image, platform-db, Keycloak in front, models only through LiteLLM
+{: #adr-0052 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `homelab-services`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Phase 6 brings agents onto the platform: the SRE agent (ADR 0014) first, and coding agents that work on
+the platform's own repos after it. Each agent so far is a separate CLI session or service with its own
+history, its own keys and no shared view of what it is doing, what it costs or what is waiting for my
+approval.
+
+Paperclip (MIT) is a self-hosted control plane for teams of
+agents: a Node.js 24 server and React UI on one port (3100) with a Postgres database. It assigns tasks to
+agents (coding CLIs such as OpenCode, Claude Code or Codex, or HTTP endpoints), wakes them on schedules,
+and enforces budgets, review stages and an audit trail. What we checked in its source (2026-10-16, commit
+`78b833c`, release `v2026.916.1`):
+
+- The image is published for linux/amd64 and arm64 (the DGX is arm64), by full-SHA tag with a Sigstore
+  attestation. Started as non-root, its entrypoint skips `gosu` and runs unprivileged, so Pod Security
+  `restricted` is possible.
+- It takes an external Postgres through `DATABASE_URL` and runs its migrations at start. Everything else
+  it keeps lives in `PAPERCLIP_HOME` (instance config, attachments, agent workspaces and CLI state).
+- People sign in with email and password only (Better Auth); there is no OIDC sign-in. ADR 0028 wants
+  every UI behind Keycloak.
+- It needs three long-lived secrets: a session secret, a tool-action signing secret and a 32-byte master
+  key that encrypts the company secrets in its database.
+- Local adapters run the agent CLIs inside Paperclip's own container. The upstream image installs those
+  CLIs at `@latest`, so two builds of the same commit differ.
+- Telemetry is opt-in OpenTelemetry traces only, no metrics; health is `GET /api/health`.
+- Upstream moves fast: several commits a day.
+
+Kyverno (ADR 0033) admits only signed `platform/*` images or digest-pinned `mirror/*` ones. Models are
+reached only through the LiteLLM gateway with a virtual key per caller (ADR 0022, 0029).
+
+#### Decision
+
+- **Paperclip runs in `platform`,** namespace `paperclip`, Argo CD group `platform` (ADR 0047), synced from
+  `apps/paperclip` by `clusters/platform/paperclip.yaml`. It sits next to the SRE agent, so it keeps
+  working when `ai` is down (ADR 0014, 0018). One replica, `Recreate`.
+- **Our own image, `platform/paperclip`,** from `homelab-services` `services/paperclip`: a thin Dockerfile
+  on the upstream image pinned by digest through Zot's mirror (a release at least 14 days old), with the
+  agent CLIs and the OTel packages reinstalled at pinned versions and uid 1000. It goes through
+  `build-image.yaml`, so it gets the gates, a Cosign signature and an SBOM like every other image
+  (ADR 0032, 0033, 0043). No fork.
+- **Data:** a database `paperclip` with its own owner role in `platform-db` (ADR 0035); its nightly dump
+  covers it (ADR 0039). `PAPERCLIP_HOME` is a static PV on `/srv/homelab/paperclip`, not backed up: the
+  workspaces are git clones and the attachments are accepted as lost on a rebuild (ADR 0016).
+- **Secrets** in OpenBao `kv/platform/paperclip`, delivered by External Secrets (ADR 0023). The master key
+  also goes into the offline recovery kit, because without it a restored database's company secrets
+  can't be decrypted. Strict secret mode is on.
+- **Sign-in:** the Ingress (`paperclip.platform.home.cloudutsuk.com`, tailnet only, ADR 0037) sits behind
+  oauth2-proxy with a Keycloak client `paperclip`, allowing only the group `platform-admins`. Paperclip
+  runs `authenticated` with `private` exposure and its own login behind that gate; open sign-up is off
+  after the owner's account exists. This is a deliberate exception to ADR 0028's "Keycloak is the sign-in"
+  until Paperclip supports OIDC.
+- **Models only through LiteLLM:** one virtual key `paperclip`, limited to the models agents need, with a
+  monthly budget, kept in `kv/ai/litellm-clients`. Paperclip's own company and agent budgets are set below
+  it, so Paperclip stops first and LiteLLM is the backstop. A hosted model, if the spike shows one is
+  needed, becomes another LiteLLM backend rather than a key in the agents.
+- **Code changes only as pull requests:** a GitHub App of its own, installed on chosen repos with Contents
+  and Pull requests read/write and nothing else; branch protection keeps `main` review-only. Paperclip
+  never gets `cloudutsuk-gitops-writer` (ADR 0043). Every project gets a review stage in Paperclip, so an
+  agent's PR needs my approval there and on GitHub.
+- **Agents stay inside the pod and have no cluster access:** no ServiceAccount token, an egress
+  NetworkPolicy (DNS, `platform-db`, LiteLLM's HTTPS name, the OTLP gateway, GitHub), resource limits, and
+  every Kyverno policy enforced with no new exception. Any secret bound to an agent is treated as exposed
+  to it.
+- **Watching it:** traces to the OTLP gateway on `mon` (ADR 0042), logs through the monitoring pack,
+  alerts on a pod that isn't ready and on a failing `/api/health`, spend from LiteLLM's metrics for key
+  `paperclip`.
+- **Accepted only after the spike** (Phase 6, step 5a): the upstream image runs as uid 1000 with a
+  read-only root on the DGX, an OpenCode agent finishes a small task through LiteLLM, and memory and image
+  size fit the `platform` cluster. Its findings are added here before the status changes.
+
+#### Considered options
+
+1. **Paperclip in `platform` with our own signed image (chosen):** fits Kyverno, Argo CD and the backup
+   path we already run, and pins the agent CLIs that upstream leaves floating.
+2. **Paperclip in `ai`:** closer to the models, but it would go down with the GPU stack, which is when the
+   SRE agent's work matters most.
+3. **The upstream image through Zot's mirror, pinned by digest:** admitted without our signature, but the
+   CLIs inside are `@latest` at upstream's build time and it skips our scanners.
+4. **A fork of Paperclip** (for example to add OIDC sign-in): too much upkeep at upstream's pace.
+5. **Paperclip's own login alone on the tailnet:** simpler, one login, but a second identity store next
+   to Keycloak and no group check (ADR 0028).
+6. **Embedded Postgres in the pod:** zero setup, but invisible to Velero's dump hooks.
+7. **No control plane: agents as separate sessions and services:** nothing new to run, but no shared
+   board, no budgets across agents and no single place for approvals.
+
+#### Consequences
+
+- Good: one board for every agent's work, cost and pending approvals; the SRE agent can file its RCAs and
+  proposed fixes there with a review stage (Phase 6, step 5h).
+- Good: nothing new to operate around it: Argo CD, Kyverno, OpenBao, `platform-db`, Velero, LiteLLM and
+  `mon` are reused as they are.
+- Bad: two sign-ins (Keycloak, then Paperclip) until Paperclip supports OIDC.
+- Bad: agents run arbitrary code inside the pod with the secrets bound to them; the controls are the
+  egress list, the PR-only App, review stages and budgets, not isolation.
+- Bad: a large image (Node, the Rust runner, several CLIs) and frequent upstream releases; every bump is a
+  deliberate digest change with a `platform-db` dump first, and the rollback is the previous digest plus a
+  restore.
+- Bad: no Prometheus metrics of its own; availability comes from the probe and kube-state-metrics.
+- Bad: losing the master key loses every company secret, so the recovery kit grows by one key.
+
+#### Related
+
+- Numbered 0048 until 2026-10-22, when it was renumbered: [ADR 0048](#adr-0048) (Hermes Agent) had the number first.
+- ADR 0014, ADR 0016, ADR 0018, ADR 0022, ADR 0023, ADR 0028, ADR 0029, ADR 0033, ADR 0035, ADR 0037,
+  ADR 0039, ADR 0042, ADR 0043, ADR 0047
+- Plan: `homelab-services` `docs/paperclip-plan.md`; roadmap: Phase 6, steps 5a to 5h
 
 {% endraw %}
 <!-- adr:end -->

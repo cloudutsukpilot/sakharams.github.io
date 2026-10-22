@@ -64,7 +64,7 @@ play to follow a packet through it:
 | Arize Phoenix | `ai` cluster | Shows every chat and agent request as a trace: retrieved chunks and scores, prompt, tokens, latency per step |
 | Model gateway (LiteLLM) | `ai` cluster | The one OpenAI-compatible endpoint for every model call: routing, queueing, limits, token counts, later overflow |
 | vLLM chat + vLLM embeddings | `ai` cluster (GPU) | Local chat model and embedding model, each with its own memory slice |
-| KEDA | `ai` cluster | Scales on-demand models from 0 to 1 when the gateway sees demand and back to 0 when idle, so an unused model frees its memory (phase 5) |
+| KEDA + HTTP add-on | `ai` cluster | Scales a model from 0 to 1 on its next request and back to 0 when idle, so an unused model frees its memory; the add-on's interceptor holds the request while the model starts (ADR 0051). The embeddings model works this way since 2026-10-22 |
 | SRE agent | platform | Alert-triggered diagnosis with human approval before any change |
 | mon cluster | its own k3d cluster | OpenTelemetry gateway, Grafana LGTM, Alertmanager; ready-made dashboards for the fleet, Kubernetes, data stores, AI serving and the platform |
 | Monitoring pack | every cluster, including labs | OTel collectors, kube-state-metrics and ServiceMonitor discovery, installed by one ApplicationSet |
@@ -97,7 +97,7 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 | Observability | OpenTelemetry Collector + Grafana LGTM | The same stack the [OpenTelemetry lab](/tags/opentelemetry-lab/) already teaches |
 | LLM serving | vLLM | OpenAI-compatible API, continuous batching, runs on the GB10 GPU |
 | Model gateway | LiteLLM proxy | One endpoint for all callers, so adding a model, a second machine or a hosted fallback doesn't touch the services |
-| Scale to zero | **KEDA** (CNCF graduated) in the `ai` cluster | Plain HPA can't go to zero replicas, and CPU-based scaling is useless on one GPU. KEDA scales on a Prometheus query, so a rarely used model unloads when idle. Knative would also scale to zero, but needs its own serving layer |
+| Scale to zero | **KEDA** (CNCF graduated) in the `ai` cluster | Plain HPA can't go to zero replicas, and CPU-based scaling is useless on one GPU. With its HTTP add-on, a request to a sleeping model waits for it instead of failing, so a rarely used model unloads when idle (ADR 0051). Knative would also scale to zero, but needs its own serving layer |
 | Vector store | Qdrant | Payload filters (repo, lab, cloud, path) and hybrid search |
 | Semantic cache | Redis with RedisVL `SemanticCache` | Small, well understood, TTL and similarity threshold built in |
 | RAG visualization | Arize Phoenix (self-hosted) | Understands LLM and retrieval spans (documents, scores, prompts), has an embeddings map and evals, and takes OpenTelemetry input like the rest of the platform. Langfuse is the fallback, but it also needs ClickHouse |
@@ -883,60 +883,75 @@ scaling steps below possible:
 
 **Autoscaling** in the usual Kubernetes sense doesn't apply with one GPU. CPU-based HPA would only
 start copies that compete for the same chip. Instead, `mon` watches vLLM's waiting-request count and
-time to first token. When those stay high, that's the signal to add a backend or turn on overflow. Real
-autoscaling, such as KEDA on queue depth, becomes possible once there's a second GPU node.
+time to first token. When those stay high, that's the signal to add a backend or turn on overflow. Scaling
+*out*, such as KEDA adding replicas on queue depth, becomes possible once there's a second GPU node.
 
 ### On-demand models with KEDA
 {: #on-demand-models-with-keda }
 
 There's one kind of scaling that does pay off on one box: **scaling to zero**. The table above says
 rarely used models are "loaded on demand and unloaded when idle", because memory is the only lever.
-**KEDA** (Kubernetes event-driven autoscaling, a CNCF graduated project) does exactly that, and it runs
-only in the **`ai` cluster**:
+Each vLLM holds its whole slice from start to stop, busy or not: on 2026-10-22 the two models held 53.6 GiB
+of the host's 121.7 GiB while the embeddings model had served no request in 25 hours and the chat model
+none in 18 of them. **KEDA** (Kubernetes event-driven autoscaling, a CNCF graduated project) with its
+**HTTP add-on** fixes that, in the **`ai` cluster** only (ADR 0051):
 
-- **Which models.** Only the on-demand ones, such as a reranker or a coding model if they're added. The
-  chat model and the embedding model keep `minReplicaCount: 1` and are never scaled to zero, because the
-  portal chat and ingest need them all the time.
-- **The trigger.** KEDA's Prometheus scaler queries Mimir for the model gateway's request metrics for
-  that model. Demand scales its vLLM Deployment from 0 to 1; a long quiet spell (the cooldown) scales it
-  back to 0 and hands its memory slice back to the desktop and the labs.
-- **Cold starts.** Loading a model takes time, so the first request after a quiet spell waits. The
-  gateway queues and retries that request, and its callers already expect a slow first answer from an
-  on-demand model. That trade is the whole point: memory when nobody's using it, a wait when someone is.
-- **Admission.** Before the model scales up, its memory slice must fit what's free on the host, the same
-  rule the lab runner follows (ADR 0017). If it doesn't fit, it stays at 0 and the gateway answers with a
-  clear "model unavailable" instead of starving the chat model.
+- **The path.** LiteLLM no longer calls the model's Service. It calls `<model>-proxy`, an `ExternalName`
+  Service that points at the add-on's **interceptor**. The interceptor matches the Host header to an
+  `InterceptorRoute`, forwards to the model when a pod is ready and, when the model is at zero, **holds
+  the request** until one is. Callers don't change: they still ask the gateway for a model by name.
+- **The trigger.** The add-on's external scaler reads each route's pending requests from the interceptor
+  and pushes them to KEDA. A request for a sleeping model scales its Deployment from 0 to 1; 15 minutes
+  without one (the cooldown) scales it back to 0 and hands its memory back to the desktop and the labs.
+  A Prometheus trigger on the gateway's metrics was the first idea, but at zero the call fails before
+  the metric moves, so every caller would have to retry for minutes.
+- **Cold starts.** The first request after a quiet spell waits for the model to load: 61 s for the
+  embeddings model, measured on 2026-10-22, and the response carries `X-KEDA-HTTP-Cold-Start: true`.
+  The route allows 5 minutes before it answers 504, and holds at most 200 requests while it waits.
+- **Which models.** The embeddings model since 2026-10-22. The chat model is next (phase 5, step 1b): it
+  frees about 41 GiB, but takes about 4 minutes to start, so its callers' timeouts must allow a slow first
+  answer. Later on-demand models (a reranker, a coding model) follow the same pattern.
+- **Memory isn't reserved.** While a model sleeps, the host can use its slice. If the host has filled it
+  when the next request comes, vLLM can't take its slice and the start fails; "Where the memory goes" on
+  the DGX Spark dashboard shows how close that is. An admission check that refuses the start cleanly, as
+  the lab runner does (ADR 0017), isn't built.
 
 ```yaml
-# Sketch: an on-demand model that sleeps when idle
+# The embeddings model's route and scaler (homelab-gitops apps/vllm-embeddings/scale-to-zero.yaml, abridged)
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: vllm-embeddings
+spec:
+  target: {service: vllm-embeddings, port: 8000}
+  rules:
+    - hosts: [vllm-embeddings-proxy.models.svc.cluster.local]
+  scalingMetric:
+    concurrency: {targetValue: 100}
+  timeouts: {readiness: 5m, responseHeader: 2m}
+  coldStart: {maxPendingRequests: 200, overflow: Reject}
+---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: vllm-reranker
-  namespace: serving
+  name: vllm-embeddings
 spec:
-  scaleTargetRef:
-    name: vllm-reranker
+  scaleTargetRef: {name: vllm-embeddings}
   minReplicaCount: 0
-  maxReplicaCount: 1                 # one GPU: never more than one copy
-  cooldownPeriod: 1800               # 30 quiet minutes before it unloads
+  maxReplicaCount: 1            # one GPU slice: never two copies
+  cooldownPeriod: 900           # 15 quiet minutes before it unloads
   triggers:
-    - type: prometheus
+    - type: external-push
       metadata:
-        serverAddress: https://mimir.mon.home.cloudutsuk.com/prometheus
-        query: sum(rate(litellm_requests_total{model="reranker"}[5m]))   # metric name checked in phase 5
-        threshold: "0.01"
-      authenticationRef:
-        name: mimir-reader           # OAuth2 token from OpenBao through External Secrets
+        scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+        interceptorRoute: vllm-embeddings
 ```
+
+The **Wake an idle model** use case in the system diagram plays this path step by step.
 
 KEDA isn't used for the services: CPU-based scaling on one host only starts copies that compete for the
 same chip. Its other uses wait for a second GPU node: vLLM replicas on queue depth, and the overflow
 backend described above.
-
-> **TODO:** Confirm in phase 5 how the gateway behaves while a model scales from 0 (queue, retry or fail
-> fast), the gateway's real metric names, and how long the on-demand models take to load on the GB10.
-{: .prompt-warning }
 
 Elsewhere:
 - The lab runner refuses or queues a deploy that would push free memory below the headroom.
