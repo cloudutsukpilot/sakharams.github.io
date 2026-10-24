@@ -904,12 +904,16 @@ nodes:
             status: built
             facts:
               summary: The embeddings model for RAG and the cache, running locally (ADR 0010).
-              how: Qwen3-Embedding-0.6B on vLLM 0.24, OpenAI-compatible, in its own GPU slice; `VLLMNotServing` fires after 10
-                min not ready.
+              how: Qwen3-Embedding-0.6B on vLLM 0.24, OpenAI-compatible, in a 0.1 slice of the GB10 (about 12 GiB). Reached
+                through the KEDA interceptor, which starts it on demand (ADR 0051).
               where: ai · ns models
-              when: always on
-              api: '`http://vllm-embeddings.models.svc:8000/v1/embeddings`'
-            detail: Passes all seven Kyverno policies without an exception. `VLLMNotServing` fires after 10 minutes not ready.
+              when: on demand · 0 after 15 min idle
+              api:
+              - '`http://vllm-embeddings-proxy.models.svc:8080/v1/embeddings` (through the interceptor)'
+              - '`http://vllm-embeddings.models.svc:8000` (the pod itself)'
+            detail: Scales to zero after 15 minutes without a request, which frees its GPU memory; the first request after
+              that waited 61 s on 2026-10-22. Passes all seven Kyverno policies without an exception. `VLLMNotServing` fires
+              only when KEDA wants a pod and none has been ready for 10 minutes.
           - id: vllm-chat
             label: vLLM chat
             sub: Qwen3.5-35B-A3B
@@ -923,28 +927,48 @@ nodes:
               api: '`http://vllm-chat.models.svc:8000/v1/chat/completions`'
           - id: vllm-ondemand
             label: On-demand models
-            sub: planned · 0 when idle
+            sub: planned · chat next
             icon: cpu
             status: planned
             phase: 5
             facts:
-              summary: Planned rarely used models (such as a reranker) that only take GPU memory while in use.
-              how: KEDA keeps them at 0 replicas and loads one copy on demand; the first request waits for the load.
-              where: ai
+              summary: The next models to sleep when idle like the embeddings model; the chat model first (phase 5 step 1b),
+                later a reranker.
+              how: The same interceptor route and KEDA ScaledObject; the chat model needs longer timeouts for its 4-minute
+                start.
+              where: ai · ns models
               when: on demand
-              api: 'Planned: through the gateway'
-            detail: The first request after a quiet spell waits for the model to load.
+              api: 'Planned: through the gateway and the interceptor'
+            detail: Chat would free about 41 GiB while idle; its callers' timeouts must allow a 5-minute first answer.
+          - id: keda-interceptor
+            label: KEDA interceptor
+            sub: HTTP add-on
+            icon: devops/orchestration/keda-18.svg
+            status: built
+            facts:
+              summary: Sits between the gateway and a sleeping model, so a request waits for the model instead of failing
+                (ADR 0051).
+              how: Routes by Host header (`InterceptorRoute`), counts in-flight requests for KEDA and, at 0 replicas, holds the
+                request until a pod is ready; up to 5 minutes, then 504.
+              where: ai · ns keda
+              when: always on
+              api: '`keda-add-ons-http-interceptor-proxy.keda:8080`'
+            detail: 'KEDA HTTP add-on 0.16.0, rendered into git so each image is pinned by digest. A response that waited
+              carries `X-KEDA-HTTP-Cold-Start: true`.'
           - id: keda
             label: KEDA
-            sub: planned · phase 5
+            sub: scale to zero
             icon: devops/orchestration/keda-18.svg
-            status: planned
-            phase: 5
+            status: built
             facts:
-              summary: Planned autoscaling that lets idle models give back their GPU memory.
-              how: Its Prometheus scaler reads the gateway's per-model request rate from Mimir and scales between 0 and 1.
-              where: ai only
-              api: 'Planned: `ScaledObject` resources'
+              summary: Lets an idle model give its GPU memory back to the host and starts it again on the next request
+                (ADR 0051).
+              how: KEDA 2.21.0 with the HTTP add-on's external scaler, which reads the interceptor's pending requests; a
+                ScaledObject per model scales its Deployment between 0 and 1.
+              where: ai · ns keda
+              when: always on
+              api: '`ScaledObject` and `InterceptorRoute` in `apps/vllm-*/scale-to-zero.yaml`'
+            detail: Scales only down to zero and back to one; more replicas wait for a second GPU node (ADR 0022).
         - id: phoenix
           label: Phoenix
           sub: planned · RAG traces
@@ -1775,14 +1799,16 @@ edges:
   - {id: rag_px, dashed: true, stream: false, view: observability, from: rag-api, to: phoenix, proto: OTLP gRPC, port: 4317, label: traces, why: "Planned: every chat request is traced, so a wrong answer can be investigated step by step in Phoenix.", certs: {planned: "Planned: not designed yet."}}
   - {id: rag_db, dashed: true, from: rag-api, to: ai-db, proto: PostgreSQL, port: 5432, why: "Planned: stores the RAG service's ingest state and chat history.", certs: {planned: "Planned: not designed yet."}}
   - {id: gw_llm, from: gateway, to: vllm-chat, proto: HTTP, port: 8000, why: "Every chat completion (Hermes Agent today, the portal chat and the SRE agent later) is routed here by model name.", certs: {none: "Plain HTTP inside the ai cluster: the gateway and vLLM are Services in the same cluster network."}}
-  - {id: gw_emb, dashed: true, from: gateway, to: vllm-embed, proto: HTTP, port: 8000, why: "Planned: every embedding request (ingest, and question vectors for the cache and retrieval) is routed to the running embeddings model.", certs: {planned: "Planned: not designed yet."}}
+  - {id: gw_ic, from: gateway, to: keda-interceptor, proto: HTTP, port: 8080, why: "Used on every embeddings request: LiteLLM calls `vllm-embeddings-proxy`, which is the interceptor, so the model can sleep when idle.", certs: {none: "Plain HTTP inside the ai cluster; callers' TLS ended at Traefik before the gateway."}}
+  - {id: ic_emb, from: keda-interceptor, to: vllm-embed, proto: HTTP, port: 8000, why: "Used once a pod is ready: the interceptor forwards the request straight to the embeddings pod's IP and streams the answer back.", certs: {none: "Plain HTTP inside the ai cluster, pod to pod."}}
   - {id: gw_more, view: ops, from: gateway, to: more, proto: HTTPS, port: 443, dashed: true, tone: warn, label: "overflow, later", why: "Planned: when the queue stays long, a second machine or a hosted model is added behind the gateway, with no change to its callers.", certs: {planned: "Planned: each hosted model provider's public certificate."}}
   - {id: ing_gh, dashed: true, oneway: true, from: repos, to: rag-ingest, proto: HTTPS, port: 443, label: clone, why: "Planned: every 6 hours (or on Re-index now) rag-ingest pulls the latest pushed content of the blog and repos.", certs: {server: "github-https", note: "Planned: a GitHub webhook or a poll, either way GitHub's public certificate."}}
   - {id: ing_qd, dashed: true, from: rag-ingest, to: qdrant, proto: Qdrant, port: 6333, why: "Planned: after embedding, new and changed chunks are written to Qdrant and the chunks of removed files deleted.", certs: {planned: "Qdrant's name already has a Let's Encrypt certificate (`qdrant.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
   - {id: ing_gw, dashed: true, from: rag-ingest, to: gateway, proto: HTTP, port: 4000, label: embeddings, why: "Planned: changed files are embedded through the gateway before they are stored.", certs: {planned: "The gateway's name already has a Let's Encrypt certificate (`llm.ai.home.cloudutsuk.com`); in-cluster callers may use the Service instead."}}
-  - {id: gw_od, dashed: true, view: ops, from: gateway, to: vllm-ondemand, proto: HTTP, port: 8000, label: on demand, why: "Planned: used only when a caller asks for an on-demand model; the gateway routes it here once KEDA has loaded it.", certs: {planned: "Planned: not designed yet."}}
-  - {id: keda_mimir, dashed: true, view: observability, from: keda, to: mimir-store, proto: HTTPS, port: 443, label: PromQL, detail: "An OAuth2 token from OpenBao through External Secrets.", why: "Planned: every polling interval, KEDA asks Mimir how many requests the gateway has seen for each on-demand model.", certs: {planned: "Planned: not designed yet."}}
-  - {id: keda_scale, dashed: true, view: ops, oneway: true, from: keda, to: vllm-ondemand, kind: control, label: "scale 0 ↔ 1", why: "Planned: when demand appears or after a quiet spell, KEDA loads one copy of the model, or unloads it and frees its memory.", certs: {planned: "Planned: not designed yet."}}
+  - {id: ic_od, dashed: true, view: ops, from: keda-interceptor, to: vllm-ondemand, proto: HTTP, port: 8000, label: on demand, why: "Planned: the chat model behind the same interceptor, so it too starts on the first request after a quiet spell.", certs: {planned: "Planned: plain HTTP inside the ai cluster, like the embeddings route."}}
+  - {id: keda_ic, view: ops, from: keda, to: keda-interceptor, proto: HTTP, port: 9090, label: pending, why: "Always on: the add-on's external scaler reads each route's pending requests from the interceptor and pushes them to KEDA over gRPC.", certs: {none: "Plain HTTP and gRPC inside the keda namespace."}}
+  - {id: keda_scale, view: ops, oneway: true, from: keda, to: vllm-embed, kind: control, label: "scale 0 ↔ 1", why: "Used when a request arrives for a sleeping model, and after 15 idle minutes: KEDA sets the Deployment to 1 or back to 0, freeing its memory.", certs: {none: "No connection of its own: KEDA changes the Deployment's replicas through the cluster's API."}}
+  - {id: keda_scale_od, dashed: true, view: ops, oneway: true, from: keda, to: vllm-ondemand, kind: control, label: "scale 0 ↔ 1", why: "Planned: the same scaling for the chat model and later on-demand models.", certs: {planned: "Planned: through the cluster's API, like the embeddings model."}}
 
   # Planned: SRE agent (phase 6)
   - {id: mon_sre, dashed: true, view: observability, from: alertmanager, to: sre, proto: Webhook, tls: true, label: alert, why: "Planned: when an alert fires, Alertmanager also hands it to the SRE agent for diagnosis.", certs: {planned: "Planned: not designed yet."}}
@@ -2189,26 +2215,26 @@ scenarios:
 
   - id: wake-model
     title: Wake an idle model
-    summary: "Planned (phase 5): KEDA loads a rarely used model on demand and unloads it when idle."
+    summary: "The embeddings model sleeps after 15 idle minutes; the next request wakes it (ADR 0051)."
     steps:
       - title: A request for a sleeping model
-        action: "Gateway: a request arrives for an on-demand model at 0 replicas"
-        text: "A caller asks the gateway for an on-demand model; the gateway queues the request while the model is asleep."
-        lights: [gateway, vllm-ondemand]
+        action: "Gateway → interceptor: an embeddings request (HTTP 8080)"
+        text: "LiteLLM sends the request to vllm-embeddings-proxy, the KEDA interceptor. The model is at 0 replicas, so the interceptor holds it."
+        edges: [gw_ic]
       - title: KEDA sees the demand
-        action: "KEDA ↔ Mimir: requests for this model in the last 5 minutes (PromQL)"
-        text: "KEDA's Prometheus scaler reads the gateway's per-model request rate from Mimir over HTTPS."
-        path: [keda_mimir, ~keda_mimir]
-      - title: Load the model
-        action: "KEDA → on-demand model: scale 0 → 1"
-        text: "If its memory slice fits what's free on the host, KEDA scales the model to one copy and vLLM loads it."
+        action: "KEDA ↔ interceptor: pending requests for this route (9090)"
+        text: "The add-on's external scaler reads one pending request for the route and pushes it to KEDA."
+        path: [keda_ic, ~keda_ic]
+      - title: Start the model
+        action: "KEDA → vLLM embed: scale 0 → 1"
+        text: "KEDA sets the Deployment to one pod; vLLM takes its 12 GiB slice and loads the model, about a minute in all."
         edges: [keda_scale]
-      - title: Serve the request
-        action: "Gateway ↔ on-demand model: the queued request (HTTP 8000)"
-        text: "The queued request is answered. After 30 quiet minutes KEDA scales the model back to 0 and its memory returns."
-        path: [gw_od, ~gw_od]
+      - title: Serve the held request
+        action: "Interceptor ↔ vLLM embed → gateway: the embeddings (8000)"
+        text: "The interceptor forwards the held request to the ready pod; the answer carries X-KEDA-HTTP-Cold-Start: true. 61 s end to end on 2026-10-22."
+        path: [ic_emb, ~ic_emb, ~gw_ic]
         result: success
-        outcome: "Model served, then unloaded when idle"
+        outcome: "Model woke and answered; back to 0 after 15 idle minutes"
 
   - id: chat
     title: Ask the chatbot
@@ -2269,13 +2295,13 @@ scenarios:
         text: "rag-ingest clones the blog and repos from GitHub over HTTPS with a read-only token; only pushed work is indexed."
         edges: [ing_gh]
       - title: Embed changed files
-        action: "rag-ingest → gateway → vLLM embed: embed changed files"
-        text: "Only changed files are sent through the gateway (4000) to the embeddings model (8000), which already runs today."
-        path: [ing_gw, gw_emb]
+        action: "rag-ingest → gateway → interceptor → vLLM embed: embed changed files"
+        text: "Only changed files go through the gateway (4000) and the KEDA interceptor (8080) to the embeddings model (8000)."
+        path: [ing_gw, gw_ic, ic_emb]
       - title: Vectors come back
         action: "vLLM embed → gateway → rag-ingest: the embeddings"
-        text: "The embeddings come back through the gateway to rag-ingest."
-        path: [~gw_emb, ~ing_gw]
+        text: "The embeddings come back through the interceptor and the gateway to rag-ingest."
+        path: [~ic_emb, ~gw_ic, ~ing_gw]
       - title: Update Qdrant
         action: "rag-ingest → Qdrant: upsert new chunks, delete removed ones"
         text: "New chunks are written to Qdrant and removed files deleted; the cache invalidates with the index version."
