@@ -135,6 +135,9 @@ anywhere behind SSO. cloudutsuk.com's DNS is at GoDaddy and holds only GitHub Pa
 - On hold (2026-10-11): the Cloudflare Zero Trust team asks for a payment method, which the owner
   declined. ADR 0037 (accepted the same day) replaces the tunnel and Access with Tailscale; the DNS move
   above is done and stays.
+- Reopened (2026-10-24): the Zero Trust team is active on the free plan. ADR 0058 brings the tunnel and
+  Access back alongside Tailscale, with flat public names, `cloudflared` on the host instead of in
+  `platform`, and `auth.cloudutsuk.com` as the single issuer.
 
 #### Considered options
 
@@ -457,6 +460,8 @@ everything else.
   above, because the host had far less free memory than this ADR budgeted ([ADR 0046](#adr-0046)).
 - **Replaced (2026-10-16):** Qwen3.5-35B-A3B in FP8, the newer generation of the Qwen candidate, for tool
   calling and context ([ADR 0049](#adr-0049)).
+- **Slices held only while serving (2026-10-22):** KEDA scales an idle model server to zero, so its slice
+  goes back to the host between uses; embeddings first, chat since 2026-10-23 ([ADR 0051](#adr-0051)).
 
 #### Considered options
 
@@ -471,12 +476,14 @@ everything else.
 - Good: The OpenAI API keeps clients portable.
 - Bad: The model takes about a third of the box's memory.
 - Bad: Time-slicing has no memory isolation; a mis-set utilization can starve the other model or the host.
-- Bad: GPU memory doesn't show in pod or container memory metrics (see ADR 0026).
+- Bad: GPU memory doesn't show in pod or container memory metrics (see ADR 0026). Since 2026-10-22 the host
+  exports it per process (`homelab_gpu_process_memory_bytes`, ADR 0051).
 
 #### Related
 
 - [ADR 0022](#adr-0022)
 - [ADR 0046](#adr-0046), [ADR 0049](#adr-0049)
+- [ADR 0051](#adr-0051)
 
 ## ADR-0011: Qdrant for vectors and Redis (RedisVL) for the semantic cache
 {: #adr-0011 }
@@ -746,6 +753,9 @@ forgotten cloud lab keeps billing; a double click could deploy the same lab twic
 - Lab contract v2 (2026-10-14, Phase 2 step 5): `deploy.ports` lists every host port the lab's k3d
   cluster publishes, its Kubernetes API port included; the blog's `check.py` fails a card that misses
   one, because two clusters can't bind the same host port.
+- Emulated deploys (2026-10-21, ADR 0050): a cloud lab whose card sets `deploy.emulated` can also be
+  deployed against the Floci emulators on the host. That deploy needs no cost confirmation and gets no
+  TTL; its destroy runs in the same mode.
 
 #### Considered options
 
@@ -939,6 +949,11 @@ same box don't add capacity.
   give each extra model a fixed memory slice, loading rarely used ones on demand; add a second box or
   a hosted model as another gateway backend. KEDA only once a second GPU node exists. `mon` alerts on
   vLLM queue depth and time to first token.
+- Amended (2026-10-22, [ADR 0051](#adr-0051)): KEDA came in earlier, to
+  scale the other way. With its HTTP add-on it takes an idle model server to zero and starts it on the next
+  request, so a model's slice is held only while it serves ("loading rarely used ones on demand" above).
+  LiteLLM reaches those models through the add-on's interceptor; callers don't change. Adding replicas
+  still waits for a second GPU node.
 
 #### Considered options
 
@@ -958,6 +973,7 @@ same box don't add capacity.
 - [ADR 0010](#adr-0010)
 - [ADR 0021](#adr-0021)
 - [ADR 0029](#adr-0029)
+- [ADR 0051](#adr-0051)
 
 ## ADR-0023: OpenBao as the local secret manager; External Secrets Operator in every cluster
 {: #adr-0023 }
@@ -1777,7 +1793,9 @@ need. Every service already has an internal HTTPS name with a Let's Encrypt cert
   no public name (`auth.cloudutsuk.com` from ADR 0028 is dropped).
 - **Fallback.** If Tailscale's coordination service is down, existing connections keep working; new
   devices wait. On the home LAN, SSH to the DGX with a port-forward still works.
-- **Cloudflare stays for DNS and DNS-01 only** (ADR 0024). ADR 0003's DNS move is kept; its tunnel
+- **Cloudflare stays for DNS and DNS-01 only** (ADR 0024). Amended 2026-10-24 by ADR 0058: Cloudflare
+  Tunnel and Access now run alongside Tailscale for browser UIs; Tailscale stays the only path to machine
+  endpoints and `kubectl`. ADR 0003's DNS move is kept; its tunnel
   and Access parts are replaced by this ADR once it's accepted.
 
 - As built (2026-10-11): the DGX (`tag:homelab`, key expiry off) advertises `172.30.0.0/24`, approved
@@ -2252,7 +2270,8 @@ reaches `homelab-gitops`. Every private repo in the org can run jobs on the `hom
   already ships the Docker CLI and buildx, and no Docker daemon is involved. Its gRPC API has no
   authentication, so a NetworkPolicy admits only pods in `arc-runners`. Registry credentials stay in
   the job: buildx forwards them from the runner's Docker config for each build. The cache is an
-  `emptyDir` (25 GiB, garbage-collected at 20 GB).
+  `emptyDir` (25 GiB, garbage-collected at 20 GB; 100 GiB and 80 GB since 2026-10-23, when the
+  vLLM-based image-gen build overflowed 25 GiB and got the daemon evicted).
 - **Rootless needs two exceptions.** Seccomp and AppArmor are `Unconfined` for the daemon's user
   namespace, and `--oci-worker-no-process-sandbox` runs build steps without their own PID namespace,
   because k3d's nested containers can't mount a new `/proc`. That's the `buildkitd-rootless`
@@ -2723,6 +2742,761 @@ family, Qwen, has a newer generation: Qwen3.5 (February 2026).
 #### Related
 
 - ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0046 (superseded), ADR 0048 (Hermes Agent)
+
+## ADR-0050: Emulated lab deploys: cloud labs against the Floci emulators on the host, at no cost
+{: #adr-0050 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-21 · `homelab-services`, `self-service-portal`, `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+A cloud lab (one whose card names Azure, AWS or GCP) can only be deployed from the portal into a real
+cloud account: it costs money, needs a cost confirmation and is destroyed at its TTL (ADR 0017). Trying
+a lab, demoing it, or letting a coding agent iterate on its Terraform all spend money and need the
+owner's cloud logins on the host.
+
+[Floci](https://floci.io) (MIT, no account or token) emulates AWS (126 services), Azure (29, including
+the ARM management plane, so `azurerm` Terraform applies) and GCP (27, `google` Terraform and gcloud),
+one small native container per cloud, multi-arch. It's a test double, not the cloud: credentials are
+accepted unchecked, IAM is mostly not enforced, and some services are simulated.
+
+#### Decision
+
+- **Emulators on the host, next to the lab runner.** `homelab-services/services/lab-runner/deploy/floci/compose.yaml`
+  runs `floci` (AWS), `floci-az` and `floci-gcp`, started by the runner's `install.sh` and restarted
+  by Docker at boot. They publish only on the homelab gateway, `172.30.0.1:4566`, `:4577` and `:4588`
+  (ADR 0030), because in dev mode they accept any credentials. Not in a cluster: the runner and `make`
+  run on the host, and lab clusters reach the gateway.
+- **Hardened and pinned.** Images through Zot's docker.io mirror (ADR 0034), pinned by index digest to
+  releases at least 14 days old (first: floci 2.2.0, floci-az 0.14.0, floci-gcp 0.10.0, all 2026-10-06).
+  They run as the images' non-root user with every capability dropped, a read-only root file system and
+  1 GB of memory each (about 130 MB used idle). **No Docker socket**: with it, anything on the bridge
+  could start containers on the host through an emulator. Docker-backed services (AWS Lambda, RDS, ECS;
+  Azure Functions; GCP Cloud SQL, Cloud Run, GKE) are therefore metadata-only or unavailable.
+- **Hybrid storage** (in memory, flushed every 5 s) in Docker volumes, so a lab deployed before a reboot
+  can still be destroyed.
+- **Opt-in per lab.** A card sets `deploy.emulated: true`; the portal then shows **Deploy emulated**
+  next to Deploy, and the runner API takes `emulated: true` on a deploy. An emulated deploy needs no cost
+  confirmation and gets no TTL. The runner refuses it (422) when an emulator for one of the card's
+  clouds isn't reachable.
+- **A destroy runs in the mode of its deploy**, recorded by the runner (`lab_state.emulated`), so a
+  request can't use `emulated` to skip the cost check of a lab running in the cloud.
+- **No real login reaches an emulated job.** The runner drops every passed-through `AWS_*`, `AZURE_*`,
+  `ARM_*`, `CLOUDSDK_*` and `GOOGLE_*` variable, gives `az`, `gcloud` and the AWS tools empty per-lab
+  config folders, sets throwaway AWS keys and `AWS_ENDPOINT_URL`, and passes `FLOCI_<CLOUD>_ENDPOINT`
+  and `LAB_CLOUD_MODE=emulated` for the lab's Makefile to point its Azure and GCP providers at. A
+  Makefile that forgets an endpoint fails against the real cloud rather than billing it.
+
+#### Considered options
+
+1. **LocalStack**: AWS only, and (per Floci's comparison) its community edition has needed an auth token since March 2026.
+2. **Azurite, the GCP SDK emulators, Moto**: data plane only or one service each; no Terraform apply of
+   a resource group, VNet or GKE cluster.
+3. **Floci in a cluster** (`platform`): the runner and `make` are on the host, Docker-backed services
+   would need a socket in a pod, and a cluster restart would drop emulated labs' state.
+4. **Floci on the host, opt-in per lab, no Docker socket** (chosen).
+
+#### Consequences
+
+- Good: Cloud labs can be tried and demoed for free, from the portal, without the owner's cloud logins.
+- Good: Coding agents can iterate on a lab's Terraform against the emulators.
+- Good: The same pinned emulators can serve CI and Testcontainers later (`testcontainers-floci` for the
+  `inventory` service's collectors, Phase 4).
+- Bad: Emulated behaviour can differ from the cloud (IAM, networking, simulated services). A lab that
+  teaches those still needs the real cloud.
+- Bad: Without the Docker socket, labs built on Lambda, Functions, RDS or GKE don't run fully emulated.
+- Bad: Lab Makefiles need an emulated path for Azure and GCP (endpoint overrides, the floci-az
+  certificate from `GET /_floci/tls-cert`); AWS needs nothing more than the runner's variables.
+- Bad: Three more images to bump, pinned twice a month at most.
+
+#### Related
+
+- [ADR 0017](#adr-0017)
+- [ADR 0030](#adr-0030)
+- [ADR 0034](#adr-0034)
+- [ADR 0031](#adr-0031)
+
+## ADR-0051: Scale idle model servers to zero with KEDA and its HTTP add-on, embeddings first
+{: #adr-0051 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-22 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Each vLLM server holds its whole `--gpu-memory-utilization` slice of the GB10's unified memory from start
+to stop, busy or not (ADR 0010): about 41 GiB for the chat model (0.36) and 12 GiB for embeddings (0.1).
+On 2026-10-22 the DGX had 84% of its 121.7 GiB in use and 8.4 GiB of swap out, and the host's GPU memory
+metric (infra-local `host/exporters`, `homelab_gpu_process_memory_bytes`) showed the two slices were
+53.6 GiB of that, more than every process's own memory combined (43 GiB).
+
+Most of that time the models were idle. Over the 25 hours of vLLM metrics available that day:
+
+| Model | Requests | Hours with none | Ready after a restart (weights cached) |
+|---|---|---|---|
+| `vllm-chat` | 85 | 18 of 25 | about 4 minutes |
+| `vllm-embeddings` | 0 | 25 of 25 | about 45 s |
+
+ADR 0022 put KEDA off until a second GPU node, as a way to add replicas. The need here is the opposite:
+fewer than one replica, so the memory goes back to the host while nobody calls. Callers already reach the
+models only through LiteLLM by name (ADR 0022), so the change sits between LiteLLM and vLLM. A wait on the
+first call after an idle period is acceptable to the owner.
+
+#### Decision
+
+- **KEDA 2.21.0** in `ai`, namespace `keda`, from its Helm chart (`clusters/ai/keda.yaml`). The chart is
+  only on `https://kedacore.github.io/charts`, which the `ai` AppProject now allows.
+- **The KEDA HTTP add-on 0.16.0** next to it (`apps/keda-http-add-on`). Its interceptor sits between
+  LiteLLM and a model server: it routes by Host header, reports pending requests to KEDA through its
+  external scaler and, while the Deployment is at zero, holds the request until a pod is ready. Plain KEDA
+  on a metric can wake a model only after a request has already failed.
+- **Rendered, not a Helm source:** the add-on's chart takes one image tag for its three images, so it
+  can't carry per-image digests (Kyverno `require-image-digest`, ADR 0033). It is rendered into git by
+  `scripts/render_keda_http_add_on.sh`, and Kustomize's `images:` pins the digests. No policy exception.
+- **Per model** (`apps/<model>/scale-to-zero.yaml`): an `InterceptorRoute` (the v1beta1 API; not the
+  older `HTTPScaledObject`) with its own readiness and response-header timeouts and a cap on held
+  requests; a `ScaledObject` from 0 to 1 with a cooldown; an `ExternalName` Service `<model>-proxy` for
+  the interceptor. LiteLLM's `api_base` points at the proxy name. The Deployment has no `replicas`, and its
+  Application ignores `/spec/replicas`, so Argo CD and KEDA don't fight.
+- **Embeddings first** (2026-10-22): `vllm-embeddings`, with a 15-minute cooldown, a 5-minute readiness
+  timeout and a 2-minute response-header timeout.
+- **Chat next** (2026-10-23): `vllm-chat`, the same three objects, with a 30-minute cooldown (over 48 hours,
+  14 cold starts against 15 at 15 minutes, all in the daytime), an 8-minute readiness timeout (a cold start
+  takes about 4 minutes: 87 s loading the weights, 105 s warming up) and a 15-minute response-header
+  timeout (with thinking on, a non-streamed answer sends no header until it's done). LiteLLM's timeout for
+  the model is 900 s. Its callers' timeouts allow for the first call's wait: job-hunter's
+  `LLM_TIMEOUT_SECONDS` is 600 (non-streamed), Hermes' `HERMES_STREAM_READ_TIMEOUT` and
+  `HERMES_STREAM_STALE_TIMEOUT` are 360 (defaults 120 and 180); shorts-studio streams with 300 s to its
+  first byte, which a cold start just fits.
+- `VLLMNotServing` keeps working unchanged: it only fires when the Deployment wants replicas
+  (`kube_deployment_spec_replicas > 0`) and none is ready, so a model at zero is quiet.
+
+#### Considered options
+
+1. **Keep every model always on**: no wait, but about 54 GiB held around the clock for a few requests a
+   day, on a host that is also a desktop.
+2. **KEDA with a Prometheus trigger on LiteLLM's request metrics**: no extra proxy, but at zero the call
+   fails immediately; only the failure wakes the model, and every caller would need minutes of retries.
+3. **KEDA's cron scaler** (models up in working hours): no proxy and no first-call wait inside the window,
+   but calls outside it fail, and Hermes and job-hunter run on their own schedules.
+4. **LiteLLM or a script starting the model**: LiteLLM has no scale-from-zero hook; a home-made waker
+   would be our own interceptor without the routing, metrics or timeouts.
+5. **KEDA plus the HTTP add-on** (chosen): requests wait instead of failing, callers don't change, and
+   each model's timeouts and cooldown sit in git next to it.
+
+#### Consequences
+
+- Good: An idle model gives its slice back: 12 GiB for embeddings, about 44 GB for chat.
+- Good: Callers still call LiteLLM by model name; only their timeouts change, for the first call's wait.
+- Good: Each model's cold-start behaviour (timeouts, held-request cap, cooldown) is in git.
+- Bad: The first call after an idle period waits for the model (about 45 s for embeddings, about 4
+  minutes for chat); a caller with a shorter timeout fails that call and must retry.
+- Bad: Memory isn't reserved while a model is down. If the host fills the freed memory, the model can't
+  start (vLLM fails to take its slice): watch "Where the memory goes" on the Fleet / DGX Spark dashboard.
+- Bad: One more hop, and a single interceptor pod; if it is down, the scaled models are unreachable
+  although their pods may be fine.
+- Bad: The add-on's manifests are rendered by hand; an upgrade is a script run and a review, not a version
+  bump in an Application.
+- Bad: Anything that checks a model's health through LiteLLM or the interceptor wakes it. Prometheus
+  scrapes the pods directly, which doesn't.
+
+#### Related
+
+- [ADR 0010](#adr-0010): the memory slices this frees
+- [ADR 0022](#adr-0022): the gateway and the earlier "KEDA only once a second GPU node exists"
+- [ADR 0033](#adr-0033): digests and admission
+- [ADR 0049](#adr-0049): the chat model, next in line
+
+## ADR-0052: Paperclip as the agent control plane in platform: our own signed image, platform-db, Keycloak in front, models only through LiteLLM
+{: #adr-0052 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `homelab-services`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Phase 6 brings agents onto the platform: the SRE agent (ADR 0014) first, and coding agents that work on
+the platform's own repos after it. Each agent so far is a separate CLI session or service with its own
+history, its own keys and no shared view of what it is doing, what it costs or what is waiting for my
+approval.
+
+Paperclip (MIT) is a self-hosted control plane for teams of
+agents: a Node.js 24 server and React UI on one port (3100) with a Postgres database. It assigns tasks to
+agents (coding CLIs such as OpenCode, Claude Code or Codex, or HTTP endpoints), wakes them on schedules,
+and enforces budgets, review stages and an audit trail. What we checked in its source (2026-10-16, commit
+`78b833c`, release `v2026.916.1`):
+
+- The image is published for linux/amd64 and arm64 (the DGX is arm64), by full-SHA tag with a Sigstore
+  attestation. Started as non-root, its entrypoint skips `gosu` and runs unprivileged, so Pod Security
+  `restricted` is possible.
+- It takes an external Postgres through `DATABASE_URL` and runs its migrations at start. Everything else
+  it keeps lives in `PAPERCLIP_HOME` (instance config, attachments, agent workspaces and CLI state).
+- People sign in with email and password only (Better Auth); there is no OIDC sign-in. ADR 0028 wants
+  every UI behind Keycloak.
+- It needs three long-lived secrets: a session secret, a tool-action signing secret and a 32-byte master
+  key that encrypts the company secrets in its database.
+- Local adapters run the agent CLIs inside Paperclip's own container. The upstream image installs those
+  CLIs at `@latest`, so two builds of the same commit differ.
+- Telemetry is opt-in OpenTelemetry traces only, no metrics; health is `GET /api/health`.
+- Upstream moves fast: several commits a day.
+
+Kyverno (ADR 0033) admits only signed `platform/*` images or digest-pinned `mirror/*` ones. Models are
+reached only through the LiteLLM gateway with a virtual key per caller (ADR 0022, 0029).
+
+#### Decision
+
+- **Paperclip runs in `platform`,** namespace `paperclip`, Argo CD group `platform` (ADR 0047), synced from
+  `apps/paperclip` by `clusters/platform/paperclip.yaml`. It sits next to the SRE agent, so it keeps
+  working when `ai` is down (ADR 0014, 0018). One replica, `Recreate`.
+- **Our own image, `platform/paperclip`,** from `homelab-services` `services/paperclip`: a thin Dockerfile
+  on the upstream image pinned by digest through Zot's mirror (a release at least 14 days old), with the
+  agent CLIs and the OTel packages reinstalled at pinned versions and uid 1000. It goes through
+  `build-image.yaml`, so it gets the gates, a Cosign signature and an SBOM like every other image
+  (ADR 0032, 0033, 0043). No fork.
+- **Data:** a database `paperclip` with its own owner role in `platform-db` (ADR 0035); its nightly dump
+  covers it (ADR 0039). `PAPERCLIP_HOME` is a static PV on `/srv/homelab/paperclip`, not backed up: the
+  workspaces are git clones and the attachments are accepted as lost on a rebuild (ADR 0016).
+- **Secrets** in OpenBao `kv/platform/paperclip`, delivered by External Secrets (ADR 0023). The master key
+  also goes into the offline recovery kit, because without it a restored database's company secrets
+  can't be decrypted. Strict secret mode is on.
+- **Sign-in:** the Ingress (`paperclip.platform.home.cloudutsuk.com`, tailnet only, ADR 0037) sits behind
+  oauth2-proxy with a Keycloak client `paperclip`, allowing only the group `platform-admins`. Paperclip
+  runs `authenticated` with `private` exposure and its own login behind that gate; open sign-up is off
+  after the owner's account exists. This is a deliberate exception to ADR 0028's "Keycloak is the sign-in"
+  until Paperclip supports OIDC.
+- **Models only through LiteLLM:** one virtual key `paperclip`, limited to the models agents need, with a
+  monthly budget, kept in `kv/ai/litellm-clients`. Paperclip's own company and agent budgets are set below
+  it, so Paperclip stops first and LiteLLM is the backstop. A hosted model, if the spike shows one is
+  needed, becomes another LiteLLM backend rather than a key in the agents.
+- **Code changes only as pull requests:** a GitHub App of its own, installed on chosen repos with Contents
+  and Pull requests read/write and nothing else; branch protection keeps `main` review-only. Paperclip
+  never gets `cloudutsuk-gitops-writer` (ADR 0043). Every project gets a review stage in Paperclip, so an
+  agent's PR needs my approval there and on GitHub.
+- **Agents stay inside the pod and have no cluster access:** no ServiceAccount token, an egress
+  NetworkPolicy (DNS, `platform-db`, LiteLLM's HTTPS name, the OTLP gateway, GitHub), resource limits, and
+  every Kyverno policy enforced with no new exception. Any secret bound to an agent is treated as exposed
+  to it.
+- **Watching it:** traces to the OTLP gateway on `mon` (ADR 0042), logs through the monitoring pack,
+  alerts on a pod that isn't ready and on a failing `/api/health`, spend from LiteLLM's metrics for key
+  `paperclip`.
+- **Accepted only after the spike** (Phase 6, step 5a): the upstream image runs as uid 1000 with a
+  read-only root on the DGX, an OpenCode agent finishes a small task through LiteLLM, and memory and image
+  size fit the `platform` cluster. Its findings are added here before the status changes.
+
+#### Considered options
+
+1. **Paperclip in `platform` with our own signed image (chosen):** fits Kyverno, Argo CD and the backup
+   path we already run, and pins the agent CLIs that upstream leaves floating.
+2. **Paperclip in `ai`:** closer to the models, but it would go down with the GPU stack, which is when the
+   SRE agent's work matters most.
+3. **The upstream image through Zot's mirror, pinned by digest:** admitted without our signature, but the
+   CLIs inside are `@latest` at upstream's build time and it skips our scanners.
+4. **A fork of Paperclip** (for example to add OIDC sign-in): too much upkeep at upstream's pace.
+5. **Paperclip's own login alone on the tailnet:** simpler, one login, but a second identity store next
+   to Keycloak and no group check (ADR 0028).
+6. **Embedded Postgres in the pod:** zero setup, but invisible to Velero's dump hooks.
+7. **No control plane: agents as separate sessions and services:** nothing new to run, but no shared
+   board, no budgets across agents and no single place for approvals.
+
+#### Consequences
+
+- Good: one board for every agent's work, cost and pending approvals; the SRE agent can file its RCAs and
+  proposed fixes there with a review stage (Phase 6, step 5h).
+- Good: nothing new to operate around it: Argo CD, Kyverno, OpenBao, `platform-db`, Velero, LiteLLM and
+  `mon` are reused as they are.
+- Bad: two sign-ins (Keycloak, then Paperclip) until Paperclip supports OIDC.
+- Bad: agents run arbitrary code inside the pod with the secrets bound to them; the controls are the
+  egress list, the PR-only App, review stages and budgets, not isolation.
+- Bad: a large image (Node, the Rust runner, several CLIs) and frequent upstream releases; every bump is a
+  deliberate digest change with a `platform-db` dump first, and the rollback is the previous digest plus a
+  restore.
+- Bad: no Prometheus metrics of its own; availability comes from the probe and kube-state-metrics.
+- Bad: losing the master key loses every company secret, so the recovery kit grows by one key.
+
+#### Related
+
+- Numbered 0048 until 2026-10-22, when it was renumbered: [ADR 0048](#adr-0048) (Hermes Agent) had the number first.
+- ADR 0014, ADR 0016, ADR 0018, ADR 0022, ADR 0023, ADR 0028, ADR 0029, ADR 0033, ADR 0035, ADR 0037,
+  ADR 0039, ADR 0042, ADR 0043, ADR 0047
+- Plan: `homelab-services` `docs/paperclip-plan.md`; roadmap: Phase 6, steps 5a to 5h
+
+## ADR-0053: Scrape every metric every 60s, and size query ranges for it
+{: #adr-0053 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-22 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Everything runs on one DGX Spark that is also a desktop, and it runs warm: on 2026-10-22 its CPU sensors
+read 72 to 78 °C with a load average of 4 to 5, 87 of 121.7 GiB of memory in use and 8.7 GiB of swap out.
+The `mon` k3d node was one of the busiest containers on the host, spiking to 190% CPU, and Mimir was its
+busiest process.
+
+Every scrape was 30s: the monitoring pack's collectors (kubelet, cAdvisor, kube-state-metrics, the API
+server, the target allocator's default), the gateway's host scrapes, our own ServiceMonitors, and the
+charts' defaults for Argo CD, External Secrets, Kyverno and Velero. Nothing here needs 30s resolution: the
+alerts wait 5 to 15 minutes before firing, and the dashboards are read over hours.
+
+A longer scrape breaks short query ranges. `rate()` and `increase()` need two samples in their range; a
+`[1m]` range at a 60s scrape holds one or none. The vendored mixins and dashboards have about 120 of them,
+written for a 15s scrape: Mimir, Loki and Tempo's latency recording rules, `KubeAggregatedAPIErrors`, three
+node-mixin alerts, and panels in the Argo CD, External Secrets, Grafana, Tempo and LiteLLM dashboards.
+
+#### Decision
+
+- **Every scrape is 60s**: the monitoring pack's collectors and its target allocator's default, the
+  Traefik PodMonitor, the gateway's host scrapes on `mon` (the blackbox probes already were), the
+  ServiceMonitors in this repo (Mimir, Loki, Tempo, Grafana, LiteLLM, vLLM, job-hunter) and Kyverno's in
+  its ApplicationSet. In infra-local, the Argo CD, External Secrets and Velero chart values set it too.
+  cert-manager's chart default is already 60s.
+- **Grafana's Mimir data source** has `timeInterval: 60s`, so `$__rate_interval` is at least 4 minutes.
+- **Query ranges are at least 4m** (four scrapes), set at render time, never by editing vendored files:
+  the Mimir mixin is told the scrape interval (`scrape_interval: '60s'`, which its `rateInterval()`
+  reads); Loki and Tempo get `recording_rules_range_interval: '4m'`; `scripts/dashboards.py` widens any
+  other upstream range under 4m, to `$__rate_interval` in dashboards (an `increase(x[N])` becomes
+  `N * rate(x[$__rate_interval])`, keeping its unit) and to `[4m]` in rules.
+- Hand-written rules and dashboards use ranges of 5m or more, or `$__rate_interval`.
+
+#### Considered options
+
+1. **Keep 30s**: finest resolution, but twice the samples for Mimir to ingest, compact and query, on a
+   host that is short of CPU headroom and memory.
+2. **60s for the noisy jobs only** (kubelet, cAdvisor, kube-state-metrics): most of the saving, but two
+   intervals to reason about in every query, and charts' ServiceMonitors would still differ.
+3. **Drop more series instead** (ADR 0026 already drops what nothing reads): worth doing anyway, but
+   it doesn't change the cost of the series that stay.
+4. **60s everywhere, ranges sized at render time** (chosen): half the samples, one rule for every query.
+
+#### Consequences
+
+- Good: Mimir ingests, stores and compacts about half as many samples, and every collector and exporter
+  is scraped half as often.
+- Good: The window rule is enforced where vendored content is rendered, so a re-vendor keeps it.
+- Bad: Graphs have 1-minute resolution; a spike shorter than a minute shows less.
+- Bad: Alerts can fire up to a minute later, and a target that goes down takes a minute longer to show.
+- Bad: A new upstream dashboard or rule written for a 15s scrape is only safe once it goes through
+  `scripts/dashboards.py`; a hand-written `[1m]` or `[2m]` returns nothing.
+
+#### Related
+
+- [ADR 0026](#adr-0026): collection, and dropping what isn't read
+- [ADR 0027](#adr-0027): vendored dashboards and rules
+- [ADR 0042](#adr-0042): the monitoring pack on every cluster
+- [ADR 0051](#adr-0051): the other change made for the same host
+
+## ADR-0054: FLUX.1-schnell image generation in ai: our own diffusers server, FP8 weights, behind LiteLLM, scaled to zero
+{: #adr-0054 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-23 · `homelab-gitops`, `homelab-services`, `infra-local`, `shorts-studio`</span>
+
+#### Context
+
+Shorts Studio (apps/shorts-studio) draws every frame procedurally: a branded gradient, avatars, diagrams.
+Its roadmap's Phase 3 asks for richer visuals: a generated background per section of a short. That
+needs a text-to-image model, and the only GPU is the GB10 in `ai`, shared by time-slicing with vLLM
+(ADR 0010). Memory is the constraint, not compute: on 2026-10-23 the DGX had about 22 GB of its 121 GB
+of unified memory free with `vllm-chat` holding its 44 GB slice and `vllm-embeddings` scaled to zero
+(ADR 0051).
+
+FLUX.1-schnell (Black Forest Labs) is Apache 2.0, distilled to 1-4 steps, and good at the clean,
+illustrative scenes the shorts need. In bf16 its diffusers pipeline is 34 GB (transformer 23.8 GB, T5
+text encoder 9.5 GB). It is gated on Hugging Face: an account accepts the terms once, then downloads with
+its token.
+
+vLLM doesn't serve diffusion models, and callers reach models only through LiteLLM by name (ADR 0022).
+LiteLLM speaks the OpenAI images API (`/v1/images/generations`) to an OpenAI-compatible backend.
+
+#### Decision
+
+- **A small server of our own**, homelab-services `services/image-gen`: FastAPI with the OpenAI images
+  API (`b64_json` PNGs) over a diffusers `FluxPipeline`, one request at a time, `/readyz` 503 until loaded.
+- **FP8 weights, bf16 compute:** the Linear weights of the transformer and T5 are stored as
+  `float8_e4m3fn` and upcast per layer (diffusers layerwise casting). The checkpoints are read one tensor at
+  a time and cast as they arrive, so loading never holds the bf16 copy. T5's feed-forward output layers
+  (`wo`) stay bf16, because T5 casts their input to the stored type before the hook runs. CLIP and the VAE
+  stay bf16. Measured on the GB10 (2026-10-23): 20.1 GiB after a 48 s load, 22.4 GiB peak while
+  generating, a 768x1344 image in 8 s (15 s for the first).
+- **Image:** `nvcr.io/nvidia/vllm:26.07-py3` at the digest `vllm-chat` runs, plus `diffusers` 0.40.0 and
+  `accelerate` 1.15.0 installed with `--no-deps` and hashes. Its torch is built for the GB10, and the node
+  already has its layers. The image scan reports instead of failing (ADR 0044's exception for upstream
+  findings).
+- **Weights downloaded once on the host** into the shared models folder (`/srv/homelab/models`, the
+  `models` claim), with the owner's Hugging Face token; the pod mounts the claim read-only and runs with
+  `HF_HUB_OFFLINE=1`, so no token is stored in the cluster.
+- **`apps/image-gen`** in namespace `models`, one time-sliced GPU, scaled from 0 to 1 by KEDA with a
+  10-minute cooldown (ADR 0051), behind LiteLLM as `flux.1-schnell` (timeout 400 s for a cold start).
+- **Callers:** Shorts Studio's LiteLLM virtual key gets `flux.1-schnell` next to the chat model.
+
+#### Considered options
+
+1. **ComfyUI:** a full node-graph server with its own UI and API, much larger than one pipeline needs, and
+   its API isn't the OpenAI shape LiteLLM routes; it would need its own gateway path.
+2. **SDXL-Turbo:** smaller (about 7 GB) and faster, but under Stability AI's own licence rather than
+   Apache 2.0, at 512x512, and with weaker prompt following than Flux.
+3. **Flux in bf16:** 34 GB doesn't fit the memory free beside the chat model.
+4. **bitsandbytes NF4 or torchao FP8:** less memory or faster kernels, but extra native packages to build
+   and verify for the GB10 (aarch64, CUDA 13); layerwise casting needs nothing beyond diffusers.
+5. **A pod that downloads with an HF token from OpenBao:** works, but the token would sit in the cluster
+   for a one-time download.
+
+#### Consequences
+
+- Good: generated scenes for Shorts Studio from a local, Apache-licensed model, through the same gateway
+  and keys as the chat model; about 22 GiB held only while images are being made, 8 s an image.
+- Good: other platform services can ask for images by name with a virtual key.
+- Bad: a cold start loads and casts 34 GB of checkpoints, about a minute; the first request after an idle
+  period waits.
+- Bad: while it runs with the chat model, the DGX is close to full: in the test, with the chat and embeddings
+  models awake too, the host was down to 10 GiB available. Another large model awake at the same time can
+  push it into swap (watch the GPU memory panel).
+- Bad: the image is NVIDIA's vLLM image plus two wheels, so its CVE findings follow NVIDIA's releases.
+
+#### Related
+
+- ADR 0010
+- ADR 0022
+- ADR 0044
+- ADR 0051
+
+## ADR-0055: Web search for agents: Tavily first, SearXNG self-hosted as the fallback, Playwright only to fetch pages
+{: #adr-0055 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+
+#### Context
+
+Shorts Studio's scripts are written from the chat model's memory. On 2026-10-24, 5 of the 6 episodes scheduled
+on `platform` were rejected by its editor, mostly for technical errors. Examples: "a circuit breaker returns
+HTTP 429", "DNS points to the old server forever", "checksums detect dropped packets". Its next version adds a
+research agent that writes a brief from sources before any script is written (shorts-studio
+`docs/agent-workflow-plan.md`). It also adds an evaluator that checks every claim against that brief. Both need
+web search, and the homelab has none.
+
+The constraints:
+
+- **No paid search:** free tiers only, until use shows what a paid plan would cost.
+- **Secrets in OpenBao.**
+- **Only public topic text leaves the homelab.**
+- **No scraping that breaks a search engine's terms of service.**
+
+#### Decision
+
+- **Tavily is the primary search.** It's a search API built for LLM agents, returning ranked results with
+  clean extracted content. Its free tier is 1,000 credits a month. The key lives in OpenBao at
+  `kv/platform/shorts-studio` as `tavily_api_key`, stored by infra-local
+  `host/shorts-studio/configure.sh --tavily`. Only the search query, built from the topic, is sent.
+- **SearXNG is the fallback**, self-hosted in `platform` (`apps/searxng`).
+  - **Pinned:** a dated image, `docker.io/searxng/searxng:2026.10.19-81371861f`, digest-pinned.
+  - **Exposure:** JSON output on, the bot limiter off (it's internal), and a cluster-internal Service
+    reachable only from the `shorts-studio` namespace. There's no UI route.
+  - **Secret:** its `secret_key` is generated in the cluster by an External Secrets `Password` generator,
+    so nobody has to type one.
+- **Failover:** the agents' search client calls Tavily and opens a circuit breaker on errors, timeouts or quota
+  responses. Searches then go to SearXNG until a cooldown passes.
+- **Playwright fetches pages; it never searches.** Headless Chromium, inside the Shorts Studio image, opens
+  the pages a search returned and extracts their text, including JavaScript-heavy documentation. Fetched text
+  is untrusted data: the agents quote it as context and screen it for prompt injection.
+- **Caching:** search results stay in Redis (`redis-cache`) for 7 days and pages for 30, so a re-run doesn't
+  spend credits.
+
+**When SearXNG becomes the primary** (a new ADR supersedes this one):
+
+- Tavily's quota or rate limits fail searches for more than a week in a month.
+- A paid plan would cost more than the budget set for it.
+- Tavily is down for more than a day.
+- SearXNG matches Tavily on the research agent's evaluation (citation coverage and fact accuracy on the golden
+  topics).
+
+#### Considered options
+
+1. **Brave Search API as the fallback:** a good index with its own API, but it has no free credits.
+2. **Playwright driving Google or Bing:** free, but it breaks their terms of service and runs into CAPTCHAs and
+   bot detection. It also breaks whenever the result pages change.
+3. **SearXNG only:** free with no quota. But its results come from the engines it queries, which rate-limit
+   automated traffic, and it returns snippets rather than extracted content, so every result needs a page
+   fetch. It's the fallback for now, and the primary if Tavily stops being enough.
+4. **No web search, only the blog (`rag-api`) and the model's knowledge:** what failed on 2026-10-24.
+
+#### Consequences
+
+- Good: briefs and checks cite real sources; scripts stop depending on what the model remembers.
+- Good: a free path that keeps working when Tavily's credits run out or the service fails.
+- Bad: Tavily queries leave the homelab. They hold only public topic text, never episode content or keys.
+- Bad: SearXNG relies on public engines that can throttle it; heavy use can get its egress address limited for
+  a while.
+- Bad: another platform workload to patch. The image is a dated daily build, updated on purpose, not tracking
+  `latest`.
+
+#### Related
+
+- ADR 0033
+- ADR 0056
+
+## ADR-0056: A second local model for agents: Gemma 4 26B-A4B (FP8, Apache 2.0) in ai, scaled to zero, behind LiteLLM
+{: #adr-0056 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+
+#### Context
+
+The chat model, Qwen3.5-35B-A3B (ADR 0049), writes Shorts Studio's scripts and also grades them. Those scores
+decide whether a short is made, so a model grading its own writing matters. On 2026-10-24 the editor rejected 5
+of 6 scheduled scripts, and drafts swung between scores with each rewrite.
+
+Shorts Studio's agent workflow (shorts-studio `docs/agent-workflow-plan.md`) gives each agent its own model
+setting: research, diagram, writer, evaluator and learning. It needs a second, different local model family
+to compare against; the comparison is kept local only.
+
+**Gemma 4** (Google, March–June 2026) is under Apache 2.0, unlike Gemma 1–3's custom terms, so the channel's
+monetised videos are fine.
+
+**Published comparisons of the 26B-A4B with Qwen3.5-35B-A3B** (October 2026, mostly third-party with small
+samples):
+
+- **Qwen is ahead on:**
+  - reasoning indexes: Artificial Analysis 19 vs 17, OpenRouter 19.3 vs 13.1;
+  - speed: about twice as fast;
+  - tool calls: TAU2, dense siblings.
+- **Gemma is ahead on:**
+  - human preference: Arena 1441 vs 1400;
+  - fewer confidently wrong answers: AA-Omniscience, measured on its 31B sibling;
+  - precise instruction following and extraction, in reports.
+
+That suggests Gemma as the judge and the learning agent, and Qwen for research and diagrams. The writer gets
+tested with both.
+
+**Memory:** with every model at zero, the host had about 92 GB available (2026-10-24). Chat (0.36, about
+44 GB), embeddings (0.1), image-gen (about 22 GiB) and the GPU slices are already shared by time-slicing (ADR
+0010).
+
+#### Decision
+
+**Model:** `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` at revision `ed35d7abe5d9`.
+
+- A mixture of experts: 26B parameters, about 3.8B active per token.
+- FP8 weights, 28.6 GB, not gated on Hugging Face.
+- **Served from a local copy in 2 GB shards**, `/srv/homelab/models/local/gemma-4-26B-A4B-it-FP8-dynamic-ed35d7ab`,
+  read-only and offline. The bytes are upstream's; only the file layout changes. Upstream ships one 26.7 GiB
+  `model.safetensors`. vLLM keeps a memory-mapped file's pages resident until the file is loaded, so the first
+  start was OOM-killed past the pod's 10Gi limit, and the `ai` node's own cap is 16 GiB. infra-local
+  `host/models/reshard.py` writes the shards from the pinned snapshot and verifies every tensor.
+- Text only: `--limit-mm-per-prompt` with no images or audio, which skips the vision and audio encoders'
+  memory.
+
+**Serving:** `apps/vllm-gemma` in `ai`, namespace `models`, on the same vLLM 0.24 image as `vllm-chat`. A
+throwaway pod checked that this image has `Gemma4ForConditionalGeneration`, the `gemma4` tool-call and
+reasoning parsers, and `examples/tool_chat_template_gemma4.jinja`.
+
+- `--gpu-memory-utilization 0.30`, about 36 GB.
+- `--max-model-len 32768`. Only 5 of its 30 layers keep a full-context KV cache, about 20 KB a token, so a
+  32k sequence needs about 0.9 GB with the sliding-window layers.
+- Prefix caching, which the model card requires.
+
+**Scale to zero:** KEDA, as for the other models (ADR 0051). That's an `InterceptorRoute` with a static
+`/v1/models` answer, so LiteLLM's model-info polls don't wake it, plus a `ScaledObject` from 0 to 1. The
+cooldown is 10 minutes, shorter than chat's 30: an agent run calls the judge in bursts, and a short cooldown
+gives the memory back before rendering.
+
+**Gateway:** LiteLLM `gemma-4-26b-a4b` (`hosted_vllm`, timeout 900 s for a cold start). Shorts Studio's virtual
+key gets the model.
+
+**Roles:** chosen per agent by Shorts Studio's golden-set evaluation, not fixed here.
+
+This ADR becomes `accepted` once Gemma wins at least one role. If it wins none, it's removed and the 36 GB
+stays free.
+
+#### Considered options
+
+1. **Gemma 4 31B, dense:** stronger per token, but every parameter is active (slower on the GB10's bandwidth)
+   and it needs about 31 GB plus a larger KV cache. It's the next candidate if the 26B-A4B judges poorly.
+2. **Gemma 4 12B:** smaller and quicker, but likely too weak to judge technical accuracy.
+3. **A second Qwen** (e.g. Qwen3.6): the same family as the writer, which defeats the reason to judge with
+   another model.
+4. **A cloud model:** better scripts, but the decision for this workflow is local models only.
+5. **No second model, a stricter prompt only:** tried on 2026-10-24. A rubric and lengthening in code fixed
+   length, but scores still swung 4, 4, 6, and the editor flagged correct claims as blockers.
+
+#### Consequences
+
+- Good: a second family to write or judge with; each agent gets the model that does its job best, measured on
+  the golden set.
+- Good: no memory held while idle. The cost is the first call after idle: measured 4 min 44 s through LiteLLM
+  (2026-10-24: weights 2 min 24 s from the local shards, compile and warm-up 1 min 16 s, the rest pod start),
+  well inside the 900 s timeout. Callers set a read timeout above that (Shorts Studio's judge: 900 s).
+- Bad: memory is the limit while models are awake. Chat and Gemma together are about 80 GB, which fits in the
+  92 GB available. Chat, Gemma and image-gen together (about 102 GB) don't.
+  - Mitigations: the agents call models one after another; rendering, where image-gen runs, happens only after
+    the user approves a script; Gemma's cooldown is 10 minutes.
+  - Watch "Where the memory goes" on Fleet / DGX Spark.
+  - If a start fails for lack of memory, the next step is to lower chat's slice or drop to Gemma 4 12B.
+- Bad: the 4th time-sliced GPU slot on the node is taken (chat, embeddings, image-gen, Gemma), so a fifth
+  model needs more slots.
+- Bad: a revision change is a host step: download the snapshot, re-shard it, change the folder in
+  `deployment.yaml` (apps/vllm-gemma README). Warm the first start once by pausing the ScaledObject at 1.
+
+#### Related
+
+- ADR 0010
+- ADR 0022
+- ADR 0049
+- ADR 0051
+- ADR 0055
+
+## ADR-0057: Cloudflare metrics from our own collector, with a read-only token
+{: #adr-0057 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Cloudflare carries the `cloudutsuk.com` zone (ADR 0003) and, with ADR 0058, the tunnel and Access. The
+homelab should show Cloudflare's plan, cost, usage against the plan's limits, certificates, tunnels and
+edge traffic in Grafana on `mon`, next to the rest of the fleet.
+
+The zone and the Zero Trust team are on Free plans, so the API decides what's possible. Asked with a
+token on 2026-10-24, the zone's GraphQL settings allow `httpRequestsAdaptiveGroups` (30 days back),
+`httpRequests1hGroups` (3 days) and `httpRequests1dGroups` (1 year), but not `httpRequests1mGroups` or
+`firewallEventsAdaptiveGroups`. The REST API answers for the plan, subscriptions (Billing), DNS record
+usage and quota, certificate packs, tunnels and Access apps. None of these calls is billed on any plan;
+the GraphQL quota is 300 queries per 5 minutes.
+
+#### Decision
+
+- A small Python collector, `infra-local host/exporters/cloudflare-metrics.py`, runs as a host exporter
+  (Compose service `cloudflare-metrics`, profile `cloudflare`). Every 5 minutes it makes about 10 calls
+  and writes `homelab_cloudflare_*` series for node-exporter's textfile collector, so the gateway's
+  existing `node-exporter` job brings them to Mimir with `cluster="dgx"`. Edge traffic becomes counters
+  (requests and bytes by host, status and cache status; requests by country) from the adaptive dataset,
+  5 minutes behind; Cloudflare's own daily totals come as gauges for today and yesterday.
+- It uses its own read-only token, `homelab-metrics-read` (`infra-local host/cloudflare/create-token.sh
+  metrics`, stored in OpenBao at `kv/host/cloudflare-metrics`): Account Analytics, Account Settings,
+  Cloudflare Tunnel, Access: Apps and Policies, Access: Audit Logs Read, Billing (account) and
+  Analytics, Zone, DNS, SSL and Certificates (zone), all Read. The tunnel and Access token, which can write, stays out of it.
+- `dashboards/fleet/cloudflare.json` (Fleet / Cloudflare, written here) shows it.
+
+#### Considered options
+
+1. **lablabs/cloudflare-exporter with dashboard 13133**: its zone query asks for
+   `httpRequests1mGroups`, which a Free zone refuses, so the whole query fails; with `FREE_TIER=true`
+   it skips zone analytics altogether. On this account it would show tunnel status only.
+2. **Cloudflare's own Prometheus exporter**: runs as a Worker, skips Free-plan zones for every
+   GraphQL metric, and reports no plan, billing or quota.
+3. **Grafana Cloud's Cloudflare integration**: needs Grafana Cloud and the Pro plan.
+4. **Our own collector** (chosen): asks only for what the Free plan allows, adds plan, cost and quota,
+   and reports per query whether Cloudflare answered (`homelab_cloudflare_up{query}`), so a refused
+   dataset shows on the dashboard instead of an empty panel.
+
+#### Consequences
+
+- Good: plan, cost and usage on one dashboard, with no Cloudflare cost and a token that can change nothing.
+- Good: one more small container, no new scrape job or port.
+- Bad: we maintain the collector; a Cloudflare API change is ours to follow.
+- Bad: traffic is Cloudflare's sampled data in 5-minute steps, and counts only proxied (orange-cloud)
+  records. Counters restart from zero when the collector restarts (rate() and increase() handle it).
+- Zero Trust seats (added 2026-10-25): listing Access users needs Access: Audit Logs Read, so the token
+  has it too; the collector counts users and seats against the Free plan's 50.
+- Later: `cloudflared`'s own metrics (ADR 0058, Phase 3 step 12) for tunnel connections and latency.
+
+#### Related
+
+- [ADR 0003](#adr-0003)
+- [ADR 0026](#adr-0026)
+- [ADR 0058](#adr-0058)
+
+## ADR-0058: Public access through Cloudflare Tunnel and Access alongside Tailscale
+{: #adr-0058 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-24 · `infra-local`, `homelab-gitops`, `homelab-services`, `self-service-portal`</span>
+
+#### Context
+
+ADR 0003 planned public access through a Cloudflare Tunnel guarded by Cloudflare Access. Its tunnel and
+Access parts were put on hold because the Zero Trust team asked for a payment method, and ADR 0037
+replaced them with private access through Tailscale. Since then:
+
+- The Zero Trust team is active on the free plan (2026-10-24, payment method on file, nothing billed).
+- Tailscale works, but every device needs its client: no browser-only access from a borrowed machine, and
+  the blog's Dashboard tab (Phase 3 step 7) can't link to anything anonymous readers can open.
+- The browser UIs already sign in through Keycloak (ADR 0028): Argo CD, Grafana, the portal, Hermes,
+  Job Hunter, Shorts Studio, Velero UI and LiteLLM's UI. Floci's console and Qdrant's dashboard have no
+  login of their own.
+
+Cloudflare's free Universal SSL certificate covers only `cloudutsuk.com` and one level below it, so a
+public name like `grafana.mon.cloudutsuk.com` would fail TLS without Advanced Certificate Manager.
+
+Keycloak builds its URLs from the request's hostname (ADR 0028 as built). With a public and an internal
+name in use at once, tokens would carry two different issuers, and the k3s API servers and apps trust
+only one.
+
+#### Decision
+
+- **Both paths run at once.** Tailscale (ADR 0037) stays unchanged and stays the only path to machine
+  endpoints and `kubectl`. Cloudflare Tunnel and Access are added for browser UIs and static pages.
+- **Every browser UI is published behind Access.** One Access application per public hostname, allowing
+  the owner's identity through Keycloak as the identity provider, with a one-time PIN to the owner's
+  email as break-glass when Keycloak is down. Apps that sign in through Keycloak keep doing so; the
+  second sign-in is silent on the same Keycloak session. UIs without a login (Floci console, Qdrant
+  dashboard) rely on Access alone.
+- **Static pages are public.** A bypass policy for read-only pages with no data worth guarding: a status
+  page and the blog's Dashboard tab.
+- **Fail closed.** A catch-all Access application on `*.cloudutsuk.com` allows only the owner, so a
+  hostname added to the tunnel without its own application is guarded, not published. The blog's
+  `www` and apex records stay on GitHub Pages, outside the tunnel.
+- **Flat public names, one level deep:** `<app>.cloudutsuk.com` (for example `grafana.cloudutsuk.com`,
+  `argocd.cloudutsuk.com`), and `<service>-<lab>.cloudutsuk.com` for lab UIs through one wildcard tunnel
+  route to the labs gateway (ADR 0045). The internal `*.home.cloudutsuk.com` names and their
+  Let's Encrypt certificates don't change and stay on each Ingress as aliases.
+- **One Keycloak issuer: `https://auth.cloudutsuk.com`.** Keycloak gets a fixed hostname (backchannel
+  stays internal). PowerDNS answers the same name with `172.30.0.1` inside the network, and cert-manager
+  issues its certificate through DNS-01, so the issuer resolves and validates on both paths. Every k3s
+  API server's OIDC drop-in and node host alias, and every client's issuer and redirect URIs, move to
+  it. `auth.cloudutsuk.com` has no Access application (Access uses Keycloak as its IdP, so that would
+  loop); Traefik blocks `/admin` on the public name.
+- **Each app's configured base URL becomes its public name** (Grafana `root_url`, Argo CD `url`,
+  Backstage `baseUrl`, and the like). Requests to the internal name over Tailscale still work and
+  redirect to the public name after sign-in.
+- **Stay private (Tailscale only):** the OTLP gateway, Zot registry, PowerDNS API, k3s APIs, LiteLLM's
+  `/v1` API and Qdrant's API (API clients can't sign in through Access), plus OpenBao's UI and the
+  Keycloak admin console (owner's default; reopen with a new ADR).
+- **`cloudflared` runs on the host**, as a Compose project on the `homelab` bridge
+  (`infra-local host/cloudflared`), like the labs gateway and the exporters (owner's default): it reaches
+  every cluster's Traefik (`172.30.0.1`-`.4`) and the labs gateway (`172.30.0.5`) and survives a rebuild
+  of `platform`. Its tunnel token lives in OpenBao.
+- **Access can't be skipped on a public host.** Traefik checks the `Cf-Access-Jwt-Assertion` header
+  against the team's signing keys on requests for public hostnames.
+- **Rollout** follows Phase 3 steps 10-17: the issuer move first, then a Grafana pilot, then the rest.
+
+#### Considered options
+
+1. **Tailscale only (ADR 0037 as is)**: no browser-only access, nothing public for the Dashboard tab.
+2. **Cloudflare only (ADR 0003 as planned)**: loses `kubectl` and machine endpoints from the laptop, and
+   the fallback when Cloudflare is down.
+3. **Tunnel without Access**: admin UIs on the internet with only their own login in front.
+4. **Multi-level public names with Advanced Certificate Manager**: keeps names like
+   `grafana.mon.cloudutsuk.com`, but costs money every month for no functional gain.
+5. **`cloudflared` as pods in `platform` (ADR 0003's placement)**: public access would go down with
+   `platform` and depend on its rebuilds.
+6. **Both paths, flat names, host `cloudflared`** (chosen).
+
+#### Consequences
+
+- Good: Every UI works from any browser after SSO, and from tailnet devices as before.
+- Good: SSO is checked at Cloudflare's edge before a request reaches the DGX; no inbound ports.
+- Good: The Dashboard tab and a status page can be public.
+- Good: The catch-all application makes a forgotten hostname private by default.
+- Bad: Moving the issuer touches every OIDC client and every k3s API server; done first and tested on
+  the tailnet before anything is public.
+- Bad: Two access paths to keep in step: a new UI needs an Ingress alias, a tunnel route and an Access
+  application.
+- Bad: Cloudflare becomes a dependency for public access and Tailscale for private access; each is the
+  other's fallback for browser UIs only.
+- Bad: The free plan keeps Access logs for 24 hours; they're exported to `mon` to keep them longer.
+
+#### Related
+
+- [ADR 0003](#adr-0003)
+- [ADR 0024](#adr-0024)
+- [ADR 0028](#adr-0028)
+- [ADR 0037](#adr-0037)
+- [ADR 0045](#adr-0045)
 
 {% endraw %}
 <!-- adr:end -->

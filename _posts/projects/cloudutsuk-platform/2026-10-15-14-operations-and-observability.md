@@ -43,6 +43,15 @@ dashboard covers every cluster with a drop-down
 cert-manager, Kyverno, Traefik, Velero and the collectors themselves. Turning on a chart's
 `serviceMonitor` is all it takes; the target allocator finds it.
 
+**Everything is scraped every 60 seconds.** It was 30 at first; halving it halved what Mimir ingests on a
+DGX that was running warm, and no alert or dashboard here needs finer resolution
+([ADR 0053](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0053)). The catch is
+in the queries: `rate()` needs two samples in its range, and the upstream mixins and dashboards are full
+of `[1m]` ranges written for a 15-second scrape. At 60 seconds those return nothing, and an alert built on
+one goes quietly silent. So every query range is at least four scrapes (4 minutes), set when the vendored
+content is rendered rather than by editing it: the Mimir, Loki and Tempo mixins are told the interval, and
+the import script widens any shorter range it finds.
+
 **Labs get the same pack** under lab contract v2: `make up` registers the lab with Argo CD, which installs
 the pack. The lab's signals show up in `mon` without the platform knowing anything about the lab.
 
@@ -224,6 +233,9 @@ Memory is the constraint on a single DGX with 128 GB of unified memory: the GPU 
 - **Pressure, not just usage:** Linux pressure stall information for CPU, memory and I/O is on the
   dashboard. Swap is too: the first look at the new dashboard showed it nearly full, a warning no
   usage graph had given.
+- **The monitoring itself:** `mon` was one of the busiest clusters on the host, with Mimir its busiest
+  process. Scraping every 60 seconds instead of 30 halves its ingest (see
+  [monitoring](#application-and-infrastructure-monitoring)).
 - **Energy:** DCGM reports the GPU's energy; the dashboard shows kWh per hour and per day. The DGX
   doesn't expose the whole system's power to Linux.
 
