@@ -3498,6 +3498,80 @@ only one.
 - [ADR 0037](#adr-0037)
 - [ADR 0045](#adr-0045)
 
+## ADR-0059: IaC runner image with the Terragrunt tools baked in, and up to four runners gated on host memory
+{: #adr-0059 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `homelab-gitops`, `infra-local`, `terragrunt-shared-module`</span>
+
+#### Context
+
+The `homelab-iac` scale set runs infra-local's Terragrunt jobs. ADR 0044 gave the `homelab` set our own
+image with the CI tools baked in, and kept `homelab-iac` on the stock `actions-runner` image because its
+jobs don't run the gates. So every Terragrunt job's *Setup Environment* downloads Terraform, Terragrunt,
+TFLint and kubelogin. The image's `python3` has no pip, so `setup-python` downloads Python as well. A
+one-off failed connection to releases.hashicorp.com failed whole jobs with `AggregateError` (runs
+40097748577, 40122422422). Only `actions/cache`, itself a network round-trip, sometimes saved the
+downloads.
+
+The set had `maxRunners: 1`, so every infra-local job ran one after another, across runs too. A
+runner peaked at 731 MiB in the week to 2026-10-26. The DGX's memory is shared with the GPU models, and
+its available memory dropped to 2 GiB that week. Kubernetes schedules on the platform node's requests
+(20 GiB, about 7 GiB requested), which say nothing about the host.
+
+#### Decision
+
+- **Own image `platform/actions-runner-iac`** (`ci/runner-image-iac`): the stock runner, pinned by
+  digest, plus `ci/iac-tools` installed at `/opt/iac`:
+  - Terraform 1.14.8, Terragrunt 0.93.10, TFLint 0.63.0 and kubelogin 0.2.12, matching the shared
+    module's `*_VERSION` pins, plus k3d 5.9.0 and kubectl 1.35.5, all sha256-checked
+  - a Python 3.12.3 venv with pip and the shared module's packages (PyYAML, python-dotenv,
+    hash-locked) at `/opt/iac/python`, first on `PATH`
+
+  With them, `setup-environment`'s version checks pass and the job downloads nothing. A version bump in
+  the shared module that the image hasn't caught up with falls back to downloading; it doesn't fail.
+  wizcli is left out: its step always fetches `latest`.
+- **Built and promoted like ADR 0044:** `runner-image-iac.yml` uses `build-image.yaml` (same gates,
+  `image-gate: report`, signed, with an SBOM). The digest goes into
+  `clusters/platform/arc-runner-homelab-iac.yaml` by hand after a test job, and the `iac-setup` init
+  container then stops downloading k3d and kubectl.
+- **`maxRunners: 4`, gated on host memory.** A `memory-gate` init container reads
+  `node_memory_MemAvailable_bytes` from the host's node-exporter (172.30.0.1:9100). It holds the runner
+  pod until the DGX has `HOST_MIN_AVAILABLE_GIB` (6: the runner's 4 GiB limit plus 2 GiB) available,
+  and GitHub keeps the job queued meanwhile. If node-exporter doesn't answer, the gate lets the runner
+  start (fail open): an exporter outage must not stop the CI that would fix it.
+- **Runner memory request 1 GiB** (was 512 MiB), near the measured peak, so the platform node's
+  scheduler accounts for four runners honestly (4 GiB of its 20).
+- infra-local's plan matrix may run four at a time. Plans are read-only, and each stack has its own
+  state and lock. Applies stay one at a time, in order.
+
+#### Considered options
+
+1. **Keep downloading in every job** (with the retried download in terragrunt-shared-module#8): works,
+   but it's slow and every job still depends on four download hosts.
+2. **Download the tools in the `iac-setup` init container**: a failure restarts the init container
+   instead of failing a job, but the tools are still downloaded once per pod.
+3. **Our own image** (chosen): no downloads, and the same build, gates and signing as ADR 0044.
+4. **Memory-aware scaling in ARC**: ARC has no such hook. A controller that patches `maxRunners` from
+   metrics would fight Argo CD's self-heal.
+5. **Scheduler only, with larger requests**: the platform node's requests don't reflect the host's
+   free memory, which is what runs out.
+
+#### Consequences
+
+- Good: Terragrunt jobs start in seconds, without depending on releases.hashicorp.com, GitHub releases or
+  PyPI.
+- Good: Up to four plans or runs at once when the host has memory, and none when it doesn't.
+- Bad: The tool pins live in two places (shared module and `ci/iac-tools/tools.txt`). A mismatch costs
+  speed, not correctness.
+- Bad: The memory gate is a check at pod start, not a reservation. Four runners that start together
+  each saw enough memory, and later model load can still squeeze them (each is capped at 4 GiB).
+- Bad: Another image to roll out by hand.
+
+#### Related
+
+- [ADR 0040](#adr-0040)
+- [ADR 0044](#adr-0044)
+
 {% endraw %}
 <!-- adr:end -->
 
