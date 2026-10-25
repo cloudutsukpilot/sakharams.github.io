@@ -60,3 +60,4 @@ adrs:
   - {id: "0056", title: "A second local model for agents: Gemma 4 26B-A4B (FP8, Apache 2.0) in ai, scaled to zero, behind LiteLLM", status: proposed, date: 2026-10-24, anchor: adr-0056, repos: [homelab-gitops, infra-local, shorts-studio]}
   - {id: "0057", title: "Cloudflare metrics from our own collector, with a read-only token", status: accepted, date: 2026-10-24, anchor: adr-0057, repos: [homelab-gitops, infra-local]}
   - {id: "0058", title: "Public access through Cloudflare Tunnel and Access alongside Tailscale", status: accepted, date: 2026-10-24, anchor: adr-0058, repos: [infra-local, homelab-gitops, homelab-services, self-service-portal]}
+  - {id: "0059", title: "IaC runner image with the Terragrunt tools baked in, and up to four runners gated on host memory", status: accepted, date: 2026-10-26, anchor: adr-0059, repos: [homelab-gitops, infra-local, terragrunt-shared-module]}
