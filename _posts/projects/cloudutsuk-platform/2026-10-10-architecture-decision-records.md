@@ -3462,6 +3462,25 @@ only one.
   of `platform`. Its tunnel token lives in OpenBao.
 - **Access can't be skipped on a public host.** Traefik checks the `Cf-Access-Jwt-Assertion` header
   against the team's signing keys on requests for public hostnames.
+- **An edge rate limit caps request volume** (amended 2026-10-26, Phase 3 step 17a). The trigger was
+  `canvas.cloudutsuk.com`, the System Design Canvas on Cloudflare Pages: anyone with a Keycloak account
+  can reach it, so it has the widest audience. The rule:
+  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), in `infra-local
+    host/cloudflare/ratelimit.sh`: more than 150 requests in 10 seconds from one IP at one Cloudflare
+    data centre is blocked for 10 seconds.
+  - **Free plan limits** shape it: one rule, counting by IP only, a 10-second period and a 10-second
+    timeout, and an expression that can match only the path. So it can't single out one hostname or
+    count a host's total traffic per minute. It covers every proxied hostname (canvas, auth, grafana
+    and the rest), which also suits the tunnel's UIs.
+  - **Action Block, not a challenge.** On Free a challenge has no duration (it only throttles), and
+    the apps' API calls can't solve one anyway.
+  - **150 per 10 s** allows a Grafana dashboard's burst of panel queries and stops a loop or a scraper
+    within seconds. It stays a per-client cap: a spread-out flood from many IPs is left to Cloudflare's
+    automatic DDoS protection and to Access, which turns away every unauthenticated request before it
+    reaches Pages or the tunnel.
+  - **`*.pages.dev` isn't covered.** Zone rules don't apply to Cloudflare's own domain, so only Access
+    guards `system-design-canvas.pages.dev`.
+  - **Token:** `homelab-tunnel-access` gains Zone WAF Write on `cloudutsuk.com` only.
 - **Rollout** follows Phase 3 steps 10-17: the issuer move first, then a Grafana pilot, then the rest.
 
 #### Considered options
@@ -3475,6 +3494,9 @@ only one.
 5. **`cloudflared` as pods in `platform` (ADR 0003's placement)**: public access would go down with
    `platform` and depend on its rebuilds.
 6. **Both paths, flat names, host `cloudflared`** (chosen).
+7. **A per-host, per-minute rate limit for `canvas.cloudutsuk.com`** (asked for 2026-10-26): needs the
+   Host field and periods over 10 seconds, which start at the Pro plan. The zone-wide per-IP rule above
+   is what the Free plan allows; revisit it if the zone moves to Pro.
 
 #### Consequences
 
@@ -3482,12 +3504,16 @@ only one.
 - Good: SSO is checked at Cloudflare's edge before a request reaches the DGX; no inbound ports.
 - Good: The Dashboard tab and a status page can be public.
 - Good: The catch-all application makes a forgotten hostname private by default.
+- Good: One client can't send more than about 15 requests a second to any public hostname; a runaway
+  loop is cut off at the edge within 10 seconds.
 - Bad: Moving the issuer touches every OIDC client and every k3s API server; done first and tested on
   the tailnet before anything is public.
 - Bad: Two access paths to keep in step: a new UI needs an Ingress alias, a tunnel route and an Access
   application.
 - Bad: Cloudflare becomes a dependency for public access and Tailscale for private access; each is the
   other's fallback for browser UIs only.
+- Bad: The rate limit is per IP and per data centre, so it isn't a total cap. Many clients, or one behind
+  several data centres, can each stay under it. Users behind one NAT share a counter.
 - Bad: The free plan keeps Access logs for 24 hours; they're exported to `mon` to keep them longer.
 
 #### Related
