@@ -1,0 +1,179 @@
+# Exploded homelab PC for _posts/homelab/2026-10-26-homelab-setup-3d-dgx-spark-home-pc.md
+# Units: cm, y up, case front at +z. Parts read from the machine (lscpu, lspci, lsblk, udev memory
+# records, nvidia-smi) on 2026-10-26; the board's slot layout is simplified. Case, cooler and PSU
+# models aren't recorded, so they're shown generically and say so.
+title: Homelab PC, exploded
+caption: "The Intel workstation that takes the time-bound projects. Pull **Explode** to separate the parts; case, cooler and PSU are generic shapes."
+accent: "#F97316"
+height: 540
+light: [160, 300, 220]
+shadow_extent: 120
+floor_size: 520
+camera: {pos: [92, 68, 104], target: [0, 24, 0], fov: 38, max_polar: 86}
+parts:
+  - id: case
+    label: Case
+    group: Enclosure
+    color: black
+    opacity: 0.35
+    pos: [0, 0, 0]
+    explode: [0, 0, 0]
+    facts:
+      summary: "Mid-tower with three ARGB front fans, on a wooden caddy with castors under the desk."
+      note: "Model not recorded."
+    shapes:
+      - {type: box, size: [21, 1, 42], pos: [0, 0.5, 0], opacity: 1}
+      - {type: box, size: [21, 1, 42], pos: [0, 45.5, 0]}
+      - {type: box, size: [1, 46, 42], pos: [10, 23, 0]}
+      - {type: box, size: [21, 46, 1], pos: [0, 23, -20.5]}
+  - id: front-fans
+    label: Front ARGB fans
+    group: Cooling
+    color: black
+    pos: [0, 0, 21]
+    explode: [0, 0, 25]
+    facts:
+      summary: "Three front fans with RGB rings: the pink glow in the photo."
+      note: "Model not recorded."
+    shapes:
+      - {type: box, size: [21, 46, 1], pos: [0, 23, 0], opacity: 0.25}
+      - {type: torus, r: 5.2, tube: 0.7, pos: [0, 37, 0.8], rgb: 0.0}
+      - {type: torus, r: 5.2, tube: 0.7, pos: [0, 24, 0.8], rgb: 0.33}
+      - {type: torus, r: 5.2, tube: 0.7, pos: [0, 11, 0.8], rgb: 0.66}
+      - {type: cyl, r: 1.6, h: 0.6, rot: [90, 0, 0], pos: [0, 37, 0.8], color: graphite}
+      - {type: cyl, r: 1.6, h: 0.6, rot: [90, 0, 0], pos: [0, 24, 0.8], color: graphite}
+      - {type: cyl, r: 1.6, h: 0.6, rot: [90, 0, 0], pos: [0, 11, 0.8], color: graphite}
+  - id: board
+    label: ASUS Pro WS W680-ACE IPMI
+    group: Platform
+    color: "#1b2430"
+    pin: W680 board
+    pin_at: [0, 34, 0]
+    pos: [-8, 0, -1]
+    explode: [-20, 0, 0]
+    facts:
+      model: "ATX workstation board, Intel W680, LGA1700 · BIOS 3501"
+      summary: "A workstation board with out-of-band management (IPMI card) and ECC support, so the PC can be managed like a small server."
+      specs:
+        - [Socket, "LGA1700 (12th to 14th gen Core)"]
+        - [Memory, "4× DDR5 DIMM, up to 192 GB, ECC or non-ECC"]
+        - [PCIe, "2× PCIe 5.0 x16 (x16 or x8/x8), 2× PCIe 3.0 x16 (x4), 1× PCIe 3.0 x1"]
+        - [M.2, "3× M.2 PCIe 4.0 x4, 1× Key E for Wi-Fi"]
+        - [LAN, "2× Intel I226-LM 2.5 GbE (both unused, link down)"]
+        - [Management, "IPMI expansion card included"]
+        - [Video out, "DisplayPort, HDMI, VGA from the CPU's UHD 770"]
+      source: "[ASUS tech specs](https://www.asus.com/motherboards-components/motherboards/workstation/pro-ws-w680-ace-ipmi/techspec/) and `/sys/class/dmi` on the PC"
+    shapes:
+      - {type: box, size: [0.4, 30.5, 24.4], pos: [0, 26, 0]}
+  - id: cpu
+    label: Intel Core i9-14900KS
+    group: Platform
+    color: silver
+    metal: 0.85
+    rough: 0.25
+    pos: [-7.5, 35, 2]
+    explode: [-10, 6, 0]
+    facts:
+      model: "24 cores (8P + 16E) / 32 threads · up to 6.2 GHz"
+      summary: "Fast single-thread for builds and k3d control planes; it also carries the layers Ollama can't fit in 16 GB of VRAM."
+      specs:
+        - [Cores, "24 (8 performance + 16 efficient), 32 threads"]
+        - [Max clock, "6.2 GHz"]
+        - [iGPU, "Intel UHD 770 (drives the LG HDR WQHD)"]
+        - [Idle temp, "37 °C package (`sensors`)"]
+    shapes:
+      - {type: box, size: [0.6, 4.5, 3.7], pos: [0, 0, 0]}
+  - id: cooler
+    label: CPU cooler
+    group: Cooling
+    color: graphite
+    pos: [-5, 35, 2]
+    explode: [10, 6, 0]
+    facts:
+      summary: "Whatever cools the i9; drawn as a generic tower cooler."
+      note: "Model not recorded."
+    shapes:
+      - {type: box, size: [5, 12, 12], pos: [0, 0, 0], color: silver, metal: 0.8, rough: 0.3}
+      - {type: cyl, r: 5.6, h: 2.4, rot: [0, 0, 90], pos: [-0.2, 0, 7.4], color: black}
+  - id: ram
+    label: 96 GB DDR5
+    group: Platform
+    color: "#2a2d33"
+    pos: [-7.3, 35, -7]
+    explode: [-8, 14, 0]
+    facts:
+      model: "2× 48 GB G.Skill F5-5200J4040A48G"
+      summary: "Two 48 GB DIMMs, one per channel, rated 5200 MT/s CL40 and running at 4800 MT/s; two slots free for 192 GB later."
+      specs:
+        - [Kit, "G.Skill F5-5200J4040A48G (DDR5-5200 CL40)"]
+        - [Slots, "Controller0-DIMM1 and Controller1-DIMM1; DIMM0 slots empty"]
+        - [Speed now, "4800 MT/s, below the kit's 5200 rating"]
+        - [Visible, "91 GiB to Linux"]
+      source: "`udevadm info -e` memory records on the PC"
+    shapes:
+      - {type: box, size: [0.8, 3.4, 13.3], pos: [0, 0, 0], color: "#2a2d33"}
+      - {type: box, size: [0.8, 3.4, 13.3], pos: [0, 0, -2], color: "#2a2d33"}
+  - id: gpu
+    label: NVIDIA GeForce RTX 5070 Ti
+    group: Graphics
+    color: "#1c1f24"
+    metal: 0.4
+    pin: RTX 5070 Ti
+    pin_at: [0, 4, 0]
+    pos: [-1, 22, 0]
+    explode: [24, 2, 0]
+    facts:
+      model: "GB203 · 16 GB GDDR7 · driver 595.71.05"
+      summary: "The PC's model runner: Ollama keeps the small models (qwen3:8b, gemma4) fully on the card and splits the 17 to 20 GB ones with system RAM."
+      specs:
+        - [VRAM, "16 GB GDDR7 (16,303 MiB)"]
+        - [Power limit, "300 W"]
+        - [Link, "PCIe 5.0 x16"]
+        - [Output, "HDMI to the LG UltraWide"]
+        - [Models here, "qwen3-coder:30b, qwen3:32b, deepseek-r1:32b, gemma4:26b, gemma4, qwen3:8b"]
+      source: "`nvidia-smi` and `ollama list` on the PC"
+    shapes:
+      - {type: box, size: [6, 13, 30], pos: [0, 0, 0]}
+      - {type: cyl, r: 4.2, h: 0.6, rot: [0, 0, 90], pos: [3.2, 0, -9], color: black}
+      - {type: cyl, r: 4.2, h: 0.6, rot: [0, 0, 90], pos: [3.2, 0, 0], color: black}
+      - {type: cyl, r: 4.2, h: 0.6, rot: [0, 0, 90], pos: [3.2, 0, 9], color: black}
+      - {type: box, size: [0.3, 0.6, 26], pos: [3, 6.6, 0], color: green, emissive: green, glow: 0.8}
+  - id: nvme
+    label: 2 TB ADATA Legend 960
+    group: Storage
+    color: "#1b1d22"
+    pos: [-7.5, 28, 1]
+    explode: [-10, -4, 10]
+    facts:
+      model: "ADATA LEGEND 960 · M.2 PCIe 4.0 NVMe · 1.9 TiB"
+      summary: "Boot drive and model store: Ubuntu 26.04, Docker and about 90 GB of Ollama models; 244 GB used."
+      specs:
+        - [Used, "244 GB of 1.9 TB (14%)"]
+        - [Mounted, "`/` and `/boot/efi`"]
+    shapes:
+      - {type: box, size: [0.5, 2.2, 8], pos: [0, 0, 0]}
+  - id: wifi
+    label: Realtek RTL8852BE Wi-Fi 6
+    group: Network
+    color: "#2b2f36"
+    pos: [-7.6, 14, -9]
+    explode: [-10, -6, -8]
+    facts:
+      summary: "The PC's live network link today: Wi-Fi to the home router at 192.168.1.10; the two 2.5 GbE ports are unplugged."
+      specs:
+        - [Interface, "`wlp7s0` · 192.168.1.10/24"]
+        - [Gateway, "192.168.1.254"]
+        - [Bluetooth, "IMC Networks radio on USB"]
+    shapes:
+      - {type: box, size: [0.5, 2.2, 3], pos: [0, 0, 0]}
+  - id: psu
+    label: Power supply
+    group: Power
+    color: "#24272c"
+    pos: [0, 5, -6]
+    explode: [0, -1, -26]
+    facts:
+      summary: "Feeds the i9 and the 300 W RTX card; drawn as a generic ATX unit."
+      note: "Model and wattage not recorded."
+    shapes:
+      - {type: box, size: [15, 8.6, 16], pos: [0, 0, 0]}

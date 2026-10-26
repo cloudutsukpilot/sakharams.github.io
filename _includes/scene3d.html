@@ -1,0 +1,54 @@
+{% comment %}
+  Interactive 3D scene: orbit, zoom, click a part for its specs, optional explode slider and cables.
+  Usage: {% include scene3d.html id="homelab/homelab-desk" %}
+  The id is the data file's path under _data/scenes3d/ without .yml (folders mirror the post's folders).
+  assets/js/scene3d.js draws it (Three.js is loaded on demand). The parts table below is the
+  no-JavaScript fallback and stays available as "All parts" once the scene is ready.
+  Data (units are free, keep one per scene; y is up):
+    title, caption, accent, height (px), autorotate (bool), exposure, light [x,y,z], shadow_extent,
+    floor (bool), floor_size, floor_color, camera {pos, target, fov, min, max, max_polar}, explode_label,
+    parts: [{id, label, group, color, metal, rough, pos, rot, explode [dx,dy,dz], pin (true|text), pin_at,
+             info (false = decoration), facts {model, summary, specs [[k, v]], note, source},
+             shapes: [{type: box|rbox|cyl|torus|sphere|screen, size [w,h,d], radius, axis, r, r2, h, tube,
+                       pos, rot, color, metal, rough, emissive, glow, opacity, rgb, screen {style, title, lines, bg, fg, accent}}]}],
+    cables: [{id, label, color, r, points [[x,y,z]...], packets, speed, both, facts}]
+  Keep this file free of blank lines and indentation so kramdown passes it through as one HTML block.
+{% endcomment %}
+{%- assign s3 = site.data.scenes3d -%}
+{%- assign s3_parts = include.id | split: "/" -%}
+{%- for part in s3_parts -%}{%- assign s3 = s3[part] -%}{%- endfor -%}
+{%- assign s3_dom_id = include.id | replace: "/", "--" | prepend: "s3d-" -%}
+{%- if s3.parts %}
+<figure class="s3d" id="{{ s3_dom_id }}" style="--s3d-accent: {{ s3.accent | default: '#38BDF8' }}; --s3d-h: {{ s3.height | default: 520 }}px;">
+<div class="s3d-toolbar" role="toolbar" aria-label="{{ s3.title | escape }} controls"></div>
+<div class="s3d-stage" tabindex="0" aria-label="{{ s3.title | escape }}: interactive 3D view. Drag to orbit, right-drag or Shift-drag to pan, Control plus scroll or pinch to zoom, arrow keys to orbit.">
+<div class="s3d-pins"></div>
+<div class="s3d-tip" role="tooltip" hidden></div>
+<div class="s3d-hint" aria-hidden="true">Ctrl + scroll (or pinch) to zoom</div>
+<p class="s3d-loading">Loading the 3D view…</p>
+<aside class="s3d-panel" hidden><button type="button" class="s3d-panel-close" aria-label="Close details"><i class="fas fa-xmark" aria-hidden="true"></i></button><div class="s3d-panel-body"></div></aside>
+</div>
+<div class="s3d-chips"></div>
+{%- if s3.caption %}
+<figcaption class="s3d-caption">{{ s3.caption | markdownify | remove: '<p>' | remove: '</p>' | strip }}</figcaption>
+{%- endif %}
+<details class="s3d-fallback">
+<summary>All parts ({{ s3.title | escape }})</summary>
+<table>
+<thead><tr><th>Part</th><th>Details</th></tr></thead>
+<tbody>
+{%- for p in s3.parts %}{% unless p.info == false %}
+<tr><td><strong>{{ p.label | escape }}</strong>{% if p.facts.model %}<br><small>{{ p.facts.model | replace: '`', '' | escape }}</small>{% endif %}</td><td>{{ p.facts.summary | replace: '`', '' | escape }}{% for s in p.facts.specs %}{% if forloop.first %}<br>{% endif %}<small>{{ s[0] | escape }}: {{ s[1] | replace: '`', '' | escape }}{% unless forloop.last %} · {% endunless %}</small>{% endfor %}</td></tr>
+{%- endunless %}{% endfor %}
+{%- for c in s3.cables %}{% unless c.info == false %}
+<tr><td><strong>{{ c.label | escape }}</strong></td><td>{{ c.facts.summary | replace: '`', '' | escape }}</td></tr>
+{%- endunless %}{% endfor %}
+</tbody>
+</table>
+</details>
+<script type="application/json" class="s3d-data">{{ s3 | jsonify | replace: '<', '<' }}</script>
+</figure>
+<script defer src="{{ '/assets/js/scene3d.js' | relative_url }}"></script>
+{%- else %}
+<p><em>3D scene "{{ include.id }}" not found in _data/scenes3d/.</em></p>
+{%- endif %}

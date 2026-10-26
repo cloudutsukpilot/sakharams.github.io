@@ -1,0 +1,369 @@
+// Interactive 3D scenes (_includes/scene3d.html, assets/js/scene3d.js). Colours derive from Chirpy's
+// theme variables, so light and dark mode both work. Every class is prefixed `s3d-`.
+
+.s3d {
+  --s3d-ink: var(--heading-color);
+  --s3d-text: var(--text-color);
+  --s3d-muted: color-mix(in srgb, var(--s3d-text) 60%, transparent);
+  --s3d-border: color-mix(in srgb, var(--s3d-ink) 16%, transparent);
+
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--s3d-border);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--s3d-ink) 2%, var(--main-bg));
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  &.is-ready .s3d-loading {
+    display: none;
+  }
+
+  &.is-failed .s3d-stage {
+    height: auto;
+    min-height: 0;
+  }
+
+  // Full-window fallback when the Fullscreen API isn't there, and the real fullscreen.
+  &.is-full {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-radius: 0;
+    background: var(--main-bg);
+
+    .s3d-stage {
+      flex: 1 1 auto;
+      height: auto;
+    }
+
+    .s3d-chips {
+      max-height: 22vh;
+      overflow: auto;
+    }
+
+    .s3d-fallback,
+    .s3d-caption {
+      display: none;
+    }
+  }
+}
+
+.s3d-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.s3d-btn,
+.s3d-explode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--s3d-border);
+  border-radius: 0.5rem;
+  background: var(--main-bg);
+  color: var(--s3d-text);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--s3d-accent);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: var(--s3d-accent);
+    background: color-mix(in srgb, var(--s3d-accent) 16%, var(--main-bg));
+    color: var(--s3d-ink);
+  }
+}
+
+.s3d-explode input {
+  width: 8rem;
+  accent-color: var(--s3d-accent);
+}
+
+.s3d-stage {
+  position: relative;
+  height: var(--s3d-h, 520px);
+  min-height: 300px;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  background:
+    radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--s3d-accent) 10%, transparent), transparent 70%),
+    color-mix(in srgb, var(--s3d-ink) 5%, var(--main-bg));
+  outline: none;
+  touch-action: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--s3d-accent);
+  }
+
+  @media (max-width: 576px) {
+    height: min(var(--s3d-h, 520px), 70vh);
+  }
+}
+
+.s3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.s3d-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 1rem;
+  color: var(--s3d-muted);
+  text-align: center;
+}
+
+.s3d-hint {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  padding: 0.3rem 0.7rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  font-size: 0.8rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.25s ease;
+
+  &.is-on {
+    opacity: 1;
+  }
+}
+
+.s3d-tip {
+  position: absolute;
+  z-index: 4;
+  max-width: 18rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--s3d-border);
+  border-radius: 0.4rem;
+  background: var(--main-bg);
+  color: var(--s3d-ink);
+  font-size: 0.8rem;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.s3d-pins {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.s3d-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--s3d-accent) 55%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--main-bg) 88%, transparent);
+  color: var(--s3d-ink);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+
+  &.is-on {
+    border-color: var(--s3d-accent);
+    background: var(--s3d-accent);
+    color: #fff;
+  }
+}
+
+.s3d-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  width: min(340px, 92%);
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  border-left: 1px solid var(--s3d-border);
+  background: var(--main-bg);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);
+  font-size: 0.88rem;
+  user-select: text;
+
+  h4 {
+    margin: 0 1.8rem 0.3rem 0;
+    font-size: 1.05rem;
+  }
+
+  @media (max-width: 576px) {
+    top: auto;
+    width: 100%;
+    height: 58%;
+    border-top: 1px solid var(--s3d-border);
+    border-left: 0;
+  }
+}
+
+.s3d-panel-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--s3d-ink) 8%, transparent);
+  }
+}
+
+.s3d-panel-group {
+  margin: 0 0 0.15rem;
+  color: var(--s3d-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.s3d-panel-model {
+  margin: 0 0 0.5rem;
+  color: var(--s3d-muted);
+  font-size: 0.82rem;
+}
+
+.s3d-panel-lead {
+  margin: 0 0 0.7rem;
+  color: var(--s3d-ink);
+}
+
+.s3d-panel-note,
+.s3d-panel-src {
+  margin: 0.6rem 0 0;
+  color: var(--s3d-muted);
+  font-size: 0.8rem;
+}
+
+.s3d-specs {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+
+  th,
+  td {
+    padding: 0.28rem 0.3rem;
+    border-bottom: 1px solid var(--s3d-border);
+    vertical-align: top;
+    text-align: left;
+  }
+
+  th {
+    width: 38%;
+    color: var(--s3d-muted);
+    font-weight: 500;
+  }
+}
+
+.s3d-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.s3d-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.s3d-chip-head {
+  min-width: 6.5rem;
+  color: var(--s3d-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.s3d-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.55rem;
+  border: 1px solid var(--s3d-border);
+  border-radius: 1rem;
+  background: var(--main-bg);
+  font-size: 0.78rem;
+  cursor: pointer;
+
+  &::before {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--s3d-dot, #64748b);
+    content: '';
+  }
+
+  &:hover,
+  &[aria-pressed='true'] {
+    border-color: var(--s3d-accent);
+  }
+
+  &[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--s3d-accent) 14%, var(--main-bg));
+  }
+}
+
+.s3d-caption {
+  margin-top: 0.5rem;
+  color: var(--s3d-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.s3d-fallback {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+
+  summary {
+    color: var(--s3d-muted);
+    cursor: pointer;
+  }
+
+  table {
+    margin-top: 0.4rem;
+  }
+}
