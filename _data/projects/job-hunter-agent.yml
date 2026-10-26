@@ -1,0 +1,72 @@
+# Project playbook card for /tags/job-hunter-agent/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Employer names from the author's resume, the Supabase project, the LinkedIn account and the Slack
+# channel are deliberately left out (public repo).
+name: Job Hunter Agent
+tag: Job Hunter Agent
+summary: >-
+  A self-hosted agent that finds jobs on LinkedIn, scores them against my resume and drafts a tailored
+  resume and cover letter for each one. Nothing is ever submitted: every application waits for my approval.
+status: Live
+created: '2026-10-22'
+category: ai-automation
+clouds: [agnostic]
+facts:
+- label: Type
+  value: AI job-application assistant, manual approval only
+- label: Stack
+  value: Python, FastAPI, Pydantic, vanilla JS, Supabase (Postgres)
+- label: LLM
+  value: Local qwen3.5-35b-a3b through a LiteLLM gateway
+- label: Hosting
+  value: Homelab k3d platform cluster via Argo CD, Keycloak sign-in
+- label: Sources
+  value: LinkedIn via an MCP sidecar; Wikidata and Google News for company facts
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/job-hunter-agent/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture", url: /posts/projects/job-hunter-agent/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/job-hunter-agent/system-architecture, format: animated}
+- {type: cicd, title: "CI/CD pipeline", url: /posts/projects/job-hunter-agent/12-cicd-and-release-management/#build-automation, diagram: projects/job-hunter-agent/cicd-pipeline, format: animated}
+- {type: data-model, title: "Data model (ER)", url: /posts/projects/job-hunter-agent/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
+brief: |
+  Author's request (2026-10-21): read Mindy Jen's three dev.to articles on a LinkedIn job-application
+  agent ("HunterAgent") and plan an implementation; then build it.
+
+  Author's decisions:
+  - LLM: the local model behind the homelab's LiteLLM gateway (qwen3.5-35b-a3b), not a cloud API.
+  - Approval: manual approve only. The agent never submits an application, sends a connection request
+    or a message.
+  - Repo: a new private repo in the cloudutsukpilot org (job-hunter-agent). API in FastAPI.
+  - Database: Supabase, as in the articles (the cloud free tier).
+  - Deployment: the homelab platform cluster; the LinkedIn MCP server as a sidecar in the app pod;
+    sign-in for platform-admins only (Keycloak); hostname jobs.platform.home.cloudutsuk.com.
+  - Resumes: the author's real platform-architect resume, plus cloud-architect and devops-architect
+    versions derived from it truthfully.
+
+  Built 2026-10-21 to 2026-10-22, then extended on request the same week: several search profiles
+  with their own resume, mode, tone and schedule; per-profile scheduled runs spread through the day;
+  a review page with skills required vs. yours, a shortlist confidence and collapsible drafts; an
+  Evaluate / Re-evaluate button per job; editable resumes; run history and totals; company research
+  with financials, headcount and news from public sources; Slack messages when a run finishes.
+
+  Key facts from the code (job-hunter-agent):
+  - Agents (one base class, every run stored with OpenTelemetry spans): job scorer, resume optimizer
+    (returns line edits the app applies, so a 28k-character resume is never regenerated), cover letter
+    (4 tones), job facts (LLM fallback only), company research (cached per company), contacts (links
+    only from scraped references).
+  - Deterministic truthfulness checks: numbers, quoted originals and posting terms the output adds that
+    the original resume doesn't have; capitalised phrases with their acronym count as one term. Any flag
+    blocks approval until accepted.
+  - Status flow: pending_review -> approved -> applied, or rejected (and reopen).
+  - Structured output via JSON schema, thinking disabled, one repair retry, 300 s timeout.
+  - Discovery filters: duplicates, excluded companies, reposts. (An applicant-count filter was removed
+    at the author's request.)
+  - Evaluation of 6 real postings: skills mode was cleanest; keyword mode added tools; tailor from the
+    master resume.
+  - Lessons from the build: a LinkedIn session-copy test hit a redirect loop and HTTP 429 and
+    invalidated the session; the sidecar's Chromium was OOMKilled at 2 GiB (now 3 GiB); the in-cluster
+    LinkedIn sign-in needed --chrome-path, a pwuser-owned HOME on the volume and an exec-based login;
+    cert-manager DNS-01 needed public resolvers because of split DNS; Wikidata refuses requests without
+    a descriptive User-Agent.

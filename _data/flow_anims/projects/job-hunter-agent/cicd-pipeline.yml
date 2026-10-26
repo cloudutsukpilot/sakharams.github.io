@@ -1,0 +1,97 @@
+# Animated flow diagram for _posts/projects/job-hunter-agent/2026-10-22-12-cicd-and-release-management.md
+# (include id: projects/job-hunter-agent/cicd-pipeline). From a push to a running pod: three checks on
+# GitHub-hosted runners, then (main only) homelab-gitops' reusable build-image workflow on the homelab
+# runner, then GitOps. Source: job-hunter-agent .github/workflows/ci.yaml, homelab-gitops
+# .github/workflows/build-image.yaml and apps/job-hunter.
+title: Job Hunter Agent CI/CD pipeline
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 590]
+modes:
+  - { id: pass, label: "Every gate passes" }
+  - { id: fail, label: "Simulate a failing security gate" }
+
+lanes:
+  - { label: "Every push and pull request (GitHub-hosted)", x: 8, y: 8, w: 984, h: 252 }
+  - { label: "main only: build-image on the homelab runner", x: 8, y: 276, w: 984, h: 146 }
+  - { label: "Promote and deploy (GitOps)", x: 8, y: 436, w: 984, h: 146 }
+
+nodes:
+  - { id: PUSH, label: "git push", x: 120, y: 140, w: 140, shape: terminal, color: blue, icon: git }
+  - { id: TEST, label: "Unit tests", sub: "pytest, ruff", x: 400, y: 66, w: 170, icon: check }
+  - { id: SUPA, label: "Supabase test", sub: "all migrations", x: 400, y: 140, w: 170, icon: "databases/postgresql-18.svg" }
+  - { id: DOCK, label: "Docker build", sub: "smoke build", x: 400, y: 214, w: 170, icon: "devops/orchestration/docker-18.svg" }
+  - { id: MAIN, label: "main?", x: 690, y: 140, w: 110, h: 80, shape: diamond }
+
+  - { id: STOP, label: "No image", sub: "reports uploaded", x: 120, y: 352, w: 150, tone: fail, icon: cross, icon_pos: corner }
+  - { id: GATES, label: "7 security gates", sub: "Gitleaks … Hadolint", x: 380, y: 352, w: 160, color: rose, icon: shield, icon_pos: corner }
+  - { id: BUILD, label: "Build + scan", sub: "Trivy image, SBOM", x: 630, y: 352, w: 150, color: orange, icon: package, icon_pos: corner }
+  - { id: ZOT, label: "Zot registry", x: 875, y: 352, w: 140, h: 60, shape: cylinder, color: amber, icon: "devops/cicd/zot-18.svg", icon_pos: corner }
+
+  - { id: SIGN, label: "Sign + attest", sub: "OpenBao transit", x: 880, y: 510, w: 140, color: rose, icon: "devsecops/openbao-18.svg", icon_pos: corner }
+  - { id: PROM, label: "Commit digest", sub: "homelab-gitops", x: 680, y: 510, w: 150, color: orange, icon: git, icon_pos: corner }
+  - { id: ARGO, label: "Argo CD sync", x: 480, y: 510, w: 140, color: teal, icon: "devops/cicd/argocd-18.svg", icon_pos: corner }
+  - { id: KYV, label: "Kyverno", sub: "signed, pinned", x: 290, y: 510, w: 140, color: rose, icon: "devsecops/kyverno-18.svg", icon_pos: corner }
+  - { id: POD, label: "New pod", sub: "Recreate", x: 105, y: 510, w: 130, color: violet, icon: container }
+
+edges:
+  - { id: PT, from: PUSH, to: TEST, points: [[190, 140], [250, 140], [250, 66], [315, 66]] }
+  - { id: PS, from: PUSH, to: SUPA }
+  - { id: PD, from: PUSH, to: DOCK, points: [[190, 140], [250, 140], [250, 214], [315, 214]] }
+  - { id: TM, from: TEST, to: MAIN, points: [[485, 66], [565, 66], [565, 140], [635, 140]] }
+  - { id: SM, from: SUPA, to: MAIN }
+  - { id: MG, from: MAIN, to: GATES, label: "yes", points: [[690, 180], [690, 268], [380, 268], [380, 324]] }
+  - { id: GS, from: GATES, to: STOP, tone: fail, points: [[300, 352], [195, 352]] }
+  - { id: GB, from: GATES, to: BUILD, tone: ok }
+  - { id: BZ, from: BUILD, to: ZOT, proto: HTTPS, port: 443 }
+  - { id: ZS, from: ZOT, to: SIGN, points: [[875, 382], [875, 482]] }
+  - { id: SP, from: SIGN, to: PROM, points: [[810, 510], [755, 510]] }
+  - { id: PA, from: PROM, to: ARGO, kind: event, points: [[605, 510], [550, 510]] }
+  - { id: AK, from: ARGO, to: KYV, points: [[410, 510], [360, 510]] }
+  - { id: KP, from: KYV, to: POD, tone: ok, points: [[220, 510], [170, 510]] }
+
+steps:
+  - lights: [PUSH]
+    title: A push
+    text: A commit lands on main, or a pull request is opened. Small changes go straight to main; schema changes go through a PR so the migration is applied first.
+  - edges: [PT, PS, PD]
+    title: Three checks in parallel
+    text: Unit tests and ruff, the full flow against a fresh local Supabase with every migration applied, and a Docker build. A pull request stops after these.
+  - edges: [TM, SM]
+    title: Only main deploys
+    text: The image job needs the unit and Supabase tests to pass, and runs only on main with the repo variable HOMELAB_DEPLOY set. The Docker build is a separate check.
+  - edges: [MG]
+    title: Seven security gates
+    text: On the homelab runner, the platform's reusable workflow runs Gitleaks, Semgrep, Bandit, Trivy, Checkov, Conftest and Hadolint. Any finding above the bar fails the job.
+  - edges: [GS]
+    when: fail
+    title: A gate fails
+    text: No image is built and nothing deploys; the running version stays. The scanners' reports are uploaded to the run so the finding can be fixed or suppressed by fingerprint.
+  - edges: [GB]
+    when: pass
+    title: Build, scan, SBOM
+    text: The image is built from digest-pinned base images, scanned again by Trivy as an image, and described by a CycloneDX SBOM from Syft.
+  - edges: [BZ]
+    when: pass
+    title: Push to Zot
+    text: The image goes to the homelab's Zot registry as platform/job-hunter-agent, with registry credentials read from OpenBao for this run only.
+  - edges: [ZS]
+    when: pass
+    title: Sign and attest
+    text: cosign signs the digest and attests the SBOM with a key that never leaves OpenBao's transit engine. The run's OpenBao token is revoked afterwards.
+  - edges: [SP]
+    when: pass
+    title: Promote by digest
+    text: A GitHub App commits the new digest to apps/job-hunter/kustomization.yaml in homelab-gitops. Git is the release record.
+  - edges: [PA]
+    when: pass
+    title: Argo CD syncs
+    text: The workflow pings Argo CD's webhook so it refreshes at once instead of at its next poll, and the app syncs to the new digest.
+  - edges: [AK]
+    when: pass
+    title: Admission
+    text: Kyverno admits the pod only if the image is signed, pinned by digest and from the allowed registry, and the pod meets the restricted security profile.
+  - edges: [KP]
+    when: pass
+    title: Recreate rollout
+    text: The old pod stops before the new one starts, because only one browser may use the LinkedIn profile. The session survives on the volume.

@@ -1,0 +1,84 @@
+# Animated flow diagram for _posts/projects/job-hunter-agent/2026-10-22-05-technical-architecture.md
+# (include id: projects/job-hunter-agent/system-architecture). One scheduled run for one search profile,
+# from the cron firing to my approval. The app and its agents are one FastAPI process; the LinkedIn MCP
+# server is a sidecar in the same pod. Source: the job-hunter-agent repo and homelab-gitops apps/job-hunter.
+# Coordinates are in viewBox units; node x/y is the centre.
+title: Job Hunter Agent system architecture
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 700]
+
+lanes:
+  - { label: "1 · Discover", x: 8, y: 8, w: 984, h: 140 }
+  - { label: "2 · Research and draft", x: 8, y: 168, w: 984, h: 162 }
+  - { label: "3 · Store", x: 8, y: 348, w: 984, h: 135 }
+  - { label: "4 · Review and approve", x: 8, y: 502, w: 984, h: 190 }
+
+nodes:
+  - { id: APP, label: "Job Hunter", sub: "FastAPI + cron", x: 95, y: 88, w: 140, color: violet, icon: "programming/python.svg", icon_pos: corner }
+  - { id: MCP, label: "LinkedIn MCP", sub: "sidecar, Chromium", x: 355, y: 88, w: 150, color: teal, icon: browser, icon_pos: corner }
+  - { id: LI, label: "LinkedIn", x: 615, y: 88, w: 140, color: slate, icon: globe }
+  - { id: SL, label: "Slack", sub: "incoming webhook", x: 880, y: 88, w: 150, color: pink, icon: "miscellaneous/slack-18.svg", icon_pos: corner }
+
+  - { id: LLM, label: "LiteLLM", sub: "qwen3.5-35b-a3b", x: 95, y: 250, w: 140, color: indigo, icon: cpu, icon_pos: corner }
+  - { id: AG, label: "Agents", sub: "score, tailor", x: 355, y: 250, w: 140, color: violet, icon: function, icon_pos: corner }
+  - { id: TC, label: "Truthfulness\nchecks", x: 615, y: 250, w: 140, color: rose, icon: shield, icon_pos: corner }
+  - { id: FACTS, label: "Wikidata +\nGoogle News", x: 880, y: 250, w: 150, color: slate, icon: search, icon_pos: corner }
+
+  - { id: DB, label: "Supabase", sub: "Postgres", x: 615, y: 415, w: 140, h: 60, shape: cylinder, color: amber, icon: "databases/postgresql-18.svg" }
+
+  - { id: ME, label: "Me", x: 95, y: 600, shape: circle, color: blue }
+  - { id: KC, label: "Keycloak", sub: "platform-admins", x: 355, y: 600, w: 150, color: rose, icon: "iam/keycloak-18.svg", icon_pos: corner }
+  - { id: UI, label: "Review UI", sub: "same app", x: 615, y: 600, w: 140, color: blue, icon: browser, icon_pos: corner }
+
+edges:
+  - { id: APPMCP, from: APP, to: MCP, proto: HTTP, port: 8080 }
+  - { id: MCPLI, from: MCP, to: LI, proto: HTTPS, port: 443 }
+  - { id: APPSL, from: APP, to: SL, proto: HTTPS, port: 443, kind: event, points: [[135, 60], [135, 34], [880, 34], [880, 60]] }
+  - { id: APPAG, from: APP, to: AG, points: [[95, 116], [95, 160], [355, 160], [355, 222]] }
+  - { id: AGFACTS, from: AG, to: FACTS, proto: HTTPS, port: 443, points: [[355, 278], [355, 312], [880, 312], [880, 278]], proto_at: [760, 312] }
+  - { id: AGLLM, from: AG, to: LLM, proto: HTTPS, port: 443, points: [[285, 250], [165, 250]] }
+  - { id: AGTC, from: AG, to: TC }
+  - { id: TCDB, from: TC, to: DB, proto: HTTPS, port: 443, kind: data, proto_at: [615, 352] }
+  - { id: MEKC, from: ME, to: KC, proto: OIDC, port: 443 }
+  - { id: KCUI, from: KC, to: UI, label: "session" }
+  - { id: UIDB, from: UI, to: DB, exit: top, enter: bottom, kind: data, label: "approve" }
+
+steps:
+  - lights: [APP]
+    title: A profile's time comes
+    text: At 08:00 India time on a weekday the scheduler fires the Cloud Architect profile's job. The run is recorded as running; other profiles have their own times.
+  - edges: [APPMCP]
+    title: Ask the sidecar
+    text: The app calls the LinkedIn MCP server on loopback port 8080 over streamable HTTP. Its client allows only read-only tools, so it can't apply or message anyone.
+  - edges: [MCPLI]
+    title: A signed-in browser
+    text: Chromium, signed in as me, runs the search and opens up to 5 new postings per keyword. Jobs already stored are skipped before any page loads.
+  - edges: [APPAG]
+    title: Filter and hand over
+    text: Duplicates, excluded companies and reposts are dropped; new postings are stored with the profile that found them and passed to the agents.
+  - edges: [AGFACTS]
+    title: Research the company
+    text: The company's LinkedIn About page, then Wikidata for revenue and headcount by year and Google News for headlines. Cached for a week; figures only when published.
+  - edges: [AGLLM]
+    title: The local model writes
+    text: Every agent call goes through LiteLLM to a local model with a JSON schema. It scores the fit, returns line edits to my resume, writes a letter and re-scores the result.
+  - edges: [AGTC]
+    title: Check the claims
+    text: Numbers, tools and phrases the draft adds that my resume doesn't have are flagged. Any flag blocks approval until I've looked at it.
+  - edges: [TCDB]
+    title: Saved for review
+    text: Drafts, scores, research and the run's counts go to Supabase over its HTTPS API. The application waits as pending review; nothing is sent.
+  - edges: [APPSL]
+    lights: [SL, ME]
+    title: Tell me
+    text: When the run finishes, the app posts a summary to a Slack incoming webhook. A failed post never fails the run.
+  - edges: [MEKC]
+    title: Sign in
+    text: I open the app and Keycloak signs me in with OpenID Connect. Only members of platform-admins get in; the app checks the group too.
+  - edges: [KCUI]
+    title: The review queue
+    text: A signed cookie holds the session for 8 hours. The review page leads with skills required vs. mine and the shortlist confidence; drafts are collapsed.
+  - edges: [UIDB]
+    title: My decision
+    text: I approve or reject. After approving I apply on the employer's site myself and mark it applied. The agent never does that step.
