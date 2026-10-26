@@ -1,0 +1,194 @@
+# Exploded DGX Spark for _posts/homelab/2026-10-26-homelab-setup-3d-dgx-spark-home-pc.md
+# Units: mm, y up. A schematic, not a teardown: the outer size and the I/O are NVIDIA's published specs;
+# where parts sit inside is simplified so each one can be clicked.
+title: DGX Spark, exploded
+caption: "Schematic of the DGX Spark (150 × 150 × 50.5 mm). Pull the **Explode** slider to lift the parts apart; the internal layout is simplified, the specs are real."
+accent: "#76B900"
+height: 520
+light: [200, 420, 260]
+shadow_extent: 260
+floor_size: 900
+camera: {pos: [300, 250, 330], target: [0, 70, 0], fov: 36, max_polar: 86}
+explode_label: Explode
+parts:
+  - id: base
+    label: Chassis
+    group: Enclosure
+    color: gold
+    metal: 0.75
+    rough: 0.35
+    pos: [0, 0, 0]
+    facts:
+      model: "150 × 150 × 50.5 mm · 1.2 kg"
+      summary: "Metal enclosure 150 mm square; on my desk it sits under the main monitor."
+      specs:
+        - [Size, "150 mm × 150 mm × 50.5 mm"]
+        - [Weight, "1.2 kg"]
+        - [Power, "240 W external power supply (GB10 TDP 140 W)"]
+    shapes:
+      - {type: rbox, size: [150, 6, 150], radius: 12, pos: [0, 3, 0]}
+      - {type: box, size: [146, 36, 2], pos: [0, 24, -73], color: "#b6a37a"}
+      - {type: box, size: [2, 36, 146], pos: [-74, 24, 0], color: "#b6a37a"}
+      - {type: box, size: [2, 36, 146], pos: [74, 24, 0], color: "#b6a37a"}
+  - id: io
+    label: Rear I/O
+    group: Connectivity
+    color: graphite
+    pos: [0, 6, 74]
+    explode: [0, 0, 70]
+    pin: Rear I/O
+    pin_at: [0, 34, 0]
+    facts:
+      summary: "Everything plugs in at the back: in my setup one USB-C goes to the Targus dock and HDMI goes to a monitor."
+      specs:
+        - [USB, "4× USB Type-C"]
+        - [Display, "1× HDMI 2.1a; up to 3× DisplayPort over USB-C"]
+        - [Ethernet, "1× RJ-45 10 GbE (unused here, link down)"]
+        - [High-speed, "2× QSFP on ConnectX-7 (unused here)"]
+      source: "[NVIDIA DGX Spark](https://www.nvidia.com/en-us/products/workstations/dgx-spark/)"
+    shapes:
+      - {type: box, size: [146, 30, 2], pos: [0, 18, 0], color: "#b6a37a", metal: 0.7}
+      - {type: rbox, size: [9, 3.2, 3], radius: 1.5, axis: z, pos: [-58, 16, 1.6], color: black}
+      - {type: rbox, size: [9, 3.2, 3], radius: 1.5, axis: z, pos: [-46, 16, 1.6], color: black}
+      - {type: rbox, size: [9, 3.2, 3], radius: 1.5, axis: z, pos: [-34, 16, 1.6], color: black}
+      - {type: rbox, size: [9, 3.2, 3], radius: 1.5, axis: z, pos: [-22, 16, 1.6], color: black}
+      - {type: box, size: [15, 5, 3], pos: [-4, 16, 1.6], color: black}
+      - {type: box, size: [16, 13, 3], pos: [16, 16, 1.6], color: black}
+      - {type: box, size: [18, 9, 3], pos: [38, 20, 1.6], color: silver, metal: 0.8}
+      - {type: box, size: [18, 9, 3], pos: [58, 20, 1.6], color: silver, metal: 0.8}
+  - id: board
+    label: Mainboard
+    group: Compute
+    color: "#0f3d24"
+    pos: [0, 8, 0]
+    explode: [0, 20, 0]
+    facts:
+      summary: "Carries the GB10 superchip, its memory, the NIC, Wi-Fi and the SSD slot (layout simplified here)."
+    shapes:
+      - {type: box, size: [138, 2, 138], pos: [0, 1, 0]}
+  - id: gb10
+    label: GB10 Grace Blackwell superchip
+    group: Compute
+    color: "#2b2f36"
+    metal: 0.5
+    pos: [0, 10, -8]
+    explode: [0, 62, 0]
+    pin: GB10
+    pin_at: [0, 8, 0]
+    facts:
+      model: "NVIDIA GB10 Grace Blackwell superchip"
+      summary: "CPU and GPU on one package sharing one pool of memory, which is why a 70B-class model fits without splitting it across devices."
+      specs:
+        - [CPU, "20 Arm cores: 10× Cortex-X925 (up to 3.9 GHz) + 10× Cortex-A725"]
+        - [GPU, "Blackwell, 5th-gen Tensor Cores"]
+        - [AI compute, "Up to 1 PFLOP FP4 (theoretical, with sparsity)"]
+        - [TDP, "140 W"]
+        - [Seen as, "`nvidia-smi`: NVIDIA GB10 · driver 580.159.03 · ~7 W idle"]
+      source: "NVIDIA spec sheet and `lscpu` / `nvidia-smi` on spark-0be9"
+    shapes:
+      - {type: box, size: [56, 3, 46], pos: [0, 1.5, 0], color: "#1d5e34"}
+      - {type: box, size: [20, 2, 30], pos: [-13, 4, 0], color: "#9aa0a8", metal: 0.85, rough: 0.25}
+      - {type: box, size: [26, 2, 34], pos: [12, 4, 0], color: "#9aa0a8", metal: 0.85, rough: 0.25}
+  - id: memory
+    label: 128 GB LPDDR5X unified memory
+    group: Compute
+    color: black
+    pos: [0, 10, -8]
+    explode: [0, 40, 0]
+    facts:
+      model: "128 GB LPDDR5X, 256-bit, 273 GB/s"
+      summary: "One coherent pool the CPU and GPU both address; `free -h` shows 121 GiB usable to Linux, and the GPU takes from the same pool."
+      specs:
+        - [Capacity, "128 GB (121 GiB visible to the OS)"]
+        - [Interface, "256-bit LPDDR5X"]
+        - [Bandwidth, "273 GB/s"]
+        - [Gotcha, "Bandwidth, not capacity, limits tokens/s on big dense models"]
+    shapes:
+      - {type: box, size: [12, 2, 10], pos: [-38, 2, -16]}
+      - {type: box, size: [12, 2, 10], pos: [-38, 2, 0]}
+      - {type: box, size: [12, 2, 10], pos: [-38, 2, 16]}
+      - {type: box, size: [12, 2, 10], pos: [38, 2, -16]}
+      - {type: box, size: [12, 2, 10], pos: [38, 2, 0]}
+      - {type: box, size: [12, 2, 10], pos: [38, 2, 16]}
+  - id: nvme
+    label: 4 TB NVMe SSD
+    group: Storage
+    color: "#1b1d22"
+    pos: [-30, 10, 44]
+    explode: [-60, 40, 30]
+    facts:
+      model: "Samsung MZALC4T0HBL1 · 3.7 TiB"
+      summary: "Holds DGX OS, Docker images, k3d volumes and model weights; 653 GB used today."
+      specs:
+        - [Form, "M.2 NVMe, self-encrypting"]
+        - [Used, "653 GB of 3.7 TB (19%)"]
+        - [Mounted, "`/` (`/dev/nvme0n1p2`)"]
+    shapes:
+      - {type: box, size: [42, 2, 22], pos: [0, 1, 0]}
+      - {type: box, size: [12, 2.4, 10], pos: [-8, 1.2, 0], color: silver, metal: 0.6}
+  - id: cx7
+    label: ConnectX-7 SmartNIC
+    group: Connectivity
+    color: "#2b2f36"
+    pos: [40, 10, 48]
+    explode: [60, 40, 30]
+    facts:
+      model: "NVIDIA ConnectX-7, 200 Gbps"
+      summary: "Meant for clustering two Sparks back to back; I run one Spark, so it's idle."
+      specs:
+        - [Ports, "2× QSFP at the back"]
+        - [Speed, "Up to 200 Gbps"]
+        - [Use here, "None yet"]
+    shapes:
+      - {type: box, size: [24, 3, 22], pos: [0, 1.5, 0], color: "#9aa0a8", metal: 0.8}
+  - id: wifi
+    label: Wi-Fi 7 + Bluetooth 5.4
+    group: Connectivity
+    color: "#2b2f36"
+    pos: [10, 10, 52]
+    explode: [0, 40, 50]
+    facts:
+      summary: "The Spark's only active link today: Wi-Fi on 5 GHz (channel 161, 80 MHz) to the home router, 192.168.1.19."
+      specs:
+        - [Interface, "`wlP9s9` · 192.168.1.19/24"]
+        - [Gateway, "192.168.1.254"]
+        - [Also, "`tailscale0` 100.72.155.9 for remote access"]
+    shapes:
+      - {type: box, size: [16, 2, 12], pos: [0, 1, 0]}
+  - id: cooler
+    label: Heatsink and fans
+    group: Cooling
+    color: silver
+    metal: 0.85
+    rough: 0.3
+    pos: [0, 16, -8]
+    explode: [0, 92, 0]
+    facts:
+      summary: "Cools the 140 W GB10; at idle the GPU reads about 49 °C."
+      specs:
+        - [Idle GPU, "~49 °C at ~7 W (`nvidia-smi`)"]
+    shapes:
+      - {type: box, size: [96, 3, 80], pos: [0, 1.5, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [-40, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [-30, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [-20, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [-10, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [0, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [10, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [20, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [30, 10, 0]}
+      - {type: box, size: [1.4, 14, 76], pos: [40, 10, 0]}
+      - {type: cyl, r: 18, h: 4, pos: [0, 19, 52], color: black}
+  - id: lid
+    label: Top cover
+    group: Enclosure
+    color: gold
+    metal: 0.75
+    rough: 0.4
+    pos: [0, 44.5, 0]
+    explode: [0, 120, 0]
+    facts:
+      summary: "Champagne-gold metal lid that closes the box."
+    shapes:
+      - {type: rbox, size: [150, 6, 150], radius: 12, pos: [0, 3, 0]}
+      - {type: box, size: [140, 0.6, 140], pos: [0, 6.3, 0], color: "#a8996f", rough: 0.9}

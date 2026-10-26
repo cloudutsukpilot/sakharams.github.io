@@ -1,0 +1,293 @@
+# Network and software map for _posts/homelab/2026-10-26-homelab-setup-3d-dgx-spark-home-pc.md
+# Facts from the machines on 2026-10-26 (ip, ss, docker ps, k3d, tailscale, openssl s_client) and from
+# _data/diagrams/projects/cloudutsuk-platform/system-architecture.yml.
+title: Homelab network
+accent: "#76B900"
+accent2: "#F97316"
+level: 1
+levels: [Overview, Machines, Areas, Services]
+nodes:
+  - id: you
+    label: You
+    sub: phone or laptop
+    icon: user
+    status: built
+    facts:
+      summary: "The one operator: reaches internal tools over Tailscale, and public ones through Cloudflare."
+      how: "A tailnet device opens a `*.home.cloudutsuk.com` name; anyone else opens a flat `*.cloudutsuk.com` name and signs in at Cloudflare Access."
+      where: "anywhere"
+      url: {Portal: "https://portal.platform.home.cloudutsuk.com", Grafana: "https://grafana.mon.home.cloudutsuk.com"}
+  - id: internet
+    label: Internet services
+    icon: cloud
+    status: external
+    facts:
+      summary: "The two outside services that make the homelab reachable without opening a port on the router."
+      how: "Both are dialled out to from the Spark; nothing on the internet connects in."
+      url: {Cloudflare: "https://dash.cloudflare.com/", Tailscale: "https://login.tailscale.com/admin/machines"}
+    children:
+      - id: cf-edge
+        label: Cloudflare
+        sub: Access + Tunnel edge
+        icon: miscellaneous/cloudflare-18.svg
+        status: external
+        facts:
+          summary: "Public front door for flat `*.cloudutsuk.com` names, guarded by Cloudflare Access (ADR 0058)."
+          how: "Access signs the visitor in, then sends the request down the tunnel `cloudflared` holds open from the Spark."
+          where: "Mumbai edges (bom03 to bom12)"
+          when: "always on"
+          url: {Dashboard: "https://dash.cloudflare.com/"}
+      - id: ts-control
+        label: Tailscale
+        sub: coordination server
+        icon: miscellaneous/tailscale-18.svg
+        status: external
+        facts:
+          summary: "Hands out WireGuard keys and the tailnet policy; it never carries the traffic itself."
+          how: "Every node keeps an HTTPS session to it; peers then talk directly over WireGuard."
+          when: "always on"
+          url: {Admin: "https://login.tailscale.com/admin/machines"}
+  - id: home
+    label: Home network
+    sub: 192.168.1.0/24
+    icon: router
+    status: built
+    facts:
+      summary: "One flat Wi-Fi LAN: the router and the two machines, with no port forwards."
+      how: "Both machines join over 5 GHz Wi-Fi and get DHCP addresses; their wired ports are unplugged today."
+      where: "192.168.1.0/24"
+      api: "None of its own"
+    children:
+      - id: router
+        label: Home router
+        sub: 192.168.1.254
+        icon: router
+        status: built
+        facts:
+          summary: "The ISP router: DHCP, the default gateway and the Wi-Fi both machines use."
+          how: "Hands out 192.168.1.x leases and NATs everything out; no inbound port is forwarded."
+          where: "192.168.1.254"
+          api: "Admin page at `http://192.168.1.254`"
+      - id: spark
+        label: DGX Spark
+        sub: spark-0be9 · 192.168.1.19
+        icon: miscellaneous/nvidia-18.svg
+        status: built
+        direction: down
+        facts:
+          summary: "The 24x7 box: local models and the long-lived Cloudutsuk Platform clusters."
+          how: "DGX OS with Docker; k3d clusters share the `homelab` bridge `172.30.0.0/24`, host services sit beside them."
+          where: "Wi-Fi 192.168.1.19 · tailnet 100.72.155.9"
+          when: "always on"
+          api: "`ssh sakharam@spark-0be9.local`"
+        children:
+          - id: spark-host
+            label: Host services
+            icon: terminal
+            status: built
+            facts:
+              summary: "Things that must outlive any one cluster: remote access, the tunnel and the exporters."
+              how: "Docker Compose projects and systemd units on the `homelab` bridge."
+              where: "DGX host · 172.30.0.1"
+              when: "always on, from boot"
+              api: "`172.30.0.1` (9100, 9400, 9101, 9115 exporters)"
+            children:
+              - id: tailscaled
+                label: tailscaled
+                sub: subnet router
+                icon: miscellaneous/tailscale-18.svg
+                status: built
+                facts:
+                  summary: "Puts tailnet devices onto the cluster bridge, so clusters keep private addresses yet stay reachable."
+                  how: "Advertises `172.30.0.0/24` and forwards to each cluster's Traefik (core .1, platform .2, mon .3, ai .4)."
+                  where: "DGX host"
+                  when: "always on"
+                  api: "None of its own: routes to `172.30.0.1`–`.4`"
+              - id: cloudflared
+                label: cloudflared
+                sub: homelab-cloudflared
+                icon: miscellaneous/cloudflare-18.svg
+                status: built
+                facts:
+                  summary: "Holds the outbound tunnel to Cloudflare, on the host so public access survives a `platform` rebuild."
+                  how: "`cloudflared tunnel run` over QUIC; its token comes from OpenBao and is mounted read-only."
+                  where: "DGX host · Compose on the `homelab` bridge"
+                  when: "always on"
+                  api: "Metrics on `:2000`"
+              - id: exporters
+                label: Exporters
+                sub: node, DCGM, cAdvisor, blackbox
+                icon: chart
+                status: built
+                facts:
+                  summary: "Watch the Spark and its GPU from outside the clusters, so a dead cluster can't hide."
+                  how: "Prometheus exporters on the host; the `mon` cluster scrapes them."
+                  where: "172.30.0.1"
+                  when: "always on"
+                  api: "`172.30.0.1:9100` node · `:9400` DCGM"
+          - id: clusters
+            label: k3d clusters
+            icon: cluster
+            status: built
+            facts:
+              summary: "The long-lived Cloudutsuk Platform clusters; each one has its own Traefik on the bridge."
+              how: "k3s v1.35 in Docker via k3d; `core` boots first, then `mon`, `platform` and `ai`."
+              where: "172.30.0.1 to .4"
+              when: "always on"
+              api: "APIs on `172.30.0.1:6441`–`6444`"
+            children:
+              - id: core
+                label: core
+                sub: identity, secrets, DNS
+                icon: lock
+                status: built
+                facts:
+                  summary: "What everything depends on: Keycloak, OpenBao, PowerDNS, Zot and backups."
+                  how: "Installed by Terragrunt Helm stacks, kept outside Argo CD."
+                  where: "172.30.0.1 · API :6441"
+                  url: {Auth: "https://auth.cloudutsuk.com"}
+              - id: platform
+                label: platform
+                sub: portal, GitOps, CI
+                icon: devops/cicd/argocd-18.svg
+                status: built
+                facts:
+                  summary: "Portal, Argo CD, CI runners, and today also the project apps (Job Hunter, Shorts Studio, Hermes)."
+                  how: "Managed by its own Argo CD from `homelab-gitops`."
+                  where: "172.30.0.2 · API :6442"
+                  url: {Portal: "https://portal.platform.home.cloudutsuk.com"}
+              - id: mon
+                label: mon
+                sub: Grafana LGTM
+                icon: chart
+                status: built
+                facts:
+                  summary: "Every cluster's and host's signals in one place, outside what it watches."
+                  how: "OTLP in, Mimir, Loki, Tempo and Grafana with one replica each."
+                  where: "172.30.0.3 · API :6443"
+                  url: {Grafana: "https://grafana.mon.home.cloudutsuk.com"}
+              - id: ai
+                label: ai
+                sub: vLLM on the GB10
+                icon: cpu
+                status: built
+                facts:
+                  summary: "The GPU cluster for local models, kept apart so a model can't starve the portal."
+                  how: "vLLM serves chat and embedding models; KEDA scales on-demand models to zero; LiteLLM fronts them."
+                  where: "172.30.0.4 · API :6444"
+                  api: "Planned: `https://llm.ai.home.cloudutsuk.com`"
+      - id: pc
+        label: Homelab PC
+        sub: homelab · 192.168.1.10
+        icon: server
+        status: built
+        direction: down
+        facts:
+          summary: "The i9 + RTX 5070 Ti box for time-bound work, so short-lived projects don't compete with the 24x7 stack."
+          how: "Ubuntu 26.04 with Docker and Ollama; managed over SSH from the Spark."
+          where: "Wi-Fi 192.168.1.10"
+          when: "on when a project needs it"
+          api: "`ssh homelab` (sakharams@192.168.1.10:22)"
+        children:
+          - id: ollama
+            label: Ollama
+            sub: RTX 5070 Ti 16 GB
+            icon: cpu
+            status: built
+            facts:
+              summary: "Local coding and reasoning models on the RTX: qwen3-coder 30b, qwen3 32b, deepseek-r1 32b, gemma4."
+              how: "A systemd service; larger models split between the 16 GB of VRAM and the 96 GB of RAM."
+              where: "homelab · 127.0.0.1:11434"
+              when: "always on while the PC is on"
+              api: "`http://127.0.0.1:11434` (localhost only)"
+          - id: pc-projects
+            label: Project clusters
+            sub: Shorts Studio, Job Hunter
+            icon: cluster
+            status: planned
+            phase: next
+            facts:
+              summary: "Planned: time-bound projects move here from `platform`, so they can come and go without touching the 24x7 clusters."
+              how: "Planned: k3d clusters on the PC, deployed by the Spark's Argo CD and reporting to `mon`."
+              where: "homelab PC"
+              when: "while a project is active"
+              api: "Planned: registered in Argo CD like a lab cluster"
+certs:
+  le-public:
+    label: auth.cloudutsuk.com and the other public names
+    type: public
+    by: "Cloudflare's edge, for the flat `*.cloudutsuk.com` names"
+    issuer: "Let's Encrypt YR1 (seen on auth.cloudutsuk.com, 2026-10-26)"
+    valid: "90 days; this one until 22 Jan 2027"
+    trust: "Public chain to ISRG Root X1, trusted by every browser"
+  cf-tunnel:
+    label: Cloudflare tunnel edge
+    type: public
+    by: "Cloudflare's tunnel edge (region bom)"
+    issuer: "Cloudflare's own CA, which cloudflared ships with and checks"
+    valid: "Cloudflare's own"
+    stored: "Cloudflare's side; the tunnel token is in OpenBao, mounted read-only"
+    trust: "cloudflared only accepts the edge certificates it was built to trust"
+  le-home:
+    label: "*.home.cloudutsuk.com names (portal, Grafana, Argo CD …)"
+    type: public
+    by: "Each cluster's Traefik (TLS ends there)"
+    issuer: "Let's Encrypt via cert-manager, ACME DNS-01 through Cloudflare's API"
+    valid: "90 days; cert-manager renews 30 days before expiry"
+    stored: "A Secret per Ingress in each cluster"
+    trust: "Public chain to ISRG Root X1, so phones trust it with no extra CA"
+  tailscale-keys:
+    label: WireGuard node keys
+    type: key
+    by: "Your device and tailscaled on the Spark"
+    valid: "Until the node key expires, then you sign in again"
+    stored: "On each device; only public keys go to the coordination server"
+    trust: "The coordination server hands each peer only the public keys the tailnet policy allows"
+  tailscale-control:
+    label: controlplane.tailscale.com
+    type: public
+    by: "Tailscale's coordination server"
+    issuer: "Let's Encrypt"
+    valid: "Tailscale's own"
+    trust: "Public CA; inside it the control protocol is also encrypted with the machine key (Noise)"
+  ssh-homelab:
+    label: homelab host key (ED25519 SHA256:bD2T8ccM…)
+    type: key
+    by: "sshd on the homelab PC"
+    valid: "Until the PC is reinstalled"
+    stored: "Pinned in `~/.ssh/known_hosts` on the Spark (all three host keys, checked strictly)"
+    trust: "The fingerprint was checked against a fresh scan on 2026-10-26; your RSA key is in the PC's authorized_keys"
+edges:
+  - {id: you_cf, from: you, to: cf-edge, proto: HTTPS, port: 443, why: "Used when anyone opens a public name like auth.cloudutsuk.com: Cloudflare Access signs them in first.", certs: le-public}
+  - {id: cf_tunnel, from: cloudflared, to: cf-edge, proto: QUIC, port: 7844, kind: stream, label: outbound tunnel, both: true, why: "Always on: cloudflared dials out over QUIC and keeps the tunnel open, so requests come back down it with no open port.", certs: cf-tunnel}
+  - {id: tunnel_platform, from: cloudflared, to: platform, proto: HTTPS, port: 443, why: "Used for each public request: cloudflared hands it to the platform cluster's Traefik on the bridge.", certs: le-home}
+  - {id: tunnel_core, from: cloudflared, to: core, proto: HTTPS, port: 443, why: "Used when a sign-in reaches auth.cloudutsuk.com: Keycloak in core answers it.", certs: le-home}
+  - {id: you_ts, from: you, to: tailscaled, proto: WireGuard, port: 41641, kind: control, why: "Used whenever you open an internal tool from a phone or laptop: the packet travels inside WireGuard straight to the Spark.", certs: {server: tailscale-keys, note: "WireGuard encrypts with node keys; the HTTPS inside is checked separately."}}
+  - {id: ts_ctrl, from: tailscaled, to: ts-control, proto: HTTPS, port: 443, oneway: true, label: keys + policy, why: "Always on: tailscaled learns which peers may reach it and their public keys.", certs: tailscale-control}
+  - {id: you_ctrl, from: you, to: ts-control, proto: HTTPS, port: 443, oneway: true, label: keys + policy, why: "Always on: your device learns the Spark's key and the 172.30.0.0/24 route.", certs: tailscale-control}
+  - {id: ts_mon, from: tailscaled, to: mon, proto: HTTPS, port: 443, why: "Used when you open grafana.mon.home.cloudutsuk.com: the subnet route forwards to mon's Traefik at 172.30.0.3.", certs: le-home}
+  - {id: ts_platform, from: tailscaled, to: platform, proto: HTTPS, port: 443, why: "Used when you open the portal or Argo CD over the tailnet.", certs: le-home}
+  - {id: ts_ai, from: tailscaled, to: ai, proto: HTTPS, port: 443, why: "Used when a tool on your laptop calls a model on the ai cluster.", certs: le-home}
+  - {id: exp_mon, from: exporters, to: mon, proto: HTTP, port: 9100, kind: telemetry, label: scrape, why: "Every scrape interval: mon pulls host and GPU metrics from the exporters.", certs: {none: "Plain HTTP on the private bridge; it never leaves the Spark."}}
+  - {id: spark_wifi, from: spark, to: router, proto: Wi-Fi, kind: data, oneway: true, label: 5 GHz, why: "Always on: the Spark's only live link, for internet, the tunnel and the LAN.", certs: {none: "Wi-Fi encryption uses the network passphrase, not a certificate."}}
+  - {id: pc_wifi, from: pc, to: router, proto: Wi-Fi, kind: data, oneway: true, why: "Always on while the PC runs: its only live link today.", certs: {none: "Wi-Fi encryption uses the network passphrase, not a certificate."}}
+  - {id: spark_ssh, from: spark, to: pc, proto: SSH, port: 22, why: "Used when I manage the PC: `ssh homelab` from the Spark, key-based login as sakharams.", certs: ssh-homelab}
+  - {id: argocd_pc, from: platform, to: pc-projects, proto: HTTPS, port: 6443, dashed: true, why: "Planned: Argo CD on platform deploys the project clusters on the PC, as it does lab clusters today.", certs: {planned: "Planned: the k3s cluster CA of each project cluster, as for lab clusters."}}
+  - {id: pc_mon, from: pc-projects, to: mon, proto: OTLP, port: 443, kind: telemetry, dashed: true, oneway: true, why: "Planned: project clusters send metrics, logs and traces to mon like every other cluster.", certs: {planned: "Planned: otlp.mon.home.cloudutsuk.com's Let's Encrypt certificate."}}
+scenarios:
+  - id: grafana
+    title: Open Grafana from the phone
+    summary: "An internal tool over Tailscale: no public name, no open port."
+    steps:
+      - {title: Keys from Tailscale, action: "Phone ↔ Tailscale: get the Spark's key and route", text: "Your phone already holds the Spark's WireGuard key and the 172.30.0.0/24 route from the coordination server.", edges: [you_ctrl]}
+      - {title: WireGuard to the Spark, action: "Phone → tailscaled: HTTPS inside WireGuard (UDP 41641)", text: "The packet goes straight to the Spark, encrypted with WireGuard; nothing touches Cloudflare.", path: [you_ts]}
+      - {title: Subnet route to mon, action: "tailscaled → mon Traefik 172.30.0.3:443", text: "tailscaled forwards to mon's Traefik, which ends TLS with a Let's Encrypt certificate.", path: [ts_mon]}
+      - {title: Dashboard comes back, action: "mon → tailscaled → phone: the Grafana page", text: "The response returns the same way, inside the tunnel.", path: [~ts_mon, ~you_ts], result: success, outcome: "Grafana open on the phone"}
+  - id: public
+    title: A public sign-in
+    summary: "A flat public name through Cloudflare Access and the outbound tunnel."
+    steps:
+      - {title: Browser to Cloudflare, action: "Browser → Cloudflare: GET auth.cloudutsuk.com (443)", text: "The visitor reaches Cloudflare's edge in Mumbai; Access checks them first.", edges: [you_cf]}
+      - {title: Down the tunnel, action: "Cloudflare → cloudflared: request over the QUIC tunnel", text: "Cloudflare sends it down the tunnel the Spark opened; the router has no port forward.", path: [~cf_tunnel]}
+      - {title: Keycloak answers, action: "cloudflared → core Traefik → Keycloak", text: "cloudflared hands the request to core's Traefik on the bridge, and Keycloak answers it.", path: [tunnel_core]}
+      - {title: Page returns, action: "core → cloudflared → Cloudflare → browser", text: "The response goes back up the tunnel and out of the edge.", path: [~tunnel_core, cf_tunnel, ~you_cf], result: success, outcome: "Sign-in page served"}
