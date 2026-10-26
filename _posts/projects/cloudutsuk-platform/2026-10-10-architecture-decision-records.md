@@ -3465,8 +3465,9 @@ only one.
 - **An edge rate limit caps request volume** (amended 2026-10-26, Phase 3 step 17a). The trigger was
   `canvas.cloudutsuk.com`, the System Design Canvas on Cloudflare Pages: anyone with a Keycloak account
   can reach it, so it has the widest audience. The rule:
-  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), in `infra-local
-    host/cloudflare/ratelimit.sh`: more than 150 requests in 10 seconds from one IP at one Cloudflare
+  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), managed as Terraform in
+    infra-cloudflare (ADR 0060; first written as `infra-local host/cloudflare/ratelimit.sh`, which goes
+    once Terraform owns the rule): more than 150 requests in 10 seconds from one IP at one Cloudflare
     data centre is blocked for 10 seconds.
   - **Free plan limits** shape it: one rule, counting by IP only, a 10-second period and a 10-second
     timeout, and an expression that can match only the path. So it can't single out one hostname or
@@ -3480,7 +3481,8 @@ only one.
     reaches Pages or the tunnel.
   - **`*.pages.dev` isn't covered.** Zone rules don't apply to Cloudflare's own domain, so only Access
     guards `system-design-canvas.pages.dev`.
-  - **Token:** `homelab-tunnel-access` gains Zone WAF Write on `cloudutsuk.com` only.
+  - **Token:** its own, `homelab-waf` (Zone WAF Write and Zone Read on `cloudutsuk.com`; ADR 0060). The
+    tunnel token no longer needs Zone WAF Write.
 - **Rollout** follows Phase 3 steps 10-17: the issuer move first, then a Grafana pilot, then the rest.
 
 #### Considered options
@@ -3523,6 +3525,48 @@ only one.
 - [ADR 0028](#adr-0028)
 - [ADR 0037](#adr-0037)
 - [ADR 0045](#adr-0045)
+
+#### As built (2026-10-26)
+
+Live:
+
+- **Issuer (step 11):** Keycloak's `KC_HOSTNAME` is `https://auth.cloudutsuk.com`, with a dynamic
+  backchannel and `KC_HOSTNAME_ADMIN` on `auth.core.home.cloudutsuk.com`. The k3s API servers, Argo CD,
+  Velero UI, OpenBao, the `oidc@` kubeconfig and every app here trust it. The node alias comes from
+  `host/k3s/node-hosts.sh` (`EXTRA`) until the clusters are next recreated, because changing a k3d host
+  alias recreates the cluster. Sign-in goes straight to Entra: both browser flows' redirectors default to
+  it, so the realm shows no password form; brute-force detection stays on.
+- **Tunnel and Access (step 12):** `cloudflared` runs on the host (`infra-local host/cloudflared`), and
+  its routes are in `routes.yaml`. `auth.cloudutsuk.com` returns 404 for `/admin` and `/realms/master` at
+  the tunnel instead of at Traefik, because inside the network the same name reaches the same Traefik.
+  Access signs in through Keycloak (client `cloudflare-access`; claims `groups`, `name` and
+  `preferred_username`) or a one-time PIN to the owner's email. Applications are in
+  `infra-local host/cloudflare/access.yaml`, and the catch-all on `*.cloudutsuk.com` is checked.
+- **UIs (steps 13-14):** Grafana, Argo CD and Velero UI are live. The portal, Hermes, Job Hunter, Shorts
+  Studio, LiteLLM (UI only; `/v1` returns 404 at the tunnel) and Qdrant have their Access application,
+  route, DNS record and Keycloak redirect URI.
+
+Changed from the decision above:
+
+- **The status page is behind Access, not a bypass (step 15).** It is the homelab link page at
+  `status.cloudutsuk.com`, for platform-admins only. It lists every internal endpoint, so the owner chose
+  Keycloak over a public page. It is read-only through the tunnel: rescans need the local origin.
+- **One application allows any Keycloak user:** System Design Canvas on Cloudflare Pages
+  (`canvas.cloudutsuk.com`, its `pages.dev` names and previews). In practice that means accounts in the
+  Entra tenant, the only broker today.
+
+Pending, to pick up later:
+
+- Step 13: the phone test with Tailscale off, and a second account refused.
+- Step 14: merge the apps' Ingress and base-URL change and test each app. Floci needs its console
+  installed first.
+- Step 15: the blog's Dashboard tab (bypass), which waits for step 7.
+- Step 16: the lab UIs' wildcard route.
+- Step 17: Traefik checks `Cf-Access-Jwt-Assertion` on public hosts; Access logs exported to `mon`; an
+  outside check that OTLP, Zot, the PowerDNS API, the k3s APIs and LiteLLM `/v1` don't answer; docs and
+  diagrams.
+- An `oidc@<cluster>` kubectl sign-in by hand, and adding `auth.cloudutsuk.com` to each cluster's
+  `hostAliases` in `resources.yaml` at its next recreation.
 
 ## ADR-0059: IaC runner image with the Terragrunt tools baked in, and up to four runners gated on host memory
 {: #adr-0059 }
@@ -3597,6 +3641,84 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
 
 - [ADR 0040](#adr-0040)
 - [ADR 0044](#adr-0044)
+
+## ADR-0060: Cloudflare zone rules as Terraform in a new infra-cloudflare repo, starting with the WAF rate limit
+{: #adr-0060 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `infra-cloudflare`, `infra-github`, `terragrunt-shared-module`, `infra-local`</span>
+
+#### Context
+
+ADR 0058's amendment of 2026-10-26 added one edge rate-limiting rule for the `cloudutsuk.com` zone. It
+was implemented as a shell script, `infra-local host/cloudflare/ratelimit.sh`, which PUTs the zone's
+`http_ratelimit` ruleset with the tunnel token. Like the rest of `host/cloudflare/` (Access in
+`access.sh`, tokens in `create-token.sh`), the script has no plan, no state, no drift detection and no
+review of what will change. It also needs Zone WAF Write on a token that otherwise runs the tunnel and
+Access.
+
+Every other cloud estate here (infra-aws, infra-azure, infra-gcp, infra-github, infra-local) is
+Terraform through the Terragrunt shared module, with plans on pull requests, applies on `main` and a
+weekly drift scan. The shared module has no Cloudflare provider yet.
+
+On 2026-10-26 the zone had no `http_ratelimit` ruleset: the script had never been run. So there's nothing
+to import.
+
+#### Decision
+
+- **A new repo, `infra-cloudflare`**, created through infra-github (ADR 0005) in its `infra` group next
+  to infra-aws, infra-azure and infra-gcp. Its custom property `cloud` gets the new allowed value
+  `cloudflare`. It is laid out like the other infra repos (`config.yaml`, `entrypoint.py`,
+  `environments/cloudflare/<zone>/resources.yaml`) and runs the shared module's `terragrunt-cicd.yaml`.
+- **Scope, first: the zone's WAF rules.** The rate limit from ADR 0058 becomes a `cloudflare_ruleset` in
+  the `http_ratelimit` phase, with the same rule:
+  - more than 150 requests in 10 s from one IP at one data centre (`cf.colo.id`, `ip.src`) is blocked
+    for 10 s
+  - expression `(http.request.uri.path contains "/")`, every proxied hostname
+
+  ADR 0058 still records why that rule is the most the Free plan allows. Custom rules
+  (`http_request_firewall_custom`) go in the same place when they're needed. DNS records, Access
+  applications and the tunnel stay where they are for now. Moving them is a later step with its own
+  import plan: they exist and are in use.
+- **Shared module:** a new `cloud/cloudflare` with a `cloudflare_ruleset` Terraform module and
+  Terragrunt unit, provider `cloudflare/cloudflare` pinned to 5.27.0 (2026-10-05), and the credential
+  plumbing the other clouds have (`config/providers.yaml`, `resolve-credentials`, preflight). The token
+  comes from `CLOUDFLARE_API_TOKEN`.
+- **Runner: `ubuntu-latest`.** Cloudflare's API is public, so the jobs need nothing on the homelab
+  network. `homelab-iac` stays scoped to infra-local (ADR 0040). State goes to the same Azure backend as
+  the other infra repos, under its own key.
+- **Its own token, `homelab-waf`:** Zone WAF Write and Zone Read on `cloudutsuk.com` only, created by
+  `infra-local host/cloudflare/create-token.sh waf`. It's stored in OpenBao (`kv/host/cloudflare-waf`)
+  and set as the repo's `CLOUDFLARE_API_TOKEN` Actions secret, the way the Pages token is. The tunnel
+  token loses the Zone WAF Write that ADR 0058's amendment added.
+- **`ratelimit.sh` is removed** from infra-local once infra-cloudflare's first apply has created the
+  rule, so there's one owner of the ruleset.
+
+#### Considered options
+
+1. **Keep `ratelimit.sh`** (ADR 0058's amendment): it works, but there's no plan, state or drift scan,
+   and a manual change in the dashboard goes unnoticed.
+2. **Cloudflare in infra-local**: infra-local is the DGX's local estate and runs on the homelab-iac
+   runner; Cloudflare is a SaaS account like AWS or GitHub, which have their own repos.
+3. **Plain Terraform without the shared module**: quicker to start, but outside the CI, OPA and drift
+   tooling every other infra repo uses.
+4. **A new infra-cloudflare repo on the shared module** (chosen).
+
+#### Consequences
+
+- Good: Changes to the WAF rules are reviewed as a plan on a pull request, applied from `main`, and
+  checked weekly for drift.
+- Good: The WAF token is separate and limited to one zone's WAF; the tunnel token gets smaller again.
+- Good: There's a home for the rest of the Cloudflare configuration when it's migrated.
+- Bad: A new provider in the shared module: credentials, preflight, OPA's provider list and docs.
+- Bad: For now Cloudflare is configured in two places: Terraform for WAF, `host/cloudflare/*.sh` for
+  DNS, Access and the tunnel.
+- Bad: Another repo, another set of Actions secrets (Cloudflare token, Azure backend) to rotate.
+
+#### Related
+
+- [ADR 0005](#adr-0005)
+- [ADR 0040](#adr-0040)
+- [ADR 0058](#adr-0058)
 
 {% endraw %}
 <!-- adr:end -->
