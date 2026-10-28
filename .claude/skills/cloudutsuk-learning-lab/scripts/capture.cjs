@@ -65,7 +65,12 @@ const card = JSON.parse(
 );
 const cap = card.capture || {};
 const urls = cap.urls || card.endpoints || {};
-const repo = path.resolve(String(args.repo || (card.repo && card.repo.path) || '.').replace(/^~(?=\/|$)/, os.homedir()));
+// A card's repo.path is relative to ~/gitrepos, as the lab runner reads it; --repo is relative to here.
+const repo = args.repo
+  ? path.resolve(String(args.repo).replace(/^~(?=\/|$)/, os.homedir()))
+  : card.repo && card.repo.path
+    ? path.resolve(os.homedir(), 'gitrepos', String(card.repo.path))
+    : path.resolve('.');
 const only = args.only ? String(args.only).split(',').map((s) => s.trim()) : null;
 const experiments = (card.experiments || []).filter((e) => !only || only.includes(e.id));
 const outDir = path.join(ROOT, 'assets', 'img', 'labs', slug);

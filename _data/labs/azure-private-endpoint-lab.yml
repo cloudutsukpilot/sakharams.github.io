@@ -16,7 +16,7 @@ category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
 lab_category: cloud       # Labs tab group (_data/lab_catalog.yml)
 clouds: [azure]
 repo:
-  path: /home/sakharam/gitrepos/private-connectivity-labs/azure-private-endpoint
+  path: private-connectivity-labs/azure-private-endpoint
   # Private for now: github.com/cloudutsukpilot/private-connectivity-labs (add `url:` once public)
 deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
   # `up` creates the Azure side and the local probe. The DGX tunnel and split-DNS steps need sudo and
