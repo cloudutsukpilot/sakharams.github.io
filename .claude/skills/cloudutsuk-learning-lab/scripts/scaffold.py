@@ -173,7 +173,7 @@ category: hands-on-labs  # Projects tab group (_data/project_catalog.yml)
 lab_category: TODO       # Labs tab group: an id from _data/lab_catalog.yml (observability, ...)
 clouds: [agnostic]       # azure | aws | gcp | agnostic
 repo:
-  path: {repo}           # absolute local path of the lab repo (not rendered; the lab runner rejects ~)
+  path: {repo}           # the lab repo, relative to ~/gitrepos (not rendered; the lab runner rejects ~)
   # url: https://github.com/<owner>/<repo>   # rendered as a "Lab code" chip once public
 deploy:                  # read by the lab runner so the portal's Labs page can deploy the lab (not rendered)
   targets: {{up: up, down: down, status: status}}   # plain Make target names in repo.path

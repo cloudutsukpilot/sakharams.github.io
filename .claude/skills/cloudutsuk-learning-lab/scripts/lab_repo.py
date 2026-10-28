@@ -40,7 +40,9 @@ def dest_of(card, arg):
     raw = arg or (card.get("repo") or {}).get("path")
     if not raw or "TODO" in str(raw):
         sys.exit("No destination: pass --dest or set repo.path in the card")
-    return Path(str(raw)).expanduser().resolve()
+    p = Path(str(raw)).expanduser()
+    # A card's repo.path is relative to ~/gitrepos, as the lab runner reads it; --dest is relative to here.
+    return (p if p.is_absolute() or arg else Path.home() / "gitrepos" / p).resolve()
 
 
 def port_in_use(port):

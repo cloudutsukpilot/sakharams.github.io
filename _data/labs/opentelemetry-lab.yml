@@ -18,7 +18,7 @@ category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
 lab_category: observability   # Labs tab group (_data/lab_catalog.yml)
 clouds: [agnostic]
 repo:
-  path: /home/sakharam/gitrepos/observability/otel-static-site-k3d   # absolute: the lab runner rejects ~
+  path: observability/otel-static-site-k3d   # relative to ~/gitrepos on the host that runs the lab runner
 deploy:                   # read by the lab runner (homelab-services/services/lab-runner) for the portal
   targets: {up: up, down: down, status: status}
   memory_gb: 3            # the k3d cluster with the monitoring pack and cert-manager; no LGTM any more

@@ -10,7 +10,7 @@ Errors (exit 1):
   shots     a shot in the card with no file in assets/img/labs/<slug>/ or no entry in
             _data/lab_shots/<slug>.json (skip with --allow-missing-shots while drafting)
   repo      a `make <target>` in an action, verify or preflight that the lab repo's Makefile lacks
-  deploy    a `deploy:` block the lab runner would skip: repo.path not absolute, bad target names,
+  deploy    a `deploy:` block the lab runner would skip: repo.path missing or with ~, bad target names,
             targets the Makefile lacks, bad memory_gb, ports or ttl_hours (mirrors
             homelab-services/services/lab-runner/src/lab_runner/cards.py)
   contract  a k3d lab on lab contract v2 (k3d/cluster.yaml on network `homelab`) whose deploy.ports
@@ -179,8 +179,8 @@ def check_deploy(card, errors, notes):
         errors.append("deploy: must be a mapping")
         return []
     repo = str((card.get("repo") or {}).get("path") or "")
-    if not repo.startswith("/"):
-        errors.append(f"deploy: repo.path {repo!r} must be absolute (the lab runner rejects ~ and relative paths)")
+    if not repo or repo.startswith("~"):
+        errors.append(f"deploy: repo.path {repo!r} must be relative to ~/gitrepos (the lab runner rejects ~)")
     targets = deploy.get("targets") or {}
     if not isinstance(targets, dict):
         errors.append("deploy.targets: must be a mapping")
@@ -210,12 +210,17 @@ def check_deploy(card, errors, notes):
     return names
 
 
+def repo_dir(raw):
+    """A card's repo.path, relative to ~/gitrepos as the lab runner reads it (an absolute path still works)."""
+    return Path.home() / "gitrepos" / Path(str(raw)).expanduser()
+
+
 def check_repo(card, exps, errors, notes, deploy_targets=()):
     repo = (card.get("repo") or {}).get("path")
     if not repo or "TODO" in str(repo):
         notes.append("card: repo.path not set; skipped Makefile checks")
         return
-    path = Path(str(repo)).expanduser()
+    path = repo_dir(repo)
     if not path.exists():
         notes.append(f"lab repo {path} not found; skipped Makefile checks")
         return
@@ -247,7 +252,7 @@ MON_GRAFANA = "https://grafana.mon.home.cloudutsuk.com"
 def check_contract(card, errors, notes):
     """Lab contract v2 (homelab Phase 2 step 5), judged from the lab repo's k3d/cluster.yaml."""
     repo = (card.get("repo") or {}).get("path")
-    k3d = Path(str(repo or "")).expanduser() / "k3d" / "cluster.yaml"
+    k3d = repo_dir(repo or "") / "k3d" / "cluster.yaml"
     if not repo or not k3d.exists():
         return
     try:

@@ -19,7 +19,7 @@ category: hands-on-labs   # Projects tab group (_data/project_catalog.yml)
 lab_category: observability   # Labs tab group (_data/lab_catalog.yml)
 clouds: [agnostic]
 repo:
-  path: /home/sakharam/gitrepos/observability/ebpf-lab
+  path: observability/ebpf-lab
 platform:
   runtime: "k3d (lab-ebpf) on the homelab network, Cilium as the CNI"
   observability: "Hubble, Tetragon, Falco + Falcosidekick UI, OpenTelemetry eBPF Instrumentation → homelab mon cluster"
