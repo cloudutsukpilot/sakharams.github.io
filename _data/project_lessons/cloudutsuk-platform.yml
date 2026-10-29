@@ -805,3 +805,14 @@ lessons:
     fix: "Delete the stale policies so the operator starts, and turn the gates off (or keep node addresses fixed) for every cluster. The new Platform status dashboard has a Scrape coverage panel: every job each cluster should send, shown MISSING when it has no target at all."
     lesson: "\"Up == 0\" alerts only see targets that still exist. Watch for expected series that disappear, per cluster, and never let a component write rules from addresses it saw once at startup on a network that renumbers."
     adrs: ["0042", "0041"]
+
+  - id: L075
+    date: 2026-10-29
+    step: "Phase 5, step 1f"
+    title: "NVIDIA's vLLM image ships cuFFT as a stub: anything else that needs an FFT fails with \"cuFFT error 50\""
+    tags: [gpu, gb10, cuda, docker, ltx, models]
+    symptom: "LTX-2.5's audio-to-video pipeline, run inside nvcr.io/nvidia/vllm:26.07-py3 on the GB10, failed in the audio VAE's mel spectrogram with \"RuntimeError: cuFFT error: unknown error 50\", and the container printed \"You are running using the stub version of cufft\". torch.fft on CUDA failed the same way at any size; on the CPU it worked."
+    cause: "The image's libcufft.so.12 is a 13 KB stub: vLLM needs no FFT, so NVIDIA slimmed it out. torch links it and loads without complaint until the first FFT call."
+    fix: "The real cuFFT from PyPI (nvidia-cufft 12.4, CUDA 13, aarch64, pinned by hash) and its folder first on LD_LIBRARY_PATH in the image. torchaudio, which has no CUDA 13 aarch64 build, came from the 2.11.1 wheel without dependencies: LTX only resamples and takes a spectrogram."
+    lesson: "A slim vendor image is slim for its own workload. When reusing NVIDIA's vLLM image for something else (diffusion, audio), smoke-test every CUDA library the new code calls (cuFFT, cuRAND, cuSOLVER) inside the container before building on it, and look at the library's size before blaming the driver."
+    adrs: ["0066", "0054"]
