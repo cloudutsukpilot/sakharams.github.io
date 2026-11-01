@@ -41,7 +41,7 @@ end of every phase, so the blog never describes a platform that doesn't exist.
 | 3. Portal + labs | Backstage custom image through CI, SSO, Labs plugin, lab runner, `deploy:` blocks, Dashboard tab on the blog, public access to every UI behind SSO alongside Tailscale (ADR 0058) | 1, 2 | In progress (started 2026-10-13, alongside Phase 2) |
 | 4. Inventory + cost | Four collectors, `lab` tag, AWS cost allocation tags, OpenCost on every k3d cluster with custom DGX prices, Inventory & Cost plugin, budget alerts | 2, 3 | Not started |
 | 5. Local LLM + RAG + chat | `ai` cluster: vLLM chat and embeddings behind a LiteLLM gateway; KEDA scaling on-demand models to zero when idle; Qdrant, Redis cache, rag-ingest, rag-api, Chat plugin | 3 | In progress (started 2026-10-15) |
-| 6. Alert agent | sre-agent webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 | Not started |
+| 6. Agents (platform-wardens) | A `wardens` cluster with Temporal and one worker per agent, each agent its own identity (ADRs 0069 to 0071); first the `terraform-drift` agent on `infra-azure`, then the SRE agents that replace the single sre-agent: Alertmanager webhook, multi-cluster access, RAG and `mon` tools, eval suite from lab experiments (faults injected with LitmusChaos) | 2, 2a, 5 (the drift agent needs only 1 and 2) | In progress (started 2026-11-01 with the drift agent) |
 
 ### Phase steps
 {: #phase-steps }
@@ -228,12 +228,20 @@ already runs and need no CI, so it depends on Phase 0 only.
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Alertmanager webhook into the sre-agent | `sre-agent`, `homelab-gitops` | A firing alert reaches the agent | Not started |
-| 2 | Read-only multi-cluster access with short-lived tokens | `sre-agent`, `homelab-gitops` | The agent's Kubernetes token expires after 15 minutes and it can't change anything | Not started |
-| 3 | RAG and `mon` tools for the agent | `sre-agent` | An RCA cites the right lab doc and the metrics behind it | Not started |
-| 4 | Eval suite built from lab experiments | `sre-agent` | The evals pass | Not started |
+| 1 | Alertmanager webhook into the SRE agents | `platform-wardens`, `homelab-gitops` | A firing alert reaches the agent | Not started |
+| 2 | Read-only multi-cluster access with short-lived tokens | `platform-wardens`, `homelab-gitops` | The agent's Kubernetes token expires after 15 minutes and it can't change anything | Not started |
+| 3 | RAG and `mon` tools for the SRE agents | `platform-wardens` | An RCA cites the right lab doc and the metrics behind it | Not started |
+| 4 | Eval suite built from lab experiments | `platform-wardens` | The evals pass | Not started |
 | 5 | Alert-agent incident diagram | this blog | It's drawn and in the Diagrams lane | Not started |
 | 6 | Phase 6 exit: ADRs synced, playbook updated, card moved to Live | this blog | M6's exit check passes | Not started |
+| 7 | ADRs for the `wardens` cluster, self-hosted Temporal and per-agent identities (0069 to 0071, superseding 0014) | `homelab-gitops` | The ADRs are merged and synced to this blog | In progress (proposed 2026-11-01) |
+| 8 | `wardens` k3d cluster on the homelab PC: API `172.30.0.1:6446`, load balancer `172.30.0.6`, External Secrets, DNS, Kyverno, monitoring pack, registered in Argo CD | `infra-local`, `homelab-gitops` | Argo CD shows `wardens` healthy and its node metrics are in `mon` | Not started |
+| 9 | Public OIDC issuer for `wardens` service accounts, and the drift agent's Entra app with a federated credential | `infra-local`, `infra-azure` | A pod in `wardens` gets an Entra token with no stored secret | Not started |
+| 10 | Temporal on a `wardens-db` Postgres, UI behind Keycloak, metrics and alerts in `mon` | `homelab-gitops` | A test workflow completes and the UI opens after Keycloak sign-in | Not started |
+| 11 | `wardens` framework ready for the homelab: model provider from configuration (LiteLLM by default), Slack next to Teams, approval endpoint with a configurable token issuer, GitHub App token minting | `platform-wardens` | The framework and drift agent tests pass with LiteLLM and a Slack webhook | Not started |
+| 12 | Shared agent Helm chart, image and CI through `build-image.yaml` to Zot | `platform-wardens`, `homelab-gitops`, `infra-github` | A `main` build commits the drift agent's digest to `homelab-gitops` | Not started |
+| 13 | `wardens` runtime and the `terraform-drift` worker deployed, run by a Temporal schedule after the weekly drift scan, in shadow mode | `homelab-gitops` | A scheduled run posts findings to Slack and writes a run record | Not started |
+| 14 | Drift agent opens draft PRs after two or three clean shadow runs | `platform-wardens`, `homelab-gitops` | A drifted `infra-azure` stack gets a draft PR on its `resources.yaml` | Not started |
 
 ## MVP definition
 {: #mvp-definition }
@@ -288,7 +296,7 @@ Epics map one to one to phases, and each epic lives in the repo that does most o
 | Portal + labs | `self-service-portal`, `homelab-services` | Auth providers; Labs plugin; lab-runner lock and admission control |
 | Inventory + cost | `homelab-services`, `homelab-gitops` | Azure collector; AWS collector; GCP billing export; DGX power estimate; OpenCost in the monitoring pack with custom DGX prices; daily OpenCost allocation into `COST_DAILY` |
 | RAG + chat | `homelab-services`, `homelab-gitops` | Incremental ingest; semantic cache; Chat plugin with citations; KEDA ScaledObject for each on-demand model |
-| Alert agent | `sre-agent` | Alertmanager webhook; RAG tool; eval cases from lab experiments |
+| Alert agent | `platform-wardens` | Alertmanager webhook; RAG tool; eval cases from lab experiments |
 | Later (deferred) | a new lab repo, then `infra-local` | Cilium on k3d as a lab first; the long-lived clusters only if the lab passes ([why deferred](/posts/projects/cloudutsuk-platform/05-technical-architecture/#cilium-considered-deferred)) |
 | Playbook | this blog | Area posts per phase; ADR sync; diagrams |
 
