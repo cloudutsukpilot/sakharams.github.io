@@ -4924,6 +4924,81 @@ public HTTPS URL. A k3d API server is not public.
   cluster), ADR 0070 (Temporal)
 - `platform-wardens` framework category 8 (identity) and decision 0007 (autonomy levels)
 
+## ADR-0072: Deployment standard: Terragrunt for a workload's infrastructure, a wrapper chart per app, Applications from git, the digest in the app's values
+{: #adr-0072 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `homelab-gitops`, `infra-local`, `infra-azure`, `infra-github`, `terragrunt-shared-module`, `platform-wardens`</span>
+
+#### Context
+
+Deployments on the platform grew three ways:
+
+- **Infrastructure for a workload** is partly Terragrunt (Azure resources in `infra-azure`, GitHub repos in
+  `infra-github`, cluster bootstrap in `infra-local`) and partly host scripts (OpenBao seeds, Keycloak
+  clients, GitHub Apps).
+- **Apps** are kustomize folders (`apps/<svc>` with an `images:` list) or Helm charts with values inline in
+  their Application (`temporal`, `grafana`), and a few local charts (`apps/monitoring-pack`).
+- **Image digests** reach git only through `kustomize edit set image` in the reusable `build-image.yaml`,
+  so anything built by CI had to be a kustomize folder.
+
+The platform-wardens agents (ADR 0069) are the first set of apps that share one deployment shape: one
+worker per agent, the same security context, network policy, identity wiring and kill switch, different
+values. Copying a kustomize base per agent loses that sharing; a chart can't take its digest from
+`kustomize edit`. The terragrunt-shared-module also offers `providers/argocd` (Applications and projects
+created by Terraform), which ADR 0038 chose not to use for apps.
+
+#### Decision
+
+Every new deployment follows four rules:
+
+1. **A workload's infrastructure is Terragrunt** wherever a provider exists: Azure resources, Entra apps,
+   service principals, federated credentials and role assignments (`infra-azure`), GitHub repositories and
+   teams (`infra-github`), cluster bootstrap releases (`infra-local`), each as a stack per workload so its
+   identity and access are reviewable code. Host scripts stay only for what has no provider used here:
+   seeding OpenBao, Keycloak clients, and creating GitHub Apps (`host/github/create-app.py`).
+2. **Terraform seeds Argo CD and one root Application per Argo CD; git owns every other Application**
+   (unchanged from ADR 0038). Each app is an Application YAML in homelab-gitops (`clusters/<cluster>/`),
+   synced by its cluster's app-of-apps with prune and self-heal. `providers/argocd` is for clusters with no
+   app-of-apps yet, such as seeding a root Application on a new cloud cluster.
+3. **An app built here is a wrapper chart** in `apps/<app>/`: a `Chart.yaml` whose dependency is a shared
+   chart, pinned by version, and a `values.yaml` with the app's settings and its image digest. Shared charts
+   live in `charts/<name>/` and are referenced as `file://../../charts/<name>`, so Argo CD builds them from
+   the same commit (no chart registry, no Argo CD setting changes). A third-party app keeps using its
+   upstream chart, its values in the Application. Existing kustomize apps stay as they are until touched.
+4. **CI records the digest in the app's values file.** `build-image.yaml` takes `gitops-values-file`
+   (path to the values file) and `gitops-values-key` (the digest's key, default `.image.digest`) and writes
+   the index digest with a pinned, checksummed `yq`, then commits to `main` and asks Argo CD to refresh. The
+   values file's history is the deploy record. Images are always referenced by digest and signed (ADR 0033);
+   tags are never deployed.
+
+#### Considered options
+
+1. **Terraform creates each Application** (`providers/argocd`, once per app): changes to releases are still
+   git merges, but every change to an Application (sync options, paths, adding or removing an app) needs a
+   Terragrunt apply, a Terraform-created Application isn't self-healed when edited in the UI, the graph
+   splits between an infra repo and homelab-gitops, and `argocd_project` needs Argo CD admin credentials in
+   CI. Kept for clusters without an app-of-apps.
+2. **A kustomize base per app**: works with `kustomize edit` as is, but every agent copies the same base.
+3. **Kustomize inflating Helm charts** (`helmCharts`): would keep `kustomize edit`, but needs Argo CD's
+   `--enable-helm` for every app on the platform.
+4. **Publish shared charts to Zot**: versioned artifacts, but a second publish pipeline and pull
+   credentials for Argo CD, for charts that live in the same repo as their users.
+5. **Wrapper charts, Applications from git, digest in values** (chosen).
+
+#### Consequences
+
+- Good: one owner per layer (Terraform for infrastructure and Argo CD itself, git for everything Argo CD
+  deploys); apps sharing a shape share a chart; a new app is a values file, not a copy.
+- Good: CI can deploy a chart-based app without kustomize.
+- Bad: two app shapes coexist (kustomize folders and wrapper charts) until the old ones are migrated.
+- Bad: a change to a shared chart reaches every app that uses it on its next sync; shared charts carry a
+  version and a changelog, and an app moves to a new chart version by bumping its dependency.
+
+#### Related
+
+- ADR 0008 (CI builds, Argo CD pulls), ADR 0033 (signed images by digest), ADR 0038 (Argo CD installed by
+  Terraform, app-of-apps), ADR 0069 (the wardens cluster), ADR 0071 (agent identities as Terraform)
+
 {% endraw %}
 <!-- adr:end -->
 
