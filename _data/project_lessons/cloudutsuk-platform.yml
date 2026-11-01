@@ -827,3 +827,14 @@ lessons:
     fix: "Register the cluster with Argo CD before external-secrets, wait for the CRD, then install external-secrets and secret-stores. Add OTLP_TOKEN_WARDENS to the gateway. Use the Valid ClusterSecretStore as the DNS check. The guide now says all three."
     lesson: "A runbook for creating something new rots silently, because nothing runs it until the next new thing. When a shared default changes (a chart's renderMode, an enforcing admission policy, a hand-kept token list), check the bootstrap order it assumes, and keep per-cluster lists derived from one place where possible."
     adrs: ["0069", "0042", "0033"]
+
+  - id: L077
+    date: 2026-11-02
+    step: "Phase 2, step 2b"
+    title: "fincore without privileges reports every file as fully cached"
+    tags: [linux, memory, page-cache, observability, containers]
+    symptom: "Run as a normal user on the homelab PC, fincore listed about 85 GiB of Ollama model files as fully cached, more than the 47 GiB the kernel reported as Cached in total. Run with sudo, or with the right capabilities, the same files showed 0 bytes."
+    cause: "Since Linux 6.x the cachestat and mincore calls fincore uses answer only for a file the caller owns or may write. Otherwise cachestat fails with \"Operation not permitted\", fincore prints a warning per file and falls back to reporting the whole file as resident instead of failing."
+    fix: "Run fincore with permission to answer: as root, or in a container with FOWNER (counts as the owner) and DAC_READ_SEARCH (opens any file) over a read-only mount of /. The page-cache exporter does the latter and runs the host's own fincore through chroot."
+    lesson: "Sanity-check a breakdown against the total it claims to explain before acting on it: per-file numbers that add up to more than the kernel's own total mean the tool is guessing. And read the warnings a tool prints per item; here they were the whole story."
+    adrs: ["0026"]
