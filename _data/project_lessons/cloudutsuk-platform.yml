@@ -816,3 +816,14 @@ lessons:
     fix: "The real cuFFT from PyPI (nvidia-cufft 12.4, CUDA 13, aarch64, pinned by hash) and its folder first on LD_LIBRARY_PATH in the image. torchaudio, which has no CUDA 13 aarch64 build, came from the 2.11.1 wheel without dependencies: LTX only resamples and takes a spectrogram."
     lesson: "A slim vendor image is slim for its own workload. When reusing NVIDIA's vLLM image for something else (diffusion, audio), smoke-test every CUDA library the new code calls (cuFFT, cuRAND, cuSOLVER) inside the container before building on it, and look at the library's size before blaming the driver."
     adrs: ["0066", "0054"]
+
+  - id: L076
+    date: 2026-11-01
+    step: "Phase 6, step 8"
+    title: "A new cluster can't follow the add-a-cluster guide as written: External Secrets waits on a CRD only Argo CD brings, and the OTLP gateway lists its tokens by hand"
+    tags: [k3d, external-secrets, argocd, opentelemetry, kyverno, runbook]
+    symptom: "Creating the wardens cluster step by step, the external-secrets release failed its dry run (\"ServiceMonitor CRD is required but not present in the cluster\"), and secret-stores failed after it. Once the cluster was in Argo CD and every add-on was healthy, its collectors still logged HTTP 401 from the OTLP gateway on mon, and the guide's busybox DNS check was refused by Kyverno."
+    cause: "The guide was written when mon, platform and ai were created, before the monitoring pack and Kyverno existed. Since then the External Secrets values set serviceMonitor.renderMode: failIfMissing, and the ServiceMonitor CRD only arrives with the monitoring pack that Argo CD installs. The gateway's bearer-token auth names one environment variable per cluster, so a token seeded in OpenBao isn't accepted until the gateway's own config lists it."
+    fix: "Register the cluster with Argo CD before external-secrets, wait for the CRD, then install external-secrets and secret-stores. Add OTLP_TOKEN_WARDENS to the gateway. Use the Valid ClusterSecretStore as the DNS check. The guide now says all three."
+    lesson: "A runbook for creating something new rots silently, because nothing runs it until the next new thing. When a shared default changes (a chart's renderMode, an enforcing admission policy, a hand-kept token list), check the bootstrap order it assumes, and keep per-cluster lists derived from one place where possible."
+    adrs: ["0069", "0042", "0033"]
