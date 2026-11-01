@@ -598,7 +598,7 @@ policy `required_tags.rego` enforces them. The portal should show cost per lab.
 ## ADR-0014: Extend sre-agent for alert-triggered troubleshooting; human approval for every write
 {: #adr-0014 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-10 · `sre-agent`, `homelab-gitops`</span>
+<span class="adr-status adr-status-superseded">Superseded by <a href="#adr-0069">ADR-0069</a></span> <span class="adr-meta text-muted">2026-10-10 · `sre-agent`, `homelab-gitops`</span>
 
 #### Context
 
@@ -1350,6 +1350,13 @@ cross-cluster routing and debugging ambiguous; published API ports widen the att
   chosen when the lab is scaffolded, not allocated by the lab runner: `make up` creates the cluster
   from that file. Each lab's API listens on 127.0.0.1 on its own port (6450 up); Argo CD reaches it on
   the server node's `homelab` address.
+- `gpu` on the DGX Spark (2026-10-27, ADR 0061): when the homelab PC becomes the primary host, the Spark
+  keeps only the model servers, in a `gpu` cluster on its own bridge `homelab-gpu` `172.31.0.0/24`
+  (`br-homelab-gpu`, Docker assigns .128-.254), created by infra-local's `network-gpu` stack, which only
+  the Spark applies. `gpu` is the only cluster on it, so it publishes its API (6445) and HTTP/HTTPS on
+  the gateway `172.31.0.1`; no host-address unit is needed. Pod and service CIDRs 10.50/10.51, cluster
+  DNS 10.51.0.10. The PC reaches `172.31.0.0/24`, and the Spark reaches `172.30.0.0/24`, over the direct
+  cable (runbook step A1).
 
 #### Considered options
 
@@ -1374,6 +1381,7 @@ For the other clusters' ingress:
 
 - [ADR 0024](#adr-0024)
 - [ADR 0025](#adr-0025)
+- [ADR 0061](#adr-0061)
 
 ## ADR-0031: Testing strategy
 {: #adr-0031 }
@@ -2303,6 +2311,12 @@ reaches `homelab-gitops`. Every private repo in the org can run jobs on the `hom
   and on `main` crane pushes that layout. The job checks that the pushed digest is BuildKit's. The
   tools come from the runner image (ADR 0044).
 
+- Build path update (2026-10-27, Phase 0a step 3, ADR 0061): every image is built for linux/arm64 on
+  BuildKit in `platform` and linux/amd64 natively on the homelab PC's BuildKit (mutual TLS), into one
+  OCI layout per platform. Each is scanned and gets its own SBOM. On `main` crane pushes both, checks
+  each digest, and joins them in one index; Cosign signs the index and attests both SBOMs on it (and
+  signs and attests each platform image). Gitops pins the index digest.
+
 #### Considered options
 
 1. **BuildKit as a sidecar in every runner pod**: no shared cache, and the Unconfined exceptions would
@@ -3159,7 +3173,7 @@ LiteLLM speaks the OpenAI images API (`/v1/images/generations`) to an OpenAI-com
 ## ADR-0055: Web search for agents: Tavily first, SearXNG self-hosted as the fallback, Playwright only to fetch pages
 {: #adr-0055 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
 
 #### Context
 
@@ -3229,6 +3243,44 @@ The constraints:
 
 - ADR 0033
 - ADR 0056
+
+#### As built (2026-10-26)
+
+Live in Shorts Studio's research agent on `platform`, with the key in OpenBao (`kv/platform/shorts-studio`)
+and SearXNG answering when Tavily fails (circuit breaker, 15 minutes).
+
+- **Golden set** (8 topics, Tavily, Qwen): 7 of 8 briefs pass, mean 9.9 (shorts-studio PR 9). The first run
+  in the pod passed 3 of 8 (mean 9.4); most failures were too few primary sources.
+- **Changed from the decision above:** the research plan names each topic's official sites, and its
+  documentation query searches only those plus the preferred domains (Tavily's `include_domains`). SearXNG
+  has no such filter and answers the plain query. PDFs (papers, standards) are read with pypdf, not
+  Playwright, which only starts a download for them.
+- **Cost:** about 5 credits a topic (one per query, basic depth); a full golden-set run is about 40 of the
+  1,000 free credits a month.
+- **Traces:** search, fetch and LLM spans reach Tempo on `mon` (service `shorts-studio`, cluster `platform`).
+
+#### Pending (to do later)
+
+Run evals and agent jobs **one short at a time**. On 2026-10-26 three evals ran at once (two script evals,
+one research eval) with chat and Gemma awake: the host reached 107 of 121 GB used, the ai cluster's gateway
+and models restarted mid-run, and the host was rebooted. A single short afterwards stayed above 51 GB free.
+
+1. **Merge and roll out:** shorts-studio PR 9 (research: official sites, PDFs, a turn per query; eval output on
+   the data volume) and PR 10 (judge blockers must quote an unbacked statement). Check the pod runs the new
+   image (`shorts --help`, the image digest in Argo).
+2. **Script eval in the pod, one case per run** (`shorts eval script -c <case>`), then `shorts eval judge`.
+   Done locally on the new code: break-glass-accounts 8.4 and circuit-breaker 8.2, both pass. Still to run:
+   cloud-security-principles, cache-stampede, dns-propagation, idempotency-event-driven, kafka-black-friday,
+   silent-data-corruption.
+3. **Writer comparison for ADR 0056:** the same cases with `--writer-model gemma-4-26b-a4b`, one per run.
+4. **Re-run the failed portal episodes** #1, 2, 4, 5 and 6 through the agents, one at a time; each waits in
+   "Scripts to review" and renders only after approval.
+5. **Quality:** cache-stampede's primary-source share is 0.29 (the bar is 0.3); time per case is 3-6 minutes.
+6. **Deferred:** a Redis cache backend (`redis-cache` admits only the `rag` namespace), rag-api and Qdrant for
+   the blog source, and editing diagrams in the editor.
+7. **After a host reboot:** model pods admitted before the GPU plugin was healthy stay in
+   `UnexpectedAdmissionError`. They hold no memory; delete them (`kubectl -n models delete pod
+   --field-selector=status.phase=Failed`).
 
 ## ADR-0056: A second local model for agents: Gemma 4 26B-A4B (FP8, Apache 2.0) in ai, scaled to zero, behind LiteLLM
 {: #adr-0056 }
@@ -3339,6 +3391,21 @@ stays free.
 - ADR 0049
 - ADR 0051
 - ADR 0055
+
+#### Pending (to do later)
+
+Gemma holds the judge and learning roles in Shorts Studio's config. The research judge calibrated 21 of 24 as
+expected (2026-10-25; the 2 misses were errors in the briefs). Its script blockers came from memory, without
+the brief, and on 2026-10-26 one of them was wrong: Microsoft's guidance keeps emergency access accounts
+permanently assigned. Since shorts-studio PR 10 a judge blocker must quote an unbacked statement.
+
+To accept this ADR:
+
+1. Run the writer comparison **one case per run** (see ADR 0055, Pending):
+   `shorts eval script -c <case>` and `shorts eval script -c <case> --writer-model gemma-4-26b-a4b`.
+2. Compare score, blockers and time per case; give the writer role to the better model.
+3. Re-run `shorts eval judge` in the pod after PR 9 and 10 are live.
+4. Mark this ADR `accepted` with the measured roles, or remove Gemma if it wins none.
 
 ## ADR-0057: Cloudflare metrics from our own collector, with a read-only token
 {: #adr-0057 }
@@ -3465,9 +3532,8 @@ only one.
 - **An edge rate limit caps request volume** (amended 2026-10-26, Phase 3 step 17a). The trigger was
   `canvas.cloudutsuk.com`, the System Design Canvas on Cloudflare Pages: anyone with a Keycloak account
   can reach it, so it has the widest audience. The rule:
-  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), managed as Terraform in
-    infra-cloudflare (ADR 0060; first written as `infra-local host/cloudflare/ratelimit.sh`, which goes
-    once Terraform owns the rule): more than 150 requests in 10 seconds from one IP at one Cloudflare
+  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), in `infra-local
+    host/cloudflare/ratelimit.sh`: more than 150 requests in 10 seconds from one IP at one Cloudflare
     data centre is blocked for 10 seconds.
   - **Free plan limits** shape it: one rule, counting by IP only, a 10-second period and a 10-second
     timeout, and an expression that can match only the path. So it can't single out one hostname or
@@ -3481,8 +3547,7 @@ only one.
     reaches Pages or the tunnel.
   - **`*.pages.dev` isn't covered.** Zone rules don't apply to Cloudflare's own domain, so only Access
     guards `system-design-canvas.pages.dev`.
-  - **Token:** its own, `homelab-waf` (Zone WAF Write and Zone Read on `cloudutsuk.com`; ADR 0060). The
-    tunnel token no longer needs Zone WAF Write.
+  - **Token:** `homelab-tunnel-access` gains Zone WAF Write on `cloudutsuk.com` only.
 - **Rollout** follows Phase 3 steps 10-17: the issuer move first, then a Grafana pilot, then the rest.
 
 #### Considered options
@@ -3542,9 +3607,9 @@ Live:
   Access signs in through Keycloak (client `cloudflare-access`; claims `groups`, `name` and
   `preferred_username`) or a one-time PIN to the owner's email. Applications are in
   `infra-local host/cloudflare/access.yaml`, and the catch-all on `*.cloudutsuk.com` is checked.
-- **UIs (steps 13-14):** Grafana, Argo CD and Velero UI are live. The portal, Hermes, Job Hunter, Shorts
-  Studio, LiteLLM (UI only; `/v1` returns 404 at the tunnel) and Qdrant have their Access application,
-  route, DNS record and Keycloak redirect URI.
+- **UIs (steps 13-14):** Grafana, Argo CD, the portal, Hermes, Job Hunter, Shorts Studio, Velero UI,
+  LiteLLM (UI only; `/v1` returns 404 at the tunnel) and Qdrant are live, each with its own certificate,
+  Access application and sign-in callback on the public name.
 
 Changed from the decision above:
 
@@ -3558,8 +3623,7 @@ Changed from the decision above:
 Pending, to pick up later:
 
 - Step 13: the phone test with Tailscale off, and a second account refused.
-- Step 14: merge the apps' Ingress and base-URL change and test each app. Floci needs its console
-  installed first.
+- Step 14: the phone test for each app. Floci needs its console installed first.
 - Step 15: the blog's Dashboard tab (bypass), which waits for step 7.
 - Step 16: the lab UIs' wildcard route.
 - Step 17: Traefik checks `Cf-Access-Jwt-Assertion` on public hosts; Access logs exported to `mon`; an
@@ -3684,8 +3748,17 @@ to import.
   plumbing the other clouds have (`config/providers.yaml`, `resolve-credentials`, preflight). The token
   comes from `CLOUDFLARE_API_TOKEN`.
 - **Runner: `ubuntu-latest`.** Cloudflare's API is public, so the jobs need nothing on the homelab
-  network. `homelab-iac` stays scoped to infra-local (ADR 0040). State goes to the same Azure backend as
-  the other infra repos, under its own key.
+  network. `homelab-iac` stays scoped to infra-local (ADR 0040).
+- **State in its own container**, `tfbackend-cloudflare` in the `stoacctfazure` account the other infra
+  repos use (created 2026-10-26). CI signs in as the `homelab-iac-state` principal (Storage Account
+  Contributor on that account only, `infra-local host/azure/iac-state-sp.sh`), through
+  `backend_auth_alias: management`, as infra-local does.
+- **Secrets are per repo.** The org is on GitHub Free, where private repos can't use organization
+  secrets, so infra-cloudflare carries its own:
+  - `BACKEND_ARM_CLIENT_SECRET` (secret), with `BACKEND_ARM_CLIENT_ID` and `BACKEND_ARM_TENANT_ID`
+    (variables), from OpenBao `kv/platform/ci-iac`
+  - `REPO_READ_TOKEN`, to check out the shared module
+  - `CLOUDFLARE_API_TOKEN` (below)
 - **Its own token, `homelab-waf`:** Zone WAF Write and Zone Read on `cloudutsuk.com` only, created by
   `infra-local host/cloudflare/create-token.sh waf`. It's stored in OpenBao (`kv/host/cloudflare-waf`)
   and set as the repo's `CLOUDFLARE_API_TOKEN` Actions secret, the way the Pages token is. The tunnel
@@ -3712,13 +3785,1144 @@ to import.
 - Bad: A new provider in the shared module: credentials, preflight, OPA's provider list and docs.
 - Bad: For now Cloudflare is configured in two places: Terraform for WAF, `host/cloudflare/*.sh` for
   DNS, Access and the tunnel.
-- Bad: Another repo, another set of Actions secrets (Cloudflare token, Azure backend) to rotate.
+- Bad: Another repo, and another set of per-repo Actions secrets to rotate (Cloudflare token, the
+  state principal's secret, `REPO_READ_TOKEN`): on GitHub Free they can't be shared at org level.
 
 #### Related
 
 - [ADR 0005](#adr-0005)
 - [ADR 0040](#adr-0040)
 - [ADR 0058](#adr-0058)
+
+## ADR-0061: The homelab PC becomes the 24x7 primary host; the DGX Spark keeps only the model servers
+{: #adr-0061 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-27 · `homelab-gitops`, `infra-local`, `homelab-services`</span>
+
+#### Context
+
+The whole platform runs on one DGX Spark (ADR 0002, ADR 0015): `core`, `mon`, `platform` and `ai`, the
+lab clusters, and the host services (cloudflared, exporters, the labs gateway, lab-runner, the job-hunter
+Supabase stack). The GB10 shares 121 GiB of memory between the CPU and the GPU. In October 2026 the Spark
+ran at 72–78 °C with load 4–5 and swap in use (ADR 0053), and GPU jobs that overshot memory froze the
+whole host five times, taking every cluster down with them.
+
+A second machine is available: the homelab PC (i9-14900KS, 24 cores, x86_64, 96 GB DDR5, RTX 5070 Ti with
+16 GB, 2 TB NVMe). An earlier plan (blog roadmap Phase 0a, 2026-10-27) used it part-time for burst work
+only. The owner decided instead to run the PC 24x7 and move everything to it, so that the Spark does
+nothing but serve models.
+
+The models can't follow. Qwen3.5-35B-A3B FP8 (~43 GB, ADR 0049), Gemma 4 26B-A4B (~30 GB, ADR 0056) and
+FLUX.1-schnell (~22 GB, ADR 0054) don't fit in 16 GB of VRAM without a quantized, slower replacement. The
+model weights (~256 GB) already live on the Spark.
+
+#### Decision
+
+- **The homelab PC is the primary, always-on host.** `core`, `mon`, `platform`, `ai` (LiteLLM, ai-db,
+  Qdrant, redis-cache; same cluster definition as on the Spark, so the PC's RTX 5070 Ti is attached but
+  unused for now), the lab clusters and every host service run on it. The clusters
+  keep their names, API ports and the `homelab` network `172.30.0.0/24` (ADR 0030), so kubeconfigs, Argo
+  CD cluster secrets, DNS names and OpenBao paths stay the same.
+- **The DGX Spark is a model host.** A new `gpu` k3d cluster on its own network (`homelab-gpu`,
+  `172.31.0.0/24`, pod/service CIDRs `10.50/16` and `10.51/16`, API `172.31.0.1:6445`) runs the vLLM
+  servers, image-gen, KEDA and its HTTP add-on (scale to zero, ADR 0051), plus the add-ons and the
+  monitoring pack. The central Argo CD on the PC manages it like any other cluster. LiteLLM on the PC
+  calls the models through an Ingress on `gpu`, with TLS and service auth (ADR 0029).
+- **The two hosts are joined by a direct cable** (the Spark's 10 GbE to one of the PC's 2.5 GbE ports) with
+  a static `/30`, and routes to each other's bridge network. The cable is required before the cutover.
+- **Every image we build is multi-arch** (amd64 + arm64). CI pushes and signs the image *index*, and
+  Kyverno verifies the index digest. This replaces the arm64-only manifest digests of ADR 0043 and keeps a
+  rollback to the Spark possible.
+- **The move is a planned DR restore** (ADR 0015): rehearsed in full on the PC while the Spark stays live,
+  then cut over in one maintenance window, with the Spark's old clusters stopped (not deleted) for a 14-day
+  rollback period. The step-by-step runbook is
+  docs/migration/dgx-spark-to-homelab-pc.md.
+
+#### Considered options
+
+1. **Part-time burst host (blog Phase 0a as first written)**: the PC runs a `burst` cluster in a window and
+   on demand, and the Spark keeps the control plane. Saves electricity, but adds a power-lifecycle service
+   and alert muting, and leaves the Spark carrying the 24x7 control plane next to the models. Replaced by
+   this decision.
+2. **Everything on the PC, including the models**: quantized models (for example Qwen3.5-35B-A3B Q4 with
+   the MoE experts in system RAM through llama.cpp) on the 5070 Ti. Frees the Spark completely, but chat
+   gets slower and only one GPU model fits at a time. Rejected for now.
+3. **The PC as a k3s agent node in the existing clusters**: mixes arm64 and x86 nodes in one cluster, and
+   the servers run in Docker on the Spark's bridge. Rejected in the earlier analysis, and it doesn't take
+   the load off the Spark.
+4. **Primary host on the PC, models on the Spark (chosen).**
+
+#### Consequences
+
+- Good: the Spark does one job. Builds, labs, TTS, ffmpeg, Mimir and Argo CD no longer compete with the
+  models for unified memory, and a GPU freeze no longer takes the control plane down.
+- Good: the PC's 24 x86 cores and 96 GB of RAM give CI and the labs more headroom, and x86 images become
+  available to labs that need them.
+- Good: the same cluster names and addresses keep the migration mostly a restore, not a reconfiguration.
+- Bad: two hosts to run and patch. Model calls cross a cable; if the link or the Spark is down, chat,
+  embeddings and image generation are unavailable (ADR 0018's degradation contract applies).
+- Bad: the PC draws more power than the Spark and now runs 24x7. Its internet connection is Wi-Fi 6 until a
+  wired uplink is added.
+- Bad: every own image must be rebuilt multi-arch, and arm64-specific pins (runner images, job-hunter's
+  Chromium path, CI tool downloads) must be made arch-aware first.
+- Follow-up: once this ADR is accepted, ADRs 0002 and 0015 (single host), 0022 (the whole AI stack in
+  `ai`), 0030 (network plan) and 0043 (arm64-only build path) get notes pointing here.
+
+#### Related
+
+- [ADR 0002](#adr-0002), [ADR 0015](#adr-0015): amended.
+- [ADR 0022](#adr-0022): the model servers move to `gpu`; the gateway tier
+  stays in `ai`.
+- [ADR 0025](#adr-0025): boot order, now across two hosts.
+- [ADR 0030](#adr-0030): `homelab-gpu` network and CIDRs added.
+- [ADR 0033](#adr-0033), [ADR 0043](#adr-0043): signing and
+  verifying image indexes.
+- [ADR 0051](#adr-0051): KEDA moves with the models.
+
+## ADR-0062: IaC runners: the tool image rolled out, one runner kept warm, up to six, and a shared provider cache
+{: #adr-0062 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-27 · `homelab-gitops`, `infra-local`, `terragrunt-shared-module`</span>
+
+#### Context
+
+infra-local run 40561944990 (four `helm/gpu` stacks, push of #48) took about 35 minutes from push to
+the post-apply report. Terragrunt itself ran for about 5 of them. The rest was spent like this:
+
+- **Setup Environment, 57–89 s in each of 13 jobs.** It restored a 137 MB `actions/cache` entry from
+  GitHub at about 6 MB/s (24–28 s), downloaded wizcli again (17–32 s; unpinned, so the cached copy is
+  ignored on purpose), and downloaded Python 3.12.3 with `setup-python` (17–19 s), because the stock
+  runner's `python3` has no pip. ADR 0059's image fixes all of this except wizcli, but it was never
+  promoted to the scale set.
+- **Pod start, 20 s to 3 min per job.** `minRunners: 0` means every job waits for a new pod, and the
+  `iac-setup` init container downloaded k3d and kubectl in each one.
+- **Runner capacity.** A PR run and the push after its merge overlap. With `maxRunners: 4`, the PR's
+  four plans held every runner, and the push's fourth plan waited about 2 minutes for one.
+- **Provider downloads, 7–17 s per init.** `TG_PROVIDER_CACHE` is on, but its directory is in the
+  pod's home directory, which goes away with the pod.
+
+When this was measured, the DGX had 86 GiB available and the platform node had about 6.6 GiB of 20 GiB
+requested.
+
+#### Decision
+
+- **Promote `platform/actions-runner-iac`** (index `sha256:d3948028…`, built from homelab-gitops@06ffc99,
+  amd64 + arm64) to the `homelab-iac` runner, pulled with `zot-pull`. Before promotion, a test pod
+  confirmed that Kyverno's signature check admits the image and that every tool is at its pinned
+  version. `iac-setup` no longer downloads k3d or kubectl, and the `iac-tools` emptyDir is removed. The
+  `arc-runners-writable-home` PolicyException now also matches the `actions-runner-iac` image.
+- **`minRunners: 1`, `maxRunners: 6`.** One idle runner is ready for the first job of a run. Six
+  runners let a PR run and the push after its merge go ahead together. The memory gate from ADR 0059 is
+  unchanged: the warm runner and each new runner still wait until the host has
+  `HOST_MIN_AVAILABLE_GIB` available. Six 1 GiB requests reserve 6 GiB of the platform node's 20.
+- **A shared Terragrunt provider cache.** `homelab-iac-provider-cache` is a 5 Gi `local-path` PVC
+  (apps/arc-runners), mounted by every runner pod at `/home/runner/tg-provider-cache` and named in
+  `TG_PROVIDER_CACHE_DIR`. platform has a single node, so the ReadWriteOnce volume is shared by every
+  runner pod on it. Terragrunt locks each provider while it downloads it, so concurrent jobs can share
+  the directory.
+- **terragrunt-shared-module's `setup-environment`** skips the `actions/cache` restore when every tool
+  is already installed at its pinned version. It installs wizcli only when Wiz credentials are present,
+  because without them the Wiz validator skips the scan anyway.
+
+#### Considered options
+
+1. **Warm runners without the image:** this saves the pod start, but each job still downloads the
+   tools.
+2. **`actions/cache` for the provider cache:** it goes through GitHub's cache service at the same
+   6 MB/s, which is no faster than the registry.
+3. **A hostPath provider cache:** restricted Pod Security forbids it.
+4. **More than one warm runner:** with the memory gate, idle runners would hold memory on the host
+   that the models share. One covers the first job of a run.
+
+#### Consequences
+
+- Good: A Terragrunt job's setup drops from 60–90 s to a few seconds. Its first job starts on the
+  warm runner, and provider downloads happen once per version, not once per job.
+- Good: A PR run and its merge's push run no longer queue behind each other's plans.
+- Bad: One runner pod is always running, with a 1 GiB request and a few hundred MiB in use.
+- Bad: The provider cache grows with every provider version and is never pruned. Deleting the PVC
+  clears it, and the only cost is downloading the providers again.
+- Bad: A tool bump in the shared module needs a new image, or jobs fall back to downloading (ADR 0059).
+
+#### Related
+
+- [ADR 0040](#adr-0040)
+- [ADR 0059](#adr-0059)
+
+## ADR-0063: A model arbiter on gpu: starts wait for memory, and an idle model unloads early for a waiting one
+{: #adr-0063 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-28 · `homelab-gitops`, `homelab-services`</span>
+
+#### Context
+
+Since ADR 0051, each model on the GB10 scales to zero after a fixed idle cooldown (chat 30 minutes,
+embeddings 15, Gemma and image-gen 10), and KEDA starts it again on the next request. The cooldowns stay
+wanted: an unloaded model gives back its memory, and an idle DGX Spark runs cooler. But each model decides
+alone, and KEDA can't make one model's start depend on another's state. That shows in two ways.
+
+**Nothing stops a start that doesn't fit.** Over the 14 days to 2026-10-28 (about 9 days of metrics in
+`mon`; gaps on 10-16 to 10-21 and on 10-23), the host's `MemAvailable` fell to 0.93 GB on 10-26 at 06:14.
+Chat and Gemma were loaded and both busy, and the metrics stop for 14 minutes after it: the host nearly
+froze (a GB10 out of unified memory hangs the whole machine). It was below 5 GB ten times, each time with
+chat and Gemma together, Gemma starting 6 to 13 minutes after chat. It was below 20 GB for 578 minutes,
+484 of them with two or more models loaded.
+
+**A waiting model sits behind an idle one still in its cooldown.** On 10-25 at 00:07 image-gen took
+11 minutes to start, with chat and Gemma loaded and idle and 3 to 5 GB free. It became ready just after
+Gemma's cooldown ended.
+
+| Model | Cold starts | Median start | Hours loaded | Requests |
+|---|---|---|---|---|
+| `vllm-chat` | 25 | 4 min (max 10) | 84 | about 1,246 |
+| `vllm-gemma` | 14 | 5 min (max 14) | 5.7 | about 213 |
+| `vllm-embeddings` | 54 | 1 min (max 18) | 103 | about 2 |
+| `image-gen` | 16 | 1 min (max 11) | 4.8 | 57 images |
+
+Unloading idle models early for a waiting one would have saved only 15 to 25 minutes over those 9 days:
+most starts while another model was loaded had enough memory. The larger gain is the memory check. The
+owner's rule (2026-10-28): models keep unloading when idle, so the DGX Spark stays cool. When another
+model has requests waiting, a model that has been idle for more than 5 minutes unloads straight away,
+without waiting for the rest of its cooldown.
+
+What the arbiter can read on `gpu`, checked on 2026-10-28:
+
+- **Waiting and in-flight requests per model:** the interceptor's admin endpoint
+  (`keda-add-ons-http-interceptor-admin.keda:9090/queue`) returns `{"models/vllm-chat": {"Concurrency":
+  N, ...}, ...}` for every `InterceptorRoute`. That covers image-gen too, which has no metrics of its
+  own. A request the interceptor holds for a model at zero counts in `Concurrency`.
+- **The host's free memory:** a pod's own `/proc/meminfo` shows the DGX Spark's real `MemAvailable` (the
+  same 91 GB as the host), while the k3d node container's shows the 16 GB set by `servers_memory`. No
+  dependency on Mimir, which moves to the PC (ADR 0061).
+
+#### Decision
+
+**A small Python service, `model-arbiter`, in `gpu`'s `models` namespace, decides when a model may start,
+and unloads an idle model early when another one is waiting. KEDA, the interceptor and each model's
+cooldown stay. A model that is used stays up, and one that goes idle still unloads at the end of its
+cooldown.**
+
+The rules:
+
+1. **Idle models unload at the end of their cooldown**, as now (ADR 0051): chat 30 minutes, embeddings 15,
+   Gemma and image-gen 10. KEDA does this, not the arbiter.
+2. **A model is waiting** when it isn't loaded and the interceptor shows requests for it
+   (`Concurrency > 0`).
+3. **A model is idle** when its `Concurrency` has been 0 for more than **5 minutes** without a break.
+4. **Start a waiting model** when the host can take it: `MemAvailable − size(model) ≥ floor`. The floor is
+   **15 GB**, and `size` is the model's measured peak (below).
+5. **Otherwise, unload idle models early** to make room: the least recently used first, one at a time,
+   until the waiting model fits. After each unload, wait for its pod to be gone and `MemAvailable` to rise
+   before checking again. If the waiting model already fits, nothing is unloaded early.
+6. **A busy model is never unloaded.** If no idle model would make room, the waiting model keeps waiting
+   (the interceptor holds its requests up to the route's readiness timeout, then answers 504). This is
+   what stops chat and Gemma both busy from freezing the host: Gemma waits for chat instead.
+7. **Several waiting models** start in the order their first request arrived.
+8. **A start that fails:** if a model isn't ready within its route's readiness timeout, it counts as idle
+   and can be unloaded. The arbiter logs it and counts it in its metrics.
+
+How it acts, through KEDA's pause annotation on each model's `ScaledObject`
+(`autoscaling.keda.sh/paused-replicas`). The arbiter never touches a Deployment's replicas.
+
+- **Unloaded model:** paused at `"0"`. A request to it waits at the interceptor, and KEDA can't start it
+  on its own. This is what lets the floor gate every start: KEDA activates as soon as a request arrives,
+  faster than the arbiter checks.
+- **Start:** the arbiter removes the annotation. KEDA sees the waiting requests and scales the model to 1,
+  and from then on KEDA handles it, including its cooldown.
+- **Back to zero by its cooldown:** the arbiter sees replicas 0 with no annotation, and pauses it at `"0"`
+  again.
+- **Unload early:** the arbiter pauses it at `"0"`.
+- **Argo CD:** each model's Application ignores the annotation (`ignoreDifferences`), so Argo CD doesn't
+  fight the arbiter.
+
+The rest of the design:
+
+- **Model sizes in git**, in a ConfigMap next to the arbiter. To start with: chat 44 GB, Gemma 36,
+  image-gen 22, embeddings 12 (ADRs 0051, 0054 and 0056). Replace them with the peak measured by the
+  host's GPU process memory metric (`homelab_gpu_process_memory_bytes`) on each model's next start.
+- **After a restart** it reads the state back from the annotations and the Deployments, and treats every
+  loaded model as busy for its first 5 minutes, so a restart never unloads anything early.
+- **Checks every 5 seconds.** It needs only the interceptor admin port, the API server (list on Deployments,
+  list and patch on `ScaledObjects` in `models`), and `/proc/meminfo`.
+- **The service:** Python 3 and the standard library for the three API calls (no Kubernetes client and its
+  dependencies; changed while building it, 2026-10-28), in `homelab-services/services/model-arbiter`,
+  built and signed by `build-image.yaml` for arm64 and amd64 (ADR 0033), and pinned by digest in
+  `apps/model-arbiter`. It runs on `gpu` only.
+- **Its metrics** on `/metrics`, scraped by the monitoring pack:
+  - models loaded, per model;
+  - early unloads;
+  - how long a waiting model waited;
+  - starts held back by the memory floor;
+  - `MemAvailable` as the arbiter saw it.
+- **Alerts:**
+  - `ModelArbiterDown`, when its metrics are absent;
+  - `ModelWaitingTooLong`, when a model has been waiting for longer than its readiness timeout.
+
+#### Considered options
+
+1. **Keep ADR 0051 as it is:** no new code. Nothing stops two large models starting together, which is
+   what nearly froze the host on 10-26, and a waiting model can sit behind an idle one in its cooldown.
+2. **Only a memory floor** (hold a start back while memory is short): stops the freeze. But a waiting model
+   would sit behind an idle one until that one's cooldown ends, up to 30 minutes behind chat.
+3. **No idle timeout: models stay loaded until another one needs the memory:** fewest cold starts. But the
+   GB10 holds tens of GB all day and runs warmer, which the owner doesn't want.
+4. **A queue (Kafka or similar) in front of the models:** the interceptor already holds requests per
+   model. A queue would make every caller asynchronous, and adds a broker to run, for no extra control.
+5. **The arbiter as a KEDA external scaler** (KEDA asks it whether each model should be active): no
+   annotations. But the scaler would have to rebuild the same cross-model state behind a gRPC interface.
+   The annotation is simpler to reason about and to undo.
+6. **Cooldowns kept, a memory floor on every start, and an early unload of a model idle for 5 minutes
+   when another is waiting, in a small arbiter** (chosen).
+
+#### Consequences
+
+- Good: A start that would take the host below 15 GB waits instead. The 10-26 near-freeze would have been
+  Gemma waiting for chat.
+- Good: A waiting model no longer sits behind an idle one's cooldown. It waits at most 5 minutes of
+  idleness, plus the unload.
+- Good: Idle models still unload, so memory and heat drop when nothing is called.
+- Good: The rules, sizes and floor are in git, and the arbiter's metrics show every early unload and wait.
+- Bad: Code of our own decides when models start. If the arbiter is down, unloaded models stay paused, and
+  their requests get a 504 after the readiness timeout until the arbiter is back or the annotations are
+  removed. Removing them brings back ADR 0051's behaviour.
+- Bad: A caller of a model that waits behind a busy one can wait past its timeout and get a 504. For chat
+  and Gemma that is a choice between a slow answer and a frozen host.
+- Bad: The sizes must be kept up to date when a model or its `--gpu-memory-utilization` changes, or the
+  floor check is off by the difference.
+- Note: The embeddings starts every 25 minutes on 10-22 and 10-23, with about 2 real requests in two weeks,
+  are something else waking it. The cause is still to be found, separately from this ADR.
+
+#### Related
+
+- [ADR 0010](#adr-0010): the memory slices
+- [ADR 0051](#adr-0051): scale to zero with KEDA and the HTTP add-on, the cooldowns kept here
+- [ADR 0054](#adr-0054), [ADR 0056](#adr-0056): image-gen and Gemma
+- [ADR 0061](#adr-0061): the DGX Spark as the model host, `gpu`
+
+## ADR-0064: Hermes as a personal assistant: WhatsApp self-chat, Gmail through a skill, Outlook calendar read-only from its ICS link, briefs as cron jobs
+{: #adr-0064 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-28 · `homelab-gitops`, `sakharams.github.io`</span>
+
+#### Context
+
+The owner wants an assistant that:
+- plans the day;
+- reads and drafts Gmail and manages Google Calendar;
+- reads the Outlook calendar, which the owner publishes as an ICS link (no Outlook mail, no changes);
+- keeps reminders and runs scheduled tasks;
+- sends a morning brief;
+- is reached on WhatsApp.
+
+Hermes Agent already runs on `platform` (ADR 0048) with the local chat model (ADR 0049). It has a cron
+scheduler, messaging gateways and skills. A search on 2026-10-28 found no better fit:
+- **GitHub trending:** nothing that covers this list.
+- **OpenClaw:** covers most of it, but would be a second agent to run.
+- **GAIA:** noncommercial licence, no Outlook support.
+
+The pinned image (`v2026.9.24`) was checked offline. Its findings:
+- **WhatsApp:** the Baileys bridge (WhatsApp Web, Node 26) is in the image. It copies itself into
+  `/opt/data` to run `npm install`, so the read-only root doesn't block it.
+- **Pairing:** `hermes whatsapp` needs a terminal.
+- **Unpaired gateway:** with `WHATSAPP_ENABLED=true` and no paired session, the gateway exits with code 78.
+- **Google:** the bundled `google-workspace` skill covers Gmail, Calendar, Drive, Contacts, Sheets and
+  Docs, not Google Tasks. Its sign-in is a copy-paste OAuth flow that needs no browser in the pod.
+- **Outlook:** no official skill. The community `microsoft-workspace-skill` (MIT, 33 stars) covers Mail,
+  Calendar and Contacts through Graph, but needs an Azure app, signs in personal accounts only, and asks
+  for mail and write permissions. The owner needs only to read one calendar, which Outlook can publish as
+  an ICS link. The image has no ICS parser, but it has `python-dateutil` (recurrence rules) and `requests`.
+- **Schedules:** Hermes resolves them in `HERMES_TIMEZONE` or `config.yaml` `timezone`, otherwise in
+  server-local time (UTC on the nodes).
+
+#### Decision
+
+- **No new workload:** the existing `hermes` Deployment becomes the assistant.
+- **Git owns:**
+  - `timezone: Asia/Kolkata`, set by the `setup` init container.
+  - `WHATSAPP_MODE=self-chat`.
+  - `WHATSAPP_ALLOWED_USERS`, from OpenBao `kv/platform/hermes` `whatsapp_allowed_users`.
+  - `WHATSAPP_ENABLED` is **not** in git. Pairing writes it with the session, so an unpaired pod never
+    crash-loops.
+- **WhatsApp on the owner's own number:** self-chat mode, where the owner messages themself and cron jobs
+  deliver to the self-chat (`/sethome`).
+- **Gmail and Google Calendar through the bundled Google skill.** It is granted only the Gmail and Calendar
+  scopes: the `v2026.9.24` setup asks for eight and keeps what the owner ticks.
+- **The Outlook calendar, read-only, from its published ICS link:**
+  - **Code:** `apps/hermes/outlook-calendar/` holds a small reader (`outlook_calendar.py`), a wrapper for
+    tomorrow, and a `SKILL.md`. It handles Outlook's Windows zone names, recurrence with exceptions, moved
+    and cancelled occurrences, all-day events and busy status.
+  - **Deployment:** a `configMapGenerator` ships them, and `setup` copies them into `/opt/data` on every
+    start, so git owns them.
+  - **The link:** it is a secret, because anyone with it can read the calendar. It lives in OpenBao
+    `kv/platform/hermes` `outlook_ics_url`. Its own ExternalSecret, `hermes-outlook`, mounts it as the
+    optional file `/etc/hermes/outlook/ics-url`, so a missing link can't stall the `hermes` Secret.
+- **Web search through the platform's SearXNG** (`apps/searxng`, ADR 0055): `web.search_backend: searxng`
+  and `SEARXNG_URL`, and SearXNG's NetworkPolicy admits `hermes`. Otherwise Hermes rotates through the
+  public free tiers of Exa, Parallel, Firecrawl and Keenable, which rate-limit and see every query.
+- **Briefs as cron jobs:**
+  - weekdays at 07:00 IST, a morning brief: both calendars, Gmail that needs the owner, reminders and a plan;
+  - Sunday to Thursday at 21:00, the plan for tomorrow.
+  - The prompts are read-only. Sending mail or changing a calendar happens only from the chat, after the
+    owner confirms.
+- **State and backup:** credentials, tokens and the WhatsApp session live in `/opt/data` and go into the
+  nightly Velero backup.
+- **Runbook:** the steps are in `apps/hermes/README.md`, "Personal assistant".
+
+#### Considered options
+
+1. **A separate WhatsApp number (bot mode):** Hermes' recommendation. It gives a cleaner chat and a lower
+   ban risk, but the owner chose their own number.
+2. **The WhatsApp Business Cloud API:** official and ban-safe. But it needs a Meta business account and a
+   public webhook, and it can't run on a personal number.
+3. **OpenClaw or GAIA next to Hermes:** a second agent, with its own security review and model wiring, for
+   no capability Hermes lacks.
+4. **The community Microsoft Graph skill, or a Microsoft 365 MCP server:** these would add Outlook mail and
+   calendar writes. But they need an Azure app, a client secret that expires, and broad delegated
+   permissions (`Mail.ReadWrite`, `Mail.Send`) for a need that is read-only and calendar-only. The skill was
+   reviewed (commit `682e8ea`, only Microsoft hosts) and kept as the path if Outlook mail is ever wanted.
+5. **`WHATSAPP_ENABLED` in git:** simpler to read, but the gateway exits until pairing is done, and again
+   whenever the phone unlinks the device.
+
+#### Consequences
+
+- Good: no new service. The assistant uses the private local model, at no cost per token.
+- Good: the owner's mail and calendars never leave the homelab, except to Google and Microsoft themselves.
+- Good: Outlook needs no Azure app, no expiring client secret and no write permission. The worst a leak of
+  the link can do is expose the calendar, and publishing it again in Outlook replaces the link.
+- Bad: WhatsApp doesn't allow unofficial clients on personal numbers, so there's a small risk of the account
+  being restricted. Hermes only answers in the self-chat and never messages anyone first.
+- Bad: if the phone unlinks the device, the gateway exits (code 78) and the pod crash-loops, which takes the
+  API and cron down too. To recover, pair again or remove `WHATSAPP_ENABLED` from `/opt/data/.env`.
+- Bad: the WhatsApp session and the Google token sit in `/opt/data` and in Velero's backups. Anyone with a
+  backup can read the owner's Gmail.
+- Bad: the ICS reader is our own code (about 300 lines). An unusual Outlook construct (a `RDATE`, or a Windows
+  zone outside its map with no `VTIMEZONE`) can show a wrong time. Published calendars can also lag Outlook
+  by up to a few hours.
+- Bad: the chat model scales to zero (ADR 0051), so a brief can arrive about 4 minutes late.
+- Bad: the pinned bridge pairs with a stale WhatsApp version, and WhatsApp revokes the link at once
+  (hermes-agent#51477, checked 2026-10-28: the Baileys repo gave revision 1043857760 while WhatsApp Web
+  served 1052053390). `setup` patches the bridge's copy in `/opt/data` to ask WhatsApp Web, as the
+  unmerged upstream PR #61939 does. It's our own patch on vendor code, to drop at the next Hermes upgrade
+  that includes it.
+- Good: a Gmail noise filter (added 2026-10-29) runs before each brief. The owner's rules live in git
+  (`apps/hermes/gmail-triage/gmail_triage_rules.yaml`, agreed in a review of a week of mail) and a script
+  applies them: keep, mark read, or Trash, never a permanent delete. The model only writes the digest, so a
+  model mistake can't trash mail.
+- Bad: the terminal tool's login shell lost Hermes' venv from PATH (Debian's `/etc/profile`), so the skill's
+  Python had no Google libraries; `setup` writes a `.bash_profile` that puts the venv back first.
+
+#### Related
+
+- ADR 0048 (Hermes on `platform`), ADR 0049 (the chat model), ADR 0051 (scale to zero)
+- ADR 0039 (Velero), ADR 0061 (the homelab PC as primary host)
+
+## ADR-0065: Homarr on platform as the start page; the generated Homelab links page is removed, its Popeye reports stay on the host
+{: #adr-0065 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-29 · `homelab-gitops`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+infra-local's `host/doctor/links.py` wrote one static page, the **Homelab links** page, on the host at
+`127.0.0.1:4467`. Through the tunnel it was also `status.cloudutsuk.com` (ADR 0058, Phase 3 step 15). It
+found every Ingress, IngressRoute, HTTPRoute, published port and Grafana dashboard by itself, and listed
+host tools, monitoring endpoints, AI models and outside accounts from hand-kept lists. It checked each URL
+once per `run.sh refresh`. The same page served the Popeye HTML reports with their Rescan buttons.
+
+It worked, but:
+- it was our own code (about 750 lines of Python and HTML) to keep;
+- its status was a snapshot from the last refresh, not live;
+- only the host could open it, or the tunnel through a socket proxy;
+- every repo's AGENTS.md carried a rule to edit `links.py` and refresh it after every change.
+
+The owner asked for Homarr instead: an open-source dashboard
+(Apache 2.0) with app tiles, live ping status, boards edited in the browser, OIDC sign-in and a REST API.
+
+#### Decision
+
+- **Homarr v2 runs in `platform`** (`apps/homarr`, Argo CD application `homarr`):
+  - **Names:** `home.platform.home.cloudutsuk.com` on the tailnet, and `home.cloudutsuk.com` through the
+    tunnel behind Access.
+  - **Sign-in:** Keycloak only, client `homarr` on the platform-admins-only browser flow. The admin group
+    is `platform-admins`.
+  - **Pod:** non-root (uid 1000) on a read-only root with no capabilities. Its nginx directories are
+    emptyDirs that an init container fills. No Kyverno exception is needed.
+  - **State:** SQLite on a `local-path` claim with Velero's file-system backup.
+  - **Secrets:** from OpenBao `kv/platform/homarr`.
+- **The board is filled once** by infra-local `host/homarr/seed.py`. It uses the same sources as
+  `links.py` did and writes through Homarr's REST API with a short-lived API key. After that, the board is
+  edited in Homarr's UI and its database is the source of truth. Git doesn't regenerate it.
+- **The links page is removed:** `links.py`, `links_server.py` and the `homelab-links*` units. So is the
+  "keep the link page current" rule in every AGENTS.md. A new tool gets a tile on the board instead.
+- **The Popeye reports stay on the host.** A small page on the same ports serves them, with the same
+  Rescan buttons: `127.0.0.1:4467`, and `status.cloudutsuk.com` through the tunnel. It is built by
+  `host/doctor/popeye_page.py` and served by `popeye_server.py` as the `homelab-popeye*` units. Popeye
+  needs the doctor kubeconfig and Docker on the host, which Homarr in a cluster doesn't have. Homarr
+  links to it.
+
+#### Considered options
+
+1. **Homarr in platform (chosen).**
+   - For: the owner's pick; live status; edited in the browser; behind Keycloak like the other UIs; on
+     both names; backed up by Velero.
+   - Against: the board no longer finds new routes by itself. It's also state outside git.
+2. **Homarr on the host as a container.**
+   - For: next to Headlamp and Popeye.
+   - Against: no Argo CD, no Velero, no cert-manager. It would also need a socket proxy for the tunnel,
+     like the links page did.
+3. **Keep the links page and add Homarr.**
+   - Against: two lists of the same links, and the owner asked for the links page to go.
+4. **Seed and re-seed the board from git on every change.**
+   - For: the board would stay declarative.
+   - Against: re-seeding overwrites edits made in the UI. Homarr's API saves whole boards, so a partial
+     sync isn't possible. Rejected for now. `seed.py` refuses to touch a board that already exists.
+
+#### Consequences
+
+- Good:
+  - one less piece of our own code;
+  - live status on every tile;
+  - reachable from the tailnet and, after Access, from anywhere;
+  - the AGENTS.md rule shrinks to "add a tile".
+- Bad:
+  - a new route doesn't appear by itself. Adding its tile is part of the change that adds it, just as
+    adding its blackbox probe already is.
+  - The image is `linux/amd64` only, so `platform` can't fail over to the DGX Spark as it is (ADR 0061's
+    standby covers core only).
+  - Homarr sends weekly usage counts to PostHog unless analytics is turned off at onboarding. The owner
+    turns it off.
+- `status.cloudutsuk.com` now shows only the Popeye reports. Its Access application and tunnel route don't
+  change.
+
+#### Related
+
+- ADR 0028 (Keycloak), 0039 (Velero), 0058 (public access; step 15's status page), 0061 (the PC as primary host)
+- infra-local `host/doctor/README.md`, `host/homarr/`
+
+## ADR-0066: LTX-2.5 talking clips on gpu: our own videos API server, a process per clip, behind LiteLLM, scaled to zero and admitted by the arbiter
+{: #adr-0066 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-29 · `homelab-gitops`, `homelab-services`, `shorts-studio`</span>
+
+#### Context
+
+Shorts Studio's cast are painted 3D portrait cards (FLUX.1-schnell, ADR 0054). In a short they only flap their
+mouths: two frames, open and closed, switched by the speech's loudness. The owner wants the cast to move and talk.
+
+With the always-on services moved to the homelab PC (ADR 0061), the DGX Spark holds only the model servers, and
+about 103 GB of its unified memory is free with none loaded. The model arbiter (ADR 0063) admits a model only
+when the host keeps 15 GB free.
+
+LTX-2.5 (Lightricks, August 2026) is an open 22B audio-video model. Its `A2VidPipelineTwoStage` (ltx-pipelines)
+takes a first frame and an audio file, and generates a clip as long as the audio whose lips follow it. The
+output carries the input waveform unchanged. The weights (dev transformer, distilled LoRA, Gemma 4 text encoder,
+VAEs, spatial upscaler; about 80 GB) are in the host's models folder. The license is the LTX-2 Community License:
+free for commercial use under 10 M USD annual revenue.
+
+Measured on the GB10 on 2026-10-29, inside NVIDIA's vLLM 26.07 image:
+
+| Clip | Steps | Wall time | MemAvailable drop |
+|---|---|---|---|
+| 576x1024, 5 s | 30 | 374 s (one process, loading included) | 33 GB |
+| 640x768, 5 s, guidance passes batched | 20 | 264 s | 31 GB |
+| 640x768, 6.75 s, through the server's API | 20 | 272 s | 31 GB |
+
+The faces stayed on model (glasses, hair, clothes), with lip sync, blinks and small head movement.
+
+Three things in the base image needed fixing. Its cuFFT is a 13 KB stub, because vLLM needs no FFT, so the audio
+VAE's mel spectrogram failed with `cuFFT error 50`. torchaudio has no CUDA 13 aarch64 build. And transformers is
+5.6.1, where ltx-core needs 5.8-5.14.
+
+LiteLLM v1.103.1 speaks OpenAI's videos API (`POST /v1/videos`, `GET /v1/videos/{id}`, `GET .../content`).
+Tried against a recording backend: `extra_body` fields reach the backend as form fields, also with
+`drop_params: true`, but an extra file field is refused (`Expected primitive type`). The video id is wrapped in
+LiteLLM's own encoding, and status and content are fetched by that id.
+
+#### Decision
+
+- **A small server of our own**, homelab-services `services/video-gen`: FastAPI with OpenAI's videos API. The
+  first frame and the line come as base64 `image_b64` and `audio_b64` fields, and the clip is as long as the
+  line. The server resamples the audio to 48 kHz stereo, which the audio VAE takes.
+- **`POST /v1/videos` answers when the clip is done**, with `status: completed`, not with a queued job. KEDA's
+  interceptor and the arbiter count requests in flight. A job polled between gaps would look idle for minutes,
+  and the arbiter could unload it mid-clip for a waiting model. Clips are kept an hour for the content GET.
+- **A process per clip**: the server runs ltx-pipelines' own A2Vid CLI through a small wrapper. ltx-pipelines
+  builds each model when its stage starts and drops it after, so a long-lived process would gain nothing. A
+  process per clip returns all its memory when it ends, and keeps the upstream defaults. The wrapper keeps
+  the Hugging Face cache's symlinked paths as given (upstream resolves them to extensionless blobs and then
+  rejects them).
+- **Settings**: dev transformer with FP8 cast, distilled LoRA for stage 2, 20 steps, guidance passes batched,
+  640x768 (the card's shape), 24 fps. Lines up to 12 s.
+- **Image**: NVIDIA's vLLM 26.07 at `vllm-chat`'s digest, plus transformers 5.14.1, accelerate, av,
+  colour-science, OpenImageIO, torchaudio 2.11.1 and the real cuFFT (`nvidia-cufft`, ahead on
+  `LD_LIBRARY_PATH`), with `--no-deps` and hashes. ltx-core and ltx-pipelines come from one LTX-2 commit's
+  archive, checked by its sha256.
+- **In gpu like the other models**: `apps/video-gen` (namespace `models`), scaled to zero by KEDA (5-minute
+  cooldown), a 30-minute response timeout on its InterceptorRoute, `video-gen.gpu.home.cloudutsuk.com` on
+  `models-ingress` with the models key, and LiteLLM's `ltx-2.5` (timeout 1800 s). The arbiter manages it with
+  `size_gb: 36`.
+- **Shorts Studio's video agent** (`agents/video.py`) asks for one clip per line whose speaker has a painted
+  frame, with acting directions the LLM writes. The renderer draws the clip's frames on the speaker's card. A
+  failed clip keeps the card with lip flaps.
+
+#### Considered options
+
+1. **ComfyUI with Lightricks' templates**: a whole UI and its custom-node graph to run one pipeline, with no
+   OpenAI-shaped API for LiteLLM.
+2. **diffusers' `LTX2ImageToVideoPipeline`**: LTX-2.5 support is only on diffusers' main branch, which needs a
+   newer huggingface_hub than the base image's. The audio-to-video pipeline is ltx-pipelines'.
+3. **A long-lived process holding the models**: ltx-pipelines rebuilds its models per stage anyway, and holding
+   about 33 GB between clips would block chat (54 GB) for nothing.
+4. **The async videos API (queued, then polled)**: KEDA and the arbiter would see an idle model while it
+   renders.
+5. **The distilled NVFP4 transformer**: its `nvfp4-prequant` path needs ltx-kernels built for Blackwell. It wasn't
+   tried, because the dev transformer with FP8 cast was already within memory and time.
+
+#### Consequences
+
+- Good: the cast move and talk, from the same painted cards, through the same gateway, key and scale-to-zero as
+  the other models. Nothing is held between clips.
+- Good: a clip that fails or is refused costs one scene its motion, never the short.
+- Bad: slow. About 4.5 minutes a line, one at a time, so a 60-second short spends about an hour of GPU, and a
+  war room (25 lines) about two. Chat (54 GB) and a clip (36 GB) don't fit together, so the arbiter makes one
+  wait.
+- Bad: three workarounds for the base image (cuFFT, torchaudio, transformers) to revisit on the next NVIDIA image.
+- Bad: LTX-2.5 is under the LTX-2 Community License, not Apache 2.0. Revisit it if the channel's entity grows
+  past its revenue limit.
+
+#### Related
+
+- ADR 0010, ADR 0022, ADR 0051, ADR 0054, ADR 0061, ADR 0063
+
+## ADR-0067: Claude judges, corrects and rewrites Shorts Studio's scripts before the board and video, through the Pro subscription, with the local models as the fallback
+{: #adr-0067 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-30 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+
+#### Context
+
+Shorts Studio's scripts are written and reviewed by local models behind LiteLLM. Qwen3.5-35B-A3B writes
+(ADR 0049), and Gemma 4 26B-A4B judges, as a second model family (ADR 0056). The research agent writes a sourced
+brief first (ADR 0055). The script must score at least `quality.min_score` from the judge. That mark rose from 7
+to 8 in shorts-studio PR 34, after scripts scoring 4/10 reached the review queue. Below 8, the topic is
+researched again and rewritten, then other topics are tried, and only the best one goes to review, flagged.
+
+Two things still hold the scripts back:
+
+- **The local judge misses errors and only describes them.** It returns a score and a list of issues, and the
+  writer then rewrites the whole script from that list. A rewrite often fixes one line and breaks another, and a
+  wrong fact the judge didn't notice survives every round.
+- **The script comes last.** In the board formats (`explainer`, `interview`, `war_room`) the board agent plans
+  the board from the brief first, and the writer then narrates that board and cues its cards. A script fixed
+  late is held to a board designed before anyone knew what it would say, and the board, cues, TTS and LTX-2.5
+  clips (ADR 0066, about an hour of GPU for a short) are all spent on a script that might still fail.
+
+The owner has a Claude Pro subscription and wants Claude to be the judge: to review the script, **correct it
+directly**, and rewrite it when needed, before the board, diagrams or video are made. The local models stay as
+the fallback.
+
+The constraints:
+
+- **The subscription, not an API key.** No pay-per-token Anthropic account. A Pro subscription is used through
+  Claude Code: `claude setup-token` issues a long-lived token (`CLAUDE_CODE_OAUTH_TOKEN`), and `claude -p`
+  runs headless with `--output-format json` and `--json-schema` for structured output. `--bare` can't be used,
+  because it never reads OAuth tokens.
+- **Shared limits.** The subscription's usage limits are the owner's own, shared with their interactive Claude
+  Code sessions (one of which hit its 5-hour limit on 2026-10-30). The studio mustn't use them all.
+- **Secrets in OpenBao**, as for every other key (`kv/platform/shorts-studio`).
+- **Only public text leaves the homelab:** the brief (built from public sources) and the script, which is
+  published anyway. No personal data and no credentials go into a prompt.
+- **A short must still be made when Claude isn't available.**
+
+#### Decision
+
+### 1. The script comes first
+
+The agents run in a new order:
+
+1. **Research:** the brief, as today (ADR 0055).
+2. **Draft:** the local writer (Qwen) writes the spoken script from the brief, in the format's beats (hook,
+   intro, steps, recap, takeaway; or the war room's panel turns), as plain lines with no cues and no board.
+3. **Review and correct:** Claude judges the draft and corrects it (section 2).
+4. **The same gate as PR 34:** below `quality.min_score` (8) after `quality.max_revisions` rounds, the topic is
+   researched again, aimed at Claude's blockers, and rewritten. If it still fails, the scheduled job tries the
+   next topic. If every topic fails, the best script goes to review, flagged.
+5. **Board and diagram:** the board agent (or the diagram agent for the cast formats) plans the board from the
+   **final script**: one step per step the script narrates, and cards only for what it names.
+6. **Cues:** the local writer adds each line's cues (the word and the board changes that land on it). It may
+   not change a word: code compares the lines before and after, and rejects a cue pass that edits the text. The
+   local judge then checks only the sync (does the board show what the line says when it says it).
+7. **Render:** TTS, the board, LTX-2.5 clips and the review queue, as today.
+
+The research brief stays the only source of facts, so nothing after step 3 can bring in a new claim.
+
+### 2. What Claude does to a script
+
+One call per round, with the brief, the format's rules, the style guide's rules for this short, and the script:
+
+- **Correct in place.** Claude returns the script with its corrections made, and a list of edits. Each edit
+  names the line, the old and new text, a kind (`fact`, `routing`, `clarity`, `length`, `voice`, `tts`) and a
+  reason. A `fact` edit quotes the brief's fact that backs it. When the brief doesn't back a claim, Claude cuts
+  or softens the claim and never adds an unsourced fact; the gap goes into the blockers, so a re-research can
+  look for it.
+- **Score the corrected script** from 1 to 10 on the same rubric as today (hook, structure, voice, clarity,
+  engagement, plus routing in a war room), with blockers kept apart from polish notes. The draft's score
+  before the corrections is kept too, so the review panel shows what Claude changed and how much it helped.
+- **Rewrite only when correcting isn't enough.** When the structure itself fails (wrong beats, a weak hook that
+  can't be patched, the wrong mechanism), Claude writes the script again from the brief in the same call. The
+  best version wins, as today, so a worse rewrite never replaces a better one.
+- **Code checks every result.** The corrected or rewritten script goes through the same checks as a local one:
+  length, beats in order, a short hook, speakable lines (no TTS-unsafe symbols), every `fact` edit's quote
+  found in the brief. A result that fails them is sent back once with the errors, then counts as a failed call.
+
+The call runs `claude -p` with no tools (`--tools ""`), `--no-session-persistence`, a system prompt of the
+studio's own, `--output-format json` and `--json-schema` set to the review's schema. The model is set per
+agent (section 4); the default is Claude Opus 5.5, and Sonnet 5.5 when the plan doesn't offer Opus.
+
+### 3. Falling back to the local models
+
+The local loop of today (Qwen writes, Gemma judges, the writer rewrites from the issues) runs instead when:
+
+- the token is missing, or the CLI fails to start or to sign in;
+- the subscription answers with a usage limit or rate limit;
+- Anthropic is down, or a call takes longer than `judge.timeout_seconds` (300 s);
+- the reply doesn't match the schema after one retry, or fails the code checks twice;
+- the daily guard is spent (section 5).
+
+A failure opens a circuit breaker, as for Tavily in ADR 0055. Further shorts go straight to the local judge
+until a cooldown passes. For a usage limit, the cooldown lasts until the reset time the CLI reports. A short
+whose review falls back mid-way keeps Claude's best version so far as one of the candidates.
+
+Every review records who did it (`claude:<model>` or `local:<model>`), and the review card shows it next to
+the score. A short judged only by the local models is still held to the same pass mark of 8.
+
+### 4. Each agent's model is set in the UI
+
+The web UI gets an **LLM settings** page for platform-admins (Keycloak group). For each agent (research, draft,
+judge, board, diagram, cues, learning, video), the owner picks:
+
+- **a provider:** local LiteLLM, Claude subscription, Anthropic API key, OpenAI, Azure AI Foundry, or any
+  OpenAI-compatible endpoint;
+- **a model**, a base URL where the provider needs one, temperature, max tokens and timeout;
+- **a fallback**, another provider and model, used as in section 3. The judge's default is Claude, then the
+  local Gemma.
+
+The settings live in the studio's database. `config/studio.yaml`'s `providers.agents` stays as the default when
+an agent has no setting, so a checkout without the database works as today.
+
+**Credentials typed in the UI go to OpenBao, never to the database.** The page writes them to
+`kv/platform/shorts-studio-llm` (one field per credential, e.g. `claude_oauth_token`, `azure_foundry_key`) and
+the settings keep only the field's name. A saved credential is never shown again; the page shows only whether
+it's set and when it was last changed, and offers Replace and Remove.
+
+- The pod signs in to OpenBao with Kubernetes auth, as the role `shorts-studio-llm`, whose policy allows create,
+  update, patch and read on `kv/data/platform/shorts-studio-llm` and nothing else. The existing
+  `kv/platform/shorts-studio` keys (LiteLLM, Keycloak, YouTube, Slack, Tavily) stay read-only, through the
+  ExternalSecret, as today.
+- The app reads a credential when it makes the call, and keeps it in memory for at most five minutes, so a
+  replaced token takes effect without a restart.
+- OpenBao's audit log records every write.
+
+infra-local `host/shorts-studio/configure.sh --claude` also stores the token, for a first setup without the
+UI. The owner runs `claude setup-token` on their own machine and pastes the token in either place.
+
+### 5. A guard for the subscription
+
+The subscription has no per-token bill to cap, but its limits are shared with the owner. So:
+
+- **Scheduled jobs only.** Claude reviews the shorts that the category jobs make (one or two a day per
+  category). A Re-script started by hand uses Claude too, since the owner asked for it.
+- **At most `judge.claude.max_calls_per_short` (6) calls per short** and **`judge.claude.max_calls_per_day`
+  (40)** in all, counted in the database. Past either, the short uses the local judge.
+- **One call at a time**, so the studio never runs several Claude sessions in parallel against the owner's
+  limits.
+
+### 6. What it needs
+
+- **shorts-studio:** the `claude` CLI in the image, Claude Code's native build pinned to a version (the image
+  has no Node: Playwright is the Python package); the reordered pipeline; the Claude judge client; the LLM settings
+  page; the OpenBao writer; the guard and breaker; evals (below).
+- **homelab-gitops:** the OpenBao role and policy `shorts-studio-llm`, bound to the `shorts-studio` service
+  account. No network change: the namespace's network policy limits only ingress, so the pod already reaches
+  `api.anthropic.com` on 443.
+- **infra-local:** `configure.sh --claude`.
+
+**Before it's turned on for the scheduled jobs**, `shorts eval script` runs every golden case through both
+judges, one case per run (ADR 0055, Pending). Claude becomes the default judge if its scripts score higher on
+a blind cross-check by the other judge, and its `fact` edits are backed by the brief in at least 95% of cases.
+
+#### Considered options
+
+1. **An Anthropic API key, through the SDK or LiteLLM:** the cleanest integration (prompt caching, structured
+   output, a Console spend limit, LiteLLM's usual routing and traces) at roughly $1 a short with Opus. Not
+   chosen, because the owner wants to use the subscription they already pay for. It stays as a provider in the
+   settings page, so switching is a setting, not code.
+2. **Claude after the local loop, just before render:** the smaller change (no reorder), but the board and cues
+   are made before Claude's corrections, and a corrected script no longer matches the board it was cued to.
+3. **Claude as judge only, the local writer still rewriting:** keeps Claude's use small, but brings back the
+   problem of a rewrite that fixes one line and breaks another. Correcting in place keeps the good lines.
+4. **Only the local models, with a stricter pass mark:** no egress and no shared limits, but the local judge's
+   blind spots stay, and more topics are thrown away instead of being fixed.
+5. **Claude as the writer too, from the brief:** fewer steps, but every short would depend on the subscription,
+   and the local fallback would then be a different writer. Drafting locally and correcting with Claude keeps
+   the two paths close.
+
+#### Consequences
+
+- Good: wrong facts are fixed where they are, each fix is traced to the brief, and the review panel shows what
+  changed and why.
+- Good: the board, cues, TTS and the GPU's LTX-2.5 clips are only spent on a script that passed.
+- Good: one setting per agent, in the UI, chooses any provider; adding Azure AI Foundry or an API key later
+  needs no code change.
+- Good: nothing stops when Claude can't be reached; the short is made with today's local loop and says so.
+- Bad: the scripts and briefs are sent to Anthropic.
+- Bad: the studio uses the owner's own subscription limits. The guard keeps it small, but a busy day of
+  interactive use can push the studio onto the local judge, and the other way round.
+- Bad: the `claude` CLI adds about 100-200 MB to the image and a dependency on Claude Code's headless flags
+  and output format, which can change between versions; the version is pinned and checked in CI.
+- Bad: the pod gets write access to OpenBao for the first time, though only to one path of its own.
+- Bad: reordering the pipeline changes the board formats' writer: it now drafts without a board, and the cue
+  pass is a separate step that needs its own prompt and evals.
+
+#### Related
+
+- ADR 0049
+- ADR 0055
+- ADR 0056
+- ADR 0063
+- ADR 0066
+- shorts-studio PR 34 (the pass mark of 8, re-research, the topic fallback)
+
+#### As built (2026-10-30)
+
+shorts-studio `agents/editor.py`, the `judge` section of `config/studio.yaml`, `shorts eval script --claude`.
+One real review in a checkout, on the stored war room "The double charge" (episode 31): Claude rewrote a draft it
+scored 3/10 (the root cause named in the crisis beat, the fix designed in diagnose, remediate and commit repeated,
+a Redis cluster the brief never mentions) into one it scored 8.2/10 with no blockers. Each of its fact edits
+quotes the brief, and the facts the brief lacks went to `gaps`.
+
+**Changed from the decision above:**
+
+- **The draft is planned on a provisional board.** Each board format's writer already drafts with a board (an
+  interview's and a war room's outline name its cards), so the local writer still drafts on the board agent's
+  plan from the brief. Code checks that draft only; the local grounding and judge are skipped
+  (`writer.CHECKS_ONLY`). After Claude's review, the board agent plans the board again from the final script and
+  keeps the same number of steps. If that plan changes the steps or fails more checks, the first board stays.
+- **No sync judge after the cues.** The cue pass is checked by code: every cue's word is in its line, every target
+  is on the board and shown by then, everything is shown by the end, and no line stands still. A code repair
+  fixes what it can, and what's left is listed in the review.
+- **The breaker opens only when Claude can't be reached:** no token, the CLI missing, sign-in, a usage limit,
+  an outage, a timeout. A reply that fails the checks twice sends only that short to the local judge.
+- **The OpenBao role and policy live in infra-local** (`host/shorts-studio/configure.sh`, which also takes
+  `--claude`), like every other auth role. The mount is `kubernetes-platform`, so the role is
+  `kubernetes-platform/shorts-studio-llm`. homelab-gitops gives the pod its own service account, bound to
+  `system:auth-delegator`, because OpenBao reviews a token with the token itself (ADR 0023).
+- **The CLI is 293 MB** (Claude Code 2.1.312, the native build, checked against the release manifest's
+  sha256 for each architecture), not 100-200 MB.
+- **The settings page is called Models.** It covers research, board, diagram, writer, judge, learning and video.
+  The cue pass uses the writer's model. A provider that fails hands that agent's calls to its fallback for the
+  rest of the job. Cloud providers are called through their OpenAI-compatible APIs (Anthropic's, OpenAI's, Azure
+  AI Foundry's v1 with an `api-key` header). The page lists which keys are set, never their values.
+- **A fact edit that only cuts or softens a claim quotes nothing.** Only a quote that isn't in the brief, or a
+  new figure with no quote, fails the check.
+
+#### Pending
+
+1. **Token:** run `claude setup-token` on your own machine, then `host/shorts-studio/configure.sh --claude` in
+   infra-local.
+2. **Evals:** `shorts eval script --claude -c <case>`, one case per run (ADR 0055), with the local judge's blind
+   cross-check in each case's `review.json` (`local_judge`). Claude stays the default if it passes the bar in
+   section 6.
+
+## ADR-0068: MFA on every public portal: Cloudflare Access independent MFA if the Free plan has it, Entra MFA otherwise
+{: #adr-0068 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-30 · `infra-local`, `homelab-gitops`</span>
+
+#### Context
+
+Every public browser UI goes through Cloudflare Access (ADR 0058, `infra-local
+host/cloudflare/access.yaml`): Grafana, Argo CD, the portal, Hermes, Job Hunter, Shorts Studio, Velero
+UI, LiteLLM, Qdrant, Homarr and the status page for `platform-admins`, the System Design Canvas for any
+Keycloak user, and the `*.cloudutsuk.com` catch-all. `auth.cloudutsuk.com` is a bypass because Keycloak is
+Access's identity provider.
+
+Access lets people in two ways, and Access itself enforces a second factor on neither:
+
+- **Keycloak**, which sends every sign-in straight to Entra (ADR 0028). Whether that has a second factor
+  depends on the Entra tenant's settings, not on anything in this platform.
+- **A one-time PIN to the owner's email**, the break-glass when Keycloak is down. That is a single factor:
+  whoever reads the mailbox gets in.
+
+Cloudflare added **independent MFA** to Access in April 2026. Access asks for its own second factor (an
+authenticator app, a security key or biometrics) after either sign-in method. It is turned on for the
+whole team (`mfa_config`, `mfa_required_for_all_apps` on `/accounts/<id>/access/organizations`) and can
+be overridden per application or policy. With AMR matching, a sign-in whose IdP already did MFA isn't
+asked again.
+
+**Open question: whether the Free plan includes it.** Checked 2026-10-30:
+
+- Neither the Cloudflare docs nor the changelog entries for independent MFA (2026-04-15, 04-23, 07-01,
+  08-12) say which plans include it, and the Zero Trust plans page has no MFA row.
+- The team's settings through the API return `mfa_config: null` and `mfa_required_for_all_apps: null`,
+  which is what any team that has never configured MFA returns, so it settles nothing.
+- The `homelab-tunnel-access` token can't read the account's subscriptions (`Authentication error`).
+
+Access's other MFA control, a Require rule on "Authentication method", depends on the IdP's `amr` claim.
+A sign-in that Keycloak brokers from Entra doesn't carry Entra's `amr` on by default, so that rule
+can't be relied on here.
+
+#### Decision
+
+Proposed, pending the plan check:
+
+1. **Settle the plan question first.** In the dashboard, open Zero Trust → Settings → Authentication. If
+   the independent MFA settings can be edited, the Free plan includes it; if they are locked or ask for an
+   upgrade, it doesn't. The other way is an API write that leaves MFA off (`allowed_authenticators: []`),
+   sent with the team's other settings unchanged.
+2. **If the Free plan has it: Access independent MFA for every application.**
+   - `host/cloudflare/access.sh` sets the team's `mfa_config` (authenticators `totp`, `security_key`,
+     `biometrics`; a 24h MFA session; AMR matching on) and `mfa_required_for_all_apps: true`, and
+     `access.yaml` gains an optional per-app `mfa:` override.
+   - Rollout order: the owner enrolls a device at `<team>.cloudflareaccess.com/AddMfaDevice` first,
+     then enforcement goes on. Otherwise the PIN break-glass locks the owner out too.
+   - The `auth.cloudutsuk.com` bypass stays as it is.
+   - The System Design Canvas is open to any Keycloak user, so each of them would need to enroll. Decide
+     whether it gets an exemption (`mfa:` off) when rolling out.
+3. **In any case, or as the fallback: MFA in Entra** (security defaults or Conditional Access on the
+   `cloudutsuk-keycloak` app). It costs nothing and covers every Keycloak sign-in on both the Cloudflare
+   and the Tailscale paths. On its own it leaves the email PIN as a single factor.
+
+#### Considered options
+
+1. **Access independent MFA, required for all apps** (preferred if the plan allows it): one setting covers
+   every public hostname and both sign-in methods, the break-glass included.
+2. **Entra MFA only**: free and covers the tailnet path too, but the PIN break-glass stays single-factor
+   and enforcement lives outside this repo's code.
+3. **Access "Authentication method" Require rule**: needs Entra's `amr` passed through Keycloak, which
+   brokered sign-ins don't do by default; fragile.
+4. **An OTP step in Keycloak's browser flows**: a second factor for every Keycloak client, but not for
+   the PIN path, and a second enrollment besides Entra's.
+5. **Nothing**: the admin UIs stay one Entra session or one mailbox away.
+
+#### Consequences
+
+- Good: one setting puts a second factor in front of every public portal, break-glass included.
+- Good: AMR matching skips the second prompt when Entra already did MFA.
+- Bad: enrollment is a one-time step for each user, and losing the device needs a recovery path (a
+  second authenticator, such as a security key, enrolled from the start).
+- Bad: if the Free plan doesn't include it, option 1 means paying for Zero Trust or living with the PIN
+  path's single factor.
+- Bad: Access MFA doesn't cover the Tailscale path, which never reaches Cloudflare; Entra MFA does.
+
+#### Related
+
+- [ADR 0028](#adr-0028)
+- [ADR 0037](#adr-0037)
+- [ADR 0058](#adr-0058)
+- [Independent MFA (Cloudflare docs)](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/independent-mfa/)
+
+## ADR-0069: A wardens cluster on the homelab PC runs the platform-wardens agents and their Temporal; it replaces the single sre-agent
+{: #adr-0069 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `platform-wardens`, `infra-local`, `homelab-gitops`, `homelab-services`</span>
+
+#### Context
+
+ADR 0014 planned one `sre-agent` service in `platform`, extended for alert-triggered troubleshooting.
+Since then the agent work has moved to `platform-wardens`: a framework (`wardens`) for many small agents,
+each with its own identity, task queue and worker, run durably on Temporal (platform-wardens decision
+0004). The SRE agent will be split into several agents (incident triage, change correlation and others),
+and the first one ready to run is a DevOps agent: `terraform-drift`, which explains the weekly drift scan
+of `infra-azure` and recommends a fix as a draft PR.
+
+Nothing in `platform-wardens` is deployed yet: the shared Helm chart is empty, there is no image or CI,
+and Temporal only runs as a dev server.
+
+The cut-over of ADR 0061 is done: `core`, `platform`, `mon` and `ai` run on the homelab PC, and only
+`gpu` stays on the DGX Spark. The PC has room for another cluster.
+
+#### Decision
+
+- A new long-lived k3d cluster, **`wardens`**, on the homelab PC, created by `infra-local` like the
+  others:
+
+  | Setting | Value |
+  |---|---|
+  | API | `172.30.0.1:6446` |
+  | Load balancer | `172.30.0.6` on the `homelab` bridge |
+  | Pod / service CIDRs | `10.60.0.0/16` / `10.61.0.0/16` |
+  | Names | `<app>.wardens.home.cloudutsuk.com` |
+  | Argo CD labels | `homelab/addons=true` (cert-manager, monitoring pack, Kyverno in enforce mode) |
+
+- It runs Temporal and its database (ADR 0070), the `wardens` runtime (operator console, approval
+  endpoint, entry router) and **one worker per agent**, each in its own namespace with its own service
+  account, network policy and identity (ADR 0071). Agents are deployed through one shared Helm chart from
+  `platform-wardens/deploy/helm/agent`; each agent adds a values file in `homelab-gitops/apps/<agent>`.
+- Images follow ADR 0008: built on the ARC runners with the reusable `build-image.yaml`, pushed to Zot,
+  signed, and pinned by digest in `homelab-gitops`. Argo CD in `platform` deploys them.
+- The first agent is `terraform-drift`, scoped to `cloudutsukpilot/infra-azure`. It starts in shadow mode
+  (findings and notifications only, no write token) and gets draft PRs after two or three clean weekly
+  scans.
+- Models: the local LiteLLM gateway in `ai` (ADR 0022) for now. The `wardens` model layer takes the
+  provider from configuration (OpenAI-compatible, Azure OpenAI / Foundry, Anthropic), so an agent can
+  move to another provider without a code change.
+- Notifications go to Slack and to Teams; each audience picks one or both.
+- This supersedes ADR 0014. What it asked for stays as requirements on the SRE agents: Alertmanager as a
+  trigger, read-only cluster access with short-lived tokens, every write behind a human approval, fixes to
+  GitOps apps as PRs, and eval cases from lab experiments.
+
+#### Considered options
+
+1. **Agents in `platform`, as ADR 0014 planned**: `platform` already runs Argo CD, Backstage, the runners
+   and five apps. Temporal plus a growing set of agent workers would compete with the platform's own
+   control plane, and a compromised agent would share a cluster with Argo CD.
+2. **Agents in `ai`**: next to the model gateway, but ADR 0014's reason still holds: agents must be able to
+   report raw evidence when the models are down, so they shouldn't live where the models do.
+3. **A dedicated `wardens` cluster** (chosen): agents are isolated from the platform control plane, the
+   cluster can be scaled to zero as the last kill switch, and it can be rebuilt without touching anything
+   else.
+
+#### Consequences
+
+- Good: the agents' blast radius is one cluster with its own identities and egress rules.
+- Good: the cluster is the unit of the kill switch and of a rebuild.
+- Bad: one more cluster to run (k3s server, add-ons, monitoring pack), about 4 to 6 GiB of memory with
+  Temporal and Postgres.
+- Bad: Phase 6 starts before Phases 2a (chaos) and 5 (RAG) are finished. The drift agent needs neither;
+  the SRE agents that do wait for them.
+
+#### Related
+
+- ADR 0008 (CI builds, Argo CD pulls), ADR 0014 (superseded), ADR 0022 (model gateway), ADR 0061 (homelab
+  PC), ADR 0070 (Temporal), ADR 0071 (agent identities)
+- `platform-wardens` decisions 0004 (Temporal) and 0013 (draft PR as a recommendation)
+
+## ADR-0070: Temporal self-hosted in the wardens cluster on its own Postgres, UI behind Keycloak
+{: #adr-0070 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `homelab-gitops`, `platform-wardens`</span>
+
+#### Context
+
+`platform-wardens` runs every agent on Temporal (its decision 0004): an agent run is a workflow, a stage is
+an activity, a human approval is a signal with a timed wait (timeout means deny). That decision left the
+hosting open: self-hosted or Temporal Cloud. Temporal becomes a critical dependency of every agent: if it
+is down, no run starts.
+
+#### Decision
+
+- **Self-hosted Temporal** in the `wardens` cluster (ADR 0069), from the official `temporalio/temporal`
+  Helm chart, in namespace `temporal`. Bundled Cassandra, Elasticsearch, Prometheus and Grafana are off.
+- **Persistence and visibility on Postgres**: a `wardens-db` instance in the same cluster (one database
+  per cluster, as for `ai-db` and `platform-db`), with the `temporal` and `temporal_visibility` databases.
+  Credentials come from OpenBao (`kv/wardens/…`) through External Secrets. It is backed up like the other
+  cluster databases.
+- One Temporal namespace, **`wardens`**, with 30 days of retention; one task queue per agent.
+- All images pinned by digest and run with the restricted security context Kyverno enforces, including
+  the schema setup and update jobs.
+- The **Temporal UI** at `temporal.wardens.home.cloudutsuk.com`, signed in with Keycloak (realm
+  `homelab`) and limited to `platform-admins`. The frontend (gRPC 7233) is reachable only from pods in
+  the `wardens` cluster; nothing outside connects to it.
+- Server metrics go to `mon` through the monitoring pack, with a Temporal dashboard and alerts for the
+  frontend being down and for workflow task failures.
+
+#### Considered options
+
+1. **Temporal Cloud**: no operations, but a paid account, the agents' run history (plan summaries, findings)
+   would leave the homelab, and every run would depend on the internet link.
+2. **`temporal server start-dev` in a pod**: SQLite in a single process; history is lost when the pod
+   moves. Fine for tests, not for approvals that must survive a restart.
+3. **Database on `platform-db`**: saves one Postgres, but couples the agents' durability to the
+   `platform` cluster, which ADR 0069 keeps them away from.
+4. **Self-hosted on its own Postgres** (chosen).
+
+#### Consequences
+
+- Good: approvals and in-flight runs survive pod and node restarts; the history stays at home.
+- Good: the `wardens` cluster can be rebuilt from Git plus one database dump.
+- Bad: Temporal's four services, the UI and Postgres add about 2 to 3 GiB of memory.
+- Bad: schema upgrades come with chart upgrades and must be planned (Temporal's `update-schema` jobs).
+
+#### Related
+
+- ADR 0035 (data ownership), ADR 0039 (backups), ADR 0069 (the `wardens` cluster)
+- `platform-wardens` decision 0004 (Temporal as the durable execution layer)
+
+## ADR-0071: Every agent is its own principal: an Entra identity through workload identity federation, a GitHub App, and a Kubernetes service account
+{: #adr-0071 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `platform-wardens`, `infra-local`, `infra-azure`, `infra-github`, `homelab-gitops`</span>
+
+#### Context
+
+`platform-wardens` requires every agent to be a first-class principal: its own lifecycle-managed identity
+with a named owner, roles scoped to what its tools need, short-lived credentials, never a person's or a
+shared credential, and separate read and act identities (its framework category 8). The agents reach
+three kinds of systems:
+
+- **Azure** (Activity Log, Foundry, resource reads), which only accepts Entra tokens;
+- **GitHub** (read drift-scan artifacts, open draft PRs), which accepts GitHub App installation tokens;
+- **the homelab** (OpenBao, Temporal, LiteLLM, Kubernetes APIs), where workloads are Kubernetes service
+  accounts and people sign in through Keycloak (ADR 0028), which brokers Entra.
+
+Entra can trust a Kubernetes service account token without any stored secret (workload identity
+federation), but only if it can fetch the cluster's OIDC discovery document and signing keys from a
+public HTTPS URL. A k3d API server is not public.
+
+#### Decision
+
+- **Root identity: one Kubernetes service account per agent**, in the agent's own namespace in `wardens`
+  (ADR 0069), separate for the read worker and, from autonomy level 2, the act path.
+- **Azure: one Entra app registration and service principal per agent**, with a federated credential for
+  `system:serviceaccount:<namespace>:<service account>` from the `wardens` cluster's issuer. The agent's
+  pod gets a projected service account token (audience `api://AzureADTokenExchange`) and exchanges it for
+  a short-lived Entra token. Role assignments are per agent and read-only until level 2. The apps, service
+  principals, federated credentials and role assignments are Terraform in `infra-azure`, with the
+  agent's owner as app owner.
+- **The `wardens` cluster's issuer is public**: k3s is created with `--service-account-issuer` and
+  `--service-account-jwks-uri` pointing to `https://oidc.cloudutsuk.com/wardens`, and the discovery document
+  and JWKS are published there as static files (public keys only). Keys rotate only when the cluster is
+  rebuilt, and the publish step runs again then.
+- **GitHub: one GitHub App per agent**, installed only on the repositories in its scope (`infra-azure`
+  for `terraform-drift` v1). Its private key lives in OpenBao; the worker mints installation tokens (one
+  hour) itself. The read and write tokens are minted with different permission sets.
+- **Inside the homelab**: the service account authenticates to OpenBao (Kubernetes auth, a role per
+  agent); Temporal and LiteLLM are reached only from the agent's namespace through network policies.
+- **People approving actions** present an Entra ID token to the `wardens` approval endpoint. The issuer,
+  JWKS URL and audience are configuration, so the endpoint can switch to the Keycloak `homelab` realm
+  without a code change.
+- **Entra Agent ID** (the agent-specific identity type with blueprints and sponsors) is the target once it
+  is available and licensed in the tenant and manageable from Terraform; the per-agent app registrations
+  map one to one onto it.
+
+#### Considered options
+
+1. **Keycloak service accounts for everything**: one IdP, but Azure doesn't accept Keycloak tokens without
+   federating Keycloak into Entra, which is the same trust problem with an extra hop.
+2. **Client secrets or certificates in OpenBao for each Entra app**: works today without a public issuer,
+   but they are standing credentials that must be rotated, which the framework forbids where federation is
+   possible.
+3. **Entra Agent ID from day one**: the right shape, but its availability, licensing and Terraform support
+   in the tenant aren't confirmed.
+4. **Entra workload federation per agent, GitHub App per agent, service account at the root** (chosen).
+
+#### Consequences
+
+- Good: no stored Azure secret; every Azure call names the agent in the sign-in and audit logs.
+- Good: revoking an agent is deleting its app registration, its GitHub App installation and its OpenBao
+  role.
+- Bad: a new piece of public surface, the issuer's static files (public keys only, no API).
+- Bad: GitHub App private keys are still stored secrets (GitHub has no federation for App
+  authentication).
+- Bad: rebuilding `wardens` rotates the signing keys; the JWKS must be republished before agents can
+  reach Azure again.
+
+#### Related
+
+- ADR 0028 (Keycloak brokering Entra), ADR 0029 (service-to-service auth), ADR 0069 (the `wardens`
+  cluster), ADR 0070 (Temporal)
+- `platform-wardens` framework category 8 (identity) and decision 0007 (autonomy levels)
 
 {% endraw %}
 <!-- adr:end -->
