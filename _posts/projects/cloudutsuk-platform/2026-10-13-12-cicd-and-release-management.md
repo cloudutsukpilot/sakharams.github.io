@@ -174,6 +174,14 @@ cluster-specific apps, and ApplicationSets for the add-ons that every cluster la
 `homelab/addons=true` gets. Every Application retries a failed sync with `refresh`, so a retry picks
 up a fix commit instead of retrying the broken revision (lesson L049).
 
+Every Application belongs to one of five groups: `platform`, `monitoring`, `security`, `ai` and `labs`
+([ADR 0047](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0047)). Each group is
+an Argo CD project, which also limits what its apps may deploy: an `ai` app can only reach the `ai`
+cluster, and the `labs` project only lab clusters. The same name is the label `homelab/group`, so the
+Argo CD UI can show one group at a time, and the Argo CD dashboard in Grafana shows health and
+out-of-sync apps per group on one timeline. Codefresh's dashboard has a similar grouped view, but only
+in its hosted service, with an account and a long-lived admin token for our Argo CD, so it wasn't used.
+
 At admission, Kyverno denies a pod unless:
 
 - its image is signed by CI and has a signed SBOM (`platform/*` and `labs/*`);

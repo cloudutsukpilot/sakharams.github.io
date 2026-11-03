@@ -7,8 +7,9 @@ description: >-
   it works, where and when, link buttons and its API (plus notes or configuration), the canvas pans and zooms like a map, components are icons (built-in or real tool logos),
   layout is automatic (ELK, left to right then top to bottom), and arrows carry protocol:port pills,
   communication-kind colours, continuous moving dots for streams (both ways for WebSocket) and hover
-  cards that animate the handshake or exchange (TLS, TCP, WebSocket, SSE, gRPC, Kafka, AMQP, MQTT,
-  webhooks, OAuth/OIDC, Kerberos). An optional guided tour replays a step-by-step story. Writes the
+  cards that name the protocol chain; clicking an arrow opens a side panel with the whole exchange as one
+  looping, animated sequence diagram grouped on a bracket rail (TCP → TLS 1.3 → HTTP, SSH, WireGuard,
+  webhooks, gRPC, OIDC, Kafka, AMQP, MQTT, Kerberos …) and the certificates that secure it (issuer, validity, where it's kept, why it's trusted) or why the hop has none. An optional guided tour replays a step-by-step story. Writes the
   diagram as data in _data/diagrams/<post folders>/<name>.yml, validates it, embeds it with
   {% include diagram.html id="<post folders>/<name>" %} and checks every level in a real browser. Use when
   the user asks for an "interactive diagram", "explorable diagram", "zoomable diagram", "diagram with
@@ -23,7 +24,7 @@ Status and roadmap: [PLAN.md](PLAN.md). Engine: [assets/js/diagram.js](../../../
 (model, levels, ELK layout, SVG, pan/zoom, panel, protocol cards, tour, geo),
 [_includes/diagram.html](../../../_includes/diagram.html), [_sass/diagram.scss](../../../_sass/diagram.scss).
 Reference diagram: [_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml](../../../_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml)
-(111 components with status and facts, 5 levels, 109 arrows, 15 use cases). Do not edit the engine for one
+(111 components with status and facts, 5 levels, 109 arrows with certificates, 15 use cases). Do not edit the engine for one
 diagram. `SKILL=.claude/skills/cloudutsuk-diagram`, run from the repo root.
 
 ## Inputs
@@ -104,14 +105,59 @@ collapsed, the engine redraws the arrow to the group and merges parallel arrows 
   post's values. Otherwise use the product's default port and say "default" in the tour caption.
   Defaults and kinds: [../cloudutsuk-flow-anim/references/protocols-ports.md](../cloudutsuk-flow-anim/references/protocols-ports.md).
 - **TLS:** `HTTPS`, `WSS`, `AMQPS`, `MQTTS`, `LDAPS` and port 443 imply TLS. Set `tls: true` where
-  the post says a hop is encrypted (for example "every cross-cluster call is HTTPS"). The hover card
-  then shows the TLS 1.3 handshake.
+  the post says a hop is encrypted (for example "every cross-cluster call is HTTPS"). The exchange
+  then includes the TLS 1.3 handshake (mutual TLS when `certs` names a client certificate). SSH,
+  WireGuard and DNS never get TLS: they bring their own encryption, or none.
+- **Certificates on every arrow (`certs`).** Whenever you generate or update a diagram, say for each
+  connection which certificate secures it, or why none does. The reader sees a one-line hint (🔒 name)
+  on the hover card. The side panel that opens on a click of the arrow or its protocol pill is laid
+  out as: the connection (protocol, why, detail), then **the exchange** (below), then
+  **Certificates**: one collapsed line per certificate (role, name, type badge) that expands to its
+  details (presented by, issuer, key, validity, stored in, trusted because, note). Keep `label`
+  short and recognisable, since it is all a reader sees until they open it. Describe each certificate once in a top-level `certs:` catalog and reference it
+  from the edges:
+
+  ```yaml
+  certs:
+    le-portal:
+      label: portal.platform.home.cloudutsuk.com          # the subject or name a reader recognises
+      type: public                 # public | private | cluster (k3s CA) | self (self-signed) | key (SSH, WireGuard)
+      by: "Traefik on platform (TLS ends there)"          # who presents it
+      issuer: "Let's Encrypt YR1 → ISRG Root YR → ISRG Root X1; ACME DNS-01 (ClusterIssuer `letsencrypt`)"
+      key: "RSA 2048 · TLS 1.3"                          # optional
+      valid: "90 days; cert-manager renews it 30 days before expiry"
+      stored: "Secret `portal/portal-tls` on platform"    # optional; never the secret itself
+      trust: "Public chain: every browser and OS trusts ISRG Root X1"   # why the other end accepts it
+  edges:
+    - {id: ts_route, …, certs: {server: [le-portal, le-argocd], note: "Traefik picks one by SNI."}}
+    - {id: iac_docker, …, certs: {server: docker-proxy-server, client: docker-proxy-client}}   # mTLS card
+    - {id: tr_bs, …, certs: {none: "Plain HTTP inside the platform cluster; TLS ended at Traefik."}}
+    - {id: rag_db, …, certs: {planned: "Planned: not designed yet."}}
+  ```
+
+  `certs` on an edge is a catalog id (the server's certificate), `{server, client?, note?}` (ids or
+  lists; a `client` makes the TLS card a mutual-TLS handshake), `{none: why}` for a plaintext hop
+  (in-cluster, loopback, in-process) or `{planned: what is known}`. Check the facts in the real
+  clusters, not from memory: `kubectl get certificates -A` per context, `openssl s_client -connect
+  host:443 -servername host | openssl x509 -noout -subject -issuer -enddate` for what is actually
+  served (and `-showcerts` for the chain), Ingress annotations and Helm values for who terminates TLS.
+  Where TLS ends at an ingress, the certificate is presented `by` the ingress, and the hop behind it
+  is `none`. Bearer tokens, OIDC JWTs and API keys aren't certificates: mention them in `note`.
+  Never put a private key, a token or a secret URL in the catalog. The validator warns about any
+  edge without `certs`, a TLS protocol marked `none`, and an unused catalog entry.
 - **Kind and colour** come from `proto`. Set `kind:` when there is no protocol or it is unusual:
   request, stream, event, data, telemetry or control.
 - **Movement:** streams and telemetry get continuous moving dots automatically (`stream: true/false`
   overrides). WebSocket (`WS`/`WSS`) moves both ways (`both: true` for other duplex links).
-- **Cards:** chosen from `proto`. `cards: [tcp, tls, http]` overrides; the names are tcp, tls, http,
-  websocket, sse, grpc, kafka, amqp, mqtt, webhook, oauth, kerberos, stream and query.
+- **The exchange (cards):** an arrow's side panel shows **one animated sequence diagram** of
+  everything on the wire, in order: the connection (TCP), its security (TLS 1.3, mTLS, or SSH's own
+  key exchange) and the conversation (HTTP, webhook, gRPC, OIDC …). A bracket rail on the left groups
+  the messages (`TCP`, `TLS 1.3`, `HTTP`), the current group lights up, and the reader can click a
+  group to replay from it or pause. It loops. The hover card shows only the chain
+  (`TCP → TLS 1.3 → HTTP`). The groups come from `proto` (HTTPS = tcp, tls, http; Webhook = tcp,
+  [tls], webhook; SSH = tcp, ssh; WireGuard = wireguard; OIDC = tcp, [tls], oauth; gRPC = tcp, [tls],
+  grpc); `cards: [tcp, tls, http]` overrides them in order. Names: tcp, tls, mtls, http, websocket,
+  sse, grpc, kafka, amqp, mqtt, webhook, oauth, ssh, wireguard, kerberos, stream and query.
 - `label` is a short verb or note (`sync`, `every 6 h`). `detail` on an edge shows in its card and
   panel. Flow-map values that contain a comma must be quoted (`label: "metrics, logs, traces"`).
 
@@ -242,9 +288,11 @@ pkill -f "http.serve[r] 4123"
 ```
 
 Checked: layout at every level with no overlapping components, expand on click, the protocol card on
-hover, the detail panel (status badge, chips, lead sentence, how it works, link buttons, API), zoom, the start level (ignoring an old URL parameter), the tour, no script errors, no foreign styling and no
+hover, the detail panel (status badge, chips, lead sentence, how it works, link buttons, API), an
+arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
+(each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `tour.png` and `step-next.png`. Then run htmlproofer on the same folder.
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png` and `step-next.png`. Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -262,7 +310,8 @@ read. Never commit.
 | `min_zoom` | Opening zoom floor (default 0.62): large diagrams open at a readable zoom on their start |
 | `nodes` | Tree: `{id, label, sub?, icon?, color?, tone?, status, phase?, facts, detail?, config?, direction?, views?, children?}`. `status`: built, planned, deferred or external. `facts`: `{summary, how, where?, when?, url?, api?}` (step 1). `views`: shown only in those view tabs. `id`: lowercase, digits, `-` and `_` (appears in URLs). `icon`: built-in name or a logo path under `assets/img/icons/` (`scripts/enrich.py --find <word>` in the flow-anim skill lists logos). `config`: `{title, lang, code}` |
 | `views` | Tabs for cross-cutting connections: `[{id, label, icon?}]`; the main view (`Main flows`) is always first and `Show all` (id `*`, built in) last; don't define a view with id `*` |
-| `edges` | `{id, from, to, why, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `detail`: an extra technical note (auth, token lifetime) |
+| `edges` | `{id, from, to, why, certs, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `certs`: which certificate secures it (step 2); `detail`: an extra technical note (auth, token lifetime) |
+| `certs` | Certificate catalog: `{id: {label, type, by, issuer, valid, trust, key?, stored?, note?}}`, referenced by edges (step 2). `issuer` may be left out for `type: key` |
 | `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |
 | `map` | Geo backdrop `{name: world, lon: [w, e], lat: [n, s], width, height}`; nodes use `lat`/`lon` |
 
@@ -278,7 +327,7 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
   (drag to explore; ⤢ fits everything).
 - **Interaction:** wheel zoom needs Ctrl/⌘ (or a trackpad pinch) so the page still scrolls; in
   fullscreen the wheel zooms directly. ⤢ asks the browser for real fullscreen (Esc leaves it) and
-  falls back to a full-window overlay; either way the canvas takes all the height the player leaves. Hovering a component highlights its arrows. Keyboard: Tab to a
+  falls back to a full-window overlay; either way the canvas takes all the height the player leaves. Hovering a component highlights its arrows. The side panel is resizable: drag its inner edge (left on desktop, top on a phone), use the arrow keys on that handle, or double-click it to reset; each reader's size is remembered in their browser. Keyboard: Tab to a
   component, Enter to open it; the arrow keys pan and + / − / 0 zoom.
 - **Every load opens at the start level** (`level`, default 1 = one layer below the overview) on the
   main view. Nothing is kept in the URL; keep `level: 1` unless the post asks for another start.
@@ -286,5 +335,5 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
 ## Changing the engine
 
 Update `diagram.js`, `diagram.scss` and this file together. `validate.py` reads ICONS, PALETTE, KINDS,
-PROTO_KIND and CARDS from `diagram.js`. Check a new property or class name is not already used (`this.view` is the canvas group; `.dgm-view` its class). Re-run `preview.cjs` for every diagram in use
+PROTO_KIND, CARDS, FACTS, STATUS, CERT_KEYS and CERT_TYPES from `diagram.js`. Check a new property or class name is not already used (`this.view` is the canvas group; `.dgm-view` its class). Re-run `preview.cjs` for every diagram in use
 (`grep -rl "diagram.html" _posts _tabs *.md`). Keep every class and id prefixed `dgm-`.

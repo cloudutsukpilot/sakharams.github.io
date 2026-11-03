@@ -44,6 +44,14 @@ STATUSES = set(re.findall(r"(\w+): '", (re.search(r"const STATUS = (\{.*?\});", 
 FACT_REQUIRED = ["summary", "how"]
 FACT_LIMITS = {"summary": 200, "how": 280, "where": 60, "when": 60}
 OLD_FACTS = {"what": "summary", "why": "summary"}
+# Certificates (const CERT_KEYS and CERT_TYPES in diagram.js): a top-level `certs:` catalog, referenced by
+# every edge's `certs:` (a catalog id, {server, client, note} or {none: "why there is no TLS"}).
+CERT_KEYS = re.findall(r"'(\w+)'", (re.search(r"const CERT_KEYS = (\[.*?\]);", SRC) or [None, ""])[1]) or [
+    "label", "type", "by", "issuer", "key", "valid", "stored", "trust", "note"]
+CERT_TYPES = set(re.findall(r"(\w+): '", (re.search(r"const CERT_TYPES = (\{.*?\});", SRC) or [None, ""])[1])) or {
+    "public", "private", "cluster", "self", "key"}
+CERT_REQUIRED = ["label", "type", "by", "issuer", "valid", "trust"]
+TLS_PROTOS = {"HTTPS", "WSS", "AMQPS", "MQTTS", "LDAPS"}
 
 
 def proto_kind(e):
@@ -181,6 +189,28 @@ def validate(data, path):
     if top > 10:
         W(f"level 0 shows {top} components; group them so the overview has about 3 to 9")
 
+    certs = data.get("certs") or {}
+    if not isinstance(certs, dict):
+        E("`certs` must be a mapping of id -> certificate")
+        certs = {}
+    for cid, c in certs.items():
+        if not ID_RE.match(str(cid)):
+            E(f"cert `{cid}`: id must be lowercase, digits, - and _")
+        if not isinstance(c, dict):
+            E(f"cert `{cid}`: must be a mapping of {', '.join(CERT_KEYS)}")
+            continue
+        for k in c:
+            if k not in CERT_KEYS:
+                E(f"cert `{cid}`: unknown key `{k}` (use {', '.join(CERT_KEYS)})")
+        for k in CERT_REQUIRED:
+            if k == "issuer" and c.get("type") == "key":
+                continue
+            if not str(c.get(k) or "").strip():
+                E(f"cert `{cid}`: needs `{k}`")
+        if c.get("type") and c["type"] not in CERT_TYPES:
+            E(f"cert `{cid}`: type must be one of {sorted(CERT_TYPES)}")
+    used_certs, no_certs = set(), []
+
     edge_ids = set()
     modes = [m["id"] for m in (data.get("tour") or {}).get("modes", [])] or ["default"]
     for i, e in enumerate(data.get("edges") or []):
@@ -212,6 +242,33 @@ def validate(data, path):
                 E(f"edge `{eid}`: unknown card {c!r} (cards: {sorted(CARDS)})")
         if e.get("tone") and e["tone"] not in TONES:
             E(f"edge `{eid}`: tone must be one of {sorted(TONES)}")
+        c = e.get("certs")
+        if c is None:
+            no_certs.append(eid)
+        else:
+            if isinstance(c, str):
+                c = {"server": c}
+            if not isinstance(c, dict) or set(c) - {"server", "client", "note", "none", "planned"}:
+                E(f"edge `{eid}`: certs must be a cert id, {{server, client?, note?}} or {{none: \"why there is no TLS\"}} or {{planned: \"…\"}}")
+                c = {}
+            ids = [x for k in ("server", "client") for x in ([c[k]] if isinstance(c.get(k), str) else list(c.get(k) or []))]
+            if c.get("none") and ids:
+                E(f"edge `{eid}`: certs has both `none` and certificates")
+            if not c.get("none") and not c.get("planned") and not ids and c:
+                E(f"edge `{eid}`: certs needs `server` (a cert id) or `none`")
+            for x in ids:
+                used_certs.add(x)
+                if x not in certs:
+                    E(f"edge `{eid}`: unknown cert `{x}` (add it to the top-level `certs:`)")
+            p = re.split(r"[\s/+.-]", str(e.get("proto") or "").upper())[0]
+            if c.get("none") and (p in TLS_PROTOS or e.get("port") == 443 or e.get("tls")):
+                W(f"edge `{eid}`: {e.get('proto') or 'port 443'} is TLS, but certs says none")
+
+    if no_certs:
+        W(f"{len(no_certs)} connection(s) without `certs` (which certificate secures the hop, or none: why): {', '.join(no_certs[:12])}{' …' if len(no_certs) > 12 else ''}")
+    for cid in certs:
+        if cid not in used_certs:
+            W(f"cert `{cid}` is not used by any edge")
 
     # Views (tabs) for cross-cutting connections.
     views = {v.get("id") for v in data.get("views") or []}

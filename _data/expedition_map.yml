@@ -51,6 +51,10 @@ countries:
     name: Career & Field Notes
     icon: fas fa-compass
     color: "#06b6d4"
+  - id: domains
+    name: Domain Knowledge
+    icon: fas fa-briefcase
+    color: "#84cc16"
 
 # Category paths that are not placed on the map at all.
 skip:
@@ -107,11 +111,15 @@ routes:
   interview: career/interviews
   productivity: career/productivity
   issues-fixes: career/issues-and-fixes
+  # Domain Knowledge
+  domains: domains
 
 # Display names for state and district slugs. Anything not listed is title-cased from the
 # category name ("build-tools" -> "Build Tools", "DeepLearning" -> "Deep Learning").
 names:
   general: General
+  healthcare: US Healthcare
+  edi-x12: EDI (X12)
   labs: Hands-on Labs
   azure: Microsoft Azure
   aws: AWS

@@ -1,0 +1,31 @@
+# Domains tab (_tabs/domains.md → _includes/domains-catalog.html).
+#
+# One entry per business domain, in display order. An `active` domain has a learning-path index page at
+# `url`, rendered by _includes/domain-path.html from _data/domain_paths/<id>.yml; its posts live under
+# _posts/domains/<id>/<topic>/ with `domain: <id>` in their front matter. A `planned` domain shows as a
+# card without a link until its index exists.
+
+- id: healthcare
+  title: US Healthcare
+  icon: fas fa-heart-pulse
+  status: active
+  url: /domains/healthcare/
+  summary: >-
+    How care is insured, coded, authorised, billed and paid in the US, and the data standards behind it:
+    payers and providers, Medicare and Medicaid, revenue cycle, HIPAA, EDI X12, HL7 and FHIR.
+
+- id: communications
+  title: Communications & Telecom
+  icon: fas fa-tower-broadcast
+  status: planned
+  summary: >-
+    How carriers, networks, OSS/BSS, billing and number management fit together, from 4G/5G to messaging
+    platforms.
+
+- id: finance
+  title: Banking & Finance
+  icon: fas fa-building-columns
+  status: planned
+  summary: >-
+    Payments, cards, core banking, lending and capital markets, with the rails (ACH, SWIFT, ISO 20022) and
+    regulations (PCI DSS, SOX, KYC/AML) that shape their systems.

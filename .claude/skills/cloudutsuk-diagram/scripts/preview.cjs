@@ -10,7 +10,7 @@
  * level no two components overlap (pills on top of components are reported too). On light desktop it
  * also clicks through: expand a component, hover an arrow (protocol card), open a detail panel, zoom,
  * the start level, and (if the diagram has one) the tour. Screenshots: <view>-level<N>.png, card.png,
- * panel.png, expanded.png, tour.png. Exit code 1 if any check fails.
+ * panel.png, edge-panel.png, expanded.png, tour.png. Exit code 1 if any check fails.
  */
 const path = require('path');
 const fs = require('fs');
@@ -157,6 +157,23 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await fig.screenshot({ path: path.join(args.out, 'card.png') });
         await page.mouse.move(2, 2);
         await page.waitForTimeout(400);
+        // Click the pill: the side panel shows the connection with its certificates.
+        await page.mouse.click(pr.x + pr.width / 2, pr.y + pr.height / 2);
+        await page.waitForTimeout(700);
+        const certs = await page.$eval(`${sel} .dgm-panel`, (p) => !p.hidden && { n: p.querySelectorAll('.dgm-cert').length, any: !!p.querySelector('.dgm-certs') });
+        const ex = await page.$eval(`${sel} .dgm-panel`, (p) => ({ groups: [...p.querySelectorAll('.dgm-ex-grp .dgm-ex-tag')].map((t) => t.textContent), msgs: p.querySelectorAll('.dgm-ex-msg').length, on: !!p.querySelector('.dgm-ex-grp.is-on') }));
+        if (ex.msgs) check(ex.groups.length > 0 && ex.on, `the arrow's panel plays one exchange: ${ex.groups.join(' → ')} (${ex.msgs} messages)`);
+        if (certs && certs.any) check(certs.n > 0, `clicking an arrow opens its panel with ${certs.n} certificate card(s)`);
+        else note('the clicked arrow has no `certs`');
+        const order = await page.$eval(`${sel} .dgm-panel`, (p) => {
+          const ex = p.querySelector('.dgm-exchange'); const c = p.querySelector('.dgm-certs');
+          const d = p.querySelector('details.dgm-cert');
+          if (d) d.querySelector('summary').click();
+          return { first: !ex || !c || !!(ex.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING), closed: !d || !p.querySelector('details.dgm-cert[open]:not(:first-of-type)'), opens: !d || d.open };
+        });
+        check(order.first && order.opens, 'the exchange comes before the certificates, which open on a click');
+        await fig.screenshot({ path: path.join(args.out, 'edge-panel.png') });
+        await page.click(`${sel} .dgm-panel-close`).catch(() => {});
       } else note('no protocol pill in view at level 1');
       // Detail panel.
       const [leaf] = await visible('.dgm-node.has-detail:not(.is-collapsible)');

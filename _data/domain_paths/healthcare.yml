@@ -1,0 +1,62 @@
+# US Healthcare learning path (pages/domains/healthcare.md → _includes/domain-path.html).
+#
+# levels: shown in order, basic → advanced. topics: grouped under their `level`, in order.
+# A post joins a topic through its front matter: `domain: healthcare`, `domain_topic: <topic id>` and
+# `domain_order: <n>` (sort order within the topic). The topic id is also the post's folder under
+# _posts/domains/healthcare/ and its last `categories` entry. `coming_soon: true` marks a placeholder.
+
+levels:
+  - id: basic
+    title: "Level 1 · Foundations"
+    blurb: Who the players are, how insurance plans work and what patients pay. Start here if US healthcare is new to you.
+  - id: intermediate
+    title: "Level 2 · Core workflows"
+    blurb: The business processes that turn a visit into a payment, and the rules that govern patient data.
+  - id: advanced
+    title: "Level 3 · Health data exchange"
+    blurb: The standards that carry those workflows between systems, from EDI X12 to HL7, FHIR and DICOM.
+  - id: expert
+    title: "Level 4 · Health tech engineering & strategy"
+    blurb: Building compliant systems on these standards, and the payment models changing the industry.
+
+topics:
+  - id: ecosystem
+    level: basic
+    title: The US healthcare ecosystem
+    icon: fas fa-sitemap
+  - id: insurance
+    level: basic
+    title: Health insurance and plan types
+    icon: fas fa-id-card
+  - id: government-programs
+    level: basic
+    title: Government programs
+    icon: fas fa-landmark
+  - id: revenue-cycle
+    level: intermediate
+    title: Revenue cycle, coding and claims
+    icon: fas fa-file-invoice-dollar
+  - id: utilization-management
+    level: intermediate
+    title: Utilization management and prior authorization
+    icon: fas fa-clipboard-check
+  - id: compliance
+    level: intermediate
+    title: HIPAA, privacy and regulation
+    icon: fas fa-user-shield
+  - id: edi-x12
+    level: advanced
+    title: Healthcare EDI (ANSI X12)
+    icon: fas fa-right-left
+  - id: interoperability
+    level: advanced
+    title: Clinical interoperability (HL7, FHIR, DICOM)
+    icon: fas fa-network-wired
+  - id: healthtech-engineering
+    level: expert
+    title: Health tech engineering
+    icon: fas fa-code
+  - id: value-based-care
+    level: expert
+    title: Value-based care and analytics
+    icon: fas fa-chart-line

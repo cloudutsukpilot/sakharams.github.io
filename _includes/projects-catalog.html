@@ -8,7 +8,10 @@
 {%- assign catalog = site.data.project_catalog -%}
 {%- assign known_ids = catalog.categories | map: "id" -%}
 
-{%- capture tile_count -%}{{ site.data.projects.size | plus: catalog.extra.size | plus: site.data.labs.size }}{%- endcapture -%}
+{%- comment -%} Cards with `hidden: true` are left off this page (their tag pages still build). {%- endcomment -%}
+{%- assign hidden_n = 0 -%}
+{%- for e in site.data.projects %}{% if e[1].hidden %}{% assign hidden_n = hidden_n | plus: 1 %}{% endif %}{% endfor -%}
+{%- capture tile_count -%}{{ site.data.projects.size | minus: hidden_n | plus: catalog.extra.size | plus: site.data.labs.size }}{%- endcapture -%}
 
 <div class="projects-catalog">
   <p class="pc-intro">
@@ -20,7 +23,7 @@
   <nav class="pc-jump" aria-label="Project categories">
     {%- for cat in catalog.categories %}
     {%- assign cat_n = catalog.extra | where: "category", cat.id | size -%}
-    {%- for e in site.data.projects %}{% if e[1].category == cat.id %}{% assign cat_n = cat_n | plus: 1 %}{% endif %}{% endfor -%}
+    {%- for e in site.data.projects %}{% if e[1].category == cat.id and e[1].hidden != true %}{% assign cat_n = cat_n | plus: 1 %}{% endif %}{% endfor -%}
     {%- for e in site.data.labs %}{% if e[1].category == cat.id %}{% assign cat_n = cat_n | plus: 1 %}{% endif %}{% endfor -%}
     {%- if cat_n > 0 %}
     <a href="#{{ cat.id }}"><i class="{{ cat.icon }}" aria-hidden="true"></i> {{ cat.title }}</a>
@@ -48,6 +51,7 @@
     {%- capture tiles -%}
       {%- for entry in site.data.projects -%}
         {%- assign slug = entry[0] -%}{%- assign p = entry[1] -%}
+        {%- if p.hidden -%}{%- continue -%}{%- endif -%}
         {%- if sid == "__other" -%}
           {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
         {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}

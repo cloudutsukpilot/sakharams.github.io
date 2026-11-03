@@ -750,3 +750,47 @@ lessons:
     fix: "An init container fetches o200k_base and cl100k_base once onto the models claim, checked against the SHA-256 hashes tiktoken pins, and `TIKTOKEN_ENCODINGS_BASE` makes Harmony load them from there without downloading. Chat, reasoning and tool calls then worked."
     lesson: "A model server that's ready isn't necessarily able to answer. Make one real request part of the deploy check, and with a non-root, read-only pod, look for anything the image downloads on first use and supply it ahead of time."
     adrs: ["0046", "0010"]
+
+  - id: L070
+    date: 2026-10-15
+    step: "Phase 3: platform operations (Grafana alerting pages)"
+    title: "Grafana showed no contact points although every alert reached Slack"
+    tags: [grafana, mimir, alertmanager, alerting]
+    symptom: "Grafana's Alerting → Contact points page was empty, with no notification policies, while Slack and healthchecks.io received every alert. The page had Grafana's built-in Alertmanager selected; switching to the \"Alertmanager\" data source (Mimir's) showed nothing either."
+    cause: "Two things. Grafana's built-in Alertmanager is a separate, unused one. And Mimir's Alertmanager ran on its fallback config file: it routes alerts with it, but its config API only returns configs uploaded through that API, and Grafana reads contact points and policies from the API alone. A first upload attempt then failed with HTTP 400, because Mimir validates an uploaded config by writing it under /tmp, which the read-only root filesystem refused."
+    fix: "An emptyDir at /tmp in Mimir's pod, and an `alertmanager-sync` Job in monitoring-base (PostSync hook and hourly CronJob) that posts the same Secret to `/api/v1/alerts` for tenant `anonymous` and checks the receivers by name without printing the config. Grafana then listed slack, healthchecks and null with the two routes. A changed webhook now applies without restarting Mimir."
+    lesson: "A fallback config is invisible to the tools that read the API. If a UI should show what a service runs, load the config through the API from Git, and say where edits made in the UI end up (here: overwritten within the hour)."
+    adrs: ["0041", "0009"]
+
+  - id: L071
+    date: 2026-10-15
+    step: "Phase 3, step 8a"
+    title: "Upstream LGTM dashboards looked empty because they're written for microservices"
+    tags: [grafana, mimir, loki, tempo, dashboards]
+    symptom: "After scraping Mimir, Loki and Tempo, their official mixin dashboards first showed data in under a third of their panels. Mimir / Reads had 6 of 62, and the panel check reported Loki / Writes with 0 of 0 panels."
+    cause: "Four things. The Loki and Tempo mixins select each microservice by job, container or pod (job=~\"$namespace/distributor\"), and here each runs as one process; Mimir's default job names include `mimir`, so only its container and pod matchers needed changing. Mimir's `latency_metrics` switch made the check pick native histograms, which nothing sends, while Grafana opens on classic. The mixins use Grafana's legacy `rows` layout, which the panel check didn't read. And their log panels select cluster, namespace and job, while log streams here carry OTel's k8s_* labels."
+    fix: "Scrape each component as job `monitoring/<service>`, the mixins' convention, and have `scripts/dashboards.py` point every per-component job, container and pod matcher at the single binary, and the LogQL at the k8s_* labels. `panel_check.py` now reads legacy rows, uses a variable's saved value and skips LogQL targets. What was still empty was then Kafka, memcached, sharding, object-store or error-only panels, each listed with its reason."
+    lesson: "Upstream dashboards encode a deployment shape. Before trusting \"no data\", compare the shape they assume with the one you run, and rewrite their selectors once, in the import script, so the rewrite comes back with every version bump."
+    adrs: ["0041", "0027"]
+
+  - id: L072
+    date: 2026-10-16
+    step: "Phase 3, step 8b"
+    title: "Hermes Agent's image wants root under s6; on a restricted cluster it runs without it, and its .env outranks the pod's env"
+    tags: [hermes, kubernetes, security-context, secrets]
+    symptom: "As uid 10000 with a read-only root, the image exited at once: \"/run belongs to uid 0 instead of 10000 ... we're lacking the privileges to fix it\". Once Hermes was running, its API answered 401 to the key the pod had from OpenBao."
+    cause: "The image's PID 1 is s6-overlay's /init, which expects root (it remaps the user and chowns the volume) and a /run it owns. The platform enforces restricted Pod Security and a read-only root. Separately, on first boot the image generates an API_SERVER_KEY into /opt/data/.env when its setup step doesn't see one, and Hermes prefers .env over the process environment."
+    fix: "shareProcessNamespace makes the pause container PID 1, so the image's entrypoint takes its documented non-PID-1 path: setup without s6, run in an init container. The gateway and the dashboard, which s6 would supervise, run as two containers on one volume, with emptyDirs for /run, /tmp and /dev/shm. The setup step gets the key from the Secret too, and deletes any API_SERVER_KEY line from .env on every start. Rehearsed first in Docker with --init, --user, --read-only and --cap-drop ALL."
+    lesson: "Before writing an exception for an image that wants root, look for the path it takes when something else is PID 1. And for apps that keep their own .env on the data volume, find out which source wins before you put a secret in the pod's environment."
+    adrs: ["0048", "0033"]
+
+  - id: L073
+    date: 2026-10-16
+    step: "Phase 5, step 1 (chat model change, ADR 0049)"
+    title: "A model's context ceiling and download size decide whether it starts, before any GPU memory question"
+    tags: [vllm, qwen, models, kubernetes]
+    symptom: "The first Qwen attempt (Qwen3-8B-FP8 at --max-model-len 65536) crash-looped within seconds: \"User-specified max_model_len (65536) is greater than the derived max_model_len (max_position_embeddings=40960 ...)\". Its LiteLLM entry also pointed at a Service name that didn't exist. The replacement, Qwen3.5-35B-A3B, then downloaded its 37.5 GB at about 10 MB/s, about an hour, while the startup probe allowed 40 minutes."
+    cause: "vLLM refuses a context longer than the model's config.json allows unless rope scaling (YaRN) is configured; Qwen3-8B's native window is 40,960 tokens. The startup probe was sized for gpt-oss's 13 GB download, and a probe that expires kills the pod mid-download."
+    fix: "Chose a model whose native context covers the need (Qwen3.5-35B-A3B: 262k, served at 128k) and kept the role-named app vllm-chat, so the Service, alerts, dashboards and LiteLLM's api_base didn't change. Raised the startup window to 90 minutes for the first download. Sized the slice from config.json: only 10 of 40 layers keep a KV cache, about 20 KB per token."
+    lesson: "Before switching models, read config.json (max_position_embeddings, layer types, KV heads) and the repository size: they decide whether vLLM starts at all and how long the first start takes. Name model apps after their role, not the model, so a model change touches one Deployment."
+    adrs: ["0049", "0046", "0010"]

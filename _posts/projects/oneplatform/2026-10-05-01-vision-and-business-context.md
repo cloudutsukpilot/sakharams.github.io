@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Vision and Business Context"
 date: 2026-10-05 00:01:00 +0530

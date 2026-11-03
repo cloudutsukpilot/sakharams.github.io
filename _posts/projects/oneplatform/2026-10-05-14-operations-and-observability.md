@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Operations and Observability"
 date: 2026-10-05 00:14:00 +0530

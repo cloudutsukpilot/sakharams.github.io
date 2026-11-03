@@ -3,8 +3,9 @@
 
 The project index (/tags/<slug>/) shows a Diagrams lane built from the diagram types in
 _data/project_framework.yml (`diagrams.types`) and the project's `diagrams:` list in
-_data/projects/<slug>.yml. This script finds every `{% include flow-anim.html id="..." %}` in
-_posts/projects/<slug>/, links it to the nearest section anchor above it (`{: #anchor }`), takes the
+_data/projects/<slug>.yml. This script finds every `{% include flow-anim.html id="..." %}` (animated,
+data in _data/flow_anims/) and `{% include diagram.html id="..." %}` (interactive, the cloudutsuk-diagram
+skill, data in _data/diagrams/) in _posts/projects/<slug>/, links it to the nearest section anchor above it (`{: #anchor }`), takes the
 title from the diagram's YAML and guesses its type from its name and the post's area. Entries without
 a `diagram:` id (Mermaid diagrams or images added by hand) are kept as they are.
 
@@ -21,7 +22,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[4]
-INCLUDE = re.compile(r'\{%\s*include\s+flow-anim\.html\s+id="([^"]+)"')
+INCLUDE = re.compile(r'\{%\s*include\s+(flow-anim|diagram)\.html\s+id="([^"]+)"')
+# Each include's data folder and the format the index shows for it.
+KINDS = {"flow-anim": ("flow_anims", "animated"), "diagram": ("diagrams", "interactive")}
 ANCHOR = re.compile(r'^\{:\s*#([a-z0-9-]+)\s*\}\s*$')
 
 # (keyword in the diagram name, type) checked first; then the post's area decides.
@@ -58,8 +61,9 @@ def scan(slug, project_name=""):
                 anchor = m.group(1)
             m = INCLUDE.search(line)
             if m:
-                did = m.group(1)
-                data = ROOT / "_data" / "flow_anims" / f"{did}.yml"
+                folder, fmt = KINDS[m.group(1)]
+                did = m.group(2)
+                data = ROOT / "_data" / folder / f"{did}.yml"
                 title = (yaml.safe_load(data.read_text()) or {}).get("title") if data.exists() else None
                 name = did.rsplit("/", 1)[-1]
                 title = title or name.replace("-", " ")
@@ -71,7 +75,7 @@ def scan(slug, project_name=""):
                     "title": title,
                     "url": permalink + (f"#{anchor}" if anchor else ""),
                     "diagram": did,
-                    "format": "animated",
+                    "format": fmt,
                 })
     return found
 

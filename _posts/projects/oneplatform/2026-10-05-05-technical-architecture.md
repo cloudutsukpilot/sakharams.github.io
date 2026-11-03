@@ -1,4 +1,5 @@
 ---
+published: false
 layout: post
 title: "OnePlatform: Technical Architecture"
 date: 2026-10-05 00:05:00 +0530
