@@ -2724,6 +2724,117 @@ family, Qwen, has a newer generation: Qwen3.5 (February 2026).
 
 - ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0046 (superseded), ADR 0048 (Hermes Agent)
 
+
+## ADR-0050: Paperclip as the agent control plane in platform: our own signed image, platform-db, Keycloak in front, models only through LiteLLM
+{: #adr-0050 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `homelab-services`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+Phase 6 brings agents onto the platform: the SRE agent (ADR 0014) first, and coding agents that work on
+the platform's own repos after it. Each agent so far is a separate CLI session or service with its own
+history, its own keys and no shared view of what it is doing, what it costs or what is waiting for my
+approval.
+
+Paperclip (MIT) is a self-hosted control plane for teams of
+agents: a Node.js 24 server and React UI on one port (3100) with a Postgres database. It assigns tasks to
+agents (coding CLIs such as OpenCode, Claude Code or Codex, or HTTP endpoints), wakes them on schedules,
+and enforces budgets, review stages and an audit trail. What we checked in its source (2026-10-16, commit
+`78b833c`, release `v2026.916.1`):
+
+- The image is published for linux/amd64 and arm64 (the DGX is arm64), by full-SHA tag with a Sigstore
+  attestation. Started as non-root, its entrypoint skips `gosu` and runs unprivileged, so Pod Security
+  `restricted` is possible.
+- It takes an external Postgres through `DATABASE_URL` and runs its migrations at start. Everything else
+  it keeps lives in `PAPERCLIP_HOME` (instance config, attachments, agent workspaces and CLI state).
+- People sign in with email and password only (Better Auth); there is no OIDC sign-in. ADR 0028 wants
+  every UI behind Keycloak.
+- It needs three long-lived secrets: a session secret, a tool-action signing secret and a 32-byte master
+  key that encrypts the company secrets in its database.
+- Local adapters run the agent CLIs inside Paperclip's own container. The upstream image installs those
+  CLIs at `@latest`, so two builds of the same commit differ.
+- Telemetry is opt-in OpenTelemetry traces only, no metrics; health is `GET /api/health`.
+- Upstream moves fast: several commits a day.
+
+Kyverno (ADR 0033) admits only signed `platform/*` images or digest-pinned `mirror/*` ones. Models are
+reached only through the LiteLLM gateway with a virtual key per caller (ADR 0022, 0029).
+
+#### Decision
+
+- **Paperclip runs in `platform`,** namespace `paperclip`, Argo CD group `platform` (ADR 0047), synced from
+  `apps/paperclip` by `clusters/platform/paperclip.yaml`. It sits next to the SRE agent, so it keeps
+  working when `ai` is down (ADR 0014, 0018). One replica, `Recreate`.
+- **Our own image, `platform/paperclip`,** from `homelab-services` `services/paperclip`: a thin Dockerfile
+  on the upstream image pinned by digest through Zot's mirror (a release at least 14 days old), with the
+  agent CLIs and the OTel packages reinstalled at pinned versions and uid 1000. It goes through
+  `build-image.yaml`, so it gets the gates, a Cosign signature and an SBOM like every other image
+  (ADR 0032, 0033, 0043). No fork.
+- **Data:** a database `paperclip` with its own owner role in `platform-db` (ADR 0035); its nightly dump
+  covers it (ADR 0039). `PAPERCLIP_HOME` is a static PV on `/srv/homelab/paperclip`, not backed up: the
+  workspaces are git clones and the attachments are accepted as lost on a rebuild (ADR 0016).
+- **Secrets** in OpenBao `kv/platform/paperclip`, delivered by External Secrets (ADR 0023). The master key
+  also goes into the offline recovery kit, because without it a restored database's company secrets
+  can't be decrypted. Strict secret mode is on.
+- **Sign-in:** the Ingress (`paperclip.platform.home.cloudutsuk.com`, tailnet only, ADR 0037) sits behind
+  oauth2-proxy with a Keycloak client `paperclip`, allowing only the group `platform-admins`. Paperclip
+  runs `authenticated` with `private` exposure and its own login behind that gate; open sign-up is off
+  after the owner's account exists. This is a deliberate exception to ADR 0028's "Keycloak is the sign-in"
+  until Paperclip supports OIDC.
+- **Models only through LiteLLM:** one virtual key `paperclip`, limited to the models agents need, with a
+  monthly budget, kept in `kv/ai/litellm-clients`. Paperclip's own company and agent budgets are set below
+  it, so Paperclip stops first and LiteLLM is the backstop. A hosted model, if the spike shows one is
+  needed, becomes another LiteLLM backend rather than a key in the agents.
+- **Code changes only as pull requests:** a GitHub App of its own, installed on chosen repos with Contents
+  and Pull requests read/write and nothing else; branch protection keeps `main` review-only. Paperclip
+  never gets `cloudutsuk-gitops-writer` (ADR 0043). Every project gets a review stage in Paperclip, so an
+  agent's PR needs my approval there and on GitHub.
+- **Agents stay inside the pod and have no cluster access:** no ServiceAccount token, an egress
+  NetworkPolicy (DNS, `platform-db`, LiteLLM's HTTPS name, the OTLP gateway, GitHub), resource limits, and
+  every Kyverno policy enforced with no new exception. Any secret bound to an agent is treated as exposed
+  to it.
+- **Watching it:** traces to the OTLP gateway on `mon` (ADR 0042), logs through the monitoring pack,
+  alerts on a pod that isn't ready and on a failing `/api/health`, spend from LiteLLM's metrics for key
+  `paperclip`.
+- **Accepted only after the spike** (Phase 6, step 5a): the upstream image runs as uid 1000 with a
+  read-only root on the DGX, an OpenCode agent finishes a small task through LiteLLM, and memory and image
+  size fit the `platform` cluster. Its findings are added here before the status changes.
+
+#### Considered options
+
+1. **Paperclip in `platform` with our own signed image (chosen):** fits Kyverno, Argo CD and the backup
+   path we already run, and pins the agent CLIs that upstream leaves floating.
+2. **Paperclip in `ai`:** closer to the models, but it would go down with the GPU stack, which is when the
+   SRE agent's work matters most.
+3. **The upstream image through Zot's mirror, pinned by digest:** admitted without our signature, but the
+   CLIs inside are `@latest` at upstream's build time and it skips our scanners.
+4. **A fork of Paperclip** (for example to add OIDC sign-in): too much upkeep at upstream's pace.
+5. **Paperclip's own login alone on the tailnet:** simpler, one login, but a second identity store next
+   to Keycloak and no group check (ADR 0028).
+6. **Embedded Postgres in the pod:** zero setup, but invisible to Velero's dump hooks.
+7. **No control plane: agents as separate sessions and services:** nothing new to run, but no shared
+   board, no budgets across agents and no single place for approvals.
+
+#### Consequences
+
+- Good: one board for every agent's work, cost and pending approvals; the SRE agent can file its RCAs and
+  proposed fixes there with a review stage (Phase 6, step 5h).
+- Good: nothing new to operate around it: Argo CD, Kyverno, OpenBao, `platform-db`, Velero, LiteLLM and
+  `mon` are reused as they are.
+- Bad: two sign-ins (Keycloak, then Paperclip) until Paperclip supports OIDC.
+- Bad: agents run arbitrary code inside the pod with the secrets bound to them; the controls are the
+  egress list, the PR-only App, review stages and budgets, not isolation.
+- Bad: a large image (Node, the Rust runner, several CLIs) and frequent upstream releases; every bump is a
+  deliberate digest change with a `platform-db` dump first, and the rollback is the previous digest plus a
+  restore.
+- Bad: no Prometheus metrics of its own; availability comes from the probe and kube-state-metrics.
+- Bad: losing the master key loses every company secret, so the recovery kit grows by one key.
+
+#### Related
+
+- ADR 0014, ADR 0016, ADR 0018, ADR 0022, ADR 0023, ADR 0028, ADR 0029, ADR 0033, ADR 0035, ADR 0037,
+  ADR 0039, ADR 0042, ADR 0043, ADR 0047
+- Plan: `homelab-services` `docs/paperclip-plan.md`; roadmap: Phase 6, steps 5a to 5h
 {% endraw %}
 <!-- adr:end -->
 
