@@ -696,6 +696,9 @@ history, lab jobs, agent investigations, Keycloak), OpenBao, and a few config fi
   The scope above stays; the transport becomes Velero (dump hooks into an `emptyDir`, file-system
   backup with Kopia) to an Azure Blob container, and Kopia's encryption replaces the age key.
 
+- Amended (2026-11-02, proposed in [ADR 0073](#adr-0073)): Velero's target
+  moves from Azure Blob to a store on the DGX Spark, so there is no off-site copy until a later step adds one.
+
 #### Considered options
 
 1. **Back up every volume**: large and mostly rebuildable.
@@ -1247,6 +1250,9 @@ accounts.
   both prefixed `oidc:`), and `oidc:platform-admins` is bound to `cluster-admin`, `oidc:viewers` to
   `view`. Each node needs the host alias `auth.core.home.cloudutsuk.com -> 172.30.0.1`, because the API
   server resolves the issuer through the node, not CoreDNS. Done in `mon`.
+- Planned (2026-11-04): the realm's configuration moves from `configure-realm.sh` to a Terragrunt stack in
+  `infra-local`, built on a new `providers/keycloak` family in the shared module (ADR 0079). Until that
+  migration is done, the script stays the way the realm is configured.
 
 #### Considered options
 
@@ -1267,6 +1273,7 @@ accounts.
 - [ADR 0003](#adr-0003)
 - [ADR 0029](#adr-0029)
 - [ADR 0035](#adr-0035)
+- [ADR 0079](#adr-0079)
 
 ## ADR-0029: Service-to-service authentication
 {: #adr-0029 }
@@ -2008,6 +2015,12 @@ What Velero offers and where it doesn't fit as-is (Velero 1.18 docs):
     The chart's Role can read the `velero` namespace's secrets, which include the storage key.
   - First run: `core` 714 objects plus 328 KB of dumps (both hooks OK), `platform` 732 objects, `ai`
     backed up; Kopia uses our password, not Velero's default.
+
+- Amended (2026-11-02, proposed in [ADR 0073](#adr-0073)): the Azure Blob
+  account costs money every month. The target moves to an S3-compatible store (Garage) on the DGX Spark,
+  its data in `/srv/backups/velero`; schedules, hooks, retention and Kopia encryption stay, and the
+  `infra-azure` stack is destroyed after the migration. Retention becomes 7 days for every backup (the
+  weekly schedule is removed).
 
 #### Considered options
 
@@ -3532,8 +3545,9 @@ only one.
 - **An edge rate limit caps request volume** (amended 2026-10-26, Phase 3 step 17a). The trigger was
   `canvas.cloudutsuk.com`, the System Design Canvas on Cloudflare Pages: anyone with a Keycloak account
   can reach it, so it has the widest audience. The rule:
-  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), in `infra-local
-    host/cloudflare/ratelimit.sh`: more than 150 requests in 10 seconds from one IP at one Cloudflare
+  - **One rate-limiting rule for the zone** (`http_ratelimit` phase), managed as Terraform in
+    infra-cloudflare (ADR 0060; first written as `infra-local host/cloudflare/ratelimit.sh`, which goes
+    once Terraform owns the rule): more than 150 requests in 10 seconds from one IP at one Cloudflare
     data centre is blocked for 10 seconds.
   - **Free plan limits** shape it: one rule, counting by IP only, a 10-second period and a 10-second
     timeout, and an expression that can match only the path. So it can't single out one hostname or
@@ -3547,7 +3561,8 @@ only one.
     reaches Pages or the tunnel.
   - **`*.pages.dev` isn't covered.** Zone rules don't apply to Cloudflare's own domain, so only Access
     guards `system-design-canvas.pages.dev`.
-  - **Token:** `homelab-tunnel-access` gains Zone WAF Write on `cloudutsuk.com` only.
+  - **Token:** its own, `homelab-waf` (Zone WAF Write and Zone Read on `cloudutsuk.com`; ADR 0060). The
+    tunnel token no longer needs Zone WAF Write.
 - **Rollout** follows Phase 3 steps 10-17: the issuer move first, then a Grafana pilot, then the rest.
 
 #### Considered options
@@ -3664,6 +3679,13 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
   With them, `setup-environment`'s version checks pass and the job downloads nothing. A version bump in
   the shared module that the image hasn't caught up with falls back to downloading; it doesn't fail.
   wizcli is left out: its step always fetches `latest`.
+- **Amended 2026-11-03: the plan gates' scanners too.** OPA 1.17.0, Trivy 0.75.0 and Infracost 0.10.42
+  on `/opt/iac/bin`, sha256-checked, matching the shared module's new `OPA_VERSION`, `TRIVY_VERSION` and
+  `INFRACOST_VERSION`. Before, nothing installed them on any runner, so every plan logged `opa / trivy /
+  infracost not installed - skipping` and the policy, security and cost gates never ran. The shared
+  module's `setup-environment` now installs each one only when it is missing (terragrunt-shared-module#17),
+  so GitHub-hosted runners get them too, and this image downloads nothing. Infracost stays on 0.10.x: 2.x
+  replaced `breakdown`, which the cost gate uses.
 - **Built and promoted like ADR 0044:** `runner-image-iac.yml` uses `build-image.yaml` (same gates,
   `image-gate: report`, signed, with an SBOM). The digest goes into
   `clusters/platform/arc-runner-homelab-iac.yaml` by hand after a test job, and the `iac-setup` init
@@ -4896,6 +4918,13 @@ public HTTPS URL. A k3d API server is not public.
   is available and licensed in the tenant and manageable from Terraform; the per-agent app registrations
   map one to one onto it.
 
+- **Published (2026-11-02):** the discovery document and JWKS are served by a Cloudflare Worker, `wardens-oidc`,
+  on `oidc.cloudutsuk.com`. Its two paths hold the cluster's files inlined, nothing else, and the PC needs no
+  Node toolchain. `infra-local/host/wardens/publish-oidc.sh` copies them from the API server, refuses any
+  private key field, and checks the result from the internet. The first agent with an Entra app is
+  `change-correlator` (infra-azure `development/wardens-identities`: application, service principal,
+  federated credential, Reader on every subscription).
+
 #### Considered options
 
 1. **Keycloak service accounts for everything**: one IdP, but Azure doesn't accept Keycloak tokens without
@@ -4998,6 +5027,642 @@ Every new deployment follows four rules:
 
 - ADR 0008 (CI builds, Argo CD pulls), ADR 0033 (signed images by digest), ADR 0038 (Argo CD installed by
   Terraform, app-of-apps), ADR 0069 (the wardens cluster), ADR 0071 (agent identities as Terraform)
+
+## ADR-0073: Velero backups go to an S3-compatible store on the DGX Spark, in a folder on its disk, instead of Azure Blob
+{: #adr-0073 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-02 · `infra-local`, `homelab-gitops`, `infra-azure`</span>
+
+#### Context
+
+ADR 0039 sends every cluster's Velero backups (objects minus secrets, plus the dumps in `backup-dumps`)
+to an Azure Blob container in its own storage account (`infra-azure` stack `development/homelab-velero`).
+That account costs money every month, and the owner wants it gone (2026-11-02).
+
+Since the cut-over (ADR 0061), every cluster except `gpu` runs on the homelab PC; the DGX Spark is the model
+host with about 2.5 TB free on its disk. The two machines are on the same LAN and Tailscale network, so the
+Spark is a separate disk and machine from the clusters it would back up.
+
+Velero writes only to object storage: there is no "folder" backup location. Its AWS plugin (and Kopia, for
+file-system backup) works with any S3-compatible endpoint, so a folder on the Spark needs a small S3
+server in front of it.
+
+#### Decision
+
+- **An S3-compatible object store runs on the Spark as a host service** (`infra-local/host/backup-store/`,
+  a Docker Compose service started by the Spark's boot unit, like the other host services). Its data and
+  metadata live in **`/srv/backups/velero`** on the Spark's disk, owned by a dedicated uid, outside any
+  cluster, so no cluster rebuild touches it.
+- **Server: Garage** (single node, replication factor 1, one container, multi-arch with arm64, S3 API with
+  the calls Velero and Kopia use). The image is pinned by digest to a release at least 14 days old when it
+  is built.
+- **Reachable only from the homelab:** it listens on the Spark's LAN and Tailscale addresses, with a name
+  in `home.cloudutsuk.com` (`backups.spark.home.cloudutsuk.com`) and a Let's Encrypt certificate through
+  Cloudflare DNS-01, the same as the other host services. It is never published through the tunnel.
+- **Velero changes only its location:** each cluster's `velero-config` release gets a
+  BackupStorageLocation with `provider: aws` (the AWS plugin, pinned like the Azure one was), `s3Url` set
+  to the store, `s3ForcePathStyle: true`, one bucket `velero` and a prefix per cluster as today. The
+  nightly schedule, dump hooks and Kopia encryption stay as in ADR 0039.
+- **Every backup is kept 7 days, then cleaned up** (owner, 2026-11-02): the nightly schedule's `ttl` is
+  `168h` and the weekly schedule is removed. Velero's garbage collector (hourly) deletes each expired
+  backup with its objects in the bucket, and Kopia's repository maintenance frees the data no backup uses
+  any more, so the store holds about a week. Backups made before the change keep the expiry they were made
+  with; `infra-local/host/backup/expire-old-backups.sh` brings them down to 7 days once. This applies on
+  Azure now, ahead of the move, and lowers its cost until the stack is destroyed.
+- **One access key per cluster**, allowed only on its own prefix where the server supports it, in OpenBao
+  at `kv/<cluster>/velero` (replacing the storage account key), delivered by External Secrets. The Garage
+  admin token and every access key go into the offline recovery kit next to the Kopia password and the
+  OpenBao unseal keys: restoring `core` needs them before OpenBao exists.
+- **`wardens` joins** `core`, `platform` and `ai` with the same releases and a `backup-dumps` hook for
+  `wardens-db` (Temporal's history). Until then its backup annotations do nothing.
+- **Migration, in order:** add the Spark location next to the Azure one; make it the default and run a
+  backup of every cluster; run the quarterly restore test (ADR 0016) from the Spark into a throwaway k3d
+  cluster; after a week of good nightly backups, remove the Azure location and the Azure plugin, then
+  destroy `development/homelab-velero` in `infra-azure` (state and the storage account). Azure-only
+  backups older than that week are not copied.
+- **Watching it** stays as in ADR 0039 (age of the last good backup, failed hooks), plus the store's disk
+  space through the Spark's node exporter: alert when `/srv/backups` is more than 80% full.
+
+#### Considered options
+
+1. **Keep Azure Blob**: off-site, but a monthly bill the owner doesn't want.
+2. **MinIO on the Spark**: the best-known S3 server, but its community edition no longer gets published
+   images or full features, so pinned, maintained builds aren't available.
+3. **SeaweedFS**: Apache-2.0 and capable, but several components (master, volume, filer, S3 gateway) for a
+   single bucket of a few hundred MB.
+4. **A plain CronJob writing dumps to an NFS folder on the Spark**: no object store, but it drops Velero's
+   catalogue, retention, encryption, metrics and restore workflow from ADR 0039.
+5. **Garage on the Spark, data in `/srv/backups/velero`** (chosen).
+
+#### Consequences
+
+- Good: no monthly cost and no cloud account involved in backups or restores.
+- Good: backups are on another machine and disk than the clusters (PC), so losing the PC's disk loses no
+  backup; restores run at LAN speed.
+- Bad: no off-site copy. Both machines are in the same house, so fire, theft or a power event can take
+  both. A later step can copy `/srv/backups/velero` (already Kopia-encrypted) to removable media or a
+  free off-site target.
+- Bad: no object versioning or soft delete, which Azure gave. A bad or compromised cluster credential can
+  delete its own prefix; per-cluster keys limit the damage to one cluster.
+- Bad: one more host service on the Spark to patch and watch, and the Spark becomes part of the restore
+  path for every cluster.
+- Bad: a week of history only. A problem noticed after 7 days (a deleted record, a bad config) can't be
+  restored from backup, and an outage of the nightly schedule longer than a week leaves no backup at all,
+  which the 26-hour "last good backup" alert (ADR 0039) exists to catch.
+- Bad: replication factor 1; a failure of the Spark's disk loses the backups (the clusters on the PC are
+  unaffected and the next nightly run starts a new set).
+
+#### Related
+
+- [ADR 0016](#adr-0016): what is backed up
+- [ADR 0039](#adr-0039): how; this ADR replaces its Azure Blob target
+- [ADR 0061](#adr-0061): the clusters' host
+- [ADR 0069](#adr-0069): `wardens` and `wardens-db`
+
+## ADR-0074: The platform-wardens operator console runs on wardens behind an oauth2-proxy sidecar, with the signed-in user as requester
+{: #adr-0074 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-02 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+Phase 6 step 13a puts the `wardens` runtime on the `wardens` cluster: the operator console and the approval
+endpoint, behind Keycloak. This decision covers the **console**; the approval endpoint comes later in the
+same step.
+
+The console (platform-wardens `wardens.runtime.console`) is the way to test and tune the agents' logic and
+prompts: it builds a root task exactly as a trigger does (the same `create_root_task`, channel constraints,
+deduplication and guardrail point 1), from samples such as the task a CI/CD drift run sends for one scan run,
+and starts it on Temporal. Until now it ran only on a laptop against a local Temporal, signing no one in and
+binding to 127.0.0.1, with the OS user as requester. On the cluster it must:
+
+- reach Temporal's frontend and start runs on the real workers (`terraform-drift`, `change-correlator`),
+  including under the incident workflow, which only the terraform-drift worker registers (its weekly
+  schedule runs that way, so `change.correlate` handoffs run);
+- let only platform admins in, and record who started each run;
+- meet Kyverno (digest, restricted, read-only root, requests and a memory limit) and stay internal.
+
+The console has no OIDC code of its own, and the approval endpoint will need the same shape: an HTTP app,
+a Keycloak sign-in in front, a name with a certificate, Temporal access.
+
+#### Decision
+
+1. **A shared chart `charts/wardens-web`** (ADR 0072) for the runtime's web entry points, wrapped by
+   `apps/wardens-console`, Application `clusters/wardens/wardens-console.yaml`, namespace `wardens-console`
+   labelled `homelab/wardens-agent=true` so Temporal's NetworkPolicy admits it on 7233.
+2. **Sign-in is an oauth2-proxy sidecar** (v7.13.0, the same as Headlamp's on the host), provider
+   `keycloak-oidc`, issuer `https://auth.cloudutsuk.com/realms/homelab`, a confidential client per app
+   (`wardens-console`, created by infra-local `host/keycloak/configure-realm.sh` with the platform-admins-only
+   browser flow), PKCE, `--allowed-group=platform-admins`, an 8-hour cookie. Its client secret and cookie
+   secret live in OpenBao `kv/wardens/wardens-console` (infra-local `host/wardens/configure.sh`) and reach
+   the pod through an ExternalSecret.
+3. **The app listens on 127.0.0.1 inside the pod**, so the proxy is the only way in, and it **trusts the
+   proxy's `X-Forwarded-Email`** as the requester (`WARDENS_CONSOLE_USER_HEADER`): no header, 401. A signed-in
+   person can send as themselves or as a framework identity (to replay what a trigger sends, e.g.
+   `drift-scan-trigger`), never as another person. Every run carries the Temporal memo
+   `{"submittedBy": <email>, "via": "wardens-console"}`. Constraints may only be lowered (`maxAutonomyLevel`,
+   `costLimitUsd`), never raised above the channel's.
+4. **Incident mode starts `wardens.incident` on the `terraform-drift` queue**
+   (`WARDENS_CONSOLE_INCIDENT_QUEUE`), the worker that already runs it for the weekly schedule; the console
+   runs no worker of its own.
+5. **Internal only**: `console.wardens.home.cloudutsuk.com` on the wardens load balancer (Traefik, cert-manager
+   Let's Encrypt DNS-01, ExternalDNS to PowerDNS). No tunnel route, no Cloudflare Access application.
+   Amended (2026-11-05, proposed in [ADR 0080](#adr-0080)): the console also has the
+   public name `console.cloudutsuk.com`, behind Access.
+6. **The image** is built from platform-wardens `framework/console.Dockerfile` by its
+   `.github/workflows/wardens-console.yaml` through `build-image.yaml`, which writes the digest at
+   `."wardens-web".image.digest` in `apps/wardens-console/values.yaml`. It holds the framework and every
+   agent's manifest, input schemas and samples, not the agents' code.
+
+#### Considered options
+
+1. **OIDC in the console itself** (authorization code flow, sessions, token checks in Python): another
+   security-sensitive code path to own; oauth2-proxy is already in use here and does it well.
+2. **oauth2-proxy as a separate Deployment with Traefik ForwardAuth**: the app would then listen on the pod
+   IP and trust a header any pod reaching it could set; a sidecar keeps the app on loopback.
+3. **Cloudflare Access in front**: needs a public name for an internal tool (ADR 0058 is for public
+   portals).
+4. **Extending `charts/wardens-agent`** with a web mode: the agent chart describes workers with no inbound
+   traffic, a kill switch and Azure identity; mixing in ingress and a sidecar makes every agent's chart
+   carry both.
+5. **Sidecar oauth2-proxy, loopback app, a shared `wardens-web` chart** (chosen).
+
+#### Consequences
+
+- Good: the agents can be exercised on the real workers with the exact envelope a trigger sends, by name,
+  from any machine on the tailnet; every run says who started it.
+- Good: the approval endpoint can reuse `wardens-web` with its own client and host.
+- Bad: anyone in platform-admins can start agent runs that spend the agents' LiteLLM budget and, for
+  terraform-drift, open draft PRs on `drift/` branches (the agents' own guardrails, ceilings and kill switch
+  still apply).
+- Bad: the deduplication store is in memory, per pod: a restart forgets it (one replica).
+- Bad: an exec probe (a short Python process every 30 s) checks the app, because the kubelet can't reach
+  127.0.0.1 in the pod.
+
+#### Related
+
+- ADR 0028 (Keycloak), ADR 0033 (signed images by digest), ADR 0069 (the wardens cluster), ADR 0070
+  (Temporal), ADR 0072 (wrapper charts)
+
+## ADR-0075: A drift scan that finds drift starts the drift agent through the GitHub App's signed webhook, public only at one tunnel path
+{: #adr-0075 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-03 · `homelab-gitops`, `infra-local`, `platform-wardens`, `terragrunt-shared-module`</span>
+
+#### Context
+
+The infra-* repositories run their drift scan daily at 06:00 UTC (it was Sundays only). The terraform-drift agent
+was started only by its Temporal schedule, two hours after the scan, whether the scan found drift or not.
+Drift should reach the agent as soon as the scan finds it, and a scan without drift should not start a run.
+
+The scans run on GitHub-hosted runners. The agent runs on the `wardens` cluster, which has no public address.
+The org is on GitHub's Free plan, so organization secrets don't reach private repositories: anything a
+consumer's CI sends would need a secret in every infra-* repository.
+
+#### Decision
+
+- **Signal:** the drift scan runs its job "Drift Detection - Teams Notification" only when it found drift (or a
+  stack failed to plan). That job finishing on `main` is the trigger. The drift agent's existing GitHub App
+  subscribes to `workflow_job` events and sends them, signed with the App's webhook secret, to
+  `https://hooks.cloudutsuk.com/github`.
+- **Receiver:** platform-wardens `wardens.runtime.github_webhook`, the console's image with another command, in the
+  `wardens-console` namespace (`apps/wardens-console/templates/hooks.yaml`). It checks the HMAC signature before it
+  parses the body, reads only the repository, run id, job name, conclusion and branch, and starts the incident
+  workflow on the drift worker's queue (channel `github-webhook`), with a 5-minute start delay so the run has
+  completed. The workflow id `incident-drift-<owner>-<repo>-<run>` makes a redelivery start nothing new.
+- **Exposure:** the Cloudflare tunnel routes only the path `/github` on `hooks.cloudutsuk.com` to the wardens
+  load balancer; everything else on that name is 404 at the tunnel. Its Access application is `bypass`, because
+  GitHub can't sign in: the signature is the authentication. The Ingress serves only `/github` (Exact), and
+  the pod's network policy allows Temporal and DNS out, nothing else.
+- **Fallback:** the daily schedule `terraform-drift-daily-infra-azure` stays, for a lost delivery.
+
+#### Considered options
+
+1. **The GitHub App's `workflow_job` webhook (chosen):** no secret in any infra-* repository, GitHub signs each
+   delivery, and redeliveries are a click. It needs one public path.
+2. **A `curl` job in the CI template after drift analysis:** knows "drift found" directly, but needs an HMAC
+   secret in every infra-* repository (no org secrets on Free), and the call comes from runners on the internet
+   anyway, so it needs the same public path.
+3. **`workflow_run` events:** one per run, but they don't say whether the scan found drift; the receiver would
+   need GitHub credentials to read the jobs, in a pod that faces the internet.
+4. **Keep polling on a schedule:** no public path, but drift waits up to a day (two hours after a daily scan),
+   and every scan starts a run.
+
+#### Consequences
+
+- Good: drift reaches the agent minutes after the scan. Clean scans start nothing. The receiver holds no
+  GitHub credential and can call nothing but Temporal, so a leaked secret can at most start drift runs for
+  in-scope repositories, which the agent re-reads from GitHub.
+- Bad: a new public hostname with Access bypassed. It is limited to one path, signed deliveries, and a
+  1 MB body limit. The webhook secret lives in OpenBao `kv/wardens/github-webhook` and in the App's settings,
+  and must be rotated in both places.
+- The receiver's repository pattern (platform-wardens `framework/config/webhooks.yaml`) must stay in step with
+  the agent's scope (`config/scope.yaml`).
+
+#### Related
+
+- ADR 0003 (Cloudflare tunnel and Access), ADR 0058 (public access through the tunnel), ADR 0069 (`wardens`
+  cluster), ADR 0074 (operator console)
+- platform-wardens decision 0015 (event bus, deferred: the webhook adapter stays until it is built)
+
+## ADR-0076: The stack-author agent: a chat in the operator console that ends in a draft pull request, one Temporal workflow per conversation
+{: #adr-0076 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `infra-local`, `platform-wardens`, `terragrunt-shared-module`</span>
+
+#### Context
+
+Adding a resource to a stack means finding the right repository and stack, reading a module's README and writing
+`resources.yaml` by hand. The operator console already signs people in and starts agents. platform-wardens decision 0026
+has the agent's design; this record covers how it runs on the homelab.
+
+#### Decision
+
+- **Where:** a new `stack-author` worker on the `wardens` cluster from `charts/wardens-agent`, and an **Author** tab in the
+  existing console (no new route or sign-in; the console's Keycloak client already covers it).
+- **Conversation:** each one is a Temporal workflow on the agent's queue, started by the console on the `console-chat`
+  channel. It's closed after 30 idle minutes, and the channel's deadline is 4 hours. Only the person who started it can
+  read it or send to it.
+- **Identity:** its own GitHub App, `cloudutsuk-wardens-stack-author` (ADR 0071), with contents and pull requests write
+  and actions read, installed on `terragrunt-shared-module` and the infra-* repositories only. Its tokens are narrowed
+  further in code: the write token doesn't cover the shared module.
+- **Model:** the local model through LiteLLM with its own virtual key. Another provider is a setting.
+- **Memory:** short-term is the workflow's state. Long-term is a small volume (`memory.enabled` in the chart, 0.1.4)
+  holding advisory notes per person that expire after 90 days. Losing it costs a few suggestions, so it isn't backed up.
+
+#### Considered options
+
+- **Keep the conversation in the console's process:** simpler, but a console restart loses it and it leaves no run record.
+- **A separate chat app with its own route and sign-in:** another thing to run for what is one more tab.
+- **Reuse the drift agent's GitHub App:** rejected, one App per agent (ADR 0071), and that App's scope is every repository.
+
+#### Consequences
+
+- Merging the platform-wardens change before this one fails its image job at the digest commit, because
+  `apps/stack-author/values.yaml` must exist. Merge this one first. Until the first image the Application shows a
+  template error (`image.digest is required`), the same as every new agent.
+- Conversations stay in Temporal's history for the namespace's retention (30 days).
+- GitHub Free has no branch rules, so the "pull request only" guard is the agent's own code, as for the drift agent
+  (platform-wardens decision 0013's amendment). The owner merges by hand.
+
+## ADR-0077: The agents' state lives in a second Postgres in wardens, wardens-state-db, separate from Temporal's
+{: #adr-0077 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `platform-wardens`, `infra-local`</span>
+
+#### Context
+
+The platform-wardens framework defines a store interface for each kind of state an agent leaves behind,
+and ships only local versions of them (files or memory):
+
+| State | Framework interface | On the homelab today |
+|---|---|---|
+| Run records (one per run, category 22) | `RecordSink` | Files under `RUN_RECORD_DIR`, an `emptyDir`: deleted whenever the worker pod is replaced, which every image digest bump does |
+| Artifacts (findings, proposed actions) | artifact store | Files, or only inside Temporal's history |
+| Dedupe claims (cooldown per trigger) | `DedupeStore` | In process memory: lost on restart, not shared between replicas |
+| Kill switch | `KillSwitchStore` | A ConfigMap per agent from Git: engaging it is a commit, an Argo CD sync and a kubelet refresh, more than the 60 s the manifests promise (`maxStopSeconds`) |
+| Audit log (category 11) | `AuditLog` | A local JSON-lines file with a hash chain |
+| Long-term memory (category 21) | — | A 100 MiB volume per agent (`memory.enabled`, used by stack-author), not backed up, one per pod |
+
+ADR 0070 put Temporal on `wardens-db`, one database per cluster as for `ai-db` and `platform-db`. Putting the
+agents' state there too was considered and rejected (option 2): Temporal's chart can't drop another role's
+database (its `temporal` role isn't a superuser, `createDatabase: false`, its schema jobs only set up and
+update), but the instance is what gets reset. On a homelab the usual fix for a broken Temporal is to wipe
+and recreate its database or volume, and a restore of `wardens-db` to recover Temporal would roll the
+agents' records back with it. Temporal's history is infrastructure that can be thrown away; the agents'
+records and audit log are data that must outlive it.
+
+ADR 0073 moved backups to Garage on the DGX Spark, kept 7 days, with no object lock and no off-site copy.
+
+#### Decision
+
+- **A second Postgres in `wardens`: `wardens-state-db`** (namespace `wardens-state-db`, `apps/wardens-state-db`),
+  built like `wardens-db`: Postgres 17 pinned by digest, the restricted security context, data on a hostPath
+  volume `/srv/homelab/pg/wardens-state-db` with `Retain`, the dump hook annotations of ADR 0039 (inert until
+  Velero runs in `wardens`, ADR 0073), passwords from OpenBao `kv/wardens/wardens-state-db` seeded by
+  infra-local `host/wardens/configure.sh`. This is the exception to "one database per cluster" in ADR 0070.
+- **One database, `wardens`, and one role per kind of writer**, created by the init script:
+  - `wardens_owner` owns the schema and is used only by the schema job;
+  - `wardens_agent` (every agent worker) reads and writes run records, artifacts, dedupe claims and memory,
+    reads the kill switch, and may only **insert and read** audit events;
+  - `wardens_console` (the operator console) has the agent's rights plus engaging and releasing kill switches;
+  - `wardens_reader` (dashboards, the audit anchor) reads only.
+
+  No role but `postgres` may update or delete an audit event.
+- **The framework owns the schema.** platform-wardens ships numbered SQL migrations with `wardens.state`, and a
+  plain Job in `apps/wardens-state-db` (named after the schema version, like Temporal's schema job; not an
+  Argo CD hook) applies them as `wardens_owner` with the console image, which carries the framework.
+- **Only Temporal-labelled namespaces connect:** a NetworkPolicy lets in pods from namespaces labelled
+  `homelab/wardens-agent=true` (every agent and the console) on 5432, nothing else.
+- **Each store, with how long it is kept:**
+  - Run records and artifacts: rows of schema-checked JSON, kept 180 days, 30 days for `confidential` data.
+    Large inputs (a plan file) are stored as a reference and a hash, never copied.
+  - Dedupe claims: a unique fingerprint and an expiry; a claim is one `INSERT … ON CONFLICT DO NOTHING`.
+  - Kill switch: one row per scope (`all` or an agent), engaged and released by operators from the console and
+    audited. An agent is stopped when **either** its row or its Git ConfigMap says so, and when the database
+    can't be read (fail closed). The ConfigMap stays as the break-glass that needs no database.
+  - Audit: insert-only, with the existing hash chain, kept 1 year. Once a day a schedule reads the chain head
+    and the day's count as `wardens_reader` and sends them to `mon` as a log line and a metric. `mon` is
+    another cluster with other credentials, so rewriting the chain afterwards no longer matches what `mon`
+    recorded.
+  - Long-term memory: none unless a manifest approves it (category 21); then rows with provenance,
+    classification, expiry and a reviewed flag. stack-author keeps its volume until it moves to the table.
+  - A daily schedule deletes what has expired.
+- **Agents select the store by configuration** (`WARDENS_STATE_DSN` from the role's Secret); without it the
+  framework keeps its local stores, as in tests and local runs.
+
+#### Considered options
+
+1. **Keep files and ConfigMaps:** no new service, but run records are lost on every deploy, the kill switch is
+   slower than the manifests promise, and nothing is shared between replicas.
+2. **A `wardens` database on `wardens-db`:** one Postgres fewer and safe from Temporal's chart (roles), but it
+   shares Temporal's resets, restores, upgrades and load.
+3. **Object storage (Garage) for records and artifacts:** cheap for blobs, but these are small records that
+   need queries by correlation id, agent and outcome, and it gives no atomic claim for dedupe.
+4. **Redis (`redis-cache` on `ai`) for dedupe:** a cache that may evict, in another cluster; dedupe is a
+   correctness guard.
+5. **Loki as the audit log:** retention-limited and not tamper-evident. It keeps the daily anchor instead.
+6. **A second Postgres, `wardens-state-db`** (chosen).
+
+#### Consequences
+
+- Good: run records survive redeploys; Temporal can be reset or restored without touching the agents' records
+  or audit log.
+- Good: an operator can stop an agent from the console within seconds, audited.
+- Good: one implementation of the framework's stores, which on Azure points at PostgreSQL Flexible Server.
+- Bad: another Postgres to run (about 128 MiB to 512 MiB), another hostPath to move in a migration, another
+  dump to back up.
+- Bad: if `wardens-state-db` is down, every agent stops (fail closed). Intended, and alerted.
+- Bad: until Velero runs in `wardens` (ADR 0073), this database isn't backed up. Backups are kept 7 days with
+  no off-site copy, so the audit log's history beyond that lives only on the PC's disk.
+
+#### Related
+
+- ADR 0035 (data ownership), ADR 0039 and 0073 (backups), ADR 0069 (the `wardens` cluster), ADR 0070 (Temporal
+  on `wardens-db`), ADR 0072 (deployment standard), ADR 0074 (the operator console)
+- platform-wardens framework categories 06, 11, 21, 22 and 23
+
+## ADR-0078: Per-app Keycloak groups (admin, editor, viewer) as the only place access is assigned
+{: #adr-0078 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-04 · `infra-local`, `homelab-gitops`, `self-service-portal`, `job-hunter-agent`, `shorts-studio`</span>
+
+#### Context
+
+ADR 0028 made Keycloak the single OIDC issuer with two groups, `platform-admins` and `viewers`, mapped to
+roles in each tool. That worked for one person. Adding people showed the gaps:
+
+- There was no tier between read-only and owning everything, and no way to give someone a role in one app
+  without giving it in all of them.
+- Several apps admit whoever the issuer signs in (Hermes, LiteLLM) or hold keys, cluster-admin or a
+  signed-in session (Job Hunter, Shorts Studio, Headlamp, Homarr, Temporal UI, the Wardens console). One
+  shared `browser platform-admins only` flow guarded all of them with the single `platform-admin` role.
+- Cloudflare Access let only `platform-admins` through on every public UI, so a viewer couldn't reach
+  Grafana or Argo CD even though both would have given them a read-only role.
+
+The owner wants to assign a person's access in one place and have every app honour it.
+
+#### Decision
+
+- **Groups live in Keycloak, realm `homelab`.** Not in Entra. Entra stays the identity provider (who you
+  are, MFA); Keycloak holds authorization. Entra groups would reach Keycloak only as object IDs in the
+  Entra token, needing one identity-provider mapper per group, applied only at the next broker sign-in,
+  and they would leave the Keycloak-issued `groups` claim that every app already reads as a second copy.
+- **Names.** `platform-admins`, `platform-editors`, `platform-viewers` mean that role in every app (the
+  all-apps tier). `<app>-admin`, `<app>-editor`, `<app>-viewer` mean that role in one app, for: `grafana`,
+  `argocd`, `portal`, `kubernetes`, `openbao`, `velero`, `hermes`, `litellm`, `job-hunter`,
+  `shorts-studio`, `headlamp`, `homarr`, `temporal`, `wardens-console`. Groups are flat, each with a
+  `description` attribute; the `groups` claim carries short names (`full.path: false`).
+  `host/keycloak/configure-realm.sh` creates all 45 and assigns people with `--grant <group> <email>` and
+  `--revoke <group> <email>`.
+- **Each app maps the `groups` claim to its own roles**, honouring both the all-apps group and its own,
+  most privileged first. A person's effective role in an app is the highest of the two.
+- **Roles mean the same everywhere.** Viewer reads; editor operates and changes through audited paths (git,
+  Argo CD sync, dashboards, lab deploys); admin owns the app. Editors and viewers never read secrets.
+- **Kubernetes:** `kubernetes-admin` and `platform-admins` get `cluster-admin`; editors and viewers get
+  `view`. The built-in `edit` ClusterRole reads and writes Secrets, which here are copies of OpenBao paths,
+  and Argo CD's self-heal reverts hand edits anyway.
+- **Per-app gates replace the shared one.** Each gated client has its own realm role `<client>-access`,
+  mapped to exactly the groups in the script's `APP_ACCESS` table, and its own browser flow
+  `browser <client> gate` that refuses everyone else. The table is the truth: the script removes the role
+  from groups that are no longer listed. The old flow and its `platform-admin` role stay in the realm,
+  unbound, until removed by hand.
+- **Apps without a safe read-only role stay admin-only.** All three groups exist for every app, but an
+  app's `<app>-editor` and `<app>-viewer` are added to its gate (and to its Access policy) only once the
+  app maps them to a role that is safe for them. Until then they are refused by Keycloak.
+- **Cloudflare Access** gains an `allow: groups` mode that lists the groups an application admits. Apps
+  with their own roles admit every group of the app; admin-only apps admit `platform-admins` and
+  `<app>-admin`, the same as their gate.
+- **As built (2026-11-04):** gates admit all six groups for Shorts Studio and Homarr (both map the groups
+  to their own permissions); LiteLLM admits `platform-admins` and its three `litellm-*` groups only (free
+  SSO stops at five users), and its fixed `litellm_role: proxy_admin` claim is gone; Hermes, Job Hunter,
+  Headlamp, Temporal UI and the Wardens console stay admin-only. Velero UI and OpenBao need no gate (their
+  own RBAC and bound claims decide).
+- **The legacy `viewers` group is retired.** It was empty; it is no longer created or mapped and is left in
+  the realm until deleted by hand.
+- **Planned (2026-11-04):** the groups, gates and the `APP_ACCESS` table move to a Terragrunt stack (ADR 0079).
+  The access model above doesn't change. Membership stays out of git: `--grant` and `--revoke` remain commands,
+  and the realm stays the only place that records who is in a group.
+
+#### Considered options
+
+1. **Entra security groups synced into Keycloak**: assignment in the Entra admin center, but 40+ mappers
+   to keep in step, object IDs instead of names, and changes only at the next broker sign-in.
+2. **Keycloak client roles per app** instead of groups: closer to each app's own roles, but most apps here
+   read a `groups` claim, and assigning a client role is less obvious in the console than a group.
+3. **Global groups only** (`platform-admins/editors/viewers`): simple, but no way to give someone a role in
+   one app.
+4. **Per-app groups in Keycloak, plus the all-apps tier** (chosen).
+
+#### Consequences
+
+- Good: one console (or one command) assigns a person's role in any app; no app keeps its own users.
+- Good: a gated app can be opened to editors or viewers with a one-line table edit once the app is ready.
+- Bad: every app's mapping now lists two groups per role, and a new app needs its three groups, its
+  mapping and, if gated, a table entry and an Access policy.
+- Bad: tokens and app sessions keep the old groups until the next sign-in, so a revoke isn't immediate.
+
+#### Related
+
+- [ADR 0028](#adr-0028)
+- [ADR 0058](#adr-0058)
+- [ADR 0068](#adr-0068)
+- [ADR 0079](#adr-0079)
+
+## ADR-0079: Keycloak's configuration moves from configure-realm.sh to a Terragrunt stack; group membership stays out of git
+{: #adr-0079 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `terragrunt_shared_module`, `infra-local`, `homelab-gitops`</span>
+
+#### Context
+
+Keycloak's realm `homelab` (ADR 0028) is configured by one imperative script,
+`infra-local/host/keycloak/configure-realm.sh`, 460 lines of `curl` and `jq` run by hand. It has grown with every
+app, and ADR 0078 made it the place access is assigned. The script owns:
+
+| Object | Count | Notes |
+|---|---|---|
+| Realm | 1 | Lifespans, brute-force protection, no registration |
+| Groups | 45 | `platform-{admins,editors,viewers}` and `<app>-{admin,editor,viewer}` for 14 apps |
+| Clients with a `groups` mapper | 15 | 3 public with PKCE, 12 confidential |
+| Realm roles `<client>-access` and their group mappings | 8 roles, 17 groups | The `APP_ACCESS` table |
+| Browser flows `browser <client> gate` | 8 | Each is 1 flow, 3 subflows, 5 executions and 3 configs |
+| Identity provider `entra` | 1 | Plus its redirector config on the built-in `browser` flow |
+
+That is about 200 objects, counted from the script rather than the live realm. The problems:
+
+- A change shows no plan: the effect of a table edit is known only after the script has run against the only
+  issuer of the platform.
+- Nothing detects a change made in the admin console, and the script can't remove what it no longer lists, apart
+  from the `APP_ACCESS` role mappings. ADR 0078's legacy objects are "left until removed by hand" for this reason.
+- It is the one piece of platform configuration with no pull request, plan or apply record, while the clusters,
+  Azure, GitHub and Cloudflare have them (ADR 0006, ADR 0060, ADR 0072).
+- Flow steps need hand-written priority fixes, because the API gives every new step priority 0.
+
+The [`keycloak/keycloak` Terraform provider](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs)
+(5.10.0 when checked on 2026-11-04) covers every object above. Three constraints shape how it can be used:
+
+- Secrets live only in OpenBao (ADR 0023), but Terraform state is in Azure Blob and plans are CI artifacts.
+- Only Keycloak stores email addresses (ADR 0035), and this repo's decisions are published on a public blog.
+- A recreated group loses its members, and Keycloak is what every sign-in depends on.
+
+#### Decision
+
+- **Modules go in the shared module.** `terragrunt_shared_module` gains a `providers/keycloak` family, the same
+  shape as `providers/grafana`, because Keycloak is a provider against a running application and not a cloud. One
+  module per resource type, as everywhere else. The list is in that repo's `pending_resource_types.md`.
+- **The stack goes in `infra-local`**, under `environments/k3d/homelab/`, with state in the existing backend. CI
+  plans on the pull request and applies on `main` on the `homelab-iac` runner, which is on the network that reaches
+  the admin API. `ubuntu-latest` can't: `/admin` is not served on the public name (ADR 0058).
+- **Everything the script creates moves to the stack**: the realm, groups, clients, mappers, roles, role mappings,
+  gate flows and the Entra provider. `APP_ACCESS` becomes YAML in `resources.yaml`, still the single table to edit.
+  `keycloak_group_roles` with `exhaustive = true` keeps its rule that a group not listed loses the role.
+- **Group membership is not IaC.** `keycloak_group_memberships` would put people's addresses in git, which breaks
+  ADR 0035, and it needs users who exist only after their first broker sign-in. Who is in a group stays operational
+  data in Keycloak. `configure-realm.sh` shrinks to `--grant` and `--revoke` and is renamed to say so. The stack
+  manages the groups and never their members.
+- **Secrets stay out of state.** Clients and the identity provider use the provider's write-only arguments,
+  `client_secret_wo` with `client_secret_wo_version`, never `client_secret`. They need Terraform 1.11 or later, so
+  the module's stacks require it (`root.hcl` allows 1.9.8 today). `kv/core/keycloak` stays the source: its key names
+  don't change, so the `host/*/configure.sh` scripts that copy secrets to each cluster's path keep working. A new
+  client's secret is generated into OpenBao first, as today, and the plan fails if the key is missing. Rotation is
+  a new value in OpenBao plus a bump of the version.
+- **The provider signs in as its own client**, using the client credentials grant: a confidential service-account
+  client in the `master` realm with the `admin` role, because this stack owns the realm itself and has to be able to
+  recreate it. Its secret is in OpenBao under `kv/ci/`. A short bootstrap script creates it once with the bootstrap
+  admin, which goes back to being emergency-only. `url` is the public issuer and `admin_url` the internal name.
+- **Import, never recreate.** Existing objects enter state through import, so UUIDs, memberships and secrets are
+  unchanged. The realm's module sets `prevent_destroy`.
+- **Migration order:**
+  1. Export the live realm and diff it against the script, so settings changed in the console are decided on rather
+     than lost.
+  2. Add the provider and modules to the shared module.
+  3. Write the stack and import every object.
+  4. Merge only when the plan shows no create, replace or destroy. The expected difference is the
+     `client_secret_wo_version` values, and any other in-place change is explained in the pull request.
+  5. Apply, then sign in to every client and check its gate still refuses someone outside its groups.
+  6. Cut the script down to membership, and update the docs that name it.
+  7. Delete the legacy objects from ADR 0028 and ADR 0078 (the `viewers` group, the `browser platform-admins only`
+     flow and the `platform-admin` role) through the stack or by hand.
+- **Drift is reported, not silently overwritten.** The generated workflow's daily drift scan (ADR 0075) covers this
+  stack like any other, so a change made in the console shows up as drift.
+- **To confirm while building:** that the `homelab-iac` runner resolves both names and trusts their certificates,
+  how the write-only values reach Terragrunt at plan and apply (a `TF_VAR_` environment read from OpenBao, or an
+  ephemeral resource from the `vault` provider), and the manual path when `platform`, and so the runner, is down
+  during a rebuild of `core` (ADR 0025).
+
+#### Considered options
+
+1. **Keep the script**: no work and no new failure modes, but none of the problems above go away, and it grows with
+   each app.
+2. **Keycloak realm import (`--import-realm`) or `keycloak-config-cli`**: one realm file in git and no state, but no
+   plan to review and no drift detection, it is a second way of working next to every other stack, and the file would
+   need secret substitution.
+3. **Terragrunt with membership in the stack too**: the whole realm in one place, but emails in git (ADR 0035), a
+   sign-in needed before the plan can apply, and an authoritative resource that removes anyone added any other way.
+4. **A separate `infra-keycloak` repo**, as with `infra-cloudflare` (ADR 0060): cleaner ownership, but one more repo
+   for a single stack, and it would still need the homelab runner.
+5. **Terragrunt in `infra-local`, membership left out** (chosen).
+
+#### Consequences
+
+- Good: every access or client change is a pull request with a plan, and console changes are detected.
+- Good: removing an app or a legacy object removes it from the realm, without a hand-written cleanup.
+- Good: flows are declared with explicit priorities, so the script's priority fixes go away.
+- Good: secrets stay in OpenBao, and only a version number reaches state.
+- Bad: a bad apply can break sign-in everywhere, so the plan is what protects it. Break-glass (ADR 0028) stays.
+- Bad: importing about 200 objects by UUID is a one-off job, and needs a script to read the IDs from the admin API.
+- Bad: two places remain: the stack for what exists, and `--grant` / `--revoke` for who belongs to it.
+- Bad: a master-realm admin client is a powerful credential that CI can read. It is scoped by the `kv/ci/` policy and
+  the runner, not by Keycloak.
+- Bad: onboarding an app changes: a stack entry and a pull request, not a script edit and a run. The app READMEs that
+  name the script need updating at step 6.
+
+#### Related
+
+- [ADR 0023](#adr-0023)
+- [ADR 0025](#adr-0025)
+- [ADR 0028](#adr-0028)
+- [ADR 0035](#adr-0035)
+- [ADR 0058](#adr-0058)
+- [ADR 0060](#adr-0060)
+- [ADR 0072](#adr-0072)
+- [ADR 0075](#adr-0075)
+- [ADR 0078](#adr-0078)
+
+## ADR-0080: The operator console gets a public name, console.cloudutsuk.com, behind Cloudflare Access
+{: #adr-0080 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+ADR 0074 kept the operator console internal: `console.wardens.home.cloudutsuk.com`, no tunnel route, no Access
+application, reachable only on the LAN or the tailnet. The owner now wants to open it from devices without
+Tailscale, the same way as the other browser UIs (ADR 0058).
+
+The console is more sensitive than most of those UIs. It starts agent runs on the real workers, which spend the
+agents' LiteLLM budget and can open draft pull requests, and it has no read-only mode.
+
+`charts/wardens-web` took one `host`, and its oauth2-proxy sidecar had one fixed `--redirect-url`. With a fixed URL, a
+sign-in started on the other name comes back to a host that doesn't hold its cookies, and fails.
+
+#### Decision
+
+1. **The console also answers at `console.cloudutsuk.com`**, a flat public name (ADR 0058). The internal name stays,
+   for use on the tailnet without Access.
+2. **Two sign-ins, both limited to the same groups.** An Access application allows `platform-admins` and
+   `wardens-console-admin`, the groups of the client's Keycloak gate and of oauth2-proxy's `--allowed-group`. The
+   owner's one-time PIN is on every Access application (ADR 0058), but it opens only Access: the console still needs
+   a Keycloak sign-in in an allowed group.
+3. **`charts/wardens-web` gains an optional `publicHost`**: a second Ingress rule and certificate. When it is set,
+   oauth2-proxy has no fixed redirect URL, so each name uses its own callback, and `--whitelist-domain` names both.
+   Both callbacks are on the Keycloak client. Other users of the chart are unchanged.
+4. **The tunnel forwards the name to the wardens load balancer** (172.30.0.6), as for `hooks.cloudutsuk.com`.
+5. **`hooks.cloudutsuk.com` is unchanged**: it is a separate Ingress and still serves only `/github`.
+
+#### Considered options
+
+1. **Stay internal, with Tailscale on every device** (ADR 0074): the smallest attack surface, but the owner wants
+   access from devices without it.
+2. **Access only, without oauth2-proxy on the public name**: Access's headers would have to replace the sidecar's, and
+   the app would need a second way to learn the requester.
+3. **Replace the internal name with the public one** (a single redirect URL, as ADR 0058 does for apps with one base
+   URL): a Cloudflare or tunnel outage would then also lock the console out on the tailnet.
+4. **Both names, Access and Keycloak on the public one** (chosen).
+
+#### Consequences
+
+- Good: the console opens from any device after Access and Keycloak, with the requester recorded as before.
+- Good: the internal name keeps working when Cloudflare or the tunnel is down.
+- Bad: a tool that starts agent runs now has a public name. A wrong Access policy would leave Keycloak's gate as the
+  only check, and the reverse; the agents' guardrails, ceilings and kill switch still apply (ADR 0074).
+- Bad: anyone who signs in through Access uses a Zero Trust seat (ADR 0058).
+
+#### Related
+
+- ADR 0058 (public access through the tunnel and Access), ADR 0074 (the console, amended here), ADR 0075 (the tunnel
+  to the wardens load balancer), ADR 0078 (per-app groups)
 
 {% endraw %}
 <!-- adr:end -->
