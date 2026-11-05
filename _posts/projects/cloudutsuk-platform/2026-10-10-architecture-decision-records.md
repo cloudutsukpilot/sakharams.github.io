@@ -5264,6 +5264,7 @@ consumer's CI sends would need a secret in every infra-* repository.
 - ADR 0003 (Cloudflare tunnel and Access), ADR 0058 (public access through the tunnel), ADR 0069 (`wardens`
   cluster), ADR 0074 (operator console)
 - platform-wardens decision 0015 (event bus, deferred: the webhook adapter stays until it is built)
+- ADR 0082 (amends this: a second App on the same path, one secret per App, `workflow_run` rules)
 
 ## ADR-0076: The stack-author agent: a chat in the operator console that ends in a draft pull request, one Temporal workflow per conversation
 {: #adr-0076 }
@@ -5754,6 +5755,110 @@ Qwen's card for Qwen3.6-35B-A3B compares it with Qwen3.5-35B-A3B (thinking mode,
 
 - ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0049 (superseded), ADR 0051 (scale to zero),
   ADR 0061 (the Spark as model host), ADR 0063 (the model arbiter)
+
+## ADR-0082: The CI/CD triage agent gets failed runs through its own GitHub App on the existing webhook path, one secret per App
+{: #adr-0082 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+platform-wardens decisions 0027 and 0028 add a `cicd-triage` agent on `wardens`. It needs to know when a GitHub Actions run fails, in any org repository, within minutes.
+
+ADR 0075 built the entry point for drift: `wardens.runtime.github_webhook` at `https://hooks.cloudutsuk.com/github`, with one secret, reading `workflow_job` events from the drift agent's App. ADR 0071 gives each agent its own App, so triage can't reuse the drift App's identity. ADR 0075 rejected `workflow_run` for drift because that event can't say whether drift was found. For a failed run, it's the right signal: it fires once, after the run ends, with the conclusion in the payload. In a sample of failed runs, 12% had no failed job at all, and those send no `workflow_job` event.
+
+The approval wait for a fix can last 24 hours, and the channel `github-webhook` caps autonomy at level 1 and the deadline at 120 minutes.
+
+#### Decision
+
+- **A new App, `cloudutsuk-wardens-cicd-triage`** (`infra-local/host/github/manifests/wardens-cicd-triage.json`), subscribed to `workflow_run`, sending to the same URL. Permissions grow by release: reads first, then `pull_requests: write`, then `contents: write`, then `workflows: write`. Write tokens are narrowed when minted. It never gets `administration`, `secrets` or `actions: write`.
+- **One receiver, one secret per App.** The receiver tries each App's secret from `kv/wardens/github-webhook`. Same path, same tunnel route, same Access bypass, so there's **no new public surface**. It still checks the HMAC before parsing, and still holds no GitHub credential.
+- **Rules generalised in `framework/config/webhooks.yaml`:** keys `event`, `workflowIdPrefix` and `channel`, and `workflowName` becomes optional. Drift's rules, behaviour and workflow ids don't change.
+- **A rule for failed runs:** conclusions `failure`, `timed_out` and `startup_failure`; every org repository except the public blog; not `cicd-fix/` branches, whose runs the agent already watches. Workflow id `incident-cicd-triage-<owner>-<repo>-<run>-<attempt>`, so a rerun's failure gets its own analysis and a redelivery starts nothing. Start delay 120 seconds, so that runs on the same commit finish.
+- **A new channel, `ci-failure`:** deadline 1,800 minutes, and `maxAutonomyLevel` following the agent's grant at each release.
+- **A fallback, as in ADR 0075:** a daily schedule starts any default-branch failure that a lost delivery missed.
+- **Worker first, rule last.** The rule ships disabled until the worker runs on `wardens`.
+
+#### Considered options
+
+1. **Same path, one secret per App (chosen):** nothing new is exposed, and each App's secret rotates on its own.
+2. **Same path, one shared secret:** the smallest change, but rotating it means changing both Apps at once, and a leak affects both.
+3. **A second tunnel path:** clean separation, but more public surface for no real gain, since the signature is the authentication.
+4. **Add `workflow_run` to the drift App:** no new App, but the drift App holds `contents: write`, and ADR 0071 gives each agent its own identity.
+5. **Poll the Actions API on a schedule:** no webhook, but it misses the 5-minute target and uses API quota on every repository.
+
+#### Consequences
+
+- Good: failed runs reach the agent in minutes, and the receiver stays small and credential-free.
+- Good: a leaked secret can at most start read-only runs that re-check GitHub.
+- Bad: the receiver now handles every org repository's run events, about 3 deliveries a run. It answers most with a cheap 200.
+- Bad: a third secret to keep in OpenBao and an App's settings, and the receiver's repository pattern has to stay in step with the agent's scope.
+- To check on first deliveries: `workflow_run` payload size against the receiver's 1 MB limit.
+
+#### Related
+
+- ADR 0071 (per-agent identities), ADR 0075 (the webhook entry point, amended here), ADR 0083 (`reusable-workflows`)
+- platform-wardens decisions 0027 and 0028
+
+## ADR-0083: build-image.yaml and its gate move to reusable-workflows, the central repository for application pipelines; IaC workflows stay in the shared module
+{: #adr-0083 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `reusable-workflows`, `infra-local`, `homelab-services`, `self-service-portal`, `job-hunter-agent`, `shorts-studio`, `platform-wardens`</span>
+
+#### Context
+
+Three repositories hold shared workflows:
+
+| What runs | Lives in | Callers |
+|---|---|---|
+| Image build and security gates | `homelab-gitops/.github/workflows/build-image.yaml` | 14 call sites in 6 repositories |
+| IaC | `terragrunt-shared-module/.github/workflows` | All 6 `infra-*` repositories |
+| Language CI, Sonar, JFrog, Azure deploy | `reusable-workflows` | One external caller |
+
+`reusable-workflows` was meant to be the standard, but its content is behind: 2 of 135 third-party actions pinned to a SHA, 1 of 52 jobs with a timeout, and 10 files with runner labels this org doesn't have. Application pipelines should have one home, which the standards catalog and the `cicd-triage` agent (platform-wardens decisions 0027 and 0028) can both rely on.
+
+`build-image.yaml` can't simply be moved, because OpenBao's role `main` is bound to it. `infra-local/host/openbao/configure-ci.sh` requires this claim:
+
+```text
+job_workflow_ref = cloudutsukpilot/homelab-gitops/.github/workflows/build-image.yaml@refs/heads/main
+```
+
+`job_workflow_ref` names the reusable workflow running the job, not the repository calling it. Role `main` grants Zot push, Cosign signing, the `homelab-gitops` writer App and the BuildKit certificate. So this one file is the only thing in the org that can publish a signed image. If it moved with no other change, every main build would fail at its credentials step, while pull request builds kept passing.
+
+#### Decision
+
+- **`reusable-workflows` becomes the central repository for application pipelines.** `build-image.yaml`, `.github/actions/security-tools` and `policies/conftest` (with `policies-check.yml`) move there. Whether `ci/tools` moves depends on what the runner images need from it, checked during the move.
+- **The digest commit and the Argo CD refresh stay pointed at `homelab-gitops`,** which is still the deploy repository.
+- **IaC stays out of this migration.** The workflows in `terragrunt-shared-module/.github`, its `template/`, and the `infra-*` pipelines don't move. The older Terragrunt copies in `reusable-workflows` are left alone and aren't accepted references.
+- **Fix `reusable-workflows`' application workflows first:** runner labels and JFrog hosts become inputs, `continue-on-error` comes off gates, leftovers go, then SHA pins, `permissions` and timeouts. `sonarqube-ci.yaml` stays compatible, because the shared module calls it at `@main`.
+- **Order, so that nothing breaks at any step:**
+  1. Copy the files. The old ones keep working.
+  2. Role `main` accepts both paths.
+  3. Prove it with `hello-world` in `homelab-services`, through a full main build: push, sign, digest commit, Argo sync, Kyverno admission.
+  4. Move the other callers, one repository at a time, each proven by a real main build.
+  5. Remove the old path from role `main`, and replace the old file with a stub that fails with a pointer.
+
+#### Considered options
+
+1. **Move them, with both claims allowed during the move (chosen):** one home, and each step can be reversed.
+2. **Keep `build-image.yaml` in `homelab-gitops`:** costs nothing today, but leaves two central repositories for application pipelines, and path-specific rules in the agent.
+3. **Move the shared module's workflows too:** a single central repository, but its renderer, compatibility test and consumers are a project of their own. Left out by the owner's choice.
+4. **Bind role `main` to the caller, not the called file:** no move needed for OpenBao, but any repository's workflow could add a step and use the Cosign key. Rejected.
+
+#### Consequences
+
+- Good: application pipelines have one home, which the catalog can name, and the agent has one write scope for them.
+- Good: Kyverno isn't affected. It checks signatures against `cosign.pub`, a key and not a path.
+- Bad: whoever can push to `reusable-workflows` `main` can publish signed images, and GitHub Free can't protect that branch. Today only one account has write on both repositories, so this is no worse than now. Giving the fix approver write on it, so they can merge fixes, widens this on purpose.
+- Bad: a mistake shows only after merge, since pull request builds never reach role `main`. That's why step 3 proves it with a low-risk repository.
+- Bad: the agent can write to the repository holding the signing path (decision 0028). A branch can't reach role `main`. The first commit of a fix there needs approval; later ones don't.
+- IaC remains a second central location.
+- Older ADRs (0008, 0032, 0033, 0034, 0043) stay as history. This one supersedes only where they name the path.
+
+#### Related
+
+- ADR 0008 (CI build path), ADR 0033 (signing and admission), ADR 0043 (build path), ADR 0082 (triage webhook)
+- platform-wardens decisions 0027 and 0028
 
 {% endraw %}
 <!-- adr:end -->
