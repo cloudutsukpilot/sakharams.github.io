@@ -18,7 +18,7 @@ facts:
 - label: Stack
   value: Python, FastAPI, Pydantic, vanilla JS, Supabase (Postgres)
 - label: LLM
-  value: Local qwen3.5-35b-a3b through a LiteLLM gateway
+  value: Local qwen3.6-35b-a3b through a LiteLLM gateway
 - label: Hosting
   value: Homelab k3d platform cluster via Argo CD, Keycloak sign-in
 - label: Sources
@@ -35,7 +35,7 @@ brief: |
   agent ("HunterAgent") and plan an implementation; then build it.
 
   Author's decisions:
-  - LLM: the local model behind the homelab's LiteLLM gateway (qwen3.5-35b-a3b), not a cloud API.
+  - LLM: the local model behind the homelab's LiteLLM gateway (qwen3.6-35b-a3b), not a cloud API.
   - Approval: manual approve only. The agent never submits an application, sends a connection request
     or a message.
   - Repo: a new private repo in the cloudutsukpilot org (job-hunter-agent). API in FastAPI.

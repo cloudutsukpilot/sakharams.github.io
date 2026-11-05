@@ -86,7 +86,7 @@ All configuration is environment variables read by pydantic-settings, with defau
 | Variable | Local default | Production |
 |---|---|---|
 | `STORAGE_BACKEND` | `memory` | `supabase` |
-| `LLM_BASE_URL`, `LLM_CHAT_MODEL` | LiteLLM URL, `qwen3.5-35b-a3b` | same |
+| `LLM_BASE_URL`, `LLM_CHAT_MODEL` | LiteLLM URL, `qwen3.6-35b-a3b` | same |
 | `LINKEDIN_MCP_URL` | `http://127.0.0.1:8765/mcp` | `http://127.0.0.1:8080/mcp` (sidecar) |
 | `OIDC_ISSUER` | empty (sign-in off) | Keycloak realm |
 | `SCHEDULE_CRON`, `SCHEDULE_TIMEZONE` | empty, UTC | `0 8 * * 1-5`, Asia/Kolkata |

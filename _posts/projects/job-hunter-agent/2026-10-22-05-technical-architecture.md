@@ -33,7 +33,7 @@ Step through one scheduled run for one search profile:
 |---|---|---|
 | Job Hunter app | FastAPI service: API, review UI (static HTML/JS), pipeline, agents, scheduler | `app` container, port 8000 |
 | LinkedIn MCP server | `mcp-server-linkedin`: a Chromium browser signed in as me, exposed as MCP tools | `linkedin` sidecar, loopback 8080 only |
-| LiteLLM gateway | OpenAI-compatible gateway in front of the local model `qwen3.5-35b-a3b` | Homelab `ai` cluster |
+| LiteLLM gateway | OpenAI-compatible gateway in front of the local model `qwen3.6-35b-a3b` | Homelab `ai` cluster |
 | Supabase | Postgres with a REST API, free tier | Supabase cloud |
 | Keycloak | OIDC provider, realm `homelab` | Homelab `core` cluster |
 | Wikidata, Google News | Public company facts and headlines | Internet |
@@ -52,7 +52,7 @@ Indeed, company intel), `company_facts.py`, `scheduler.py`, `runs.py` (history),
 | Python + FastAPI | Async I/O for slow LLM and browser calls; Pydantic models double as the LLM's JSON schemas | Node: fewer good PDF/DOCX libraries |
 | Pydantic v2 | One model per agent output; validation catches malformed LLM answers before they're stored | Hand-written JSON parsing |
 | OpenAI SDK against LiteLLM | Any OpenAI-compatible backend; structured output with `json_schema` | A provider-specific SDK |
-| Local `qwen3.5-35b-a3b` | My resume stays home; free to run | A frontier cloud model: better prose, but my data leaves the house |
+| Local `qwen3.6-35b-a3b` | My resume stays home; free to run | A frontier cloud model: better prose, but my data leaves the house |
 | `mcp-server-linkedin` | Maintained, read-only tools, real signed-in browser | Writing my own Playwright scraper |
 | Supabase | The articles used it; Postgres + REST + row-level security on a free tier | SQLite in a PVC: simpler, but no off-cluster copy |
 | Vanilla JS UI | No build step, ~800 lines, served by FastAPI | React: more structure than one user needs |

@@ -463,7 +463,7 @@ Gap: because both containers share a pod, an app deploy also restarts the browse
 | Layer | Choice | Why |
 |---|---|---|
 | Backend | Python 3.12, FastAPI, Pydantic v2 | Async I/O, schema-first LLM output |
-| LLM | `qwen3.5-35b-a3b` via LiteLLM, OpenAI SDK | Local, any OpenAI-compatible backend |
+| LLM | `qwen3.6-35b-a3b` via LiteLLM, OpenAI SDK | Local, any OpenAI-compatible backend |
 | LinkedIn | `mcp-server-linkedin` sidecar | Maintained, read-only tools |
 | Storage | Supabase (Postgres + REST) | Free tier, RLS, off-cluster copy |
 | UI | Vanilla HTML/CSS/JS | No build step |

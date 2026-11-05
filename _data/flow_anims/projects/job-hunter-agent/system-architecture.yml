@@ -20,7 +20,7 @@ nodes:
   - { id: LI, label: "LinkedIn", x: 615, y: 88, w: 140, color: slate, icon: globe }
   - { id: SL, label: "Slack", sub: "incoming webhook", x: 880, y: 88, w: 150, color: pink, icon: "miscellaneous/slack-18.svg", icon_pos: corner }
 
-  - { id: LLM, label: "LiteLLM", sub: "qwen3.5-35b-a3b", x: 95, y: 250, w: 140, color: indigo, icon: cpu, icon_pos: corner }
+  - { id: LLM, label: "LiteLLM", sub: "qwen3.6-35b-a3b", x: 95, y: 250, w: 140, color: indigo, icon: cpu, icon_pos: corner }
   - { id: AG, label: "Agents", sub: "score, tailor", x: 355, y: 250, w: 140, color: violet, icon: function, icon_pos: corner }
   - { id: TC, label: "Truthfulness\nchecks", x: 615, y: 250, w: 140, color: rose, icon: shield, icon_pos: corner }
   - { id: FACTS, label: "Wikidata +\nGoogle News", x: 880, y: 250, w: 150, color: slate, icon: search, icon_pos: corner }
