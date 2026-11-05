@@ -87,7 +87,7 @@ data source and a cluster variable.
 |---|---|---|
 | Fleet | DGX Spark host; node-exporter Nodes and USE method | Written here; node-mixin |
 | Kubernetes | 16: compute resources (multi-cluster, cluster, namespace, node, pod, workload), networking, kubelet, API server, persistent volumes | kubernetes-mixin |
-| Platform | Argo CD, External Secrets, Kyverno, Traefik, cert-manager, Velero backups, OpenTelemetry collectors | Upstream, plus two written here |
+| Platform | Argo CD, External Secrets, Kyverno, Traefik, cert-manager, Velero backups, OpenTelemetry collectors, GitHub Actions runners | Upstream, plus three written here |
 | AI | GPU (DCGM), vLLM, LiteLLM gateway | Upstream; LiteLLM fills in Phase 5 |
 | Labs | One per running lab, loaded when the lab registers and removed when it leaves | Each lab's repo |
 
