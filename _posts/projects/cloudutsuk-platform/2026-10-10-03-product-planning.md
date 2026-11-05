@@ -202,6 +202,7 @@ already runs and need no CI, so it depends on Phase 0 only.
 |---|---|---|---|---|
 | 1 | Azure, AWS and GCP collectors (GCP through the billing export), every 6 hours plus "Sync now" | `homelab-services` | Each provider's resources and cost land in the inventory database | Not started |
 | 2 | DGX collector with a power-based cost estimate | `homelab-services` | The DGX has its own cost line (needs the electricity tariff) | Not started |
+| 2a | Cloud-equivalent prices for the local models (ADR 0089): each model behind LiteLLM is priced at what the nearest model Azure sells costs (Azure's public price list), so key spend, budgets and LiteLLM's Costs column show what the homelab saves; the electricity estimate stays on the model dashboard | `homelab-gitops` | A call to each model shows a non-zero cost in LiteLLM's spend logs | In progress (2026-11-06: prices checked against LiteLLM 1.103.1 with mock calls) |
 | 3 | `lab` tag convention and AWS cost allocation tag activation | cloud IaC repos | A `lab`-tagged resource is attributed to its lab | Not started |
 | 4 | Inventory & Cost plugin in the portal | `self-service-portal` | Portal cost matches each provider's console within a day; Sync now refreshes the data | Not started |
 | 5 | Budget alerts | `homelab-gitops` | A budget threshold fires an alert (TODO: thresholds) | Not started |
