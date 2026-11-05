@@ -66,7 +66,7 @@ third-party pieces that aren't Python packages:
 | Component | Licence | For this use |
 |---|---|---|
 | `mcp-server-linkedin` (the LinkedIn MCP server image) | Apache-2.0 | Free to use and run unmodified; the licence covers the code, not LinkedIn's terms, which still prohibit scraping (see [Requirements](/posts/projects/job-hunter-agent/02-requirements-gathering/)) |
-| Qwen3.5-35B-A3B model weights | Apache-2.0 | Free to use, including commercially; nothing is redistributed, the model is only served inside the homelab |
+| Qwen3.6-35B-A3B model weights | Apache-2.0 | Free to use, including commercially; nothing is redistributed, the model is only served inside the homelab |
 
 ## Compliance reporting
 {: #compliance-reporting }
