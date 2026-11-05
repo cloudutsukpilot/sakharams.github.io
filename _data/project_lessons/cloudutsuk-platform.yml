@@ -838,3 +838,25 @@ lessons:
     fix: "Run fincore with permission to answer: as root, or in a container with FOWNER (counts as the owner) and DAC_READ_SEARCH (opens any file) over a read-only mount of /. The page-cache exporter does the latter and runs the host's own fincore through chroot."
     lesson: "Sanity-check a breakdown against the total it claims to explain before acting on it: per-file numbers that add up to more than the kernel's own total mean the tool is guessing. And read the warnings a tool prints per item; here they were the whole story."
     adrs: ["0026"]
+
+  - id: L078
+    date: 2026-11-05
+    step: "Phase 5, step 1g"
+    title: "Renaming the chat model switched off the agents' cost ceiling without a single error"
+    tags: [llm, litellm, agents, cost, guardrails]
+    symptom: "After the chat model moved from qwen3.5-35b-a3b to qwen3.6-35b-a3b, the terraform-drift and stack-author agents kept working normally. Nothing failed and nothing alerted, but every model call they made ran without a token limit."
+    cause: "Each agent's cost ceiling becomes a token limit only through a per-model price table, keyed by the model's name. The table still listed only the old name. The framework treated a model with no price as a warning and ran the call unbounded, so a rename in the deployment's settings quietly disabled the ceiling."
+    fix: "The new name was priced, and the framework gained a startup check: a worker whose model has no price now refuses to start instead of running without a ceiling. The router, which has its own price list, got the same check, and tests assert that every model an agent declares is priced."
+    lesson: "A safety limit that depends on a lookup must fail closed when the lookup misses. Anything keyed by a name that changes outside the repo (a model, an endpoint, a deployment) needs a check at startup that the key exists, or a rename elsewhere turns the limit off silently."
+    adrs: ["0081"]
+
+  - id: L079
+    date: 2026-11-05
+    step: "Phase 5, step 1g"
+    title: "A digest-pinned base image failed the image gate on a CVE the distribution had already fixed"
+    tags: [ci, docker, security, trivy, debian]
+    symptom: "A one-line config change to Shorts Studio failed its main build at the image scan: a HIGH CVE with a fix, in apt and libapt-pkg 3.0.3, on both architectures. Bumping the pinned python:3.12-slim digest wouldn't have helped: the newest tag still shipped 3.0.3."
+    cause: "The base image is pinned by digest and the upstream image hadn't been rebuilt yet, while Debian's archive already had apt 3.0.4. The gate blocks any HIGH or CRITICAL finding that has a fix, so a fix the base image lags behind blocks every build of the app, whatever the change."
+    fix: "apt-get upgrade in the same layer as the package installs, so the image takes Debian's security fixes even when the pinned base lags."
+    lesson: "Pinning a base image freezes its packages as well as its contents. When a scanner gate blocks on fixable CVEs, upgrade the distribution's packages in the build, or the gate turns an upstream rebuild delay into a release freeze."
+    adrs: ["0081"]
