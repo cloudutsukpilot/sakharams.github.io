@@ -233,7 +233,7 @@ already runs and need no CI, so it depends on Phase 0 only.
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Alertmanager webhook into the SRE agents | `platform-wardens`, `homelab-gitops` | A firing alert reaches the agent | Not started |
+| 1 | Alertmanager webhook into the SRE agents | `platform-wardens`, `homelab-gitops`, `infra-local` | A firing alert reaches the agent | In progress (2026-11-05: built with step 32; a test alert reaches a minimal `incident-triage`) |
 | 2 | Read-only multi-cluster access with short-lived tokens | `platform-wardens`, `homelab-gitops` | The agent's Kubernetes token expires after 15 minutes and it can't change anything | Not started |
 | 3 | RAG and `mon` tools for the SRE agents | `platform-wardens` | An RCA cites the right lab doc and the metrics behind it | Not started |
 | 4 | Eval suite built from lab experiments | `platform-wardens` | The evals pass | Not started |
@@ -267,6 +267,7 @@ already runs and need no CI, so it depends on Phase 0 only.
 | 29 | Pull request comments at L1, then fix pull requests with no approval to open in repositories where opening reaches no secrets; a loop that reads the pipeline and iterates up to a limit; a block-only LLM reviewer. A person always merges | `platform-wardens`, `homelab-gitops` | A fix in the lab, then a real repository, reaches verified and a person merges it | Planned |
 | 30 | The framework's first L2 action: fix pull requests after approval, where opening reaches secrets | `platform-wardens`, `homelab-gitops`, `infra-local` | An approved fix opens, is tested by its pipeline, and a person merges it | Planned |
 | 31 | Workflow fixes in the central repositories, and for `infra-*`: the same change in the shared module's template and the failing repository, then the others once verified. Linked consumer and central fixes | `platform-wardens`, `reusable-workflows`, `terragrunt-shared-module`, `infra-*` | A seeded central bug in the lab ends in verified pull requests, merged by a person | Planned |
+| 32 | Routing, rules first (ADR 0084): Alertmanager also sends every warning and critical alert to the agents, and Slack keeps them all. A rule maps an alert's labels to an agent; a classifier on the local model handles what no rule knows and the console's chat, where an `Auto` choice proposes an agent and the person presses the button. A minimal `incident-triage` agent records the test alert to prove the route; the classifier decides alerts only once routing evals have set its threshold | `platform-wardens`, `homelab-gitops`, `infra-local` | The test alert reaches `incident-triage` and shows in Slack, another alert starts nothing, and Auto proposes an agent in the console | In progress (2026-11-05) |
 
 ## MVP definition
 {: #mvp-definition }
