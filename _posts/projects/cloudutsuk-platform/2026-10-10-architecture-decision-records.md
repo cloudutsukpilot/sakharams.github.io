@@ -2701,7 +2701,7 @@ Running it on `platform` meets these constraints:
 ## ADR-0049: Chat model: Qwen3.5-35B-A3B (FP8, Apache 2.0) replaces gpt-oss-20b
 {: #adr-0049 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `sakharams.github.io`</span>
+<span class="adr-status adr-status-superseded">Superseded by <a href="#adr-0081">ADR-0081</a></span> <span class="adr-meta text-muted">2026-10-16 · `homelab-gitops`, `sakharams.github.io`</span>
 
 #### Context
 
@@ -5663,6 +5663,97 @@ sign-in started on the other name comes back to a host that doesn't hold its coo
 
 - ADR 0058 (public access through the tunnel and Access), ADR 0074 (the console, amended here), ADR 0075 (the tunnel
   to the wardens load balancer), ADR 0078 (per-app groups)
+
+## ADR-0081: Chat model: Qwen3.6-35B-A3B (FP8, Apache 2.0) replaces Qwen3.5-35B-A3B
+{: #adr-0081 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `infra-local`, `sakharams.github.io`</span>
+
+#### Context
+
+The chat model has been Qwen3.5-35B-A3B in FP8 since 2026-10-16 (ADR 0049), in `vllm-chat` on the DGX Spark's
+`gpu` cluster, in a 0.36 slice (about 44 GB; its measured `MemAvailable` drop is 54 GB, ADR 0063). Its callers
+are agents: Hermes, job-hunter, Shorts Studio and the platform-wardens agents terraform-drift and stack-author.
+
+Qwen has released newer open models since (checked 2026-11-05):
+
+- **Qwen3.6-35B-A3B** (April 2026, Apache 2.0): the same architecture (`Qwen3_5MoeForConditionalGeneration`),
+  35B parameters with 3B active, the same linear-attention layout and context, and an official FP8 build.
+- **Qwen3.6-27B and Qwen3.8-27B** (April and August 2026): dense. Every token reads all 27B parameters, so on
+  the GB10's memory bandwidth they decode several times slower than a 3B-active MoE.
+- **Qwen3.8-Flash-Next** (August 2026, `qwen-community-1.0` licence): 125B total, 6B active, plus a 51B n-gram
+  table, about 180B parameters on disk. FP8 needs about 180 GB; even 4-bit needs about 100-125 GB, over the
+  88 GB the model arbiter can admit above its 15 GB floor, and its new attention needs a newer vLLM than the
+  26.07 image (newer images need a newer driver than the Spark's 580).
+- Qwen3.7 is hosted only; Qwen4 hasn't shipped.
+
+Qwen's card for Qwen3.6-35B-A3B compares it with Qwen3.5-35B-A3B (thinking mode, vendor-measured):
+
+| Benchmark | Qwen3.5-35B-A3B | Qwen3.6-35B-A3B |
+|---|---|---|
+| SWE-bench Verified | 70.0 | 73.4 |
+| SWE-bench Pro | 44.6 | 49.5 |
+| Terminal-Bench 2.0 | 40.5 | 51.5 |
+| SkillsBench | 4.4 | 28.7 |
+| MCPMark | 27.0 | 37.0 |
+| TAU3-Bench | 68.9 | 67.2 |
+| Tool Decathlon | 28.7 | 26.9 |
+| MMLU-Pro | 85.3 | 85.2 |
+| GPQA | 84.2 | 86.0 |
+| LiveCodeBench v6 | 74.6 | 80.4 |
+
+#### Decision
+
+- **Model:** Qwen/Qwen3.6-35B-A3B-FP8, Apache 2.0, pinned to revision `95a723d0` (2026-04-24).
+- **Same app and settings:** `apps/vllm-chat` keeps the image (`nvcr.io/nvidia/vllm:26.07`, vLLM 0.24; the card
+  asks for 0.19 or later), the 0.36 slice, 128k context, `--language-model-only`, the `qwen3_coder` tool parser,
+  the `qwen3` reasoning parser, and the two workarounds (`VLLM_USE_DEEP_GEMM=0`,
+  `VLLM_ENFORCE_STRICT_TOOL_CALLING=0`).
+- **Tested first:** the weights were downloaded to the shared models folder and served on the GB10 with the
+  deployment's exact image, flags and environment before the change
+  (2026-11-05, a container on the Spark, nothing else loaded):
+  - weights 33.4 GiB, loaded in 214 s from a cold page cache, then 97 s to profile, compile and warm up;
+    ready 5 min 50 s after start;
+  - KV cache 265,216 tokens, 2.02 requests at the full 131,072;
+  - `MemAvailable` fell from 106.3 to 57.9 GB (48.4 GB, under the arbiter's 54 GB for `vllm-chat`);
+  - a plain answer with thinking off, thinking split into `reasoning_content` (17 × 23 = 391), an `auto` tool
+    call and a streamed tool call with thinking on all came back correctly;
+  - 512 tokens in 11.0 s, about 47 tokens a second including prefill.
+- **Gateway name:** the model is published as `qwen3.6-35b-a3b`. The old name `qwen3.5-35b-a3b` stays in LiteLLM
+  as an alias to the same backend, so no caller breaks while it moves:
+  1. this change: the model and both names;
+  2. every caller's virtual key gets `qwen3.6-35b-a3b` (infra-local `host/*/configure.sh`, Hermes' by hand);
+  3. the callers switch to the new name;
+  4. the alias and the old name in the keys are removed.
+- **Fallback:** Qwen3.5-35B-A3B's weights stay on the `models` claim; going back is a revert of the model commit.
+
+#### Considered options
+
+1. **Keep Qwen3.5-35B-A3B:** works, but Qwen3.6 is better at the agent work every caller does, at no cost in
+   memory or speed.
+2. **Qwen3.6-35B-A3B in FP8** (chosen): a drop-in upgrade.
+3. **Qwen3.8-27B (dense):** the best scores among models that fit, but a dense 27B decodes several times slower
+   on the GB10, and the agents make many calls.
+4. **Qwen3.8-Flash-Next:** the strongest open Qwen, but it doesn't fit in the memory the arbiter can admit, would
+   evict every other model, and needs a newer vLLM than the Spark's driver allows. Revisit with a smaller Flash
+   variant or a driver upgrade.
+5. **Keep the name `qwen3.5-35b-a3b` for the new model:** no caller changes, but logs, metrics and costs would
+   name the wrong model.
+6. **A model-agnostic name (`chat`):** future swaps without caller changes; a bigger change to every caller and
+   key, left for later.
+
+#### Consequences
+
+- Good: better agentic coding and tool use for every caller, with the same memory, speed, licence and settings.
+- Good: the alias keeps every caller working during the move.
+- Bad: another 37.5 GB on the `models` claim while both versions are kept.
+- Bad: the model arbiter's `size_gb` for `vllm-chat` (54) was measured on Qwen3.5; re-measure after the switch.
+- Bad: the vendor's benchmarks aren't ours; Phase 5 step 7's evaluation runs should confirm them.
+
+#### Related
+
+- ADR 0010 (vLLM on the GB10), ADR 0022 (the gateway), ADR 0049 (superseded), ADR 0051 (scale to zero),
+  ADR 0061 (the Spark as model host), ADR 0063 (the model arbiter)
 
 {% endraw %}
 <!-- adr:end -->
