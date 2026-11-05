@@ -860,3 +860,14 @@ lessons:
     fix: "apt-get upgrade in the same layer as the package installs, so the image takes Debian's security fixes even when the pinned base lags."
     lesson: "Pinning a base image freezes its packages as well as its contents. When a scanner gate blocks on fixable CVEs, upgrade the distribution's packages in the build, or the gate turns an upstream rebuild delay into a release freeze."
     adrs: ["0081"]
+
+  - id: L080
+    date: 2026-11-06
+    step: "Phase 1, step 1f"
+    title: "Argo CD stopped deploying because the homelab PC's Wi-Fi card was saving power"
+    tags: [argocd, gitops, network, wifi, linux]
+    symptom: "Changes merged in the evening never reached the clusters. More than half of Argo CD's applications showed Unknown with deadline-exceeded errors, its repo-server kept restarting, and fetches from GitHub over SSH took minutes. The other host, on the same router and reaching the same GitHub server, saw none of it."
+    cause: "The PC's Realtek Wi-Fi card (rtw89 driver) had power save on. About one reply in three from GitHub arrived 30 seconds or more late, after the connection was already set up, over HTTPS as well as SSH. Argo CD waits 60 seconds for a repo-server answer, and each answer needed several such requests."
+    fix: "Power save off for the card, now and in NetworkManager's configuration so it survives a reboot. Every request then answered in under a third of a second and Argo CD synced the backlog within minutes."
+    lesson: "Before changing protocols or credentials to get around a slow dependency, time the same request from another host on the same network, and through that host. If only one machine is slow, the fault is its own link or driver, and a different protocol over that link would have stalled too."
+    adrs: ["0086"]
