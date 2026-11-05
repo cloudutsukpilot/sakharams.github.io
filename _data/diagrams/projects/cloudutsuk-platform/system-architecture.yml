@@ -916,12 +916,12 @@ nodes:
               only when KEDA wants a pod and none has been ready for 10 minutes.
           - id: vllm-chat
             label: vLLM chat
-            sub: Qwen3.5-35B-A3B
+            sub: Qwen3.6-35B-A3B
             icon: message
             status: built
             facts:
-              summary: The local chat model, so chat and diagnosis never leave the DGX (ADR 0049).
-              how: 'Qwen3.5-35B-A3B (FP8, 3B active) on vLLM 0.24 in a 0.36 slice of the GB10, 128k context, tool calls; gpt-oss-20b until 2026-10-16 (ADR 0046).'
+              summary: The local chat model, so chat and diagnosis never leave the DGX (ADR 0081).
+              how: 'Qwen3.6-35B-A3B (FP8, 3B active) on vLLM 0.24 in a 0.36 slice of the GB10, 128k context, tool calls; Qwen3.5-35B-A3B until 2026-11-05 (ADR 0049), gpt-oss-20b until 2026-10-16 (ADR 0046).'
               where: ai · ns models
               when: always on
               api: '`http://vllm-chat.models.svc:8000/v1/chat/completions`'

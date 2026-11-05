@@ -128,6 +128,15 @@ The rule I used: reuse what I already run, and only add a new tool where nothing
 > `qwen3.5-35b-a3b` behind LiteLLM. gpt-oss-20b had broken long agent runs on malformed tool-call output.
 {: .prompt-info }
 
+> **Chat model, upgraded 2026-11-05 (ADR 0081).** Qwen3.6-35B-A3B in FP8, Apache 2.0: the next release of the
+> same model, with the same architecture, size, parsers and 0.36 slice, and better agentic coding and tool use
+> on Qwen's own benchmarks (SWE-bench Pro 49.5 against 44.6, Terminal-Bench 2.0 51.5 against 40.5). Tested on
+> the GB10 before the switch: ready in about 6 minutes from a cold cache, about 47 tokens a second, tool calls
+> correct. It is published as `qwen3.6-35b-a3b`; the old name stays as an alias while the callers move. The
+> dense Qwen3.8-27B decodes several times slower on the GB10, and Qwen3.8-Flash-Next (125B, 6B active) needs
+> more memory than the model host can give one model.
+{: .prompt-info }
+
 ## API and integration architecture
 {: #api-and-integration-architecture }
 
