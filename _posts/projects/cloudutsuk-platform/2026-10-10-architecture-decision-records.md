@@ -1625,7 +1625,8 @@ through a local cache. The host is arm64. Harbor's official images are amd64 onl
   on `/srv/homelab/zot/data`, served at `https://registry.core.home.cloudutsuk.com` with a Let's Encrypt
   certificate. Accounts `admin`, `puller` and `ci-pusher` come from `kv/core/zot`; External Secrets
   builds the bcrypt htpasswd file, so plain passwords never reach Zot. On-demand sync mirrors
-  `docker.io`, `ghcr.io`, `quay.io`, `registry.k8s.io` and `nvcr.io` under `mirror/<registry>/`.
+  `docker.io`, `ghcr.io`, `quay.io`, `registry.k8s.io` and `nvcr.io` under `mirror/<registry>/`; ADR 0088 adds
+  `mcr.microsoft.com` (2026-11-06).
   `http.compat: [docker2s2]` lets the Docker CLI push Docker-format manifests; BuildKit pushes OCI.
 - Anonymous pulls of `mirror/*` work for containerd (the k3d nodes), which asks for the manifest
   directly. The Docker CLI first calls `/v2/`, which Zot answers with 401 without credentials, so people
@@ -5309,7 +5310,7 @@ has the agent's design; this record covers how it runs on the homelab.
 ## ADR-0077: The agents' state lives in a second Postgres in wardens, wardens-state-db, separate from Temporal's
 {: #adr-0077 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `platform-wardens`, `infra-local`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `platform-wardens`, `infra-local`</span>
 
 #### Context
 
@@ -5354,7 +5355,8 @@ ADR 0073 moved backups to Garage on the DGX Spark, kept 7 days, with no object l
   plain Job in `apps/wardens-state-db` (named after the schema version, like Temporal's schema job; not an
   Argo CD hook) applies them as `wardens_owner` with the console image, which carries the framework.
 - **Only Temporal-labelled namespaces connect:** a NetworkPolicy lets in pods from namespaces labelled
-  `homelab/wardens-agent=true` (every agent and the console) on 5432, nothing else.
+  `homelab/wardens-agent=true` (every agent and the console) on 5432, and the schema job's pods in the database's
+  own namespace, nothing else.
 - **Each store, with how long it is kept:**
   - Run records and artifacts: rows of schema-checked JSON, kept 180 days, 30 days for `confidential` data.
     Large inputs (a plan file) are stored as a reference and a hash, never copied.
@@ -5402,6 +5404,20 @@ ADR 0073 moved backups to Garage on the DGX Spark, kept 7 days, with no object l
 - ADR 0035 (data ownership), ADR 0039 and 0073 (backups), ADR 0069 (the `wardens` cluster), ADR 0070 (Temporal
   on `wardens-db`), ADR 0072 (deployment standard), ADR 0074 (the operator console)
 - platform-wardens framework categories 06, 11, 21, 22 and 23
+
+#### Implementation (2026-11-05)
+
+- Running: `apps/wardens-state-db`, the schema job (`wardens-state-schema-0001`, migration 0001), and run records
+  from every agent (`state.enabled` in `charts/wardens-agent` 0.1.6). Alerts: `WardensStateDbDown` and
+  `WardensRunRecordNotStored` (`docs/runbooks/wardens-alerts.md`).
+- One choice beyond the decision above: if the database can't be reached when a run ends, the agent writes the run
+  record to its local file instead of failing the run, and `WardensRunRecordNotStored` fires.
+- Built in the framework, not used yet: dedupe, the kill switch, the audit log (a trigger makes it insert-only for
+  the owner too), memory, artifacts, and the retention and anchor commands (`wardens.state.maintenance`). Their
+  migrations need a new schema job, and the retention and anchor jobs need CronJobs.
+- Backups, until Velero runs in `wardens` (ADR 0073): a nightly `pg_dump` of `wardens-db` and `wardens-state-db`
+  onto the DGX Spark's disk (infra-local `host/backup/wardens-dumps.sh`, 7 nights, each checked with `pg_restore`),
+  alerted by `WardensDumpTooOld`. Unencrypted, in a 0700 folder; a restore into a throwaway Postgres was tested.
 
 ## ADR-0078: Per-app Keycloak groups (admin, editor, viewer) as the only place access is assigned
 {: #adr-0078 }
@@ -5859,6 +5875,374 @@ job_workflow_ref = cloudutsukpilot/homelab-gitops/.github/workflows/build-image.
 
 - ADR 0008 (CI build path), ADR 0033 (signing and admission), ADR 0043 (build path), ADR 0082 (triage webhook)
 - platform-wardens decisions 0027 and 0028
+
+## ADR-0084: Alerts and chat reach the wardens agents rules first, then a classifier, then a person; Slack keeps every alert
+{: #adr-0084 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+Alertmanager on `mon` sends alerts only to Slack, so no agent sees them (Phase 6 step 1). The operator console's chat
+talks to one agent, stack-author, and more chat agents are coming, starting with one that authors CI/CD pipelines.
+platform-wardens decision 0029 settles how requests find an agent: alerts are structured and their labels are known in
+advance, so rules route them; free text has nothing to match, so a classifier on the local model proposes an agent. This
+ADR records how that runs on the homelab.
+
+#### Decision
+
+- **Alerts:** Alertmanager sends every warning and critical group to the platform-wardens alert receiver as well as to
+  Slack, through a route with `continue: true`. Slack's behaviour doesn't change, so an alert no agent handles is
+  still seen, and escalating one costs nothing extra.
+- **Receiver:** `wardens-alerts` in the `wardens-console` namespace (`apps/wardens-console/templates/alerts.yaml`), the
+  console's image with `python -m wardens.runtime.alert_webhook`. Internal only, at
+  `https://alerts.wardens.home.cloudutsuk.com/alert`. It checks a bearer token before reading the body, because
+  Alertmanager can't sign requests, and reads only allowlisted labels, never annotations. It can reach Temporal and
+  nothing else.
+- **Router worker:** `wardens-router` in the same namespace (`templates/router.yaml`), same image, task queue
+  `wardens-router`. It runs the classifier, and the incident workflow for routed alerts, so an alert doesn't depend on
+  one agent's worker. It has its own LiteLLM key and reaches HTTPS for LiteLLM only through the namespace's policy.
+- **First target:** a minimal `incident-triage` worker (`apps/incident-triage`), which records the alert as a finding and
+  a Slack message. Only the named test alert `WardensRoutingTest` routes to it until it can diagnose real ones.
+- **Secrets:** infra-local `host/wardens/configure.sh` generates the token once in `kv/wardens/alert-webhook`, copies it
+  to `kv/mon/alertmanager` `wardens_token`, and creates the router's LiteLLM key in `kv/wardens/wardens-router`.
+
+#### Considered options
+
+1. **Every alert through the classifier:** rejected in decision 0029. Alerts need no judgment to route, annotations can
+   carry attacker-influenced text, and the model may be down during the very incidents that matter.
+2. **Move alerts from Slack to the agents:** rejected. Until an agent diagnoses alerts, Slack is how people see them.
+3. **The receiver on the public tunnel, like `hooks.cloudutsuk.com`:** not needed. Alertmanager is on `mon`, which
+   already reaches `*.wardens.home.cloudutsuk.com`.
+4. **The classifier inside the console or the receiver:** rejected. A local model's turn outlasts any request.
+
+#### Consequences
+
+- Good: a known alert reaches its agent with no model call; LiteLLM being down doesn't stop it.
+- Good: a new chat agent is a manifest change in platform-wardens, with no change here.
+- Bad: two more Deployments in `wardens-console`, and a second copy of the token in `kv/mon/alertmanager`.
+- Bad: until the classifier's threshold is measured (platform-wardens `evals/routing`), an alert no rule knows only
+  escalates.
+
+#### Related
+
+- platform-wardens decision 0029; ADR 0069 (the `wardens` cluster), 0074 (the console), 0075 (the GitHub webhook).
+
+## ADR-0085: Stack Author offers choices and only the clouds that can create the resource; a weekly job refreshes its resource list through its own GitHub App
+{: #adr-0085 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `platform-wardens`, `infra-local`, `homelab-gitops`, `terragrunt-shared-module`</span>
+
+#### Context
+
+The stack-author agent (ADR 0076) answered "I need to create a storage account" with a plain-text question that listed
+all six clouds. GitHub, Cloudflare and k3d have no storage module. The model had only `list_targets`, which knows
+clouds but not modules. Its module search covered one cloud at a time and matched words in folder names, so it found
+Azure's `azurerm_storage_account` but not AWS's `aws_s3_bucket`. The person also had to type a cloud's name back.
+
+What each cloud can create changes whenever the shared module gains a module or an infra repository gains a cloud. A
+list kept only by hand goes stale. Keeping it fresh means reading the private shared module and the `infra-*`
+repositories on a schedule, and proposing the change as a pull request. No CI identity could do that: OpenBao's role
+`pr` only gets Zot pull, and role `main` is limited to `build-image.yaml` (ADR 0043).
+
+#### Decision
+
+1. **Questions carry choices.** The model's question may include up to eight choices, each with a label, a value and
+   a hint. The console shows them as numbered buttons. A reply that is a choice's number or label reaches the model
+   as that choice, resolved in workflow code.
+2. **Only clouds that can create the resource are offered.** A read tool, `find_resource`, matches the request
+   against hand-written resource kinds in `config/targets.yaml` (what people ask for, and the module for it in each
+   cloud) and against module names. It lists only clouds that have such a module in the shared module now. Ranking:
+   a cloud the request names, then modules whose name contains a word of the request, then use in that cloud's
+   stacks. When a question's choices are clouds, code cuts them to that list, whether or not the model called the
+   tool.
+3. **A weekly job refreshes the generated part of `targets.yaml`.** It runs on Mondays and by hand, in
+   platform-wardens' `stack-author-targets.yaml`. It reads three things: each cloud's modules in the shared module,
+   each `infra-*` repository's `environments/<cloud>/`, and which modules each stack's `resources.yaml` uses. It
+   rewrites only the block below a marker: per-cloud module usage counts, and targets for clouds that no hand-written
+   target lists. When the block changes, it opens or updates a pull request on `stack-author/targets-refresh`. The
+   notes name modules no kind covers. A person merges, and the agent's build deploys the change.
+4. **The job has its own GitHub App, `cloudutsuk-stack-author-refresh`.** It's installed on platform-wardens,
+   terragrunt-shared-module and the `infra-*` repositories. Its key is in OpenBao `kv/ci/wardens-targets-refresh`, read
+   through role `github-actions/wardens-targets-refresh`. The role is bound like `main`: the org's ID, `refs/heads/main`,
+   a self-hosted runner, and `job_workflow_ref` set to that workflow file. Each run mints two tokens: contents read
+   for reading, and contents and pull requests write on platform-wardens only for the pull request. Both are revoked
+   at the end.
+
+#### Considered options
+
+1. **Let the model work out which clouds fit**, from module names or its own knowledge: not chosen. A small local
+   model listed every cloud in practice, and nothing would stop it doing so again.
+2. **Rebuild the list in the worker at runtime**: not chosen. It needs no new credentials, but nothing is reviewed,
+   and new modules and clouds never surface as a change for a person to see.
+3. **Use the stack-author App for the job**: not chosen. That App is the agent's identity, narrowed to the infra
+   repositories. Giving it write on platform-wardens would let the agent change its own configuration.
+4. **A deploy key or token stored as a GitHub secret**: not chosen. It breaks the rule that CI credentials come only
+   from OpenBao (ADR 0043). A pull request opened with `GITHUB_TOKEN` also doesn't start CI.
+
+#### Consequences
+
+- Good: a request gets only clouds that can create the resource, as buttons, and "1" or a click answers. The cut is
+  in code, so a weak model can't undo it.
+- Good: a new module or cloud reaches the agent through a reviewed pull request, with notes on what the resource kinds
+  don't cover.
+- Bad: one more App and OpenBao role to keep. The App's installation-wide permissions include write on the infra
+  repositories, though each run's tokens are narrower.
+- Bad: resource kinds are hand-written. A kind that's missing or too narrow offers too few clouds until someone edits
+  it. The weekly notes list candidates.
+
+#### Related
+
+- ADR 0043 (CI credentials from OpenBao, roles bound to one workflow), ADR 0019 (self-hosted runners), ADR 0071 (agent GitHub Apps), ADR 0076 (the stack-author agent)
+- platform-wardens decision 0026; roadmap Phase 6 step 21a
+
+## ADR-0086: Waiting CI jobs named through a read-only GitHub App, homelab runners raised to 6, and ARC alerts
+{: #adr-0086 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `homelab-gitops`, `homelab-services`, `infra-local`</span>
+
+#### Context
+
+The Platform / GitHub Actions runners dashboard (Phase 1 step 1e) counts the jobs waiting for a runner but
+can't say which they are. ARC's listener only knows how many jobs GitHub assigned to its scale set: it has
+no job names, and a job GitHub hasn't assigned yet, because the scale set is full, doesn't show at all. Only
+GitHub's API names them (a run's jobs with status `queued`).
+
+The first day of metrics (2026-11-05) showed the `homelab` scale set, the org's build and test runners, at
+its maximum of 3 for 36 minutes, with up to 2 more jobs waiting and a p95 queue wait of 2 minutes. On the same
+day the busiest runner peaked at 1.3 GiB and all runners together at 5.3 GiB, on a homelab PC with 32 cores
+and about 50 GB free. Nothing alerted on a full scale set or a missing listener: `ScrapeTargetDown` only
+sees a listener pod that exists and fails.
+
+#### Decision
+
+1. **A small exporter names the waiting jobs.** `ci-queue-exporter` (homelab-services, deployed to `platform`)
+   polls every 30 seconds (from each poll's start): the repositories its App is installed on, each repository's queued and in-progress
+   runs, and the jobs of those runs only. It publishes `github_actions_job_waiting_seconds`, one series per
+   waiting job (repository, workflow, job, status, runner labels, run and link), valued at how long it has
+   waited. Requests are conditional (ETag); GitHub doesn't count a `304`, so a quiet poll costs almost nothing.
+2. **Its credential is a new GitHub App with Actions and metadata read only**, `cloudutsuk-ci-queue-reader`,
+   created with infra-local `host/github/create-app.py` (manifest `ci-queue-reader.json`), key in OpenBao
+   `kv/platform/ci-queue-reader`. External Secrets' `GithubAccessToken` generator turns the key into an
+   installation token in the exporter's namespace and refreshes it within the hour, so the pod never holds
+   the key.
+3. **The `homelab` scale set may run 6 runners**, as `homelab-iac` does. Only each runner's 512Mi request is
+   reserved; the 12Gi limit stays for the SBOM steps of large images.
+4. **Alerts:** `ARCListenerDown` (a scale set with no listener for 10 minutes) and `ARCScaleSetAtCapacity`
+   (more jobs assigned than runners for 20 minutes) in `alerts/platform/arc-runners.yaml`; with the exporter,
+   `GitHubActionsJobWaitingTooLong` (a job for our runners waiting over 15 minutes, by name) and
+   `CIQueueExporterDown`. Added 2026-11-06: `ARCJobsAssignedNoBusyRunners` (jobs assigned and no busy runner
+   for 15 minutes) and an *Offline runners* stat on the dashboard (registered minus busy minus idle, with
+   registered capped at the controller's running runners, because the listener's counts freeze between
+   GitHub's messages). On
+   2026-11-05 every runner lost GitHub's Actions service for hours while its pod stayed Running; the
+   dashboard read 0 running, 0 busy, 0 idle, which looked like a quiet queue, and no alert fired because
+   assigned jobs never exceeded the runner limit.
+5. **Queued is not assigned.** GitHub hands a scale set at most its maxRunners jobs; the rest stay queued in
+   GitHub, where only the exporter sees them. So the dashboard counts *Runners starting* (assigned, not yet
+   running, from ARC) apart from *Jobs queued in GitHub* (every queued job, from the exporter).
+
+#### Considered options
+
+1. **Reuse the ARC App** (`cloudutsuk-arc-runners`): rejected. It holds org self-hosted-runner and repository
+   administration write; a read-only exporter shouldn't carry that key.
+2. **A personal access token**: rejected. Tied to a person, and a fine-grained token can't be limited to
+   Actions read across the org as cleanly as an App installation.
+3. **A `workflow_job` webhook** (event-driven, no polling): rejected for now. It needs a public endpoint and a
+   webhook secret for a dashboard table; polling with ETags is cheap at 33 repositories.
+4. **An off-the-shelf GitHub Actions exporter**: rejected. The ones we found report runs and durations from
+   webhooks, not the jobs waiting now.
+5. **Leave `homelab` at 3**: rejected. Two-minute waits at the 95th percentile on a quiet day, with the PC mostly
+   idle.
+
+#### Consequences
+
+- Good: the dashboard's **Jobs waiting now** table names each waiting job with a link, and a job stuck longer
+  than 15 minutes alerts by name, which catches a runner label nothing serves.
+- Good: the exporter can't change anything in GitHub, and its token expires within the hour.
+- Bad: the generator's spec holds the App ID and installation ID, so they're committed after the App is
+  created and installed (not secrets).
+- Bad: up to 12 runners across both scale sets at once. If memory gets tight, the PC's node limit and the
+  runner requests decide, and `ARCScaleSetAtCapacity` plus the dashboard's memory panels show it.
+
+#### Related
+
+- ADR 0019 (self-hosted runners, private repos only), ADR 0040 (the `homelab-iac` scale set), ADR 0026 (monitoring collection)
+- ADR 0027 (alert rules for the Mimir ruler)
+
+## ADR-0087: LiteLLM's admin UI signs in through Keycloak only; the admin + master key login is off
+{: #adr-0087 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`</span>
+
+#### Context
+
+LiteLLM's `/ui` takes two sign-ins: Keycloak SSO (ADR 0078 maps groups to roles) and a username and password
+from the environment (`UI_USERNAME`/`UI_PASSWORD`, or `admin` and the master key when `UI_PASSWORD` is unset).
+The second path makes anyone holding one shared static secret a `proxy_admin`, with no per-person audit, and
+the UI is reachable from the internet behind Cloudflare Access (ADR 0058). LiteLLM v1.103.1 warns about it in
+the UI and offers `general_settings.disable_env_credential_login: true` to turn it off.
+
+#### Decision
+
+Set `disable_env_credential_login: true` in `apps/litellm/config.yaml`. Admins sign in through Keycloak
+(`platform-admins`, `litellm-admin` → `proxy_admin`). The master key keeps working as an API bearer for
+creating and revoking virtual keys (ADR 0029). Break-glass, when Keycloak is down or LiteLLM's free SSO has
+stopped (more than five users): set the setting to `false` in git, sync, sign in with `admin` and the master
+key, then set it back.
+
+#### Considered options
+
+1. **Turn it off (chosen)**: one sign-in path, per-person, behind Keycloak's gate and brute-force detection.
+2. **Keep it, with a separate `UI_PASSWORD`**: still a shared static admin secret, just a different one.
+3. **Keep it as is**: the documented fallback, but the weakest way into the gateway's admin.
+
+#### Consequences
+
+- Good: every UI admin is a named Keycloak user; the master key is no longer a UI password.
+- Bad: no UI access while Keycloak is down or SSO has stopped until the break-glass change is synced.
+
+#### Related
+
+- ADR 0022, ADR 0029, ADR 0058, ADR 0078
+
+## ADR-0088: The wardens ingress bus runs on the Event Hubs emulator in wardens, with mcr.microsoft.com mirrored through Zot
+{: #adr-0088 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+platform-wardens decision 0030 puts an event bus at the agents' front door. The Alertmanager and GitHub webhooks
+publish to an Event Hubs hub and answer at once, and one consumer routes events to Temporal. The bus code is built and
+merged (platform-wardens #73, #76, #77); its plan is `platform-wardens/docs/plans/event-bus-ingress.md`, roadmap
+Phase 6 step 33. The owner chose Microsoft's **Event Hubs emulator** for the homelab rather than an Azure namespace
+(2026-11-06).
+
+The emulator and Azurite (its metadata and the consumer's checkpoints) are published only on `mcr.microsoft.com`.
+Every cluster pulls public images through Zot (ADR 0034), and Kyverno's `restrict-image-registries` admits only Zot
+and the registries Zot mirrors (ADR 0033). MCR was neither.
+
+Both images run under `pod-security-restricted` and a read-only root. This was checked with Docker on 2026-11-06:
+the emulator as user 1654 and Azurite as user 1000, all capabilities dropped, no new privileges, with writable
+emptyDirs for `/tmp`, the emulator's `/home/app` and Azurite's data folder. The emulator came up, created its hubs,
+and kept its metadata in Azurite.
+
+#### Decision
+
+1. **`mcr.microsoft.com` becomes the sixth registry Zot mirrors:**
+   - Zot's on-demand sync gets it under `mirror/mcr.microsoft.com/` (infra-local `helm/core/zot`);
+   - k3s `registries.yaml` rewrites its pulls to that path (infra-local `host/k3s/registries.yaml`);
+   - Kyverno's `mirroredRegistries` admits it.
+
+   ADR 0034's mirror list is amended accordingly. A cluster picks up `registries.yaml` only after
+   `k3d cluster stop/start`. `wardens` is restarted first, and the other clusters when convenient. Until then their
+   pulls from MCR go straight to Microsoft, which Kyverno allows because it checks the image name, not the path.
+2. **The ingress bus runs in `wardens`, namespace `wardens-console`, as one pod with two containers:** the Event Hubs
+   emulator and Azurite.
+   - **No persistent volume:** the emulator keeps nothing across a restart anyway, and resetting Azurite with it keeps
+     the consumer's checkpoints in step with the hub. The consumer also detects a reset (platform-wardens 0030).
+   - A NetworkPolicy lets only the relays and the consumer reach AMQP (5672) and Azurite's blob port (10000).
+   - The connection strings are the emulator's and Azurite's published development defaults. They still come from
+     OpenBao (`kv/wardens/eventhubs`), like every other credential.
+   - Built in plan step 4b (`apps/wardens-console` `templates/eventhubs.yaml` and `templates/ingress.yaml`):
+     - the two containers share the pod's network namespace, so the emulator reaches Azurite on `localhost`. The
+       bus has no network egress at all (the emulator was checked to start with none);
+     - the consumer `wardens-ingress` is the console's image running `wardens.runtime.ingress`, one replica to
+       start (up to one per partition), with `/healthz` for the kubelet;
+     - `alerts.mode` and `hooks.mode` (`direct` or `relay`) switch each webhook; `relay` adds the hub's
+       connection string and an egress rule to the bus. Both stay `direct` until the cut-over (step 4c), and
+       `direct` is the rollback.
+     - Checked before merging (2026-11-06): platform-wardens' emulator integration tests pass against the pod's
+       shape in Docker (shared `localhost`, the users above, read-only root, emptyDirs); a restart of only the
+       emulator container recreates the hubs with a new `created_at`, which the consumer treats as a reset; and a
+       server-side dry run on `wardens` passes Kyverno's enforced policies (while a writable-root variant is
+       refused).
+
+#### Considered options
+
+1. **Mirror MCR through Zot (chosen):** consistent with ADR 0033/0034. Pulls are cached and scanned like any other
+   public image, and the next Microsoft image needs no exception. The cost is a `k3d cluster stop/start` per cluster.
+2. **Copy the two images into Zot by digest:** no restarts, but a manual copy on every version bump, and a second
+   way of bringing public images in.
+3. **A Kyverno PolicyException for MCR in `wardens`:** no restart and no copy, but the pull bypasses Zot, which is
+   what ADR 0033 exists to prevent.
+4. **An Azure Event Hubs namespace instead of the emulator:** durable and supported, but it costs money and needs the
+   internet for every alert. Left as the later target in platform-wardens 0030.
+
+#### Consequences
+
+- Good: every cluster can use Microsoft images the normal way, and the bus runs inside `wardens` next to the
+  consumer and relays, with no cloud cost.
+- Bad: the emulator is not for production. An emulator restart loses events accepted but not yet read (the
+  consumer reads within seconds; an alert fires on emulator restarts, platform-wardens plan phase 5), and Microsoft
+  doesn't support it.
+- Bad: one more upstream registry in Zot's sync, which needs the internet for a first pull like the others.
+
+#### Related
+
+- [0033](#adr-0033) image rules, [0034](#adr-0034) Zot (mirror list amended here)
+- platform-wardens decision 0030 and its plan `docs/plans/event-bus-ingress.md`
+
+## ADR-0089: LiteLLM prices the local models at what the nearest Azure model costs
+{: #adr-0089 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`</span>
+
+#### Context
+
+Every model behind LiteLLM runs on the homelab's own GPU, so LiteLLM knows no price for any of them: the
+`hosted_vllm/*` and `openai/flux.1-schnell` / `openai/ltx-2.5` names aren't in its cost map. The UI's Costs
+column shows `-`, every key's spend stays at $0, and a key budget (ADR 0029) never trips. The only cost on a
+dashboard is the electricity estimate on AI / Model performance and usage (GPU energy × the `kwh_price`
+variable), which is per token for all of vLLM, not per call or per key.
+
+Phase 4 (Inventory + cost) wants to show what the homelab saves against a cloud, and the agents (Paperclip,
+the wardens) need budgets that mean something. Both need a price per call.
+
+#### Decision
+
+Each model in `apps/litellm/config.yaml` gets a price in its `model_info`: what the nearest model Azure sells
+would cost, in USD, from the Azure Retail Prices API (East US, Global Standard), read 2026-11-06.
+
+| Local model | Azure model priced | Price |
+|---|---|---|
+| `qwen3.6-35b-a3b` | gpt-oss-120B (Azure sells no Qwen; the closest open-weight MoE it sells pay-per-token) | $0.15 in, $0.60 out per million tokens |
+| `gemma-4-26b-a4b` | gpt-oss-120B (Azure sells no Gemma) | $0.15 in, $0.60 out per million tokens |
+| `qwen3-embedding-0.6b` | text-embedding-3-small | $0.02 per million tokens |
+| `flux.1-schnell` | FLUX1.1 [pro] (Azure has no schnell) | $0.04 an image |
+| `ltx-2.5` | LTX-2.5 Pro image-to-video, 720p, through fal | $0.12 a second of clip |
+
+LiteLLM's spend, key budgets and the UI's Costs column then read "what this would have cost on Azure". The
+electricity estimate stays on the Grafana dashboard as what it really costs. Recheck the prices at least
+once a year, and when a model changes.
+
+#### Considered options
+
+1. **Azure list prices for the nearest model** (chosen): the platform's cloud is Azure, the prices come from a
+   public API anyone can rerun, and the comparison answers "what does the homelab save".
+2. **The electricity cost per token** from the dashboard: the true marginal cost, but it moves with the
+   tariff and the load, can't be set per call type, and is too small for a budget to mean anything.
+3. **OpenAI's or a router's prices for the same open models** (for example a Qwen price on a hosting
+   service): closer models, but not the platform's cloud, and the prices change often.
+4. **Leave them at $0**: spend and budgets stay useless.
+
+#### Consequences
+
+- Good: per-key spend, budgets and the UI's Costs column work for the local models, and the figures compare
+  with a real cloud bill.
+- Good: the prices are in git with their source, so a check is one API query.
+- Bad: the figures are notional. Nobody pays them, and a reader of LiteLLM's spend must know that.
+- Bad: the matches are approximate. gpt-oss-120B is bigger than both chat models and FLUX1.1 [pro] is better
+  than schnell, so the comparison flatters the homelab a little.
+- Bad: LiteLLM 1.103 uses a deployment's own prices only when a token, second or query price is set, so the
+  image model also carries a zero token price. Checked with mock calls on 1.103.1: chat, embedding, image and
+  video calls each return the expected cost.
+
+#### Related
+
+- ADR 0022 (LiteLLM gateway), ADR 0029 (one key per caller, budgets)
+- ADR 0081, 0056, 0054, 0066 (the models priced here)
 
 {% endraw %}
 <!-- adr:end -->
