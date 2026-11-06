@@ -113,7 +113,12 @@ What sends traces today:
   lab gets traces with no instrumentation at all: OBI watches the app's network calls with eBPF and
   builds spans from them.
 - **Not yet:** the platform's own services (the portal, the lab runner, the inventory) don't emit traces.
-  That comes with their OTel SDK setup. The RAG pipeline gets Phoenix for LLM-specific traces in Phase 5
+  That comes with their OTel SDK setup.
+- **LLM traces in Phoenix** (Phase 5): the OTLP gateway copies every span that describes a model call or an
+  agent step (OpenTelemetry GenAI or OpenInference attributes) to Arize Phoenix, and drops the rest there;
+  Tempo keeps everything, under the same trace ids. The LiteLLM gateway traces every model call this way,
+  and the agents' runs arrive as they are. Callers whose prompts hold personal data are masked: Phoenix
+  shows their model, tokens and latency, not their text. The RAG pipeline joins when it's built
   ([ADR 0021](/posts/projects/cloudutsuk-platform/architecture-decision-records/#adr-0021)).
 
 > **TODO:** Trace the portal and the lab runner (OTel SDK), so a slow lab deploy can be followed from the
