@@ -61,7 +61,7 @@ play to follow a packet through it:
 | RAG API, rag-ingest | `ai` cluster | Chat retrieval with a semantic cache; scheduled indexing of the blog and repos |
 | Qdrant, Redis | `ai` cluster | Vectors and the semantic cache |
 | Postgres | platform | Relational state: Backstage, inventory and cost, lab jobs |
-| Arize Phoenix | `ai` cluster | Shows every chat and agent request as a trace: retrieved chunks and scores, prompt, tokens, latency per step |
+| Arize Phoenix | `ai` cluster | Shows every model call (through the LiteLLM gateway) and every agent run as a trace: prompt, answer, tokens, latency per step; for the RAG pipeline, also the retrieved chunks and their scores |
 | Model gateway (LiteLLM) | `ai` cluster | The one OpenAI-compatible endpoint for every model call: routing, queueing, limits, token counts, later overflow |
 | vLLM chat + vLLM embeddings | `ai` cluster (GPU) | Local chat model and embedding model, each with its own memory slice |
 | KEDA + HTTP add-on | `ai` cluster | Scales a model from 0 to 1 on its next request and back to 0 when idle, so an unused model frees its memory; the add-on's interceptor holds the request while the model starts (ADR 0051). The embeddings model works this way since 2026-10-22 |

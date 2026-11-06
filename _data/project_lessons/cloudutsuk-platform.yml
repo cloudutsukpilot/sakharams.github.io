@@ -871,3 +871,14 @@ lessons:
     fix: "Power save off for the card, now and in NetworkManager's configuration so it survives a reboot. Every request then answered in under a third of a second and Argo CD synced the backlog within minutes."
     lesson: "Before changing protocols or credentials to get around a slow dependency, time the same request from another host on the same network, and through that host. If only one machine is slow, the fault is its own link or driver, and a different protocol over that link would have stalled too."
     adrs: ["0086"]
+
+  - id: L081
+    date: 2026-11-07
+    step: "Phase 5, step 6a"
+    title: "A database role created from an environment variable that wasn't there yet got no password"
+    tags: [postgres, kubernetes, secrets, phoenix]
+    symptom: "Phoenix crash-looped on its first start with \"password authentication failed\". The password in OpenBao, in the database server's Secret and in Phoenix's connection string all matched."
+    cause: "The role was created by hand in the running database pod with the password read from an environment variable, before the pod had restarted with the new Secret key. The variable was empty, and Postgres stores an empty password as no password at all, without an error, so the role existed but no password could ever match."
+    fix: "Set the role's password again from the pod's variable once the pod had it, then restarted Phoenix. The documented command now waits for the rollout and refuses to run when the variable is empty."
+    lesson: "A command that reads a secret from the environment must check the value is there before using it. Postgres, like many tools, treats an empty password as \"none\" instead of failing, so the mistake only shows up later, as an authentication error somewhere else."
+    adrs: ["0021"]
