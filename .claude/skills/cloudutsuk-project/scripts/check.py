@@ -79,11 +79,13 @@ def main():
                 errors.append(f"data file: diagram {d.get('title')!r} must link to a post of this project, not {d.get('url')!r}")
             if d.get("diagram"):
                 listed.add(d["diagram"])
-                if not (ROOT / "_data" / "flow_anims" / f"{d['diagram']}.yml").exists():
-                    errors.append(f"data file: diagram {d.get('title')!r} points at a missing flow-anim {d['diagram']!r}")
+                # format: interactive lives in _data/diagrams (cloudutsuk-diagram); anything else is a flow-anim
+                folder = "diagrams" if d.get("format") == "interactive" else "flow_anims"
+                if not (ROOT / "_data" / folder / f"{d['diagram']}.yml").exists():
+                    errors.append(f"data file: diagram {d.get('title')!r} points at a missing {folder} entry {d['diagram']!r}")
         embedded = set()
         for post in (ROOT / "_posts" / "projects" / args.slug).glob("*.md"):
-            embedded |= set(re.findall(r'flow-anim\.html\s+id="([^"]+)"', post.read_text()))
+            embedded |= set(re.findall(r'(?:flow-anim|diagram)\.html\s+id="([^"]+)"', post.read_text()))
         if embedded - listed:
             notes.append(f"data file: diagrams embedded but not in `diagrams:` (run scripts/diagrams.py {args.slug} --write): {', '.join(sorted(embedded - listed))}")
         todo_card = [k for k, v in card.items() if "TODO" in yaml.safe_dump(v)]

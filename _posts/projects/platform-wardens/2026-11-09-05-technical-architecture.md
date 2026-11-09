@@ -182,7 +182,7 @@ Agent runs are bursty and slow (minutes, mostly waiting on a model or an API), s
   fault there reaches every domain.
 
 > **TODO:** What's the expected run volume per agent per day once the SRE agents take every warning
-> and critical alert? That sets the worker counts and model capacity in [Infrastructure](/posts/projects/platform-wardens/11-infrastructure-and-environments/#capacity-planning).
+> and critical alert? That sets the worker counts and model capacity in [Infrastructure](/posts/projects/platform-wardens/11-infrastructure-and-environments/#capacity-and-quota-planning).
 {: .prompt-warning }
 
 ## Resilience and disaster recovery

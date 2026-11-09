@@ -45,7 +45,7 @@ so each piece of work has one row of record.
 
 > **TODO:** Is the Azure target (AKS, self-hosted Temporal, Foundry behind APIM) still the plan after
 > the homelab, or has the homelab become the product? It changes whether phases 4 and 5 keep their
-> Azure components in [Infrastructure](/posts/projects/platform-wardens/11-infrastructure-and-environments/#environment-strategy).
+> Azure components in [Infrastructure](/posts/projects/platform-wardens/11-infrastructure-and-environments/#environment-parity).
 {: .prompt-warning }
 
 ### Phase steps
