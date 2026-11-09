@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Testing, QA]
 description: "How Platform Wardens is tested: about 960 tests on a local Temporal, recorded fixtures instead of live models, eval sets per action, and the shadow stage as acceptance."
 project: platform-wardens
 project_step: 10
+image:
+  path: /assets/img/projects/platform-wardens/10-quality-assurance.webp
+  alt: "Platform Wardens: Quality Assurance - Projects hero image"
 ---
 
 Testing an agent has two halves that need different tools. The code around the model (routing,

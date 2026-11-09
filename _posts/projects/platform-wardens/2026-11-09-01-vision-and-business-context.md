@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Vision, Business]
 description: "Why Platform Wardens exists: agents absorb routine DevOps, SRE and DBA work up to the decision, while people build, govern and run the agents."
 project: platform-wardens
 project_step: 1
+image:
+  path: /assets/img/projects/platform-wardens/01-vision-and-business-context.webp
+  alt: "Platform Wardens: Vision and Business Context - Projects hero image"
 ---
 
 Most operations tickets follow the same six steps: a signal arrives, someone collects evidence,

@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Deployment, Go-Live]
 description: "Go-live in Platform Wardens is per agent: an 18-item admission checklist, a deploy that's a gitops commit, and the shadow stage as a launch that can't act."
 project: platform-wardens
 project_step: 13
+image:
+  path: /assets/img/projects/platform-wardens/13-deployment-and-go-live.webp
+  alt: "Platform Wardens: Deployment and Go-Live - Projects hero image"
 ---
 
 Platform Wardens doesn't have one go-live; every agent has its own, and it happens twice. The first time

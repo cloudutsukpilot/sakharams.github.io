@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Governance, Compliance]
 description: "Governance in Platform Wardens is mostly code: lifecycle gates as files, autonomy in the manifest, owner and reviewer from different teams, and evidence from every run."
 project: platform-wardens
 project_step: 17
+image:
+  path: /assets/img/projects/platform-wardens/17-governance-and-compliance.webp
+  alt: "Platform Wardens: Governance and Compliance - Projects hero image"
 ---
 
 Governance for agents has a reputation for being a committee that slows things down. In Platform

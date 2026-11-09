@@ -8,6 +8,9 @@ mermaid: true
 description: "From a merge in platform-wardens to a signed image digest in gitops and an Argo CD sync on wardens, and why an agent's real release is its lifecycle stage."
 project: platform-wardens
 project_step: 12
+image:
+  path: /assets/img/projects/platform-wardens/12-cicd-and-release-management.webp
+  alt: "Platform Wardens: CI/CD and Release Management - Projects hero image"
 ---
 
 Platform Wardens has two release paths that are easy to confuse. One ships code: a merge builds a signed

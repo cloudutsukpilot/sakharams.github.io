@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Support, Maintenance]
 description: "Who supports Platform Wardens' agents, how a wrong answer becomes an eval case, and how models, prompts and dependencies change without breaking running workflows."
 project: platform-wardens
 project_step: 16
+image:
+  path: /assets/img/projects/platform-wardens/16-support-and-maintenance.webp
+  alt: "Platform Wardens: Support and Maintenance - Projects hero image"
 ---
 
 Maintaining an agent is different from maintaining a service in one way that matters: its behaviour can

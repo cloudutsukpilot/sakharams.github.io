@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Documentation]
 description: "Platform Wardens' docs: 27 design categories, a decision log, how-docs, per-agent folders and a manifest that's the source of truth everything else restates."
 project: platform-wardens
 project_step: 15
+image:
+  path: /assets/img/projects/platform-wardens/15-documentation-and-knowledge-transfer.webp
+  alt: "Platform Wardens: Documentation and Knowledge Transfer - Projects hero image"
 ---
 
 Platform Wardens is documented more heavily than it's coded, and on purpose: an agent framework is a

@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Interview Prep, Architecture]
 description: "Interview answers about Platform Wardens as architect, developer, DevOps and SRE: durable agents, guardrails in code, evals, delivery and the gaps."
 project: platform-wardens
 project_interview: true
+image:
+  path: /assets/img/projects/platform-wardens/interview-questions.webp
+  alt: "Platform Wardens: Interview Questions - Projects hero image"
 ---
 
 Every answer below is about Platform Wardens as it's built today on the homelab, drawn from the code and

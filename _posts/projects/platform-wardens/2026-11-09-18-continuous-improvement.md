@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Improvement]
 description: "How Platform Wardens gets better: scored shadow runs, wrong answers turned into eval cases, cost against Foundry prices, and agents retired as deliberately as they start."
 project: platform-wardens
 project_step: 18
+image:
+  path: /assets/img/projects/platform-wardens/18-continuous-improvement.webp
+  alt: "Platform Wardens: Continuous Improvement - Projects hero image"
 ---
 
 Every agent in Platform Wardens is on probation, permanently. It climbs a level only with evidence and

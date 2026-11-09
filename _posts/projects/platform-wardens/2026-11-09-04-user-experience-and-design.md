@@ -8,6 +8,9 @@ description: "Platform Wardens' interfaces are a Slack message, a draft PR and a
 project: platform-wardens
 project_step: 4
 mermaid: true
+image:
+  path: /assets/img/projects/platform-wardens/04-user-experience-and-design.webp
+  alt: "Platform Wardens: User Experience and Design - Projects hero image"
 ---
 
 Platform Wardens has almost no screens, and that's the design. People meet the agents where they

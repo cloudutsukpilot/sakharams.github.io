@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Requirements]
 description: "What Platform Wardens must do and how well: entry points, routing, guardrails, run records, evals, and the rules that keep agents at L0 and L1."
 project: platform-wardens
 project_step: 2
+image:
+  path: /assets/img/projects/platform-wardens/02-requirements-gathering.webp
+  alt: "Platform Wardens: Requirements Gathering - Projects hero image"
 ---
 
 The requirements for Platform Wardens come from an unusual place: a reference standard for multi-agent

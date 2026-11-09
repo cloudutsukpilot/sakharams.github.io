@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Infrastructure, IaC]
 description: "Where Platform Wardens runs: a laptop with a local Temporal, the homelab's wardens k3d cluster, and the planned Azure AKS target, all defined as code."
 project: platform-wardens
 project_step: 11
+image:
+  path: /assets/img/projects/platform-wardens/11-infrastructure-and-environments.webp
+  alt: "Platform Wardens: Infrastructure and Environments - Projects hero image"
 ---
 
 Platform Wardens has two real environments today: a developer's machine with a local Temporal, and the

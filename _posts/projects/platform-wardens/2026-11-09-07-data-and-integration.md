@@ -8,6 +8,9 @@ description: "What Platform Wardens stores, for how long, how its schemas change
 project: platform-wardens
 project_step: 7
 mermaid: true
+image:
+  path: /assets/img/projects/platform-wardens/07-data-and-integration.webp
+  alt: "Platform Wardens: Data and Integration - Projects hero image"
 ---
 
 Platform Wardens owns very little data and reads a lot of other people's. Its own data is the record of

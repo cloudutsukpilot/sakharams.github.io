@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Security, Privacy]
 description: "How Platform Wardens keeps agents inside their grants: OWASP agentic threats, an identity per agent, guardrails in code, redaction and a hash-chained audit."
 project: platform-wardens
 project_step: 6
+image:
+  path: /assets/img/projects/platform-wardens/06-security-and-privacy.webp
+  alt: "Platform Wardens: Security and Privacy - Projects hero image"
 ---
 
 An agent that reads plans, logs and commit messages is an agent that reads attacker-controlled text all

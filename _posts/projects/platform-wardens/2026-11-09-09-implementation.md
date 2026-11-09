@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Implementation]
 description: "How Platform Wardens was built: one reference agent end to end first, then the framework grown from what it needed, with the debt tracked per module."
 project: platform-wardens
 project_step: 9
+image:
+  path: /assets/img/projects/platform-wardens/09-implementation.webp
+  alt: "Platform Wardens: Implementation - Projects hero image"
 ---
 
 Platform Wardens wasn't built framework-first. terraform-drift was taken end to end (schedule, model,

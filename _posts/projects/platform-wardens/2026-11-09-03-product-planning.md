@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Planning, Roadmap]
 description: "Platform Wardens' roadmap: six phases from foundations to the first gated actions, a step table per phase, the MVP and how the plan changes."
 project: platform-wardens
 project_step: 3
+image:
+  path: /assets/img/projects/platform-wardens/03-product-planning.webp
+  alt: "Platform Wardens: Product Planning - Projects hero image"
 ---
 
 Platform Wardens has a plan written for a big Azure estate and three teams, and it's being built first

@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Development, Workflow]
 description: "One uv workspace, an agent template, import rules that keep Temporal and model clients in one place, and design docs that drive the code in Platform Wardens."
 project: platform-wardens
 project_step: 8
+image:
+  path: /assets/img/projects/platform-wardens/08-development-preparation.webp
+  alt: "Platform Wardens: Development Preparation - Projects hero image"
 ---
 
 Platform Wardens is a repo where the design docs are written first and the code has to keep up with

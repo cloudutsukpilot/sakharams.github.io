@@ -8,6 +8,9 @@ description: "Three layers (Pydantic AI, Temporal, wardens), agents as manifests
 project: platform-wardens
 project_step: 5
 mermaid: true
+image:
+  path: /assets/img/projects/platform-wardens/05-technical-architecture.webp
+  alt: "Platform Wardens: Technical Architecture - Projects hero image"
 ---
 
 The architecture of Platform Wardens comes down to one question: where is the model allowed to make a

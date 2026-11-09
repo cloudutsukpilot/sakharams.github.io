@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Observability, Operations]
 description: "One trace per incident keyed by the correlation id, run records, four Grafana dashboards and alert rules with P1 to P4 priorities for Platform Wardens' agents."
 project: platform-wardens
 project_step: 14
+image:
+  path: /assets/img/projects/platform-wardens/14-operations-and-observability.webp
+  alt: "Platform Wardens: Operations and Observability - Projects hero image"
 ---
 
 An agent you can't observe is an agent you can't promote: every gate reads evidence from runs, so
