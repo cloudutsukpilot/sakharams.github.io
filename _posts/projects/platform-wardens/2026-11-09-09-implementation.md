@@ -52,6 +52,19 @@ The order things were built in, and what pulled each one in:
 | The event bus | Webhooks holding a thread per request while waiting on Temporal |
 | MCP client and `mcp-guard` | The first shared tool, web search |
 
+Each of those pieces is a function an agent calls. The call map below follows two agents into the framework:
+terraform-drift (scheduled, deterministic stages and two LLM stages) and stack-author (a chat with tools). Open a level
+to see the files, then the functions; every function's panel gives its file and line. Pick a use case and press play to
+watch one call travel, and tick **Details** to read what each check decides and what happens when it says no.
+
+{% include diagram.html id="projects/platform-wardens/call-map" %}
+
+Tracing the calls found three gaps the docs had glossed over, and the diagram draws them as they are:
+
+- Guardrail point 1 runs when the console, a webhook or the router builds a task, but not when a schedule fires.
+- stack-author's model has no circuit breaker: its worker builds the model without naming the agent.
+- The MCP client is built and the gateway is live, but no agent stage calls it yet.
+
 ## API and UI implementation
 {: #api-and-ui-implementation }
 

@@ -26,6 +26,7 @@ facts:
   url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture
 diagrams:
 - {type: system-context, title: "Wardens platform", url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/platform-wardens/system-architecture, format: interactive}
+- {type: sequence, title: "Wardens call map", url: /posts/projects/platform-wardens/09-implementation/#feature-development, diagram: projects/platform-wardens/call-map, format: interactive}
 - {type: data-model, title: "Contracts: task, artifact, run record", url: /posts/projects/platform-wardens/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
 - {type: user-journey, title: "Daily drift, from the owner's side", url: /posts/projects/platform-wardens/04-user-experience-and-design/#user-flows, format: mermaid}
 - {type: cicd, title: "Merge to a running worker", url: /posts/projects/platform-wardens/12-cicd-and-release-management/#build-automation, format: mermaid}
