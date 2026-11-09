@@ -12,6 +12,7 @@ title: wardens platform
 description: "How platform-wardens runs on the homelab today: entry points, the ingress bus, Temporal, the agent workers, models and MCP through LiteLLM, the state store and telemetry, with each how-doc replayed as a use case."
 level: 1
 levels: [Context, Homelab, Clusters, Namespaces, Inside a worker]
+lock: true
 accent: "#2563EB"
 accent2: "#8B5CF6"
 

@@ -7,6 +7,7 @@ accent: "#38BDF8"
 accent2: "#FBBF24"
 level: 1
 levels: [Overview, Components]
+lock: false
 min_zoom: 0.5
 
 certs:

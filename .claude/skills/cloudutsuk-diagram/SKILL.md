@@ -265,6 +265,15 @@ Playback: Play / Pause; Next and Previous **animate** the step (packets travel i
 targets light up); clicking a step dot does the same; each step opens the groups it needs and moves
 the camera to them. A single legacy `tour:` still works as one use case.
 
+**Lock mode (always set).** Every diagram with use cases has a padlock in the player and states
+`lock:` at the top level, `false` by default (the validator warns when it is missing). Locked, use
+cases play on the reader's layout: their level, the components they opened and their view tab.
+Nothing opens or closes; the camera still moves to each step. A packet aimed inside a closed component
+travels to that component; a hop with both ends inside one closed component, or on an arrow the tab
+hides, pulses the component and the banner says so ("· inside Workers"). Set `lock: true` when the
+use cases read well at the start `level` and opening groups would distract. The reader can toggle the
+padlock either way; turning it on mid-way puts their layout back and keeps playing.
+
 ### 4. Write, validate, embed
 
 ```bash
@@ -290,9 +299,9 @@ pkill -f "http.serve[r] 4123"
 Checked: layout at every level with no overlapping components, expand on click, the protocol card on
 hover, the detail panel (status badge, chips, lead sentence, how it works, link buttons, API), an
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
-(each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, no script errors, no foreign styling and no
+(each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png` and `step-next.png`. Then run htmlproofer on the same folder.
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png` and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -313,6 +322,7 @@ read. Never commit.
 | `edges` | `{id, from, to, why, certs, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `certs`: which certificate secures it (step 2); `detail`: an extra technical note (auth, token lifetime) |
 | `certs` | Certificate catalog: `{id: {label, type, by, issuer, valid, trust, key?, stored?, note?}}`, referenced by edges (step 2). `issuer` may be left out for `type: key` |
 | `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |
+| `lock` | Always set when there are use cases: `false` (default) lets each step open the groups it needs; `true` opens the diagram in lock mode, so use cases play on the reader's layout. The padlock in the player toggles it |
 | `map` | Geo backdrop `{name: world, lon: [w, e], lat: [n, s], width, height}`; nodes use `lat`/`lon` |
 
 Colours: explicit `color` (blue, sky, teal, green, lime, amber, orange, red, rose, pink, violet, indigo,

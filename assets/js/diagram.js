@@ -1617,6 +1617,9 @@
     // its own steps and optional modes; the reader picks one. A single legacy `tour:` is one scenario.
     // Every step change (play, next, previous, a dot) runs the step: packets travel its arrows, then
     // its targets light up. A newer action cancels an animation in flight.
+    // Lock mode (the padlock, or `lock: true`) plays on the layout the reader has: their level, the
+    // components they opened and their view tab. Nothing opens or closes; the camera still moves, and
+    // a packet whose hop is inside a closed component (or on an arrow the tab hides) pulses it instead.
     buildTour() {
       const list = (this.data.scenarios || (this.data.tour ? [{ id: 'tour', ...this.data.tour }] : [])).filter((x) => x.steps && x.steps.length);
       const capEl = this.root.querySelector('.dgm-caption');
@@ -1631,11 +1634,21 @@
       this.k = -1;
       this.playing = false;
       this.run = 0;
+      this.locked = this.data.lock === true;
       const dots = ctl.querySelector('.dgm-dots');
       const playBtn = ctl.querySelector('[data-act="play"]');
       const picker = this.root.querySelector('.dgm-scenarios');
       const modeLabel = ctl.querySelector('.dgm-toggle-mode');
       const modeBox = modeLabel && modeLabel.querySelector('input');
+      const lockBtn = ctl.querySelector('[data-act="lock"]');
+      const setLockIcon = () => {
+        if (!lockBtn) return;
+        lockBtn.innerHTML = `<i class="fas fa-${this.locked ? 'lock' : 'lock-open'}" aria-hidden="true"></i>`;
+        lockBtn.setAttribute('aria-pressed', this.locked ? 'true' : 'false');
+        lockBtn.title = this.locked ? 'Layout locked: use cases play on this layout. Click to let them open components' : 'Lock layout: play use cases without opening or closing components';
+        this.root.classList.toggle('is-locked', this.locked);
+      };
+      setLockIcon();
       const empty = () => ({ nodes: new Set(), edges: new Set(), active: new Set() });
       const setPlayIcon = () => {
         playBtn.innerHTML = `<i class="fas fa-${this.playing ? 'pause' : 'play'}" aria-hidden="true"></i>`;
@@ -1725,14 +1738,26 @@
         const b = this.before;
         if (!b) return;
         this.before = null;
-        this.expanded = b.expanded;
-        this.level = b.level;
-        this.showAll = b.view === ALL_VIEWS;
-        this.activeView = this.showAll ? null : b.view;
-        this.markView();
-        this.updateLevelLabel();
-        await this.relayout({});
+        const view = this.showAll ? ALL_VIEWS : this.activeView;
+        const same = b.view === view && b.level === this.level && b.expanded.size === this.expanded.size && [...b.expanded].every((id) => this.expanded.has(id));
+        if (!same) {
+          this.expanded = b.expanded;
+          this.level = b.level;
+          this.showAll = b.view === ALL_VIEWS;
+          this.activeView = this.showAll ? null : b.view;
+          this.markView();
+          this.updateLevelLabel();
+          await this.relayout({});
+        }
         this.animateCam(b.cam);
+      };
+      // Put back the reader's layout (open groups, level, view) but keep the snapshot, so the camera
+      // still returns at the end: used when lock mode is turned on in the middle of a use case.
+      this.restoreLayout = async () => {
+        const b = this.before;
+        if (!b) return;
+        await this.restoreBefore();
+        this.before = b;
       };
       // Open the groups step i needs, and close the open ones that neither it nor a later step uses,
       // so the packet is easy to follow.
@@ -1740,6 +1765,8 @@
         const x = this.steps[i];
         if (!x) return [];
         this.snapshot();
+        // Locked: the layout stays as the reader left it; only the camera follows the packet.
+        if (this.locked) return stepIds(x);
         // While a use case runs Show all is on: every component and arrow is shown, and groups
         // open and close around the packet instead.
         let changed = !this.showAll || !!this.activeView;
@@ -1770,14 +1797,56 @@
       };
       // Packets travel one group at a time; within a group, along every arrow at once. Requests are
       // the accent2 pointer; responses (~) a green packet running backwards. 'stopped' if cancelled.
+      // Where a leg has no arrow on the canvas: inside one closed component (or a group that holds the
+      // other end), or on an arrow the view tab hides. Returns the component to pulse and a note.
+      const hiddenLeg = (l) => {
+        const a = this.repOf(l.from);
+        const b = this.repOf(l.to);
+        if (a && b && (a === b || this.ancestorsOf(b.id).includes(a) || this.ancestorsOf(a.id).includes(b))) {
+          const outer = a === b || this.ancestorsOf(b.id).includes(a) ? a : b;
+          return { rep: outer, note: `inside ${outer.label}` };
+        }
+        return { rep: b || a, note: 'on an arrow hidden in this view' };
+      };
       const runGroup = (legs, token) =>
         new Promise((resolve) => {
           const runs = [];
+          const hidden = [];
           for (const l of legs) {
             const el = this.edgeEls.get(`${this.repOf(l.e.from)?.id}>${this.repOf(l.e.to)?.id}`);
             if (el) runs.push({ ...el, rev: l.rev });
+            else hidden.push(hiddenLeg(l));
           }
-          if (!runs.length || reduceMotion) return resolve();
+          const x = this.steps[this.stepRunning];
+          const line = x ? x.action || x.title : '';
+          this.setBanner(hidden.length && line ? `${line} · ${[...new Set(hidden.map((h) => h.note))].join(', ')}` : line || null);
+          const pulsed = [...new Set(hidden.map((h) => h.rep && this.nodeEls.get(h.rep.id)).filter(Boolean))];
+          pulsed.forEach((el) => {
+            el.classList.remove('is-pulsing');
+            void el.getBoundingClientRect();
+            el.classList.add('is-pulsing');
+          });
+          const unpulse = () => pulsed.forEach((el) => el.classList.remove('is-pulsing'));
+          if (reduceMotion) {
+            unpulse();
+            return resolve();
+          }
+          if (!runs.length) {
+            // Nothing to travel: hold for the time a short hop takes while the component pulses.
+            const t0 = performance.now();
+            const wait = (now) => {
+              if (token !== this.run) {
+                unpulse();
+                return resolve('stopped');
+              }
+              if (now - t0 < 900 / this.speed) requestAnimationFrame(wait);
+              else {
+                unpulse();
+                resolve();
+              }
+            };
+            return requestAnimationFrame(wait);
+          }
           const maxLen = Math.max(...runs.map((r) => r.m.total));
           const D = (600 + maxLen * 1.4) / this.speed;
           const ptrs = runs.map((r) => {
@@ -1790,6 +1859,7 @@
           const tick = (now) => {
             if (token !== this.run) {
               ptrs.forEach((p) => p.remove());
+              unpulse();
               return resolve('stopped');
             }
             const t = Math.min(1, (now - t0) / D);
@@ -1805,6 +1875,7 @@
             if (t < 1) requestAnimationFrame(tick);
             else {
               ptrs.forEach((p) => p.remove());
+              unpulse();
               resolve();
             }
           };
@@ -1882,6 +1953,7 @@
         }
         i = Math.min(i, this.steps.length - 1);
         const x = this.steps[i];
+        this.stepRunning = i;
         const ids = await this.ensureVisible(i);
         if (token !== this.run) return 'stopped';
         this.pointerLayer.textContent = '';
@@ -2026,7 +2098,22 @@
           this.speed = SPEEDS[(SPEEDS.indexOf(this.speed) + 1) % SPEEDS.length];
           b.textContent = `${this.speed}×`;
         }
+        if (a === 'lock') this.setLocked(!this.locked);
       });
+      // Turning lock on puts back the layout the reader had before the use case opened groups; turning
+      // it off lets the use case open what it needs. Either way the current step runs again.
+      this.setLocked = async (on) => {
+        const wasPlaying = this.playing;
+        this.stop();
+        this.locked = on;
+        setLockIcon();
+        if (on) await this.restoreLayout();
+        if (wasPlaying) {
+          // Play again from the current step.
+          this.k = Math.max(-1, this.k - 1);
+          this.play();
+        } else if (this.k >= 0) await this.showStep(this.k, true);
+      };
       modeBox?.addEventListener('change', () => {
         this.stop();
         this.mode = modeBox.checked && this.modes[1] ? this.modes[1].id : this.modes[0].id;
