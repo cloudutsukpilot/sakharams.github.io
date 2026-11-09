@@ -284,7 +284,9 @@ Never commit. Tell the user:
 
 For a project whose decisions are recorded as ADRs in its own repo (MADR files `NNNN-kebab-title.md`
 with front matter `id`, `title`, `status`, `date`, `deciders`, `related_repos` and the sections Context,
-Decision, Considered options, Consequences, optionally Related), publish them instead of retyping:
+Decision, Considered options, Consequences, optionally Related), or `# NNNN. Title` files with
+`- **Status:**` / `- **Date:**` bullets instead of front matter, as platform-wardens writes them),
+publish them instead of retyping:
 
 ```bash
 python3 $S/sync_adrs.py <slug> --src ../<repo>/docs/adr   # first run; stores the source in the data file
