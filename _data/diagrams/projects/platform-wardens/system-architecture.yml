@@ -1,0 +1,903 @@
+# Ported from platform-wardens diagrams/wardens-platform/diagram.yml (2026-11-09); icons mapped to the blog's logos.
+# Edit the source in platform-wardens and port again, so the two stay the same.
+# platform-wardens as built on the homelab (checked 2026-11-09 against platform-wardens main and homelab-gitops
+# clusters/wardens, apps/wardens-console, charts/wardens-agent, apps/litellm, apps/mcp-web-search and
+# infra-local host/cloudflared/routes.yaml). The six use cases follow docs/how-docs/: scheduled drift with a
+# handoff, an alert or GitHub event through the ingress bus, an LLM stage with guardrails and MCP, a console chat,
+# shipping a new agent, and an L2 approval (planned: no hosted approval endpoint and no agent above L1).
+# Certificates: Let's Encrypt through cert-manager (cluster issuer `letsencrypt`, DNS-01 via Cloudflare) on every
+# Traefik ingress; in-cluster hops are plaintext behind NetworkPolicies. Not checked with openssl.
+# Build: PLUGIN=<interactive-diagrams plugin folder> ./build.sh
+title: wardens platform
+description: "How platform-wardens runs on the homelab today: entry points, the ingress bus, Temporal, the agent workers, models and MCP through LiteLLM, the state store and telemetry, with each how-doc replayed as a use case."
+level: 1
+levels: [Context, Homelab, Clusters, Namespaces, Inside a worker]
+accent: "#2563EB"
+accent2: "#8B5CF6"
+
+views:
+  - {id: observability, label: Observability, icon: chart}
+  - {id: security, label: Identity & secrets, icon: lock}
+  - {id: cicd, label: CI/CD, icon: rocket}
+
+certs:
+  le-home:
+    label: "<app>.<cluster>.home.cloudutsuk.com"
+    type: public
+    by: "Traefik, the ingress controller of each k3d cluster (TLS ends there)"
+    issuer: "Let's Encrypt → ISRG Root X1; ACME DNS-01 through Cloudflare by cert-manager (cluster issuer `letsencrypt`)"
+    valid: "90 days; cert-manager renews it before expiry"
+    stored: "A Secret per Ingress in the app's namespace (for example `wardens-console/wardens-alerts-tls`)"
+    trust: "Public chain: Python's and Go's CA bundles and every browser trust ISRG Root X1"
+  le-hooks:
+    label: hooks.cloudutsuk.com (origin)
+    type: public
+    by: "Traefik on the wardens load balancer 172.30.0.6, for the tunnel's origin request"
+    issuer: "Let's Encrypt → ISRG Root X1; cert-manager, cluster issuer `letsencrypt`"
+    valid: "90 days; cert-manager renews it"
+    stored: "Secret `wardens-console/wardens-hooks-tls`"
+    trust: "cloudflared checks it against `originServerName: hooks.cloudutsuk.com`"
+  cf-edge:
+    label: "*.cloudutsuk.com at Cloudflare's edge"
+    type: public
+    by: "Cloudflare's edge (TLS ends there, then the tunnel carries the request)"
+    issuer: "Cloudflare Universal SSL, issued and renewed by Cloudflare"
+    valid: "Managed by Cloudflare"
+    trust: "Public chain: GitHub's webhook sender and browsers trust it"
+  cf-tunnel:
+    label: Cloudflare Tunnel connection
+    type: public
+    by: "Cloudflare's tunnel endpoint; cloudflared opens the connection outbound from the host"
+    issuer: "Cloudflare's own CA for tunnel endpoints; cloudflared authenticates with the tunnel's credentials file"
+    valid: "Managed by Cloudflare"
+    trust: "cloudflared pins Cloudflare's tunnel CA"
+  github-pub:
+    label: api.github.com
+    type: public
+    by: "GitHub"
+    issuer: "GitHub's public CA chain, managed by GitHub"
+    valid: "Managed by GitHub"
+    trust: "Public chain in the image's CA bundle"
+  slack-pub:
+    label: hooks.slack.com
+    type: public
+    by: "Slack"
+    issuer: "Slack's public CA chain, managed by Slack"
+    valid: "Managed by Slack"
+    trust: "Public chain in the image's CA bundle"
+  azure-pub:
+    label: "management.azure.com / login.microsoftonline.com"
+    type: public
+    by: "Azure Resource Manager and Entra ID"
+    issuer: "Microsoft Azure TLS issuing CAs → DigiCert Global Root G2; managed by Microsoft"
+    valid: "Managed by Microsoft"
+    trust: "Public chain in the image's CA bundle"
+  k3s-ca:
+    label: wardens cluster API (172.30.0.1:6446)
+    type: cluster
+    by: "The k3s API server of the wardens cluster"
+    issuer: "The cluster's own CA, created by k3s when infra-local made the cluster"
+    valid: "k3s rotates serving certificates; the CA lasts 10 years"
+    trust: "Argo CD holds the CA in its cluster Secret for `wardens`"
+
+nodes:
+  - id: engineer
+    label: Platform engineer
+    sub: "operator · developer"
+    icon: user
+    status: external
+    facts:
+      summary: "Builds and ships agents, sends tasks from the operator console, chats with stack-author and holds the kill switch."
+      how: "Browser on the tailnet (or through Cloudflare Access), `git push` to GitHub, Slack for findings."
+      api: "None of their own: the console, GitHub and Slack"
+
+  - id: approver
+    label: Approver
+    sub: "domain team member"
+    icon: users
+    status: planned
+    facts:
+      summary: "Planned: a person in an action's approver group who approves or denies a level 2 action."
+      how: "Opens the approval card's link, signs in with Keycloak and decides. Never the requester and never an agent."
+      api: "None of their own: the approval endpoint (planned)"
+
+  - id: github
+    label: GitHub
+    sub: "cloudutsukpilot org"
+    icon: devops/cicd/github-18.svg
+    status: external
+    facts:
+      summary: "Holds the code, the IaC repositories the agents read, the draft PRs they open and the homelab-gitops repo Argo CD deploys from."
+      how: "Each agent has its own GitHub App and mints installation tokens; the drift App sends signed `workflow_job` webhooks."
+      url: {Org: "https://github.com/cloudutsukpilot"}
+      api: "`https://api.github.com`"
+
+  - id: cloudflare
+    label: Cloudflare edge
+    sub: "Tunnel · Access"
+    icon: miscellaneous/cloudflare-18.svg
+    status: external
+    facts:
+      summary: "The only public way in: `hooks.cloudutsuk.com/github` for GitHub and `console.cloudutsuk.com` behind Access."
+      how: "TLS ends at the edge; the request goes down the `homelab` tunnel to cloudflared on the host. Access bypasses `hooks` (the HMAC is the authentication)."
+      url: {Webhooks: "https://hooks.cloudutsuk.com/github", Console: "https://console.cloudutsuk.com"}
+
+  - id: slack
+    label: Slack
+    sub: "#platform-warden"
+    icon: miscellaneous/slack-18.svg
+    status: external
+    facts:
+      summary: "Where people read findings, run failures and (planned) approval cards."
+      how: "Incoming webhooks; the URL per audience comes from OpenBao `kv/wardens/notify` (framework/config/notify.yaml)."
+      api: "`https://hooks.slack.com/services/…`"
+
+  - id: azure
+    label: Azure
+    sub: "ARM · Resource Graph · Entra"
+    icon: cloud
+    status: external
+    facts:
+      summary: "change-correlator reads who changed or deleted a resource from the Activity Log and Resource Graph."
+      how: "Its own Entra app with a federated credential for its service account (workload identity), Reader on every subscription."
+      api: "`https://management.azure.com`"
+
+  - id: homelab
+    label: Homelab
+    sub: "k3d clusters on the homelab"
+    icon: server
+    status: built
+    facts:
+      summary: "The k3d clusters and host services the platform runs on; wardens has its own cluster."
+      how: "k3d on the Docker bridge `homelab` 172.30.0.0/24 (gpu on 172.31.0.0/24), created by infra-local, apps by Argo CD from homelab-gitops."
+      api: "None of its own: each cluster's API"
+    children:
+      - id: cloudflared
+        label: cloudflared
+        sub: "host service"
+        icon: router
+        status: built
+        facts:
+          summary: "The `homelab` tunnel's connector on the host: brings public requests in without an open port."
+          how: "Routes `hooks.cloudutsuk.com` path `^/github$` to `https://172.30.0.6:443`; any other path gets 404 (infra-local host/cloudflared/routes.yaml)."
+          where: "homelab host"
+          api: "None of its own: the tunnel"
+
+      - id: c_wardens
+        label: wardens cluster
+        sub: "k3d · 172.30.0.6"
+        icon: cluster
+        status: built
+        facts:
+          summary: "The cluster that runs only platform-wardens: entry points, Temporal, one worker per agent, MCP servers and the state store."
+          how: "Kyverno enforces digests and restricted pods; each agent has its own namespace, service account and identity (ADR 0069, 0071)."
+          where: "API 172.30.0.1:6446"
+          url: {Console: "https://console.wardens.home.cloudutsuk.com", Temporal UI: "https://temporal.wardens.home.cloudutsuk.com"}
+        children:
+          - id: w_traefik
+            label: Traefik
+            sub: "ingress · 172.30.0.6:443"
+            icon: balancer
+            status: built
+            facts:
+              summary: "The cluster's ingress: ends TLS for the console, the alert webhook, the GitHub webhook and the MCP server."
+              how: "k3s's Traefik with cert-manager certificates; only `POST /github` (Exact) is routed for hooks."
+              api: "`https://<app>.wardens.home.cloudutsuk.com`"
+          - id: w_api
+            label: k3s API
+            icon: cluster
+            status: built
+            views: [cicd]
+            facts:
+              summary: "The cluster's Kubernetes API, which Argo CD applies the agents' manifests to."
+              how: "k3s API server; Argo CD in `platform` holds its CA and a token in a cluster Secret."
+              api: "`https://172.30.0.1:6446`"
+          - id: w_collector
+            label: Agent collector
+            sub: "monitoring pack"
+            icon: chart
+            status: built
+            views: [observability]
+            facts:
+              summary: "The node's OpenTelemetry collector: every wardens pod sends OTLP here."
+              how: "OTLP gRPC in, forwarded to the gateway on `mon` (ADR 0026). Without an endpoint the framework exports nothing."
+              api: "`http://agent-collector.monitoring.svc:4317`"
+          - id: w_eso
+            label: External Secrets
+            icon: key
+            status: built
+            views: [security]
+            facts:
+              summary: "Turns OpenBao `kv/wardens/*` entries into the Secrets the pods read: LiteLLM keys, GitHub App keys, Slack URLs, DB passwords."
+              how: "ExternalSecret per app (`secretEnv` in the agent chart), seeded by infra-local host/wardens/configure.sh."
+              api: "None of its own: the ExternalSecret CRD"
+
+          - id: ns_entry
+            label: wardens-console ns
+            sub: "entry points · bus"
+            icon: browser
+            status: built
+            facts:
+              summary: "Every way a task gets in: the console, the two webhooks, the router, the ingress consumer and the bus (how-docs: ingress)."
+              how: "One image with different commands (charts/wardens-web plus templates in apps/wardens-console)."
+              api: "None of its own: see the children"
+            children:
+              - id: console
+                label: Operator console
+                sub: "oauth2-proxy :4180"
+                icon: browser
+                status: built
+                facts:
+                  summary: "Sends a root task to an agent exactly as a trigger does, and hosts the stack-author chat (Author tab)."
+                  how: "oauth2-proxy sidecar with Keycloak (platform-admins, wardens-console-admin); the app listens on 127.0.0.1 and talks gRPC to Temporal."
+                  url: {Console: "https://console.wardens.home.cloudutsuk.com"}
+                  api: "`python -m wardens.runtime.console`"
+              - id: alerts
+                label: wardens-alerts
+                sub: "relay · :8080"
+                icon: bell
+                status: built
+                facts:
+                  summary: "Alertmanager's webhook: checks the bearer token, cuts a firing group to its bus form and publishes it."
+                  how: "Relay mode since 2026-11-06 (direct is the rollback); answers 202 published, 200 ignored, 503 hub unavailable."
+                  url: {Webhook: "https://alerts.wardens.home.cloudutsuk.com/alert"}
+                  api: "`python -m wardens.runtime.alert_webhook --mode relay`"
+              - id: hooks
+                label: wardens-hooks
+                sub: "relay · :8080"
+                icon: git
+                status: built
+                facts:
+                  summary: "The drift GitHub App's webhook: checks the HMAC, filters by config/webhooks.yaml and publishes a match."
+                  how: "Relay mode; the delivery id is the event id, so a redelivery starts nothing new."
+                  url: {Webhook: "https://hooks.cloudutsuk.com/github"}
+                  api: "`python -m wardens.runtime.github_webhook --mode relay`"
+              - id: eventhubs
+                label: Event Hubs emulator
+                sub: "+ Azurite · AMQP :5672"
+                icon: queue
+                status: built
+                facts:
+                  summary: "The ingress bus: hub `wardens-ingress` and dead-letter hub `wardens-ingress-dlq` (decision 0030, ADR 0088)."
+                  how: "Microsoft's emulator and Azurite in one pod, no volume; Azurite keeps the consumer's checkpoints. Only the relays and the consumer reach it."
+                  api: "`amqp://wardens-eventhubs:5672` · checkpoints `:10000`"
+              - id: ingress
+                label: Ingress consumer
+                sub: "wardens-ingress"
+                icon: queue
+                status: built
+                facts:
+                  summary: "Reads the hub one event at a time per partition, runs the same rules and task building as direct mode, starts the workflow."
+                  how: "Checkpoints after the handler; refused → dead-letter, Temporal down → wait (backpressure), stale → nothing."
+                  api: "`python -m wardens.runtime.ingress` · `/healthz`"
+              - id: router
+                label: wardens-router
+                sub: "queue wardens-router"
+                icon: router
+                status: built
+                facts:
+                  summary: "Runs the incident workflow for routed alerts and the classifier for chat `Auto` and alerts no rule knows."
+                  how: "A Temporal worker on queue `wardens-router` (ADR 0084); rules first, the classifier only above a measured threshold."
+                  api: "Temporal queue `wardens-router`"
+              - id: approve
+                label: Approval endpoint
+                sub: "planned · wardens-web"
+                icon: check
+                status: planned
+                facts:
+                  summary: "Planned: turns a signed-in person's click into the `approval` signal of a waiting workflow."
+                  how: "Core built (wardens.durable.approval_endpoint): verifies the OIDC token, refuses service accounts and group overage, uses the server's clock. Not hosted yet."
+                  api: "`submit_decision(token=…, body=…)`"
+
+          - id: ns_temporal
+            label: Temporal
+            sub: "ns temporal · wardens-db"
+            icon: clock
+            status: built
+            facts:
+              summary: "Durable execution: every agent run, incident, schedule and conversation is a workflow here (how-docs: durable execution)."
+              how: "Temporal 1.32 (chart 1.7.0) on Postgres `wardens-db`, Temporal namespace `wardens` with 30 days of retention."
+              url: {Temporal UI: "https://temporal.wardens.home.cloudutsuk.com"}
+            children:
+              - id: temporal
+                label: Temporal frontend
+                sub: ":7233"
+                icon: clock
+                status: built
+                facts:
+                  summary: "Holds workflow history, timers, signals and schedules; workers long-poll it for tasks."
+                  how: "gRPC frontend, reachable only from namespaces labelled `homelab/wardens-agent=true`; 64 history shards, fixed."
+                  api: "`temporal-frontend.temporal.svc:7233`"
+              - id: wardens_db
+                label: wardens-db
+                sub: "Postgres 17"
+                icon: databases/postgresql-18.svg
+                status: built
+                facts:
+                  summary: "Temporal's own databases `temporal` and `temporal_visibility`, kept apart so Temporal can be reset alone."
+                  how: "Postgres 17, data on `/srv/homelab/pg/wardens-db` (ADR 0070)."
+                  api: "`wardens-db.wardens-db.svc:5432`"
+
+          - id: ns_agents
+            label: Agent workers
+            sub: "one namespace each"
+            icon: users
+            status: built
+            facts:
+              summary: "One Temporal worker per agent on its own task queue, from the shared chart charts/wardens-agent (ADR 0072)."
+              how: "No ingress: a worker only polls Temporal. Egress to Temporal, DNS, OTLP, the state DB and HTTPS."
+              api: "None of its own: Temporal task queues"
+            children:
+              - id: drift
+                label: terraform-drift
+                sub: "shadow · L1"
+                icon: git
+                status: built
+                facts:
+                  summary: "Explains drift between Azure and resources.yaml, and opens draft PRs that codify an intended change."
+                  how: "Daily schedule `daily-infra-azure` at 08:00 UTC under the incident workflow, or started by the GitHub webhook."
+                  where: "ns terraform-drift"
+                  api: "Temporal queue `terraform-drift`"
+                children:
+                  - id: td_wf
+                    label: workflow.py
+                    sub: "via wardens.durable"
+                    icon: code
+                    status: built
+                    facts:
+                      summary: "Decides what happens next: kill switch, scope, scan run, stacks, analyse, emit, draft PR."
+                      how: "Deterministic Temporal workflow code: no I/O, clocks or LLM calls; every effect is an activity through the Activities protocol."
+                      api: "`run(task, acts)`"
+                  - id: td_acts
+                    label: activities.py
+                    icon: function
+                    status: built
+                    facts:
+                      summary: "Does all the I/O: GitHub reads, plan analysis, emitting artifacts, the draft PR, plus the framework's record and notify activities."
+                      how: "Polls Temporal for activity tasks; reads retry, acts run once unless idempotent (`open_draft_pr` is)."
+                      api: "`DriftActivities`"
+                  - id: td_llm
+                    label: LLM stages
+                    sub: "Pydantic AI · GuardedToolset"
+                    icon: cpu
+                    status: built
+                    facts:
+                      summary: "Classify and recommend: the model writes only the classification and rationale; deterministic code decides the action."
+                      how: "Validated output, usage limits from prices.yaml, read tools only through GuardedToolset (guardrail point 2), fallback to `unknown`."
+                      api: "`stages/classify.py`, `stages/recommend.py`"
+                  - id: td_guard
+                    label: Guardrails
+                    sub: "point 4 · kill switch"
+                    icon: shield
+                    status: built
+                    facts:
+                      summary: "`check_action` on every proposed action and the kill switch before the run, each stack and each act (how-docs: guardrails)."
+                      how: "Pure checks against the manifest and ownership map; the switch is the Git file or the DB row, and fails closed."
+                      api: "`wardens.guardrails.check_action`, `is_engaged`"
+              - id: correlator
+                label: change-correlator
+                sub: "shadow · L0"
+                icon: search
+                status: built
+                facts:
+                  summary: "Answers who changed or deleted an Azure resource, when and with which client, when terraform-drift hands off `change.correlate`."
+                  how: "Activity Log and Resource Graph with its own Entra identity; no schedule."
+                  where: "ns change-correlator"
+                  api: "Temporal queue `change-correlator`"
+              - id: author
+                label: stack-author
+                sub: "shadow · L1"
+                icon: message
+                status: built
+                facts:
+                  summary: "A chat in the console's Author tab: shows the exact resources.yaml diff and opens a draft PR when the person presses the button."
+                  how: "One workflow per conversation (message signal, view query), closed after 30 idle minutes; local model through LiteLLM; advisory memory."
+                  where: "ns stack-author"
+                  api: "Temporal queue `stack-author`"
+              - id: triage
+                label: incident-triage
+                sub: "shadow · L0"
+                icon: bell
+                status: built
+                facts:
+                  summary: "Records an alert a routing rule sends it as a finding and a Slack message; no tools, model or identity."
+                  how: "Only the test alert `WardensRoutingTest` routes to it so far (rule `routing-test`)."
+                  where: "ns incident-triage"
+                  api: "Temporal queue `incident-triage`"
+              - id: agent_l2
+                label: Future L2 agent
+                icon: users
+                status: planned
+                facts:
+                  summary: "Planned: an agent with a level 2 action that waits for a person's approval before it acts."
+                  how: "Declares `await_approval` on its Activities protocol; the framework waits for the signal until expiresAt (timeout = deny)."
+                  api: "None yet: decision 0007 allows L0 and L1 only"
+
+          - id: ns_mcp
+            label: mcp-web-search
+            sub: "ns mcp-web-search"
+            icon: search
+            status: built
+            facts:
+              summary: "Web search as an MCP server for the agents, reachable only through LiteLLM (decision 0031, ADR 0091)."
+              how: "mcp-guard in front of mcp-searxng and its own SearXNG, on the pod's loopback."
+              url: {MCP: "https://mcp-web-search.wardens.home.cloudutsuk.com/mcp"}
+            children:
+              - id: mcp_guard
+                label: mcp-guard
+                sub: ":8080"
+                icon: shield
+                status: built
+                facts:
+                  summary: "Lets an MCP call through only for an allowed agent and tool, with a run id and trace."
+                  how: "Verifies LiteLLM's signed token against its JWKS, takes the agent from `act.sub`, checks allowlist.yaml and `scope`, filters tools/list."
+                  api: "`mcp-web-search.mcp-web-search.svc:8080`"
+              - id: searxng
+                label: mcp-searxng
+                sub: "2.7.0 · loopback :3000"
+                icon: search
+                status: built
+                facts:
+                  summary: "The reviewed MCP server (framework/config/mcp-servers.yaml) that searches through the pod's own SearXNG."
+                  how: "`MCP_HTTP_HARDEN`, a static token from mcp-guard; private URLs refused by `web_url_read`."
+                  api: "`http://127.0.0.1:3000/mcp`"
+
+          - id: state_db
+            label: wardens-state-db
+            sub: "Postgres 17 · schema wardens"
+            icon: databases/postgresql-18.svg
+            status: built
+            facts:
+              summary: "The agents' own state: run records, artifacts, dedupe claims, kill switches, the audit chain and memory (how-docs: state)."
+              how: "One role per writer (`wardens_agent`, `wardens_console`, `wardens_reader`, `wardens_owner` for migrations); daily retention and audit anchor jobs."
+              api: "`wardens-state-db.wardens-state-db.svc:5432/wardens`"
+
+      - id: c_ai
+        label: ai cluster
+        sub: "k3d · 172.30.0.4"
+        icon: cluster
+        status: built
+        facts:
+          summary: "The model gateway and the AI data services."
+          how: "k3d cluster, Traefik with Let's Encrypt certificates."
+          api: "None of its own: see LiteLLM"
+        children:
+          - id: litellm
+            label: LiteLLM gateway
+            sub: "/v1 · /mcp"
+            icon: api
+            status: built
+            facts:
+              summary: "The only way agents reach models and MCP servers (decision 0018, 0031): OpenAI-compatible `/v1` and MCP `/mcp`."
+              how: "Virtual key per agent (a model key and an MCP-only key); for MCP it signs a short-lived token for the server."
+              url: {Gateway: "https://llm.ai.home.cloudutsuk.com"}
+              api: "`https://llm.ai.home.cloudutsuk.com/v1`"
+
+      - id: c_gpu
+        label: gpu cluster
+        sub: "k3d · 172.31.0.1"
+        icon: cluster
+        status: built
+        facts:
+          summary: "The model host: vLLM servers on the GPU."
+          how: "k3d cluster on `homelab-gpu`, KEDA scales the models."
+          api: "None of its own: see vLLM"
+        children:
+          - id: vllm
+            label: vllm-chat
+            sub: "qwen3.6-35b-a3b"
+            icon: cpu
+            status: built
+            facts:
+              summary: "The local chat model the agents use (`WARDENS_LLM_MODEL: qwen3.6-35b-a3b`)."
+              how: "vLLM's OpenAI-compatible server; LiteLLM calls it, never an agent."
+              api: "`https://vllm-chat.gpu.home.cloudutsuk.com/v1`"
+
+      - id: c_core
+        label: core cluster
+        sub: "k3d · identity, secrets, registry"
+        icon: cluster
+        status: built
+        facts:
+          summary: "Identity, secrets and the image registry for every cluster."
+          how: "k3d cluster with Keycloak, OpenBao and Zot."
+          api: "None of its own: see the children"
+        children:
+          - id: keycloak
+            label: Keycloak
+            sub: "realm homelab"
+            icon: key
+            status: built
+            facts:
+              summary: "Signs people in to the console and the Temporal UI, and (planned) signs approvers' tokens."
+              how: "OIDC issuer `https://auth.cloudutsuk.com/realms/homelab`; groups `platform-admins`, `wardens-console-admin`."
+              url: {Issuer: "https://auth.cloudutsuk.com/realms/homelab"}
+          - id: openbao
+            label: OpenBao
+            icon: lock
+            status: built
+            views: [security]
+            facts:
+              summary: "The only place secrets live: `kv/wardens/*` for the agents, the console and the bus."
+              how: "External Secrets in each cluster read it; gitops holds ExternalSecrets only."
+              url: {OpenBao: "https://bao.core.home.cloudutsuk.com"}
+          - id: zot
+            label: Zot registry
+            icon: package
+            status: built
+            views: [cicd]
+            facts:
+              summary: "Holds the agents' images, signed with Cosign; pods pull them by digest."
+              how: "OCI registry; CI pushes, kubelets pull (Kyverno requires digests)."
+              url: {Registry: "https://registry.core.home.cloudutsuk.com"}
+
+      - id: c_platform
+        label: platform cluster
+        sub: "k3d · 172.30.0.2"
+        icon: cluster
+        status: built
+        views: [cicd]
+        facts:
+          summary: "Argo CD and the CI runners that build and deploy every agent."
+          how: "k3d cluster; Argo CD manages every cluster from homelab-gitops `main`."
+          api: "None of its own: see the children"
+        children:
+          - id: arc
+            label: ARC runner
+            sub: "homelab"
+            icon: terminal
+            status: built
+            views: [cicd]
+            facts:
+              summary: "Runs the agents' CI: `uv sync --frozen`, framework tests, agent tests, then homelab-gitops build-image.yaml on `main`."
+              how: "Self-hosted GitHub Actions runner scale set; long-polls GitHub for jobs."
+              api: "`runs-on: homelab`"
+          - id: buildkit
+            label: BuildKit
+            sub: ":1234"
+            icon: container
+            status: built
+            views: [cicd]
+            facts:
+              summary: "Builds the agent images from the repo root (they need uv.lock, framework/ and contracts/)."
+              how: "Rootless buildkitd; the runner drives it with buildx over TCP 1234."
+              api: "`tcp://buildkit.buildkit.svc:1234`"
+          - id: argocd
+            label: Argo CD
+            icon: devops/cicd/argocd-18.svg
+            status: built
+            views: [cicd]
+            facts:
+              summary: "Deploys `apps/<agent>` from homelab-gitops: a push to `main` is a deploy."
+              how: "Tracks homelab-gitops `main`; the `wardens` AppProject may deploy only to the wardens cluster."
+              api: "None of its own: Applications in homelab-gitops"
+
+      - id: c_mon
+        label: mon cluster
+        sub: "k3d · 172.30.0.3"
+        icon: cluster
+        status: built
+        facts:
+          summary: "Grafana, Mimir, Loki and Tempo: every cluster sends telemetry here, and Mimir's Alertmanager sends alerts out."
+          how: "k3d cluster; dashboards and alert rules are provisioned from homelab-gitops."
+          url: {Grafana: "https://grafana.mon.home.cloudutsuk.com"}
+        children:
+          - id: alertmanager
+            label: Alertmanager
+            sub: "Mimir"
+            icon: bell
+            status: built
+            facts:
+              summary: "Sends each notification group to Slack and, with `continue: true`, to wardens-alerts."
+              how: "Mimir's Alertmanager; bearer token for the wardens receiver; group_wait about 30 s."
+              api: "`/alertmanager/api/v2/alerts`"
+          - id: mon_gw
+            label: OTLP gateway
+            sub: "Tempo · Mimir · Loki"
+            icon: chart
+            status: built
+            views: [observability]
+            facts:
+              summary: "Receives spans and metrics from every collector: one trace per incident in Tempo, run and decision metrics in Mimir."
+              how: "OTel gateway on mon; the Grafana dashboards are provisioned from homelab-gitops (how-docs: run records)."
+              url: {Grafana: "https://grafana.mon.home.cloudutsuk.com"}
+
+edges:
+  # --- entry: the console ---
+  - {id: eng_tr, from: engineer, to: w_traefik, proto: HTTPS, port: 443, label: console,
+     why: "Used when the engineer opens the console on the tailnet: to send a task or chat with stack-author.", certs: le-home,
+     detail: "From outside the tailnet the same console is at console.cloudutsuk.com through Cloudflare Access and the tunnel."}
+  - {id: tr_console, from: w_traefik, to: console, proto: HTTP, port: 4180,
+     why: "Always on behind Traefik: oauth2-proxy checks the Keycloak session, then hands the request to the console on 127.0.0.1.",
+     certs: {none: "Plain HTTP inside the cluster; TLS ended at Traefik."}}
+  - {id: console_kc, from: console, to: keycloak, proto: OIDC, port: 443, view: security,
+     why: "Used at sign-in: oauth2-proxy redeems the code and checks the groups platform-admins or wardens-console-admin.", certs: cf-edge}
+  - {id: eng_kc, from: engineer, to: keycloak, proto: OIDC, port: 443, view: security,
+     why: "Used at sign-in: the browser is sent to Keycloak, the person signs in, and comes back with a code.", certs: cf-edge}
+  - {id: console_t, from: console, to: temporal, proto: gRPC, port: 7233,
+     why: "Used when a person presses Send or types in the Author tab: starts a workflow, signals a message, queries the view.",
+     certs: {none: "Plain gRPC inside the cluster; a NetworkPolicy admits only labelled namespaces."}}
+
+  # --- entry: alerts and GitHub through the bus ---
+  - {id: am_tr, from: alertmanager, to: w_traefik, proto: HTTPS, port: 443, label: /alert,
+     why: "Used for every notification group (route has continue: true), so Slack still gets every alert.", certs: le-home,
+     detail: "Bearer token, checked before the body is parsed."}
+  - {id: tr_alerts, from: w_traefik, to: alerts, proto: HTTP, port: 8080,
+     why: "Always on: Traefik forwards /alert to the relay.", certs: {none: "Plain HTTP inside the cluster; TLS ended at Traefik."}}
+  - {id: gh_cf, from: github, to: cloudflare, proto: Webhook, port: 443, tls: true, label: workflow_job,
+     why: "Used when a drift scan's job finishes: the GitHub App sends the signed delivery to hooks.cloudutsuk.com/github.", certs: cf-edge,
+     detail: "Signed with X-Hub-Signature-256; Access bypasses this hostname."}
+  - {id: cf_cfd, from: cloudflare, to: cloudflared, proto: QUIC, port: 7844, kind: stream, label: tunnel,
+     why: "Always on: the tunnel cloudflared opened outbound carries the request to the host without an open port.", certs: cf-tunnel}
+  - {id: cfd_tr, from: cloudflared, to: w_traefik, proto: HTTPS, port: 443,
+     why: "Used for POST /github only: cloudflared sends it to the wardens load balancer 172.30.0.6.", certs: le-hooks}
+  - {id: tr_hooks, from: w_traefik, to: hooks, proto: HTTP, port: 8080,
+     why: "Used for POST /github (Exact path): Traefik answers 404 to anything else.", certs: {none: "Plain HTTP inside the cluster; TLS ended at Traefik."}}
+  - {id: alerts_eh, from: alerts, to: eventhubs, proto: AMQP, port: 5672, label: publish,
+     why: "Used for a firing group: one CloudEvent with the group key, status, allowlisted labels and start times; then 202.",
+     certs: {none: "Plain AMQP inside the cluster (the emulator has no TLS); the NetworkPolicy keeps the bus private."}}
+  - {id: hooks_eh, from: hooks, to: eventhubs, proto: AMQP, port: 5672, label: publish,
+     why: "Used for a delivery a rule matches: repository, run id, job, conclusion and branch; never the payload.",
+     certs: {none: "Plain AMQP inside the cluster; the NetworkPolicy keeps the bus private."}}
+  - {id: ing_eh, from: ingress, to: eventhubs, proto: AMQP, port: 5672, label: consume,
+     why: "Always on: reads each partition in order, checkpoints in Azurite after the handler, dead-letters what can never run.",
+     certs: {none: "Plain AMQP inside the cluster; the NetworkPolicy admits only the consumer and the relays."}}
+  - {id: ing_t, from: ingress, to: temporal, proto: gRPC, port: 7233,
+     why: "Used for each event: starts the incident workflow with an id from the event, so a repeat starts nothing.",
+     certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: router_t, from: router, to: temporal, proto: gRPC, port: 7233, label: poll,
+     why: "Always on: the router worker polls queue wardens-router and runs the incident workflow for routed alerts.",
+     certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: temporal_db, from: temporal, to: wardens_db, proto: PostgreSQL, port: 5432,
+     why: "Always on: Temporal stores history, timers and visibility.", certs: {none: "Plain TCP inside the cluster."}}
+
+  # --- terraform-drift, inside the worker ---
+  - {id: td_wf_t, from: td_wf, to: temporal, proto: gRPC, port: 7233, label: workflow tasks,
+     why: "Always on: the worker polls for workflow tasks, replays history and returns the next commands (start an activity, a child).",
+     certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: td_acts_t, from: td_acts, to: temporal, proto: gRPC, port: 7233, label: activity tasks,
+     why: "Always on: the worker polls for activity tasks and returns each result or error, which Temporal records.",
+     certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: td_acts_llm, from: td_acts, to: td_llm, proto: in-process, kind: control, label: stage,
+     why: "Used for each drifted stack: the analyse activity runs the classify and recommend stages.",
+     certs: {none: "A function call in the same process."}}
+  - {id: td_acts_guard, from: td_acts, to: td_guard, proto: in-process, kind: control, label: check,
+     why: "Used before anything leaves the agent and before each act: check_action and the kill switch.",
+     certs: {none: "A function call in the same process."}}
+  - {id: td_guard_db, from: td_guard, to: state_db, proto: PostgreSQL, port: 5432, label: kill switch,
+     why: "Used at each kill-switch check: reads the agent's row and the `all` row; an unreadable DB counts as engaged.",
+     certs: {none: "Plain TCP inside the cluster; only labelled namespaces connect."}}
+  - {id: td_acts_db, from: td_acts, to: state_db, proto: PostgreSQL, port: 5432, label: run record,
+     why: "Used at the end of every run: the run record, insert-once on run_id; a file fallback if the DB is down.",
+     certs: {none: "Plain TCP inside the cluster."}}
+  - {id: td_gh, from: td_acts, to: github, proto: HTTPS, port: 443,
+     why: "Used to read drift-scan runs, plan artifacts and resources.yaml, and to open draft PRs on drift/ branches.", certs: github-pub,
+     detail: "GitHub App installation tokens: a read set, and a write set (contents, pull_requests) for open_draft_pr."}
+  - {id: td_slack, from: td_acts, to: slack, proto: HTTPS, port: 443, oneway: true, label: one message,
+     why: "Used at the end of an incident: one message with the drift and who changed it.", certs: slack-pub}
+  - {id: td_llm_lite, from: td_llm, to: litellm, proto: HTTPS, port: 443, label: /v1,
+     why: "Used for each model call: chat completions with usage limits and the agent's virtual key.", certs: le-home}
+  - {id: td_llm_mcp, from: td_llm, to: litellm, proto: HTTPS, port: 443, label: /mcp,
+     why: "Used when a stage has MCP tools: tools/list (pinned by definitionSha256) and tools/call, with x-wardens-run and traceparent.", certs: le-home,
+     detail: "The agent's MCP-only key: a LiteLLM virtual key with no models."}
+  - {id: lite_vllm, from: litellm, to: vllm, proto: HTTPS, port: 443,
+     why: "Used for every chat completion on qwen3.6-35b-a3b: LiteLLM forwards to vLLM on the gpu cluster.", certs: le-home}
+  - {id: lite_tr, from: litellm, to: w_traefik, proto: HTTPS, port: 443, label: MCP,
+     why: "Used for an MCP call: LiteLLM calls the web-search server with a short-lived token it signs.", certs: le-home}
+  - {id: tr_guard, from: w_traefik, to: mcp_guard, proto: HTTP, port: 8080,
+     why: "Used for every MCP request to mcp-web-search: Traefik hands it to mcp-guard.", certs: {none: "Plain HTTP inside the cluster; TLS ended at Traefik."}}
+  - {id: guard_searx, from: mcp_guard, to: searxng, proto: HTTP, port: 3000,
+     why: "Used for an allowed call: mcp-guard forwards it with mcp-searxng's own token.", certs: {none: "The pod's loopback."}}
+
+  # --- the other agents ---
+  - {id: cc_t, from: correlator, to: temporal, proto: gRPC, port: 7233, label: poll,
+     why: "Always on: polls queue change-correlator; tasks arrive as handoffs from the incident workflow.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: cc_az, from: correlator, to: azure, proto: HTTPS, port: 443,
+     why: "Used for each change.correlate task: Activity Log and Resource Graph queries for the resource.", certs: azure-pub,
+     detail: "Entra workload identity federation: the service account's token is exchanged for an Azure token."}
+  - {id: cc_db, from: correlator, to: state_db, proto: PostgreSQL, port: 5432, label: run record,
+     why: "Used at the end of every run: its run record.", certs: {none: "Plain TCP inside the cluster."}}
+  - {id: sa_t, from: author, to: temporal, proto: gRPC, port: 7233, label: poll,
+     why: "Always on: one conversation workflow per chat; each message arrives as a signal.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: sa_gh, from: author, to: github, proto: HTTPS, port: 443,
+     why: "Used to read the shared module and the stack, and to open the draft PR on an author/ branch when the person presses the button.", certs: github-pub}
+  - {id: sa_lite, from: author, to: litellm, proto: HTTPS, port: 443, label: /v1,
+     why: "Used for each turn: the local model with thinking off.", certs: le-home}
+  - {id: it_t, from: triage, to: temporal, proto: gRPC, port: 7233, label: poll,
+     why: "Always on: polls queue incident-triage for tasks the routing rules send.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: it_slack, from: triage, to: slack, proto: HTTPS, port: 443, oneway: true,
+     why: "Used for each routed alert: \"Alert reached triage\" in #platform-warden.", certs: slack-pub}
+
+  # --- planned: level 2 approval ---
+  - {id: l2_t, from: agent_l2, to: temporal, proto: gRPC, port: 7233,
+     why: "Planned: the agent's workflow waits in Temporal for the approval signal until expiresAt.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: l2_slack, from: agent_l2, to: slack, proto: HTTPS, port: 443, oneway: true, label: approval card,
+     why: "Planned: the approval card goes to the action's domain team, with a link to the approval endpoint.", certs: slack-pub}
+  - {id: l2_db, from: agent_l2, to: state_db, proto: PostgreSQL, port: 5432, label: audit,
+     why: "Planned: approval.requested, granted, denied and expired go to the hash-chained audit log.", certs: {none: "Plain TCP inside the cluster."}}
+  - {id: appr_kc, from: approver, to: keycloak, proto: OIDC, port: 443, view: security,
+     why: "Planned: the approver signs in; the token carries their groups.", certs: cf-edge}
+  - {id: appr_tr, from: approver, to: w_traefik, proto: HTTPS, port: 443,
+     why: "Planned: the approver posts the decision from the card's link.", certs: {planned: "Planned: a Let's Encrypt certificate on Traefik like the console's; the hostname isn't chosen."}}
+  - {id: tr_approve, from: w_traefik, to: approve, proto: HTTP, port: 4180,
+     why: "Planned: Traefik hands the request to the approval endpoint (charts/wardens-web).", certs: {none: "Plain HTTP inside the cluster; TLS ended at Traefik."}}
+  - {id: approve_kc, from: approve, to: keycloak, proto: HTTPS, port: 443, view: security, label: JWKS,
+     why: "Planned: the endpoint verifies the token's signature, issuer, audience and expiry against Keycloak's keys.", certs: cf-edge}
+  - {id: approve_t, from: approve, to: temporal, proto: gRPC, port: 7233, label: signal,
+     why: "Planned: the verified decision goes to the waiting workflow as the approval signal.", certs: {none: "Plain gRPC inside the cluster."}}
+
+  # --- observability ---
+  - {id: td_otel, from: td_acts, to: w_collector, proto: OTLP gRPC, port: 4317, view: observability,
+     why: "After every run: spans and metrics built from the run record (invoke_agent, execute_tool, chat).", certs: {none: "Plain OTLP to the node's collector."}}
+  - {id: cc_otel, from: correlator, to: w_collector, proto: OTLP gRPC, port: 4317, view: observability,
+     why: "After every run: its spans join the incident's trace through deterministic ids.", certs: {none: "Plain OTLP to the node's collector."}}
+  - {id: sa_otel, from: author, to: w_collector, proto: OTLP gRPC, port: 4317, view: observability,
+     why: "After every conversation: spans and metrics from its run record.", certs: {none: "Plain OTLP to the node's collector."}}
+  - {id: ing_otel, from: ingress, to: w_collector, proto: OTLP gRPC, port: 4317, view: observability,
+     why: "Always on: wardens.ingress spans (the root of each trace) and the bus metrics.", certs: {none: "Plain OTLP to the node's collector."}}
+  - {id: col_gw, from: w_collector, to: mon_gw, proto: OTLP gRPC, port: 4317, view: observability,
+     why: "Always on: the collector forwards everything to the gateway on mon.", certs: {planned: "Not checked: how the collector secures the hop to mon."}}
+
+  # --- security ---
+  - {id: eso_bao, from: w_eso, to: openbao, proto: HTTPS, port: 443, view: security,
+     why: "Every refresh interval: reads kv/wardens/* and writes the pods' Secrets.", certs: le-home}
+
+  # --- CI/CD: ship an agent ---
+  - {id: eng_gh, from: engineer, to: github, proto: HTTPS, port: 443, view: cicd, label: git push,
+     why: "Used when the engineer merges a change to platform-wardens main.", certs: github-pub}
+  - {id: arc_gh, from: arc, to: github, proto: HTTPS, port: 443, view: cicd,
+     why: "Always on: the runner long-polls for jobs; on main it also commits the image digest to homelab-gitops.", certs: github-pub}
+  - {id: arc_bk, from: arc, to: buildkit, proto: gRPC, port: 1234, view: cicd, label: buildx,
+     why: "Used on main: builds the agent image from the repo root.", certs: {none: "Plain TCP inside the cluster; a NetworkPolicy admits only the runners."}}
+  - {id: bk_zot, from: buildkit, to: zot, proto: HTTPS, port: 443, view: cicd, label: push,
+     why: "Used after a build: pushes the image; CI signs it with Cosign.", certs: le-home}
+  - {id: argo_gh, from: argocd, to: github, proto: HTTPS, port: 443, view: cicd,
+     why: "Always on: Argo CD watches homelab-gitops main; the new digest is a change to sync.", certs: github-pub}
+  - {id: argo_api, from: argocd, to: w_api, proto: HTTPS, port: 6446, view: cicd,
+     why: "Used on each sync: applies apps/<agent> (the wardens-agent chart) to the wardens cluster.", certs: k3s-ca}
+  - {id: cc_zot, from: correlator, to: zot, proto: HTTPS, port: 443, view: cicd, label: image pull,
+     why: "Used when the pod starts: the node pulls the image by digest; Kyverno refuses an unpinned image.", certs: le-home}
+
+scenarios:
+  - id: drift-handoff
+    title: Scheduled drift with a handoff
+    summary: "The daily drift run under the incident workflow: analyse, guardrail, draft PR, hand off to change-correlator, one message (how-docs: durable execution, registry, state, run records)."
+    steps:
+      - {title: Schedule fires, action: "Temporal: schedule terraform-drift-daily-infra-azure fires at 08:00 UTC", lights: [temporal],
+         text: "wardens.schedule makes a fresh root task (channel schedule: L1, 0.50 USD, 120 min) and starts wardens.incident."}
+      - {title: Run the drift workflow, action: "Temporal → workflow.py: the incident starts terraform-drift.task as a child", path: [~td_wf_t],
+         text: "The incident resolves terraform.drift.explain in the registry and starts the child on queue terraform-drift (gRPC 7233)."}
+      - {title: Schedule the reads, action: "workflow.py → Temporal → activities.py: select the scan run, list stacks", path: [td_wf_t, ~td_acts_t],
+         text: "The workflow only decides; Temporal hands each activity to the activity poller, so a crash resumes at the next one."}
+      - {title: Read the plan, action: "activities.py ↔ GitHub: drift-scan run and plan artifacts", path: [td_gh, ~td_gh],
+         text: "GitHub App read token; plan JSON is redacted before any model sees it."}
+      - {title: Classify the drift, action: "LLM stage ↔ LiteLLM ↔ vLLM: classify each attribute", path: [td_acts_llm, td_llm_lite, lite_vllm, ~lite_vllm, ~td_llm_lite, ~td_acts_llm],
+         text: "Validated output; on any failure every attribute is unknown, which becomes investigate."}
+      - {title: Guardrail point 4, action: "activities.py ↔ guardrails: check_action on each proposed action", path: [td_acts_guard, ~td_acts_guard],
+         text: "In the catalog, at level 1, on the agent's own domain: allowed as output."}
+      - {title: Open the draft PR, action: "activities.py ↔ GitHub: draft PR on drift/<stack>/<key>", path: [td_gh, ~td_gh],
+         text: "The kill switch is checked again first; the tool re-checks patchSha256 and never opens a second PR."}
+      - {title: Hand off, action: "activities.py → Temporal → change-correlator: change.correlate", path: [td_acts_t, ~cc_t],
+         text: "The finding's suggestedHandoffs go through wardens.handoff (hop budget 1, half the budget); a child task starts."}
+      - {title: Who changed it, action: "change-correlator ↔ Azure: Activity Log and Resource Graph", path: [cc_az, ~cc_az],
+         text: "Workload identity; the answer is a finding attached to the incident by reference."}
+      - {title: One message, action: "activities.py → Slack: drift and who changed it, together", path: [td_slack],
+         text: "Each run wrote its run record; the root agent writes one message for the whole incident.",
+         result: success, outcome: "Draft PR and one Slack message"}
+
+  - id: bus
+    title: Alert or GitHub event via the bus
+    summary: "A webhook relays to the Event Hubs emulator; the consumer starts the work with an id from the event (how-docs: ingress, routing)."
+    modes: [{id: alert, label: Alertmanager alert}, {id: github, label: GitHub drift scan}]
+    steps:
+      - {title: Alert fires, action: "Alertmanager → Traefik → wardens-alerts: POST /alert (443)", when: alert, path: [am_tr, tr_alerts],
+         text: "Bearer token checked before the body is parsed; only allowlisted labels are read, never annotations."}
+      - {title: Publish the group, action: "wardens-alerts → Event Hubs: one CloudEvent (AMQP 5672)", when: alert, path: [alerts_eh, ~alerts_eh, ~tr_alerts, ~am_tr],
+         text: "The hub accepts it, the relay answers 202; a 503 makes Alertmanager retry."}
+      - {title: Drift scan done, action: "GitHub → Cloudflare → cloudflared → Traefik → wardens-hooks", when: github, path: [gh_cf, cf_cfd, cfd_tr, tr_hooks],
+         text: "The only public path; HMAC X-Hub-Signature-256 checked before the body is parsed."}
+      - {title: Publish the job, action: "wardens-hooks → Event Hubs: one CloudEvent, id = delivery id", when: github, path: [hooks_eh, ~hooks_eh, ~tr_hooks, ~cfd_tr, ~cf_cfd, ~gh_cf],
+         text: "A rule matched (config/webhooks.yaml); everything else got 200 and went nowhere."}
+      - {title: Consume the event, action: "Event Hubs → ingress consumer: next event in the partition", path: [~ing_eh],
+         text: "Same Receiver.handle as direct mode: rules, root task, guardrail point 1."}
+      - {title: Start the workflow, action: "Ingress consumer ↔ Temporal: start with an id from the event", path: [ing_t, ~ing_t],
+         text: "A repeat delivery is refused by Temporal; a refused task goes to the dead-letter hub; Temporal down means wait."}
+      - {title: Router runs the incident, action: "Temporal → wardens-router: incident workflow for the routed alert", when: alert, path: [~router_t],
+         text: "Rule routing-test sends WardensRoutingTest to incident-triage."}
+      - {title: Triage records it, action: "Temporal → incident-triage → Slack: Alert reached triage", when: alert, path: [~it_t, it_slack],
+         text: "A finding and a message in #platform-warden.", result: success, outcome: "Alert reached triage"}
+      - {title: Drift incident starts, action: "Temporal → terraform-drift: the drift incident's child workflow", when: github, path: [~td_wf_t],
+         text: "Started after startDelaySeconds, so the scan has finished; then it runs as in the scheduled use case.",
+         result: success, outcome: "Drift incident started"}
+
+  - id: llm-guardrails
+    title: LLM stage with guardrails and MCP
+    summary: "One stage asks the model, the model asks for a tool, GuardedToolset decides, web search goes through LiteLLM and mcp-guard (how-docs: model access, guardrails, MCP)."
+    modes: [{id: allowed, label: Tool allowed}, {id: refused, label: Undeclared tool refused}]
+    steps:
+      - {title: Kill switch check, action: "Guardrails ↔ wardens-state-db: is the switch engaged?", path: [td_acts_guard, td_guard_db, ~td_guard_db, ~td_acts_guard],
+         text: "The Git file or the DB row for this agent or `all`; unreadable counts as engaged (fail closed)."}
+      - {title: Load pinned tools, action: "LLM stage ↔ LiteLLM /mcp: tools/list, hashes checked", path: [td_acts_llm, td_llm_mcp, ~td_llm_mcp],
+         text: "A missing or changed definitionSha256 refuses the whole toolset; the stage then runs without MCP tools."}
+      - {title: Ask the model, action: "LLM stage ↔ LiteLLM ↔ vLLM: the model asks for a tool", path: [td_llm_lite, lite_vllm, ~lite_vllm, ~td_llm_lite],
+         text: "Usage limits from prices.yaml; only declared read tools are visible."}
+      - {title: Point 2 refuses, action: "GuardedToolset: undeclared tool, ModelRetry back to the model", when: refused, lights: [td_llm],
+         text: "check_tool_call returns undeclared_tool; the function never runs and a tool.refused audit event is written."}
+      - {title: Model falls back, action: "LLM stage → activities.py: deterministic fallback", when: refused, path: [~td_acts_llm],
+         text: "Out of retries, the stage takes its fallback: every attribute unknown, recorded in the run record.",
+         result: done, outcome: "Refused; fallback used"}
+      - {title: Call web search, action: "LiteLLM → Traefik → mcp-guard → mcp-searxng: tools/call", when: allowed, path: [td_llm_mcp, lite_tr, tr_guard, guard_searx],
+         text: "LiteLLM signs a short-lived token; mcp-guard checks the agent, the tool, x-wardens-run and traceparent."}
+      - {title: Results come back, action: "mcp-searxng → mcp-guard → LiteLLM → LLM stage: results", when: allowed, path: [~guard_searx, ~tr_guard, ~lite_tr, ~td_llm_mcp],
+         text: "Capped at 20,000 characters and handed to the model as untrusted data; an execute_tool span is recorded."}
+      - {title: Validated answer, action: "LLM stage → activities.py → guardrails: output checked, point 4", when: allowed, path: [~td_acts_llm, td_acts_guard, ~td_acts_guard],
+         text: "The output validator checks it against the input; check_action passes the proposed action.",
+         result: success, outcome: "Answer within the guardrails"}
+
+  - id: chat
+    title: Chat with stack-author
+    summary: "A signed-in person chats in the console's Author tab; one workflow per conversation; the person presses the button for the PR (how-docs: durable execution, model access)."
+    steps:
+      - {title: Sign in, action: "Browser ↔ Keycloak: OIDC sign-in", path: [eng_kc, ~eng_kc],
+         text: "platform-admins or wardens-console-admin; oauth2-proxy keeps the session."}
+      - {title: Send a message, action: "Browser → Traefik → console → Temporal: message signal", path: [eng_tr, tr_console, console_t],
+         text: "The first message starts the conversation workflow; only its starter may send to it."}
+      - {title: Worker takes the turn, action: "Temporal → stack-author: next_message returns the message", path: [~sa_t],
+         text: "Messages wait in order in the workflow, so none is lost during a slow model call."}
+      - {title: Read the stack, action: "stack-author ↔ GitHub: shared module and resources.yaml", path: [sa_gh, ~sa_gh],
+         text: "Its own GitHub App, read tools only."}
+      - {title: Ask the model, action: "stack-author ↔ LiteLLM ↔ vLLM: draft the change", path: [sa_lite, lite_vllm, ~lite_vllm, ~sa_lite],
+         text: "Thinking off; the diff is built and checked in code."}
+      - {title: Show the diff, action: "stack-author → Temporal → console → browser: the view query", path: [sa_t, ~console_t, ~tr_console, ~eng_tr],
+         text: "The page polls the view query, because a model turn can outlast any request timeout."}
+      - {title: Press the button, action: "Browser → console → Temporal → stack-author: open the PR", path: [eng_tr, tr_console, console_t, ~sa_t],
+         text: "The person presses Send (L1); the agent never opens a PR on its own words."}
+      - {title: Draft PR opened, action: "stack-author ↔ GitHub: draft PR on an author/ branch", path: [sa_gh, ~sa_gh],
+         text: "The kill switch is checked first; the plan's result is posted back into the conversation.",
+         result: success, outcome: "Draft PR on author/ branch"}
+
+  - id: ship-agent
+    title: Ship a new agent
+    summary: "From a merge to a routable worker in shadow: CI, image, gitops, Argo CD, registry check (how-docs: build an agent, lifecycle)."
+    steps:
+      - {title: Merge to main, action: "Engineer → GitHub: merge to platform-wardens main", path: [eng_gh, ~eng_gh],
+         text: "The change touches agents/devops/change-correlator/**, which triggers its workflow."}
+      - {title: Runner takes the job, action: "ARC runner ↔ GitHub: job for runs-on homelab", path: [arc_gh, ~arc_gh],
+         text: "uv sync --frozen, the framework tests, then the agent's unit tests (TestModel, never live models)."}
+      - {title: Build the image, action: "ARC runner → BuildKit → Zot: build and push", path: [arc_bk, bk_zot, ~bk_zot, ~arc_bk],
+         text: "Built from the repo root (uv.lock, framework/, contracts/); signed with Cosign."}
+      - {title: Commit the digest, action: "ARC runner → GitHub: digest into homelab-gitops apps/change-correlator", path: [arc_gh, ~arc_gh],
+         text: "The homelab-gitops writer App commits `wardens-agent.image.digest`."}
+      - {title: Argo CD syncs, action: "Argo CD ↔ GitHub, then Argo CD → wardens k3s API", path: [argo_gh, ~argo_gh],
+         text: "A push to homelab-gitops main is a deploy."}
+      - {title: Apply the chart, action: "Argo CD ↔ k3s API (6446): apply the wardens-agent chart", path: [argo_api, ~argo_api],
+         text: "Own namespace, service account, NetworkPolicy, ExternalSecrets and kill-switch ConfigMap."}
+      - {title: Pull the image, action: "Node ↔ Zot: pull by digest", path: [cc_zot, ~cc_zot],
+         text: "Kyverno refuses an unpinned image, a writable root or missing limits."}
+      - {title: Worker starts, action: "change-correlator ↔ Temporal: registry check, schedules, polling", path: [cc_t, ~cc_t],
+         text: "The registry validates the manifest; stage shadow and not quarantined means routable.",
+         result: success, outcome: "Routable in shadow"}
+
+  - id: approval
+    title: Level 2 approval (planned)
+    summary: "Planned: an agent waits for a person's approval, timeout = deny (how-docs: guardrails Q8). No agent is above L1 yet."
+    modes: [{id: approved, label: Approved in time}, {id: expired, label: No decision (expired)}]
+    steps:
+      - {title: Wait for approval, action: "Future L2 agent → audit: approval.requested", path: [l2_db, ~l2_db],
+         text: "check_action said needs-approval; the workflow calls await_approval with a timer to expiresAt."}
+      - {title: Send the card, action: "Future L2 agent → Slack: approval card to the domain team", path: [l2_slack],
+         text: "The card links to the approval endpoint with the workflow id and idempotency key."}
+      - {title: Sign in, action: "Approver ↔ Keycloak: OIDC sign-in", when: approved, path: [appr_kc, ~appr_kc],
+         text: "The token carries the approver's groups; a service account can't approve."}
+      - {title: Post the decision, action: "Approver → Traefik → approval endpoint: Approve", when: approved, path: [appr_tr, tr_approve],
+         text: "The body has no identity fields; the server's clock sets decided_at."}
+      - {title: Verify the token, action: "Approval endpoint ↔ Keycloak: JWKS, issuer, audience, expiry", when: approved, path: [approve_kc, ~approve_kc],
+         text: "Not the requester, in the action's approver group, bound to the same parameters hash."}
+      - {title: Signal the workflow, action: "Approval endpoint ↔ Temporal: approval signal, then 200 to the page", when: approved, path: [approve_t, ~approve_t, ~tr_approve, ~appr_tr],
+         text: "Temporal records the signal; the approver's page says the decision was recorded."}
+      - {title: Workflow resumes, action: "Temporal → Future L2 agent: await_approval returns approved", when: approved, path: [~l2_t],
+         text: "invalid_reason is checked again in the workflow; approval.granted is audited.",
+         result: success, outcome: "Approved: the action may run"}
+      - {title: Time runs out, action: "Temporal → agent: the timer reaches expiresAt", when: expired, path: [~l2_t],
+         text: "No valid decision arrived; approval.expired is audited and the action does not run (timeout = deny).",
+         result: fail, outcome: "Expired: denied"}

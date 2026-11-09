@@ -24,6 +24,10 @@ facts:
 - label: Architecture
   value: System diagram
   url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "Wardens platform", url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/platform-wardens/system-architecture, format: interactive}
+- {type: data-model, title: "Contracts: task, artifact, run record", url: /posts/projects/platform-wardens/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
+- {type: user-journey, title: "Daily drift, from the owner's side", url: /posts/projects/platform-wardens/04-user-experience-and-design/#user-flows, format: mermaid}
 brief: >-
   The author asked for this playbook to be written from the platform-wardens repo (2026-11-09), with no
   company or team names. Source of truth: the repo's README, docs/project-goal.md, docs/phases,

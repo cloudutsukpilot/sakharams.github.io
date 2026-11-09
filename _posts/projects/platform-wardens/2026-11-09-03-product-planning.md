@@ -75,7 +75,7 @@ Phase N, step M". Phases 3 to 5 are refined when they start.
 
 > **TODO:** Step 11 was written for three teams. On the homelab, is the inventory the author's own
 > operations work (drift, alerts, CI failures, upgrades), or is it skipped until there's a team? The
-> [requirements post](/posts/projects/platform-wardens/02-requirements-gathering/#stakeholder-analysis)
+> [vision post](/posts/projects/platform-wardens/01-vision-and-business-context/#stakeholders-sponsors-and-decision-makers)
 > depends on the answer.
 {: .prompt-warning }
 
