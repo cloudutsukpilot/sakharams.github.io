@@ -2,7 +2,10 @@
 """Publish a project's architecture decision records (ADRs) on the blog.
 
 The ADRs live as MADR files (`NNNN-kebab-title.md` with front matter id, title, status, date,
-deciders, related_repos) in the project's own repo, which is usually private. This script reads them,
+deciders, related_repos) in the project's own repo, which is usually private. ADRs without front matter
+are read too: `# NNNN. Title`, then bold bullets (`- **Status:** …`, `- **Date:** YYYY-MM-DD`, and any
+others such as Supersedes or Relates to, which become the Related section); `## Alternatives considered`
+counts as Considered options and the repo is the one the folder sits in. This script reads them,
 scrubs anything private and writes two things:
 
   _data/project_adrs/<slug>.yml   the log: id, title, status, date, anchor, repos (used by the
@@ -68,23 +71,66 @@ def scrub(text, where, report):
     return PRIVATE_LINK.sub(link, text)
 
 
+def bullet_header(path, text):
+    """The other ADR format: `# NNNN. Title`, then `- **Status:** …`, `- **Date:** …` and more bold
+    bullets (Supersedes, Relates to, …) before the first `##`. The extra bullets become a Related
+    section; a status with a note keeps the note there too."""
+    m = re.match(r"^# (\d{4})\.\s+(.+?)\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    if not m:
+        sys.exit(f"{path}: no front matter and no `# NNNN. Title` header")
+    meta, extra = {}, []
+    for line in m.group(3).splitlines():
+        b = re.match(r"^- \*\*(.+?):\*\*\s*(.*)$", line)
+        if b and b.group(1) in ("Status", "Date"):
+            meta[b.group(1)] = b.group(2).strip()
+        elif b:
+            extra.append(line)
+    raw = meta.get("Status", "")
+    sup = re.match(r"(?i)superseded by \[?(\d{4})", raw)
+    status = f"superseded by {sup.group(1)}" if sup else raw.split()[0].strip(";,.").lower() if raw else "proposed"
+    note = re.sub(r"^\w+[;,.]?\s*", "", raw) if not sup else re.sub(r"^(?i:superseded by) \[?\d{4}\]?(\([^)]*\))?\s*", "", raw)
+    if note:
+        extra.insert(0, f"- **Status note:** {note}")
+    d = re.match(r"(\d{4}-\d{2}-\d{2})\s*(.*)$", meta.get("Date", ""))
+    if not d:
+        sys.exit(f"{path}: no `- **Date:** YYYY-MM-DD` line")
+    if d.group(2):
+        extra.insert(0, f"- **Date note:** {d.group(2).strip('() ')}")
+    fm = {"id": m.group(1), "title": m.group(2), "status": status, "date": d.group(1),
+          "related_repos": [src_repo(path)]}
+    return fm, text[m.end(3):], extra
+
+
+def src_repo(path):
+    """The repo an ADR folder belongs to (`<repo>/docs/<folder>`), for ADRs without related_repos."""
+    p = path.resolve().parent
+    return p.parents[1].name if p.parent.name == "docs" else p.parent.name
+
+
+SECTION_ALIASES = {"Alternatives considered": "Considered options"}
+
+
 def load(src):
     adrs = []
     for path in sorted(p for p in src.glob("*.md") if NAME.match(p.name)):
         text = path.read_text()
         m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
-        if not m:
-            sys.exit(f"{path}: no front matter")
-        fm = yaml.safe_load(m.group(1)) or {}
-        body = text[m.end():]
+        extra = []
+        if m:
+            fm = yaml.safe_load(m.group(1)) or {}
+            body = text[m.end():]
+        else:
+            fm, body, extra = bullet_header(path, text)
         sections, current = {}, None
         for line in body.splitlines():
             h = re.match(r"^## (.+?)\s*$", line)
             if h:
-                current = h.group(1)
+                current = SECTION_ALIASES.get(h.group(1), h.group(1))
                 sections[current] = []
             elif current:
                 sections[current].append(line)
+        if extra:
+            sections["Related"] = extra + ([""] + sections["Related"] if "Related" in sections else [])
         adrs.append({
             "id": str(fm["id"]), "title": str(fm["title"]), "status": str(fm["status"]),
             "date": str(fm["date"]), "repos": list(fm.get("related_repos") or []),
