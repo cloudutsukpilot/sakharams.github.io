@@ -1,0 +1,1475 @@
+# Ported from platform-wardens diagrams/wardens-call-map/diagram.yml (2026-11-09); icons mapped to the blog's logos
+# and the how-doc references dropped. Edit the source in platform-wardens and port again, so the two stay the same.
+# Call map: which Python function in an agent calls which function in the wardens framework, and which checks,
+# guardrails and LLM practices run on the way. Traced on platform-wardens main (2026-11-09) for two agents:
+# terraform-drift (scheduled, deterministic stages plus two LLM stages) and stack-author (a chat with tools).
+# Every component's API line is the file and line of the function; paths under agents/ are short for
+# agents/devops/<agent>/src/<package>/, paths under wardens/ for framework/src/wardens/.
+# Gaps the code shows today are drawn as stated limits, not as working paths:
+# - guardrail point 1 (check_submission) runs only in Console.build, so schedule-started tasks skip it;
+# - stack-author's model has no circuit breaker (model_from_env without agent=);
+# - stack-author's GuardedToolset gets no manifest or audit log, so tool bounds aren't checked and refusals aren't audited;
+# - no agent stage calls mcp_toolset yet (drift's manifest declares web search; the MCP plan's phase 5 is next).
+title: wardens call map
+description: "Which agent function calls which wardens function, and the checks, guardrails and LLM practices that run on the way, replayed as eight use cases."
+level: 1
+levels: [Context, Agents & modules, Files, Functions & checks]
+accent: "#2563EB"
+accent2: "#EC4899"
+lock: false
+
+views:
+  - {id: guardrails, label: Guardrails, icon: shield}
+  - {id: llm, label: LLM practices, icon: cpu}
+  - {id: evidence, label: Evidence, icon: chart}
+
+certs:
+  le-home:
+    label: "<app>.<cluster>.home.cloudutsuk.com"
+    type: public
+    by: "Traefik, the ingress controller of each k3d cluster (TLS ends there)"
+    issuer: "Let's Encrypt → ISRG Root X1; ACME DNS-01 through Cloudflare by cert-manager (cluster issuer `letsencrypt`)"
+    valid: "90 days; cert-manager renews it before expiry"
+    stored: "A Secret per Ingress in the app's namespace"
+    trust: "Public chain: Python's CA bundle and every browser trust ISRG Root X1"
+  cf-edge:
+    label: "hooks.cloudutsuk.com at Cloudflare's edge"
+    type: public
+    by: "Cloudflare's edge (TLS ends there, then the tunnel carries the request)"
+    issuer: "Cloudflare Universal SSL, issued and renewed by Cloudflare"
+    valid: "Managed by Cloudflare"
+    trust: "Public chain: GitHub's webhook sender trusts it"
+  github-pub:
+    label: api.github.com
+    type: public
+    by: "GitHub"
+    issuer: "GitHub's public CA chain, managed by GitHub"
+    valid: "Managed by GitHub"
+    trust: "Public chain in the image's CA bundle"
+  slack-pub:
+    label: hooks.slack.com
+    type: public
+    by: "Slack"
+    issuer: "Slack's public CA chain, managed by Slack"
+    valid: "Managed by Slack"
+    trust: "Public chain in the image's CA bundle"
+
+nodes:
+  - id: engineer
+    label: Platform engineer
+    icon: user
+    status: external
+    facts:
+      summary: "Chats with stack-author in the console's Author tab and confirms the change that becomes a draft PR."
+      how: "Browser on the tailnet; the console signals the conversation workflow in Temporal."
+      api: "None of their own: the wardens console"
+
+  - id: agents
+    label: Agent code
+    sub: "agents/devops/*"
+    icon: code
+    status: built
+    facts:
+      summary: "Each agent is a small Python package: a worker, a deterministic workflow, activities, stages and tools."
+      how: "Agents never import Temporal or a model SDK directly: they go through wardens.durable and wardens.llm (ADR 0040, 0042)."
+      api: "`agents/<domain>/<agent>/src/<package>/`"
+    children:
+      - id: drift
+        label: terraform-drift
+        sub: "scheduled · L1"
+        icon: bolt
+        status: built
+        facts:
+          summary: "Explains Terraform drift found by the daily scan and opens a draft PR that codifies it."
+          how: "Deterministic stages decide; two LLM stages only classify and explain. Every write is a draft PR."
+          api: "`agents/devops/terraform-drift/src/terraform_drift/`"
+        children:
+          - id: d_worker
+            label: worker.py
+            icon: file
+            status: built
+            facts:
+              summary: "Builds the worker process: model, kill switch, sinks, the activity binding and the schedules."
+              how: "BINDING sets each activity's timeout and retries; act activities are idempotent with 3 attempts."
+              api: "`agents/…/terraform_drift/worker.py`"
+            children:
+              - id: d_run_worker
+                label: run_worker()
+                icon: function
+                status: built
+                facts:
+                  summary: "The worker's entry point: wires every wardens piece the agent needs, then polls its queue."
+                  how: "configure → DriftActivities(kill_switch=…) → bind_activities(sink, prices, notifier, audit) → connect → sync_schedules → create_worker."
+                  api: "`agents/…/terraform_drift/worker.py:356`"
+              - id: d_model
+                label: _model()
+                icon: function
+                status: built
+                facts:
+                  summary: "Builds the model the LLM stages use, through the agent's circuit breaker, and refuses an unpriced one."
+                  how: "model_from_env(MANIFEST models[0].primary, agent=NAME), then require_price against prices.yaml."
+                  api: "`agents/…/terraform_drift/worker.py:332`"
+          - id: d_workflow
+            label: workflow.py
+            icon: file
+            status: built
+            facts:
+              summary: "The deterministic workflow: decides what to do next and never touches the network itself."
+              how: "Every call on `acts` becomes a Temporal activity through wardens.durable's proxy."
+              api: "`agents/…/terraform_drift/workflow.py`"
+            children:
+              - id: d_run
+                label: run(task, acts)
+                icon: function
+                status: built
+                facts:
+                  summary: "Checks the kill switch, finds the scan run and stacks, then per stack: kill switch, analyse, emit, open the PR."
+                  how: "A failure in one stack is caught and recorded; the others go on."
+                  api: "`agents/…/terraform_drift/workflow.py:46`"
+          - id: d_acts
+            label: activities.py
+            icon: file
+            status: built
+            facts:
+              summary: "DriftActivities: every side effect the workflow asks for, each one a Temporal activity."
+              how: "Runs on the activity poller of the worker; reads GitHub, calls the stages, applies guardrail point 4."
+              api: "`agents/…/terraform_drift/activities.py:37`"
+            children:
+              - id: d_ks
+                label: kill_switch_engaged()
+                icon: function
+                status: built
+                facts:
+                  summary: "Asks wardens whether this agent's kill switch, or the `all` switch, is engaged."
+                  how: "is_engaged(self._switch, manifest()[\"name\"])."
+                  api: "`agents/…/terraform_drift/activities.py:48`"
+              - id: d_analyse
+                label: analyse()
+                icon: function
+                status: built
+                facts:
+                  summary: "Analyses one stack: hands the plan's drift to analyse_stack with the model and the gate's context."
+                  how: "Reads the redacted plan from the scan run's artifacts and calls stages/analyse.py."
+                  api: "`agents/…/terraform_drift/activities.py:84`"
+              - id: d_emit
+                label: emit()
+                icon: function
+                status: built
+                facts:
+                  summary: "Guardrail point 4: turns the analysis into artifacts and checks every proposed action before anything is written."
+                  how: "check_action(…, task_max_level=task.max_autonomy_level, ownership=…) per action, then action_decision; refused raises PermissionError."
+                  api: "`agents/…/terraform_drift/activities.py:126`"
+              - id: d_open_pr
+                label: open_draft_pr()
+                icon: function
+                status: built
+                facts:
+                  summary: "The only write: hands the request and the kill switch to the GitHub writer."
+                  how: "An act activity: idempotent, 3 attempts; DraftPrRefused, ScopeError and NotAnOperator are not retried."
+                  api: "`agents/…/terraform_drift/activities.py:212`"
+          - id: d_stages
+            label: stages/ · policies/
+            icon: file
+            status: built
+            facts:
+              summary: "The analysis pipeline: redact, classify (LLM), group, gate (deterministic), explain (LLM)."
+              how: "Only the gate decides what is proposed; the model's output is validated and has a fallback."
+              api: "`agents/…/terraform_drift/stages/`, `policies/gate.py`"
+            children:
+              - id: d_analyse_stack
+                label: analyse_stack()
+                icon: function
+                status: built
+                facts:
+                  summary: "Runs the pipeline for one stack and returns the proposals with their gate decisions."
+                  how: "attribute_changes → classify → group → evaluate → rationale, per proposal."
+                  api: "`agents/…/terraform_drift/stages/analyse.py:46`"
+              - id: d_attr
+                label: attribute_changes()
+                icon: function
+                status: built
+                facts:
+                  summary: "Turns a drifted resource into attribute changes, with sensitive values replaced before any model sees them."
+                  how: "A sensitive attribute becomes \"(sensitive value)\" in the change the prompt is built from."
+                  api: "`agents/…/terraform_drift/stages/redact.py:65`"
+              - id: d_classify
+                label: classify()
+                icon: function
+                status: built
+                facts:
+                  summary: "LLM stage: says for each changed attribute whether it is expected, a hotfix or unknown."
+                  how: "Agent(output_type=ClassifyOutput, retries=2), usage limits 4 requests and 60,000 tokens, evidence wrapped as untrusted data."
+                  api: "`agents/…/terraform_drift/stages/classify.py:87`"
+              - id: d_gate
+                label: gate.evaluate()
+                icon: check
+                status: built
+                facts:
+                  summary: "Deterministic policy: decides investigate, codify (draft PR or patch text) or a revert recommendation."
+                  how: "Secrets, scope and the classification decide; no model call. Anything unknown is investigate."
+                  api: "`agents/…/terraform_drift/policies/gate.py:76`"
+              - id: d_rationale
+                label: rationale()
+                icon: function
+                status: built
+                facts:
+                  summary: "LLM stage: one short explanation for a proposal the gate already decided."
+                  how: "Usage limits 2 requests and 20,000 tokens; on failure a fixed default rationale."
+                  api: "`agents/…/terraform_drift/stages/recommend.py:63`"
+          - id: d_writer
+            label: GitHubWriter.open_draft_pr()
+            sub: "tools/draft_pr.py"
+            icon: git
+            status: built
+            facts:
+              summary: "Opens the draft PR on a drift/ branch, or returns the one already open for the same key."
+              how: "Branch must start with the prefix and never be main; re-checks patchSha256; checks the kill switch right before the write."
+              api: "`agents/…/terraform_drift/tools/draft_pr.py:133`"
+          - id: d_entry
+            label: _suggest_correlation()
+            sub: "entrypoint.py"
+            icon: function
+            status: built
+            facts:
+              summary: "Adds a suggestedHandoffs entry to a finding so the incident can ask change-correlator who made the change."
+              how: "correlate_inputs builds the change.correlate inputs from the drifted resources."
+              api: "`agents/…/terraform_drift/entrypoint.py:305`"
+
+      - id: author
+        label: stack-author
+        sub: "chat · L1"
+        icon: message
+        status: built
+        facts:
+          summary: "Chats with an engineer about a new resource and, once they confirm the diff, opens a draft PR."
+          how: "One workflow per conversation; the model reads stacks and modules through guarded read tools."
+          api: "`agents/devops/stack-author/src/stack_author/`"
+        children:
+          - id: a_worker
+            label: worker.py
+            sub: "run_worker() · _model()"
+            icon: file
+            status: built
+            facts:
+              summary: "Builds the chat model, the catalog, the GitHub reader and writer, and binds the activities."
+              how: "_model calls model_from_env without agent=, so this model has no circuit breaker; require_price still applies."
+              api: "`agents/…/stack_author/worker.py:103`, `:125`"
+          - id: a_workflow
+            label: workflow.py
+            icon: file
+            status: built
+            facts:
+              summary: "The conversation loop: waits for the next message, runs a turn, or opens the PR the person confirmed."
+              how: "run checks the kill switch, recalls memory, then loops on next_message."
+              api: "`agents/…/stack_author/workflow.py:194`"
+            children:
+              - id: a_turn
+                label: _turn()
+                icon: function
+                status: built
+                facts:
+                  summary: "One chat turn: sends the message with the remaining budget to the chat_turn activity."
+                  how: "remaining_usd = the task's cost limit minus what the conversation has spent."
+                  api: "`agents/…/stack_author/workflow.py:93`"
+              - id: a_confirm
+                label: _confirm()
+                icon: function
+                status: built
+                facts:
+                  summary: "Runs when the person presses the button: same diff hash, deletes acknowledged, kill switch, emit, PR, remember."
+                  how: "patchSha256 must match what the person saw; nothing is written otherwise."
+                  api: "`agents/…/stack_author/workflow.py:122`"
+          - id: a_acts
+            label: activities.py
+            icon: file
+            status: built
+            facts:
+              summary: "StackAuthorActivities: the chat turn, guardrail point 4, the PR and long-term memory."
+              how: "Each method is a Temporal activity bound by wardens.durable."
+              api: "`agents/…/stack_author/activities.py:45`"
+            children:
+              - id: a_chat
+                label: chat_turn()
+                icon: function
+                status: built
+                facts:
+                  summary: "Hands the turn to the chat stage with the model, catalog, reader, manifest and prices."
+                  how: "No retries: a model failure becomes a reply, not a failed conversation."
+                  api: "`agents/…/stack_author/activities.py:76`"
+              - id: a_emit
+                label: emit()
+                icon: function
+                status: built
+                facts:
+                  summary: "Guardrail point 4 for the confirmed change, at most level 1."
+                  how: "check_action(…, task_max_level=1, ownership=…); not allowed raises DraftPrRefused."
+                  api: "`agents/…/stack_author/activities.py:79`"
+              - id: a_memory
+                label: recall() · remember()
+                icon: function
+                status: built
+                facts:
+                  summary: "Long-term memory: suggestions from earlier conversations, written only from a confirmed change."
+                  how: "Values are taken in code, never from model text, and shown as unreviewed and possibly stale."
+                  api: "`agents/…/stack_author/activities.py:64`, `:105`"
+          - id: a_stage
+            label: stages/chat.py
+            icon: file
+            status: built
+            facts:
+              summary: "The chat stage: budget, guarded read tools, the model, and a validator that prepares the diff."
+              how: "Agent(output_type=[Ask, Propose], retries=2); REQUEST_LIMIT 14 per turn."
+              api: "`agents/…/stack_author/stages/chat.py`"
+            children:
+              - id: a_chat_turn
+                label: chat_turn()
+                icon: function
+                status: built
+                facts:
+                  summary: "Sets the turn's usage limits, runs the agent with the guarded toolset and records the model call."
+                  how: "CostCeilingReached becomes the reply \"This conversation has used its budget…\"."
+                  api: "`agents/…/stack_author/stages/chat.py:164`"
+              - id: a_toolset
+                label: _toolset()
+                icon: function
+                status: built
+                facts:
+                  summary: "The six read tools the model may call, wrapped in GuardedToolset."
+                  how: "GuardedToolset(FunctionToolset(…), allowed=read_tools(manifest, …), agent=…); no manifest or audit is passed."
+                  api: "`agents/…/stack_author/stages/chat.py:95`"
+              - id: a_prepared
+                label: _prepared()
+                icon: check
+                status: built
+                facts:
+                  summary: "Output validator: a proposal is prepared in code (real stack, real module inputs) before it reaches the person."
+                  how: "Errors raise ModelRetry with the reasons, so the model repairs the proposal (2 retries)."
+                  api: "`agents/…/stack_author/stages/chat.py:67`"
+          - id: a_tools
+            label: tools/
+            icon: file
+            status: built
+            facts:
+              summary: "Catalog reads and the GitHub writer."
+              how: "Reads are limited to the target repositories; the writer re-checks the kill switch."
+              api: "`agents/…/stack_author/tools/`"
+            children:
+              - id: a_read_stack
+                label: Catalog.read_stack()
+                icon: function
+                status: built
+                facts:
+                  summary: "Reads a stack's resources.yaml and its environment's common_vars.yaml for the model."
+                  how: "The path must be under environments/<cloud>/ with no `..`; returned as data, not instructions."
+                  api: "`agents/…/stack_author/tools/catalog.py:136`"
+              - id: a_writer
+                label: GitHubWriter.open_draft_pr()
+                icon: git
+                status: built
+                facts:
+                  summary: "Opens the draft PR for the confirmed diff in an allowed repository."
+                  how: "is_engaged(kill_switch, agent) right before the write; requests the reviewers from targets."
+                  api: "`agents/…/stack_author/tools/github.py:157`"
+
+  - id: wardens
+    label: wardens framework
+    sub: "framework/src/wardens"
+    icon: package
+    status: built
+    facts:
+      summary: "The shared library every agent runs on: durability, entry, guardrails, model access, evidence, state, handoff, messages."
+      how: "Imported by each agent's worker; the guardrails live here so no agent can skip or reimplement them."
+      api: "`framework/src/wardens/`"
+    children:
+      - id: w_durable
+        label: wardens.durable
+        icon: clock
+        status: built
+        facts:
+          summary: "Temporal behind a small API: binding, the incident workflow, schedules, workers and conversations."
+          how: "The agent's workflow calls `acts.x()`; the proxy turns it into an activity with the binding's timeout and retries."
+          api: "`framework/src/wardens/durable/`"
+        children:
+          - id: w_binding
+            label: binding.py
+            icon: file
+            status: built
+            facts:
+              summary: "The bridge from plain agent code to Temporal workflows and activities."
+              how: "AgentBinding holds the options per method; default_options come from the manifest."
+              api: "`framework/src/wardens/durable/binding.py`"
+            children:
+              - id: w_proxy
+                label: _ActivityProxy
+                icon: function
+                status: built
+                facts:
+                  summary: "What `acts` is inside a workflow: every method call becomes workflow.execute_activity(\"<agent>.<method>\")."
+                  how: "now comes from workflow time; next_message and publish stay in the workflow; each call is logged as an ActivityRecord."
+                  api: "`framework/src/wardens/durable/binding.py:126`"
+              - id: w_run_agent
+                label: _run_agent()
+                icon: function
+                status: built
+                facts:
+                  summary: "Runs the agent's workflow and, in a finally block, always writes its run record."
+                  how: "RECORD_ACTIVITY is shielded from cancellation, 5 attempts, ContractError not retried; then holds or sends the message."
+                  api: "`framework/src/wardens/durable/binding.py:222`"
+              - id: w_bind
+                label: bind_activities()
+                icon: function
+                status: built
+                facts:
+                  summary: "Wraps the agent's methods as activities and adds the framework's own: record_run and notify."
+                  how: "record_run → build_run_record → sink.write → export_run; notify → Notifier.send."
+                  api: "`framework/src/wardens/durable/binding.py:436`"
+          - id: w_incident
+            label: incident.py
+            icon: file
+            status: built
+            facts:
+              summary: "The root workflow for scheduled and routed work: runs the agent as a child and plans handoffs."
+              how: "Children run one after another (parallel ones behind PARALLEL_PATCH)."
+              api: "`framework/src/wardens/durable/incident.py`"
+            children:
+              - id: w_inc_run
+                label: IncidentWorkflow.run()
+                icon: function
+                status: built
+                facts:
+                  summary: "Resolves the capability, starts the child workflow, then asks for a handoff per suggestion in its findings."
+                  how: "Each suggestedHandoffs entry becomes a plan_handoff activity with a cost share."
+                  api: "`framework/src/wardens/durable/incident.py:96`"
+              - id: w_plan_handoff
+                label: plan_handoff()
+                icon: function
+                status: built
+                facts:
+                  summary: "Activity that calls plan_child_task and records the decision as a metric and a span."
+                  how: "handoff_planned(agent, target, planned, reason)."
+                  api: "`framework/src/wardens/durable/incident.py:246`"
+          - id: w_sched
+            label: schedules.py · worker.py
+            icon: file
+            status: built
+            facts:
+              summary: "Schedules from the manifest, the root task for each fire, and the worker itself."
+              how: "sync_schedules creates or updates Temporal schedules; make_task builds the task when one fires."
+              api: "`framework/src/wardens/durable/schedules.py`, `worker.py`"
+            children:
+              - id: w_make_task
+                label: make_task()
+                icon: function
+                status: built
+                facts:
+                  summary: "Builds the root task for one schedule fire (channel schedule) with create_root_task."
+                  how: "Does not call check_submission: guardrail point 1 is skipped on this path today (stated gap)."
+                  api: "`framework/src/wardens/durable/schedules.py:59`"
+              - id: w_sync
+                label: sync_schedules()
+                icon: function
+                status: built
+                facts:
+                  summary: "Makes Temporal's schedules match the manifest's at worker start."
+                  how: "One schedule per manifest entry, running the incident workflow on the agent's queue."
+                  api: "`framework/src/wardens/durable/schedules.py:107`"
+              - id: w_create_worker
+                label: create_worker()
+                icon: function
+                status: built
+                facts:
+                  summary: "The Temporal worker for the agent's queue: its workflows and activities, sandboxed."
+                  how: "Registers IncidentWorkflow, the agent workflow and every bound activity."
+                  api: "`framework/src/wardens/durable/worker.py:90`"
+          - id: w_conv
+            label: Conversation
+            sub: "conversation.py"
+            icon: message
+            status: built
+            facts:
+              summary: "Workflow-side next_message and publish for chat agents: messages arrive as signals, the view is a query."
+              how: "next_message waits a set time and returns None when nothing arrived."
+              api: "`framework/src/wardens/durable/conversation.py:28`"
+
+      - id: w_runtime
+        label: wardens.runtime
+        icon: api
+        status: built
+        facts:
+          summary: "Entry points: the console, the GitHub and alert receivers, the ingress bus, the registry."
+          how: "Every operator, webhook and routed task is built by Console.build, which runs guardrail point 1."
+          api: "`framework/src/wardens/runtime/`"
+        children:
+          - id: w_gh_hook
+            label: GitHub Receiver
+            sub: "github_webhook.py"
+            icon: api
+            status: built
+            facts:
+              summary: "Turns a signed workflow_job delivery from the drift scan into a root task and starts the incident."
+              how: "HMAC checked first; a matching DriftRule builds the request and calls Console.build."
+              api: "`framework/src/wardens/runtime/github_webhook.py:224`"
+          - id: w_console
+            label: Console.build()
+            icon: function
+            status: built
+            facts:
+              summary: "The one place a root task is built for operators, webhooks and routing, with guardrail point 1."
+              how: "create_root_task, narrow to the channel's grants, then check_submission; refused raises Refused."
+              api: "`framework/src/wardens/runtime/console.py:181`"
+          - id: w_entry
+            label: create_root_task()
+            sub: "entry.py"
+            icon: function
+            status: built
+            facts:
+              summary: "Builds a schema-valid root task from the channel's policy: deadline, level, cost limit, hop budget."
+              how: "Channel policies from config; dedupe when a store is given."
+              api: "`framework/src/wardens/runtime/entry.py:107`"
+
+      - id: w_guard
+        label: wardens.guardrails
+        icon: shield
+        status: built
+        facts:
+          summary: "The four guardrail points, the kill switch and the circuit breaker."
+          how: "Point 1 check_submission, point 2 check_tool_call, point 3 approval (planned), point 4 check_action."
+          api: "`framework/src/wardens/guardrails/`"
+        children:
+          - id: w_is_engaged
+            label: is_engaged()
+            sub: "kill_switch.py"
+            icon: lock
+            status: built
+            facts:
+              summary: "Reads the kill switch for this agent or `all`; fails closed."
+              how: "Any exception reading the switch counts as engaged; killswitch_observed records each read."
+              api: "`framework/src/wardens/guardrails/kill_switch.py:80`"
+          - id: w_check_sub
+            label: check_submission()
+            sub: "point 1"
+            icon: check
+            status: built
+            facts:
+              summary: "Point 1: a task must ask for a declared capability, within the agent's level, the framework ceiling and its cost ceiling."
+              how: "Collects every reason (undeclared_capability, autonomy, cost_ceiling, quarantined) and raises SubmissionRejected."
+              api: "`framework/src/wardens/guardrails/autonomy.py:34`"
+          - id: w_check_action
+            label: check_action()
+            sub: "point 4 · autonomy.py"
+            icon: shield
+            status: built
+            direction: down
+            facts:
+              summary: "Point 4: six checks in order on every proposed action; the first that fails decides."
+              how: "Outcomes: output (L0–1), needs-approval (L2), within-bounds (L3), handoff, or rejected with a code."
+              api: "`framework/src/wardens/guardrails/autonomy.py:91`"
+            children:
+              - {id: ca_fn, label: check_action(action), icon: function, status: built,
+                 facts: {summary: "Entry: takes the proposed-action content, the manifest, the task's capability and level ceiling.", how: "Returns an ActionDecision; the caller records action_decision.", api: "`autonomy.py:91`"}}
+              - {id: ca_catalog, label: In the catalog, icon: check, status: built,
+                 facts: {summary: "The action must be in the manifest's actionCatalog.", how: "Code undeclared_action (principle 7).", api: "`autonomy.py:96`"}}
+              - {id: ca_level, label: Catalog level, icon: check, status: built,
+                 facts: {summary: "The action's level must equal the catalog's level for it.", how: "Code level_mismatch.", api: "`autonomy.py:99`"}}
+              - {id: ca_ceiling, label: Under the ceiling, icon: check, status: built,
+                 facts: {summary: "Level must not exceed min(task maxAutonomyLevel, framework ceiling).", how: "Code autonomy.", api: "`autonomy.py:103`"}}
+              - {id: ca_goal, label: No goal drift, icon: check, status: built,
+                 facts: {summary: "The task's capability must be one this agent serves.", how: "Code goal_drift.", api: "`autonomy.py:106`"}}
+              - {id: ca_owner, label: Owner's domain, icon: check, status: built,
+                 facts: {summary: "A resource owned by another domain becomes a handoff, not an action.", how: "Ownership map; code ownership (decision 0011).", api: "`autonomy.py:111`"}}
+              - {id: ca_l2, label: L2+ needs an owner, icon: check, status: built,
+                 facts: {summary: "A level 2 or 3 action needs the target in the ownership map.", how: "Code no_owner; at L1 an unmapped target is allowed as output only.", api: "`autonomy.py:113`"}}
+          - id: w_check_tool
+            label: check_tool_call()
+            sub: "point 2 · tool_calls.py"
+            icon: shield
+            status: built
+            direction: down
+            facts:
+              summary: "Point 2: four checks on every tool call a model asks for; the first that fails refuses it."
+              how: "Records guardrail_decision(agent, \"tool\", allowed, code) for every call."
+              api: "`framework/src/wardens/guardrails/tool_calls.py:38`"
+            children:
+              - {id: tc_fn, label: check_tool_call(name, args), icon: function, status: built,
+                 facts: {summary: "Entry: the tool name, its arguments, the caller (llm or code) and the declared parameters.", how: "Returns a ToolDecision.", api: "`tool_calls.py:38`"}}
+              - {id: tc_declared, label: Declared tool, icon: check, status: built,
+                 facts: {summary: "The tool must be in the manifest's tools.", how: "Code undeclared_tool.", api: "`tool_calls.py:50`"}}
+              - {id: tc_act, label: Not an act tool, icon: check, status: built,
+                 facts: {summary: "A model may never call an act tool; only a deterministic stage may.", how: "Code act_from_llm.", api: "`tool_calls.py:53`"}}
+              - {id: tc_params, label: Declared parameters, icon: check, status: built,
+                 facts: {summary: "No argument outside the tool's schema.", how: "Code undeclared_parameters.", api: "`tool_calls.py:55`"}}
+              - {id: tc_bounds, label: Inside the bounds, icon: check, status: built,
+                 facts: {summary: "Each bounded argument must be inside the manifest's bounds for it.", how: "Code out_of_scope.", api: "`tool_calls.py:60`"}}
+          - id: w_circuit
+            label: CircuitBreaker
+            sub: "circuit.py"
+            icon: bolt
+            status: built
+            facts:
+              summary: "Stops calling a failing dependency: open after 5 failures in a row, one trial after 60 s."
+              how: "CircuitOpen is raised at once while open, so the stage takes its fallback without waiting on timeouts."
+              api: "`framework/src/wardens/guardrails/circuit.py:39`"
+
+      - id: w_llm
+        label: wardens.llm
+        icon: cpu
+        status: built
+        facts:
+          summary: "The only way to a model: endpoint and breaker, prices and usage limits, guarded tools, call records."
+          how: "Pydantic AI models pointed at LiteLLM; the agent never holds a key or a provider SDK."
+          api: "`framework/src/wardens/llm/`"
+        children:
+          - id: w_providers
+            label: providers.py
+            icon: file
+            status: built
+            facts:
+              summary: "Builds the model from the environment and wraps it in the agent's breaker."
+              how: "model_from_env → model_from_config → with_breaker when agent= is given."
+              api: "`framework/src/wardens/llm/providers.py`"
+            children:
+              - id: w_mfe
+                label: model_from_env()
+                icon: function
+                status: built
+                facts:
+                  summary: "The model an agent uses: the LiteLLM endpoint and deployment from the environment."
+                  how: "With agent=, wraps it in BreakerModel; without it (stack-author today), no breaker."
+                  api: "`framework/src/wardens/llm/providers.py:128`"
+              - id: w_breaker
+                label: BreakerModel
+                icon: bolt
+                status: built
+                facts:
+                  summary: "A model whose every request goes through the agent's `model` circuit breaker."
+                  how: "request and request_stream run inside breaker.guard()."
+                  api: "`framework/src/wardens/llm/providers.py:134`"
+          - id: w_limits
+            label: limits.py
+            icon: file
+            status: built
+            facts:
+              summary: "Cost and tool safety for LLM stages."
+              how: "Prices from prices.yaml; tools filtered and checked per call."
+              api: "`framework/src/wardens/llm/limits.py`"
+            children:
+              - id: w_price
+                label: require_price()
+                icon: function
+                status: built
+                facts:
+                  summary: "Refuses, at worker start, a model prices.yaml doesn't price: no unbounded turns."
+                  how: "Raises UnpricedModelError."
+                  api: "`framework/src/wardens/llm/limits.py:47`"
+              - id: w_usage
+                label: usage_limits()
+                icon: function
+                status: built
+                facts:
+                  summary: "Turns the remaining budget into Pydantic AI usage limits for one run."
+                  how: "No budget left raises CostCeilingReached; a free model gets only a request limit; tokens priced at the dearer rate."
+                  api: "`framework/src/wardens/llm/limits.py:57`"
+              - id: w_guarded
+                label: GuardedToolset
+                icon: shield
+                status: built
+                facts:
+                  summary: "Wraps a stage's tools: hides undeclared ones and runs point 2 on every call."
+                  how: "Refusal → ModelRetry JSON (and an audit event when given an audit log); execute_tool span with redacted args; results capped at 20,000 characters."
+                  api: "`framework/src/wardens/llm/limits.py:78`"
+              - id: w_read_tools
+                label: read_tools()
+                icon: function
+                status: built
+                facts:
+                  summary: "The manifest's read tools this stage may use, with their parameter names."
+                  how: "Act tools are never included."
+                  api: "`framework/src/wardens/llm/limits.py:138`"
+          - id: w_model_call
+            label: model_call()
+            sub: "llm/__init__.py"
+            icon: function
+            status: built
+            facts:
+              summary: "Records one model call for the run record: stage, model, prompt version, tokens, or the failure."
+              how: "Called with result=None when the stage fell back."
+              api: "`framework/src/wardens/llm/__init__.py:24`"
+          - id: w_mcp
+            label: mcp_toolset()
+            sub: "mcp.py"
+            icon: search
+            status: built
+            facts:
+              summary: "Loads MCP tools through LiteLLM with pinned definition hashes. Built, but no agent stage calls it yet."
+              how: "check_pins refuses a missing or changed definitionSha256; gateway headers carry x-wardens-run and traceparent."
+              api: "`framework/src/wardens/llm/mcp.py:126`"
+
+      - id: w_tele
+        label: wardens.telemetry
+        icon: chart
+        status: built
+        facts:
+          summary: "Run records, redaction, OpenTelemetry export and the guardrail metrics."
+          how: "Everything that leaves the process is redacted first."
+          api: "`framework/src/wardens/telemetry/`"
+        children:
+          - id: w_brr
+            label: build_run_record()
+            icon: file
+            status: built
+            facts:
+              summary: "Builds the run record: priced model calls, redacted evidence and parameters, then a schema check."
+              how: "redact_text on evidence, redact(classification) on parameters, validate(\"run-record\")."
+              api: "`framework/src/wardens/telemetry/run_record.py:144`"
+          - id: w_redact
+            label: redact()
+            icon: lock
+            status: built
+            facts:
+              summary: "Masks secrets and personal data in any value before it is stored or exported."
+              how: "Built-in patterns plus the classification's extra patterns."
+              api: "`framework/src/wardens/telemetry/redact.py:52`"
+          - id: w_export
+            label: export_run()
+            icon: chart
+            status: built
+            facts:
+              summary: "Exports the run record as spans and metrics to the OpenTelemetry collector."
+              how: "One root span per run with action events; run metrics by capability."
+              api: "`framework/src/wardens/telemetry/otel.py:76`"
+          - id: w_metrics
+            label: metrics
+            icon: chart
+            status: built
+            views: [evidence]
+            facts:
+              summary: "Guardrail, kill switch, breaker and handoff counters, one helper per decision."
+              how: "action_decision, guardrail_decision, killswitch_observed, handoff_planned, run_record_fallback …"
+              api: "`framework/src/wardens/telemetry/metrics.py`"
+
+      - id: w_state
+        label: wardens.state
+        icon: database
+        status: built
+        facts:
+          summary: "Postgres-backed stores, each with a file fallback: run records, kill switch, memory, audit log."
+          how: "WARDENS_STATE_DSN picks Postgres; without it the file stores are used."
+          api: "`framework/src/wardens/state/postgres.py`"
+        children:
+          - id: w_sink
+            label: record_sink()
+            sub: "PostgresRecordSink"
+            icon: database
+            status: built
+            facts:
+              summary: "Writes run records to Postgres, falling back to the file sink when the database is unreachable."
+              how: "OperationalError → file sink and run_record_fallback metric."
+              api: "`framework/src/wardens/state/postgres.py:131`"
+          - id: w_ks_store
+            label: kill_switch()
+            sub: "AnyKillSwitch"
+            icon: lock
+            status: built
+            facts:
+              summary: "The switch is engaged when either the Git file or the database row says so."
+              how: "Agent-specific row or `all`."
+              api: "`framework/src/wardens/state/postgres.py:354`"
+          - id: w_memory
+            label: memory_store()
+            icon: database
+            status: built
+            facts:
+              summary: "Per-agent long-term memory with expiry."
+              how: "Postgres table; file store without a DSN."
+              api: "`framework/src/wardens/state/postgres.py:369`"
+
+      - id: w_handoff
+        label: wardens.handoff
+        icon: users
+        status: built
+        facts:
+          summary: "Plans a child task for another agent, or refuses with every reason."
+          how: "Default deny: only pairs in framework/config/handoff.yaml are allowed."
+          api: "`framework/src/wardens/handoff/policy.py`"
+        children:
+          - id: w_plan_child
+            label: plan_child_task()
+            icon: users
+            status: built
+            direction: down
+            facts:
+              summary: "Eight checks; every one runs and all reasons are collected. Then caps level and cost and validates the task schema."
+              how: "Child: same correlationId, parentTaskId, level ≤ parent and target, cost = min(share, target ceiling), hopBudget − 1."
+              api: "`framework/src/wardens/handoff/policy.py:56`"
+            children:
+              - {id: h_fn, label: plan_child_task(), icon: function, status: built,
+                 facts: {summary: "Entry: parent task, chain, the finding, the target capability, spent and cost share.", how: "Raises HandoffRefused with every code, or returns the child task.", api: "`policy.py:56`"}}
+              - {id: h_pair, label: Pair allowed, icon: check, status: built,
+                 facts: {summary: "source → target must be enabled in handoff.yaml (default deny).", how: "Code pair_not_allowed.", api: "`policy.py:71`"}}
+              - {id: h_route, label: Routable agent, icon: check, status: built,
+                 facts: {summary: "The registry must resolve the capability to a routable agent.", how: "Code no_routable_agent.", api: "`policy.py:74`"}}
+              - {id: h_hops, label: Hop budget, icon: check, status: built,
+                 facts: {summary: "The parent must have hops left.", how: "Code hop_budget.", api: "`policy.py:78`"}}
+              - {id: h_cycle, label: No cycle, icon: check, status: built,
+                 facts: {summary: "The target capability must not already be on the chain.", how: "Code cycle.", api: "`policy.py:81`"}}
+              - {id: h_verified, label: Verified finding, icon: check, status: built,
+                 facts: {summary: "The finding that suggested it must have passed verification.", how: "Code unverified.", api: "`policy.py:84`"}}
+              - {id: h_cost, label: Cost share, icon: check, status: built,
+                 facts: {summary: "The share must be above zero and within what the parent has left.", how: "Code cost_share.", api: "`policy.py:88`"}}
+              - {id: h_deadline, label: Deadline, icon: check, status: built,
+                 facts: {summary: "The parent's deadline must not have passed.", how: "Code deadline.", api: "`policy.py:92`"}}
+              - {id: h_inputs, label: Valid inputs, icon: check, status: built,
+                 facts: {summary: "The inputs must match the target capability's input schema.", how: "Code invalid_inputs.", api: "`policy.py:95`"}}
+
+      - id: w_notify
+        label: Notifier.send()
+        sub: "wardens.notify"
+        icon: bell
+        status: built
+        facts:
+          summary: "Sends the run's message to the channels configured for its audience."
+          how: "Slack incoming webhook; URLs from OpenBao through framework/config/notify.yaml."
+          api: "`framework/src/wardens/notify/channels.py:370`"
+
+  - id: pydai
+    label: Pydantic AI
+    sub: "Agent.run"
+    icon: package
+    status: external
+    facts:
+      summary: "The agent loop library: sends the prompt, calls tools the model asks for, validates the output and retries."
+      how: "Output validators raise ModelRetry to ask the model again; usage limits stop the run."
+      url: {Docs: "https://ai.pydantic.dev"}
+
+  - id: temporal
+    label: Temporal
+    icon: queue
+    status: built
+    facts:
+      summary: "Runs workflows durably: each activity's result is saved, so a crashed worker resumes at the next step."
+      how: "Workers poll their task queue over gRPC; schedules start the incident workflow."
+      api: "`temporal-frontend.temporal.svc:7233`"
+
+  - id: litellm
+    label: LiteLLM
+    icon: api
+    status: built
+    facts:
+      summary: "The model gateway: OpenAI-compatible endpoint in front of the homelab's vLLM models."
+      how: "One virtual key per agent with its own budget."
+      api: "`https://llm.ai.home.cloudutsuk.com/v1`"
+
+  - id: statedb
+    label: wardens-state-db
+    icon: database
+    status: built
+    facts:
+      summary: "Postgres for run records, kill switch rows, memory and the audit log."
+      how: "In the wardens cluster; each agent has its own role."
+      api: "`wardens-state-db.wardens-state-db.svc:5432/wardens`"
+
+  - id: github
+    label: GitHub
+    icon: devops/cicd/github-18.svg
+    status: external
+    facts:
+      summary: "The IaC repositories the agents read and the draft PRs they open; also sends the drift scan's webhook."
+      how: "Each agent's GitHub App mints installation tokens."
+      api: "`https://api.github.com`"
+
+  - id: slack
+    label: Slack
+    icon: miscellaneous/slack-18.svg
+    status: external
+    facts:
+      summary: "Where people read each run's message."
+      how: "Incoming webhook per audience."
+      api: "`https://hooks.slack.com/services/…`"
+
+  - id: collector
+    label: OTel collector
+    icon: chart
+    status: built
+    facts:
+      summary: "Receives the run's spans and metrics and sends them to the mon cluster."
+      how: "OTLP gRPC from every worker."
+      api: "`http://agent-collector.monitoring.svc:4317`"
+
+edges:
+  # --- worker start-up ---
+  - {id: rw_model, from: d_run_worker, to: d_model, kind: request, label: _model(), view: llm, main: true,
+     why: "At worker start: the model is built once and shared by both LLM stages.", certs: {none: "In-process Python call."}}
+  - {id: model_mfe, from: d_model, to: w_mfe, kind: request, label: model_from_env(agent=), view: llm, main: true,
+     why: "At worker start: the agent gets its model only through wardens.llm, pointed at LiteLLM.", certs: {none: "In-process Python call."}}
+  - {id: mfe_breaker, from: w_mfe, to: w_breaker, kind: control, label: with_breaker(), view: [llm, guardrails],
+     why: "When agent= is given: every model request will go through the agent's breaker.", certs: {none: "In-process Python call."}}
+  - {id: breaker_circuit, from: w_breaker, to: w_circuit, kind: control, label: breaker.guard(), view: [llm, guardrails],
+     why: "On every model request: the breaker counts failures and opens after 5.", certs: {none: "In-process Python call."}}
+  - {id: model_price, from: d_model, to: w_price, kind: control, label: require_price(), view: llm, main: true,
+     why: "At worker start: a model without a price is refused, so every run has a cost limit.", certs: {none: "In-process Python call."}}
+  - {id: rw_ks, from: d_run_worker, to: w_ks_store, kind: request, label: kill_switch(), view: guardrails, main: true,
+     why: "At worker start: the activities get the switch that reads both the Git file and the database row.", certs: {none: "In-process Python call."}}
+  - {id: rw_sink, from: d_run_worker, to: w_sink, kind: request, label: record_sink(), view: evidence, main: true,
+     why: "At worker start: where this agent's run records go.", certs: {none: "In-process Python call."}}
+  - {id: rw_bind, from: d_run_worker, to: w_bind, kind: request, label: bind_activities(),
+     why: "At worker start: the agent's methods become activities, plus record_run and notify.", certs: {none: "In-process Python call."}}
+  - {id: rw_cw, from: d_run_worker, to: w_create_worker, kind: request, label: create_worker(),
+     why: "At worker start: one worker for the agent's queue.", certs: {none: "In-process Python call."}}
+  - {id: rw_sync, from: d_run_worker, to: w_sync, kind: request, label: sync_schedules(),
+     why: "At worker start: Temporal's schedules are made to match the manifest.", certs: {none: "In-process Python call."}}
+  - {id: cw_t, from: w_create_worker, to: temporal, proto: gRPC, port: 7233, label: poll queue,
+     why: "Always on: the worker polls its task queue for workflow and activity tasks.",
+     certs: {none: "Plain gRPC inside the wardens cluster; a NetworkPolicy admits only labelled namespaces."}}
+  - {id: sync_t, from: w_sync, to: temporal, proto: gRPC, port: 7233, label: schedules,
+     why: "At worker start: create or update each schedule.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+
+  # --- entry and point 1 ---
+  - {id: gh_hook, from: github, to: w_gh_hook, proto: Webhook, port: 443, tls: true, label: workflow_job,
+     why: "Used when the drift scan's job finishes: the signed delivery reaches the receiver through Cloudflare and Traefik.", certs: cf-edge,
+     detail: "The hops between (Cloudflare tunnel, Traefik, the Event Hubs bus) are drawn in the wardens-platform diagram."}
+  - {id: hook_build, from: w_gh_hook, to: w_console, kind: request, label: Console.build(),
+     why: "Used for a delivery a DriftRule matches: the root task is built in one shared place.", certs: {none: "In-process Python call."}}
+  - {id: build_entry, from: w_console, to: w_entry, kind: request, label: create_root_task(),
+     why: "Every Console.build: the channel's policy sets deadline, level, cost and hops.", certs: {none: "In-process Python call."}}
+  - {id: build_sub, from: w_console, to: w_check_sub, kind: control, label: point 1, view: guardrails,
+     why: "Every Console.build: guardrail point 1 checks the task against the agent's manifest.", certs: {none: "In-process Python call."}}
+  - {id: hook_t, from: w_gh_hook, to: temporal, proto: gRPC, port: 7233, label: start incident,
+     why: "Used once the task is built: starts the incident workflow with an id from the delivery, so a repeat is refused.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: t_make_task, from: temporal, to: w_make_task, proto: gRPC, port: 7233, label: make_task,
+     why: "Used when a schedule fires: the schedule workflow asks for the root task as an activity.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: make_entry, from: w_make_task, to: w_entry, kind: request, label: create_root_task(),
+     why: "Used for each schedule fire: channel schedule. No check_submission follows on this path (stated gap).", certs: {none: "In-process Python call."}}
+  - {id: t_inc, oneway: true, from: temporal, to: w_inc_run, proto: gRPC, port: 7233, label: incident workflow,
+     why: "Used for scheduled and webhook work: the incident workflow task goes to the worker.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+
+  # --- the workflow calls an activity ---
+  - {id: inc_run, from: w_inc_run, to: d_run, kind: request, label: child workflow,
+     why: "Used for every incident: the agent's own workflow runs as a child, under _run_agent.", certs: {none: "In-process inside the worker; the child start goes through Temporal."}}
+  - {id: run_proxy, from: d_run, to: w_proxy, kind: request, label: acts.x(),
+     why: "Every time the workflow needs a side effect: the call goes to the proxy, never to the network.", certs: {none: "In-process Python call."}}
+  - {id: proxy_t, from: w_proxy, to: temporal, proto: gRPC, port: 7233, label: execute_activity,
+     why: "Every activity: Temporal saves the request and the result, so a crash resumes at the next step.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: t_bind, from: temporal, to: w_bind, proto: gRPC, port: 7233, label: activity task,
+     why: "Every activity: the worker's poller takes the task (drawn in the direction the task travels).", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: bind_ks, from: w_bind, to: d_ks, kind: request, label: kill_switch_engaged(), view: guardrails, main: true,
+     why: "Before each stack and each write: the bound activity runs the agent's method.", certs: {none: "In-process Python call."}}
+  - {id: ks_is, from: d_ks, to: w_is_engaged, kind: control, label: is_engaged(), view: guardrails, main: true,
+     why: "Every kill switch check: the framework decides, failing closed.", certs: {none: "In-process Python call."}}
+  - {id: is_store, from: w_is_engaged, to: w_ks_store, kind: control, label: engaged(), view: guardrails,
+     why: "Every kill switch check: the Git file or the database row for this agent or all.", certs: {none: "In-process Python call."}}
+  - {id: store_db, from: w_ks_store, to: statedb, proto: PostgreSQL, port: 5432, view: guardrails,
+     why: "Every kill switch check: reads the switch rows.", certs: {none: "Plain PostgreSQL inside the wardens cluster; per-agent role."}}
+
+  # --- analysis and the LLM stages ---
+  - {id: bind_analyse, from: w_bind, to: d_analyse, kind: request, label: analyse(),
+     why: "Once per stack: the bound activity runs the analysis.", certs: {none: "In-process Python call."}}
+  - {id: analyse_stack, from: d_analyse, to: d_analyse_stack, kind: request, label: analyse_stack(),
+     why: "Once per stack: the pipeline runs inside the activity.", certs: {none: "In-process Python call."}}
+  - {id: stack_attr, from: d_analyse_stack, to: d_attr, kind: request, label: attribute_changes(), view: llm, main: true,
+     why: "Before any prompt: sensitive values are replaced.", certs: {none: "In-process Python call."}}
+  - {id: stack_classify, from: d_analyse_stack, to: d_classify, kind: request, label: classify(), view: llm, main: true,
+     why: "Once per stack: the model classifies each changed attribute.", certs: {none: "In-process Python call."}}
+  - {id: classify_pyd, from: d_classify, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
+     why: "Each classify: typed output, 2 retries, 4 requests and 60,000 tokens at most.", certs: {none: "In-process Python call."}}
+  - {id: pyd_breaker, from: pydai, to: w_breaker, kind: request, label: request(), view: llm, main: true,
+     why: "Each model request of terraform-drift: through the breaker.", certs: {none: "In-process Python call."}}
+  - {id: breaker_lite, from: w_breaker, to: litellm, proto: HTTPS, port: 443, view: llm, main: true,
+     why: "Each model request: OpenAI-compatible chat completion through LiteLLM to vLLM.", certs: le-home,
+     detail: "The agent's LiteLLM virtual key is the bearer token."}
+  - {id: classify_mc, from: d_classify, to: w_model_call, kind: data, label: model_call(), view: [llm, evidence],
+     why: "After every classify, success or fallback: the call is recorded for the run record.", certs: {none: "In-process Python call."}}
+  - {id: stack_gate, from: d_analyse_stack, to: d_gate, kind: control, label: evaluate(), view: guardrails, main: true,
+     why: "Per proposal: the deterministic gate decides, not the model.", certs: {none: "In-process Python call."}}
+  - {id: stack_rationale, from: d_analyse_stack, to: d_rationale, kind: request, label: rationale(), view: llm, main: true,
+     why: "Per proposal the gate decided: one short explanation.", certs: {none: "In-process Python call."}}
+  - {id: rationale_pyd, from: d_rationale, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
+     why: "Per explanation: 2 requests and 20,000 tokens at most.", certs: {none: "In-process Python call."}}
+  - {id: classify_mcp, from: d_classify, to: w_mcp, kind: request, label: planned,
+     why: "Planned: drift's manifest declares web search, but no stage calls mcp_toolset yet; stack-author's chat is next.",
+     certs: {planned: "Planned: through LiteLLM /mcp with pinned tool hashes."}}
+
+  # --- point 4 and the draft PR ---
+  - {id: bind_emit, from: w_bind, to: d_emit, kind: request, label: emit(),
+     why: "Once per stack with proposals: artifacts are built and checked.", certs: {none: "In-process Python call."}}
+  - {id: emit_ca, from: d_emit, to: ca_fn, kind: control, label: point 4, view: guardrails, main: true,
+     why: "For every proposed action, before anything is written.", certs: {none: "In-process Python call."}}
+  - {id: ca1, oneway: true, from: ca_fn, to: ca_catalog, kind: control, label: "1", view: guardrails, why: "First check: is the action declared?", certs: {none: "In-process."}}
+  - {id: ca2, oneway: true, from: ca_catalog, to: ca_level, kind: control, label: "2", view: guardrails, why: "When declared: does its level match?", certs: {none: "In-process."}}
+  - {id: ca3, oneway: true, from: ca_level, to: ca_ceiling, kind: control, label: "3", view: guardrails, why: "When it matches: is it under the task's and framework's ceiling?", certs: {none: "In-process."}}
+  - {id: ca4, oneway: true, from: ca_ceiling, to: ca_goal, kind: control, label: "4", view: guardrails, why: "When under: does the agent serve the task's capability?", certs: {none: "In-process."}}
+  - {id: ca5, oneway: true, from: ca_goal, to: ca_owner, kind: control, label: "5", view: guardrails, why: "When it does: is the target in this agent's domain?", certs: {none: "In-process."}}
+  - {id: ca6, oneway: true, from: ca_owner, to: ca_l2, kind: control, label: "6", view: guardrails, why: "When it is: does a level 2+ action have an owner?", certs: {none: "In-process."}}
+  - {id: ca_done, from: ca_l2, to: ca_fn, kind: control, label: decision, oneway: true, view: guardrails,
+     why: "When every check passed: the outcome by level (output, needs-approval, within-bounds).", certs: {none: "In-process."}}
+  - {id: emit_metric, from: d_emit, to: w_metrics, kind: telemetry, label: action_decision(), oneway: true, view: evidence,
+     why: "After every point 4 decision: a counter by outcome and code.", certs: {none: "In-process Python call."}}
+  - {id: bind_openpr, from: w_bind, to: d_open_pr, kind: request, label: open_draft_pr(),
+     why: "For a proposal the gate made codify-draft-pr, after the workflow checked the kill switch.", certs: {none: "In-process Python call."}}
+  - {id: openpr_writer, from: d_open_pr, to: d_writer, kind: request, label: open_draft_pr(),
+     why: "The only write: the tool gets the request and the kill switch.", certs: {none: "In-process Python call."}}
+  - {id: writer_is, from: d_writer, to: w_is_engaged, kind: control, label: is_engaged(), view: guardrails, main: true,
+     why: "Right before the write: the switch is read again.", certs: {none: "In-process Python call."}}
+  - {id: writer_gh, from: d_writer, to: github, proto: HTTPS, port: 443, label: draft PR,
+     why: "When the switch is released: branch, commit and draft PR, or the open one for the same key.", certs: github-pub,
+     detail: "GitHub App installation token with write access to the target repository."}
+
+  # --- handoff ---
+  - {id: inc_t, from: w_inc_run, to: temporal, proto: gRPC, port: 7233, label: plan_handoff,
+     why: "Per suggestedHandoffs entry in the child's findings: the plan runs as an activity.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: t_plan, from: temporal, to: w_plan_handoff, proto: gRPC, port: 7233, label: activity task,
+     why: "Per handoff: the worker takes the plan_handoff task.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: ph_fn, from: w_plan_handoff, to: h_fn, kind: control, label: plan_child_task(), view: guardrails,
+     why: "Per handoff: the framework decides whether a child task may start.", certs: {none: "In-process Python call."}}
+  - {id: h1, oneway: true, from: h_fn, to: h_pair, kind: control, label: "1", view: guardrails, why: "Is source → target enabled?", certs: {none: "In-process."}}
+  - {id: h2, oneway: true, from: h_pair, to: h_route, kind: control, label: "2", view: guardrails, why: "Does the registry route the capability?", certs: {none: "In-process."}}
+  - {id: h3, oneway: true, from: h_route, to: h_hops, kind: control, label: "3", view: guardrails, why: "Are hops left?", certs: {none: "In-process."}}
+  - {id: h4, oneway: true, from: h_hops, to: h_cycle, kind: control, label: "4", view: guardrails, why: "Is the target already on the chain?", certs: {none: "In-process."}}
+  - {id: h5, oneway: true, from: h_cycle, to: h_verified, kind: control, label: "5", view: guardrails, why: "Did the finding pass verification?", certs: {none: "In-process."}}
+  - {id: h6, oneway: true, from: h_verified, to: h_cost, kind: control, label: "6", view: guardrails, why: "Is the cost share within what is left?", certs: {none: "In-process."}}
+  - {id: h7, oneway: true, from: h_cost, to: h_deadline, kind: control, label: "7", view: guardrails, why: "Is the deadline still ahead?", certs: {none: "In-process."}}
+  - {id: h8, oneway: true, from: h_deadline, to: h_inputs, kind: control, label: "8", view: guardrails, why: "Do the inputs match the target's schema?", certs: {none: "In-process."}}
+  - {id: h_done, from: h_inputs, to: h_fn, kind: control, label: all reasons, oneway: true, view: guardrails,
+     why: "After all eight: refuse with every reason, or build and validate the child task.", certs: {none: "In-process."}}
+  - {id: ph_metric, from: w_plan_handoff, to: w_metrics, kind: telemetry, label: handoff_planned(), oneway: true, view: evidence,
+     why: "After every handoff decision: a counter and a span.", certs: {none: "In-process Python call."}}
+  - {id: inc_child, from: w_inc_run, to: temporal, proto: gRPC, port: 7233, label: child workflow, oneway: true,
+     why: "When the plan is allowed: the child task starts on the target agent's queue.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: entry_suggest, from: d_emit, to: d_entry, kind: request, label: suggestedHandoffs,
+     why: "When a finding names a changed resource: the suggestion to ask change-correlator is added to it.", certs: {none: "In-process Python call."}}
+
+  # --- run record and the message ---
+  - {id: ra_t, from: w_run_agent, to: temporal, proto: gRPC, port: 7233, label: record_run, view: evidence,
+     why: "At the end of every run, success or failure: the shielded record activity.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: bind_brr, from: w_bind, to: w_brr, kind: data, label: build_run_record(), view: evidence,
+     why: "Every run: price, redact and schema-check the record.", certs: {none: "In-process Python call."}}
+  - {id: brr_redact, from: w_brr, to: w_redact, kind: control, label: redact(), view: [evidence, guardrails],
+     why: "Every run: evidence and parameters are masked before they are stored.", certs: {none: "In-process Python call."}}
+  - {id: bind_sink, from: w_bind, to: w_sink, kind: data, label: sink.write(), view: evidence,
+     why: "Every run: the record is stored.", certs: {none: "In-process Python call."}}
+  - {id: sink_db, from: w_sink, to: statedb, proto: PostgreSQL, port: 5432, view: evidence,
+     why: "Every run: insert into the run records table, with its retention.", certs: {none: "Plain PostgreSQL inside the wardens cluster; per-agent role."}}
+  - {id: bind_export, from: w_bind, to: w_export, kind: telemetry, label: export_run(), oneway: true, view: evidence, main: true,
+     why: "Every run: the record becomes spans and metrics.", certs: {none: "In-process Python call."}}
+  - {id: export_col, from: w_export, to: collector, proto: OTLP gRPC, port: 4317, oneway: true, view: evidence, main: true,
+     why: "Always on: spans and metrics to the agent collector.", certs: {none: "Plain OTLP inside the cluster."}}
+  - {id: bind_notify, from: w_bind, to: w_notify, kind: event, label: notify(), oneway: true,
+     why: "At the end of a run with something to say: the message goes to its audience.", certs: {none: "In-process Python call."}}
+  - {id: notify_slack, from: w_notify, to: slack, proto: HTTPS, port: 443, oneway: true, label: webhook,
+     why: "Each message: Slack incoming webhook.", certs: slack-pub}
+
+  # --- stack-author chat ---
+  - {id: eng_t, oneway: true, from: engineer, to: temporal, proto: HTTPS, port: 443, label: message,
+     why: "Each message typed in the Author tab: the console signals the conversation workflow.", certs: le-home,
+     detail: "Browser → console over HTTPS; the console signals Temporal over gRPC 7233."}
+  - {id: t_conv, oneway: true, from: temporal, to: w_conv, proto: gRPC, port: 7233, label: signal,
+     why: "Each message: next_message returns it inside the workflow.", certs: {none: "Plain gRPC inside the wardens cluster."}}
+  - {id: conv_turn, oneway: true, from: w_conv, to: a_turn, kind: request, label: next_message(),
+     why: "Each message: the loop runs one turn.", certs: {none: "In-process inside the workflow."}}
+  - {id: turn_proxy, from: a_turn, to: w_proxy, kind: request, label: acts.chat_turn(),
+     why: "Each turn: the model call is an activity, never workflow code.", certs: {none: "In-process Python call."}}
+  - {id: bind_chat, from: w_bind, to: a_chat, kind: request, label: chat_turn(),
+     why: "Each turn: the bound activity runs.", certs: {none: "In-process Python call."}}
+  - {id: chat_stage, from: a_chat, to: a_chat_turn, kind: request, label: chat_turn(),
+     why: "Each turn: the stage gets the model, catalog, manifest and prices.", certs: {none: "In-process Python call."}}
+  - {id: stage_usage, from: a_chat_turn, to: w_usage, kind: control, label: usage_limits(), view: llm, main: true,
+     why: "Each turn: the remaining budget becomes request and token limits.", certs: {none: "In-process Python call."}}
+  - {id: stage_toolset, from: a_chat_turn, to: a_toolset, kind: request, label: _toolset(),
+     why: "Each turn: the read tools, wrapped.", certs: {none: "In-process Python call."}}
+  - {id: ts_read_tools, from: a_toolset, to: w_read_tools, kind: control, label: read_tools(), view: guardrails, main: true,
+     why: "Each turn: only the manifest's read tools are offered.", certs: {none: "In-process Python call."}}
+  - {id: ts_guarded, from: a_toolset, to: w_guarded, kind: control, label: GuardedToolset(), view: guardrails, main: true,
+     why: "Each turn: every tool call will go through point 2.", certs: {none: "In-process Python call."}}
+  - {id: stage_pyd, from: a_chat_turn, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
+     why: "Each turn: the agent loop with history, tools and limits.", certs: {none: "In-process Python call."}}
+  - {id: pyd_lite, from: pydai, to: litellm, proto: HTTPS, port: 443, view: llm, main: true,
+     why: "Each stack-author model request: straight to LiteLLM, with no breaker (model_from_env without agent=).", certs: le-home}
+  - {id: pyd_guarded, from: pydai, to: w_guarded, kind: request, label: call_tool(), view: guardrails, main: true,
+     why: "When the model asks for a tool: the guarded toolset handles it.", certs: {none: "In-process Python call."}}
+  - {id: guarded_tc, from: w_guarded, to: tc_fn, kind: control, label: point 2, view: guardrails,
+     why: "Every tool call a model asks for.", certs: {none: "In-process Python call."}}
+  - {id: tc1, oneway: true, from: tc_fn, to: tc_declared, kind: control, label: "1", view: guardrails, why: "Is the tool declared?", certs: {none: "In-process."}}
+  - {id: tc2, oneway: true, from: tc_declared, to: tc_act, kind: control, label: "2", view: guardrails, why: "When declared: is it a read tool?", certs: {none: "In-process."}}
+  - {id: tc3, oneway: true, from: tc_act, to: tc_params, kind: control, label: "3", view: guardrails, why: "When it is: are all arguments declared?", certs: {none: "In-process."}}
+  - {id: tc4, oneway: true, from: tc_params, to: tc_bounds, kind: control, label: "4", view: guardrails, why: "When they are: inside the bounds?", certs: {none: "In-process."}}
+  - {id: tc_done, from: tc_bounds, to: tc_fn, kind: control, label: decision, oneway: true, view: guardrails,
+     why: "When every check passed: declared, or within bounds.", certs: {none: "In-process."}}
+  - {id: guarded_read, from: w_guarded, to: a_read_stack, kind: request, label: read_stack(),
+     why: "When point 2 allows it: the real function runs.", certs: {none: "In-process Python call."}}
+  - {id: read_gh, from: a_read_stack, to: github, proto: HTTPS, port: 443, label: contents,
+     why: "Each read: the stack's files from the target repository.", certs: github-pub}
+  - {id: pyd_prepared, from: pydai, to: a_prepared, kind: control, label: output validator, view: [guardrails, llm], main: true,
+     why: "When the model proposes a change: it is prepared in code before anyone sees it.", certs: {none: "In-process Python call."}}
+  - {id: stage_mc, from: a_chat_turn, to: w_model_call, kind: data, label: model_call(), view: [llm, evidence],
+     why: "After every turn, answer or fallback: the call is recorded.", certs: {none: "In-process Python call."}}
+  - {id: confirm_proxy, from: a_confirm, to: w_proxy, kind: request, label: acts.emit() · open_draft_pr(),
+     why: "When the person confirms the diff: kill switch, point 4, then the PR, each an activity.", certs: {none: "In-process Python call."}}
+  - {id: a_emit_ca, from: a_emit, to: ca_fn, kind: control, label: point 4, view: guardrails, main: true,
+     why: "When the person confirms: the change is checked at level 1.", certs: {none: "In-process Python call."}}
+  - {id: a_writer_is, from: a_writer, to: w_is_engaged, kind: control, label: is_engaged(), view: guardrails, main: true,
+     why: "Right before the write: the switch is read again.", certs: {none: "In-process Python call."}}
+  - {id: a_writer_gh, from: a_writer, to: github, proto: HTTPS, port: 443, label: draft PR,
+     why: "When confirmed and released: the draft PR in an allowed repository.", certs: github-pub}
+  - {id: a_mem, from: a_memory, to: w_memory, kind: data, label: recall() · remember(),
+     why: "At the start of a conversation and after a PR opens.", certs: {none: "In-process Python call."}}
+  - {id: mem_db, from: w_memory, to: statedb, proto: PostgreSQL, port: 5432,
+     why: "Each recall or remember.", certs: {none: "Plain PostgreSQL inside the wardens cluster; per-agent role."}}
+
+scenarios:
+  - id: startup
+    title: Worker start-up
+    summary: "What run_worker wires before any task arrives: a priced model behind a breaker, the kill switch, the sinks, the binding, the queue and schedules."
+    steps:
+      - {title: Worker starts, action: "terraform-drift worker.py: run_worker() starts", lights: [d_run_worker],
+         text: "The container's entry point. Everything the agent needs from wardens is wired here, once."}
+      - title: Model behind a breaker
+        action: "_model() → model_from_env(agent=) → with_breaker → CircuitBreaker"
+        path: [rw_model, model_mfe, mfe_breaker, breaker_circuit, ~breaker_circuit, ~mfe_breaker, ~model_mfe]
+        text: "The model comes only from wardens.llm, pointed at LiteLLM, and every request will go through the agent's breaker."
+        detail: |
+          `model_from_env` reads the endpoint and deployment from the environment; the agent holds no key and no provider SDK.
+          Because `agent=` is given, `with_breaker` wraps it in `BreakerModel`, using the process-wide `model` breaker for this agent.
+          The breaker opens after 5 failures in a row and lets one trial through after 60 s. While open, a stage gets `CircuitOpen` at once and takes its fallback.
+          stack-author calls `model_from_env` without `agent=`, so its model has no breaker today.
+      - title: Refuse an unpriced model
+        action: "_model() → require_price(): is the model in prices.yaml?"
+        path: [model_price, ~model_price, ~rw_model]
+        text: "A model prices.yaml doesn't price stops the worker, so every later run can be held to a cost limit."
+        detail: |
+          `require_price` raises `UnpricedModelError` at start-up instead of letting a run spend without a limit.
+          Later, `usage_limits` turns the task's remaining dollars into token and request limits using the same prices.
+          This is why a new model is added to `prices.yaml` before any agent can use it.
+      - {title: Kill switch and sink, action: "run_worker() → kill_switch() and record_sink()", path: [rw_ks, ~rw_ks, rw_sink, ~rw_sink],
+         text: "The activities get a switch that reads the Git file and the database row, and the sink run records go to."}
+      - {title: Bind the activities, action: "run_worker() → bind_activities(sink, prices, notifier, audit)", path: [rw_bind, ~rw_bind],
+         text: "Each DriftActivities method becomes a Temporal activity with its timeout and retries, plus record_run and notify."}
+      - {title: Poll the queue, action: "create_worker() ↔ Temporal: poll terraform-drift (gRPC 7233)", path: [rw_cw, cw_t, ~cw_t, ~rw_cw],
+         text: "The worker registers IncidentWorkflow, the drift workflow and every bound activity on its own queue."}
+      - {title: Sync the schedules, action: "sync_schedules() ↔ Temporal: one schedule per manifest entry", path: [rw_sync, sync_t, ~sync_t, ~rw_sync],
+         text: "Temporal's schedules now match the manifest; each fire starts the incident workflow.",
+         result: success, outcome: "Worker ready, guardrails wired"}
+
+  - id: entry
+    title: A task enters (point 1)
+    summary: "How a root task is built and checked before any workflow starts, and the schedule path that skips the check today."
+    modes: [{id: webhook, label: GitHub webhook}, {id: schedule, label: Schedule fires}]
+    steps:
+      - {title: Scan job finished, action: "GitHub → GitHub Receiver: workflow_job delivery (443)", when: webhook, path: [gh_hook],
+         text: "Signed with X-Hub-Signature-256 and checked before the body is parsed; a DriftRule must match."}
+      - {title: Build the root task, action: "Receiver → Console.build() → create_root_task()", when: webhook, path: [hook_build, build_entry, ~build_entry],
+         text: "The channel's policy sets the deadline, autonomy level, cost limit and hop budget of the task."}
+      - title: Guardrail point 1
+        action: "Console.build() → check_submission(task, manifest)"
+        when: webhook
+        path: [build_sub, ~build_sub]
+        text: "The task is checked against the agent's manifest before any workflow exists."
+        detail: |
+          `check_submission` collects every reason, not just the first:
+          - the capability must be in the manifest (`undeclared_capability`);
+          - `maxAutonomyLevel` must not exceed the agent's highest granted level or the framework ceiling (`autonomy`);
+          - `costLimitUsd` must not exceed `costCeiling.perRunUsd` (`cost_ceiling`);
+          - the agent must not be quarantined.
+          A refusal raises `Refused`, records `submission_decision` and an entry span; the webhook answers 422 and nothing starts.
+      - {title: Start the incident, action: "Receiver ↔ Temporal: start with an id from the delivery; 2xx to GitHub", when: webhook, path: [~hook_build, hook_t, ~hook_t, ~gh_hook],
+         text: "A repeated delivery gets the same workflow id, so Temporal refuses the duplicate.",
+         result: success, outcome: "Checked task started"}
+      - {title: Schedule fires, action: "Temporal: terraform-drift's daily schedule fires", when: schedule, lights: [temporal],
+         text: "The schedule workflow asks for the root task as an activity, because building it reads config files."}
+      - title: Task without point 1
+        action: "make_task() → create_root_task(channel=schedule)"
+        when: schedule
+        path: [t_make_task, make_entry, ~make_entry, ~t_make_task]
+        text: "The task is built from the schedule channel's policy, but check_submission is not called on this path."
+        detail: |
+          `make_task` calls `create_root_task` directly, not `Console.build`, so guardrail point 1 does not run for scheduled tasks.
+          The schedule's own values come from the agent's manifest, so in practice they stay inside it, but nothing checks that.
+          This is a stated gap: point 1 covers the console, webhooks and routing, not schedules.
+          Points 2 and 4 and the kill switch still apply inside the run.
+      - {title: Incident starts, action: "Temporal → IncidentWorkflow.run() on the agent's queue", when: schedule, path: [t_inc],
+         text: "The run goes ahead with the kill switch and points 2 and 4 still in place.",
+         result: done, outcome: "Started; point 1 not run (gap)"}
+
+  - id: killswitch
+    title: Kill switch before a write
+    summary: "One call from the workflow to the kill switch, through Temporal, the binding, the agent's activity and wardens' fail-closed check."
+    modes: [{id: released, label: Switch released}, {id: engaged, label: Switch engaged}]
+    steps:
+      - {title: Workflow needs a write, action: "workflow.run(): next stack, so check the switch first", lights: [d_run],
+         text: "The drift workflow runs as a child; before each stack and each write it asks for the kill switch."}
+      - title: Call becomes an activity
+        action: "run() → acts.kill_switch_engaged() → _ActivityProxy → Temporal"
+        path: [run_proxy, proxy_t]
+        text: "The workflow only decides; the proxy turns the call into a Temporal activity, so a crash resumes here."
+        detail: |
+          Inside a workflow `acts` is `_ActivityProxy`, not the real `DriftActivities`.
+          `__getattr__` turns `kill_switch_engaged()` into `workflow.execute_activity("terraform-drift.kill_switch_engaged")` with the binding's timeout and retry policy.
+          Temporal saves the request and, later, the result. A worker that crashes resumes at the next step without repeating finished ones.
+          Each call is also logged as an `ActivityRecord` for the run record.
+      - {title: Worker runs it, action: "Temporal → bind_activities wrapper → DriftActivities.kill_switch_engaged()", path: [t_bind, bind_ks],
+         text: "The worker's activity poller takes the task and runs the agent's method."}
+      - title: Fail-closed read
+        action: "is_engaged() → AnyKillSwitch ↔ wardens-state-db (5432)"
+        path: [ks_is, is_store, store_db, ~store_db, ~is_store]
+        text: "The switch is read from the Git file and the database row for this agent or all; an error counts as engaged."
+        detail: |
+          `is_engaged(switch, agent)` is the only kill switch check agents use.
+          `AnyKillSwitch` is engaged when either the Git file or the Postgres row says so, for this agent or for `all`.
+          Any exception while reading is treated as engaged: the agent stops rather than writes blind.
+          Every read records `killswitch_observed`, so Grafana shows how often each agent checked and what it saw.
+      - {title: Answer returns, action: "is_engaged() → activity → Temporal → workflow: engaged or not", path: [~ks_is, ~bind_ks, ~t_bind, ~proxy_t, ~run_proxy],
+         text: "The result is saved in the workflow's history, so a replay sees the same answer."}
+      - {title: Go ahead, action: "run(): released, so analyse, emit and open the PR", when: released, lights: [d_run],
+         text: "The tool checks the switch once more right before the write itself.",
+         result: success, outcome: "Released: the write may go ahead"}
+      - {title: Stop, action: "run(): engaged, so stop before the next write", when: engaged, lights: [d_run],
+         text: "Nothing more is written; the run record still says why it stopped.",
+         result: done, outcome: "Engaged: run stops, nothing written"}
+
+  - id: classify
+    title: Classify drift with the model
+    summary: "The LLM stage inside analyse: redaction, typed output, a validator, usage limits, the breaker, a recorded call and a deterministic fallback; the gate still decides."
+    modes: [{id: ok, label: Model answers}, {id: down, label: Model failing}]
+    steps:
+      - {title: Analyse one stack, action: "bind_activities → analyse() → analyse_stack()", path: [bind_analyse, analyse_stack],
+         text: "The analysis runs in one activity per stack; a failure in one stack doesn't stop the others."}
+      - title: Redact first
+        action: "analyse_stack() → attribute_changes(): sensitive values replaced"
+        path: [stack_attr, ~stack_attr]
+        text: "Changed attributes are listed with sensitive values replaced before anything reaches a prompt."
+        detail: |
+          `attribute_changes` reads the plan's drift for one resource and returns one change per attribute.
+          An attribute Terraform marks sensitive becomes `(sensitive value)`, so no secret reaches the model, the run record or a PR.
+          The scan's evidence is wrapped in the prompt as `<evidence>` and labelled untrusted data, not instructions.
+      - title: Ask the model
+        action: "classify() → agent.run() → BreakerModel → LiteLLM (443)"
+        path: [stack_classify, classify_pyd, pyd_breaker]
+        text: "Typed output (ClassifyOutput), 2 retries, at most 4 requests and 60,000 tokens."
+        detail: |
+          `Agent(output_type=ClassifyOutput, retries=2)` makes the model answer in a schema, not free text.
+          `USAGE_LIMITS` caps the stage at 4 requests and 60,000 tokens, whatever the model does.
+          The request goes through `BreakerModel`, so a failing endpoint is noticed after 5 failures and later requests fail fast.
+      - title: Validated answer
+        when: ok
+        action: "LiteLLM → BreakerModel → output validator _check → classify()"
+        path: [breaker_lite, ~breaker_lite, ~pyd_breaker, ~classify_pyd]
+        text: "The validator checks the verdicts cover every changed attribute exactly once and invent no change record."
+        detail: |
+          The `@agent.output_validator` `_check` compares the answer with the input, in code.
+          A missing or repeated (address, attribute) pair, or a change record that isn't in the evidence, raises `ModelRetry` with the reason.
+          The model then answers again, up to 2 retries; after that the stage takes its fallback.
+      - {title: Breaker or timeout, action: "BreakerModel: CircuitOpen or a failed request", when: down, path: [breaker_circuit, ~breaker_circuit, ~pyd_breaker, ~classify_pyd],
+         text: "After 5 failures in a row the breaker is open: the next request fails at once instead of waiting on a timeout."}
+      - {title: Record the call, action: "classify() → model_call(result=…) for the run record", path: [classify_mc, ~classify_mc],
+         text: "Model, prompt version and tokens, or the failure, are recorded either way."}
+      - title: Fallback
+        when: down
+        action: "classify() → fallback: every attribute unknown → gate says investigate"
+        path: [~stack_classify, stack_gate, ~stack_gate, ~analyse_stack, ~bind_analyse]
+        text: "Any exception gives every attribute the verdict unknown, which the gate turns into investigate."
+        detail: |
+          `fallback(changes, reason)` returns `unknown` for each attribute; the run goes on without the model.
+          `gate.evaluate` is deterministic: unknown never becomes a draft PR, only an investigate finding.
+          So a model outage lowers the quality of the explanation, never the safety of the output.
+        result: done
+        outcome: "Model down: investigate, nothing proposed"
+      - {title: Gate decides, action: "analyse_stack() → gate.evaluate(): investigate, codify or revert", when: ok, path: [~stack_classify, stack_gate, ~stack_gate],
+         text: "Deterministic policy on secrets, scope and the verdicts; the model never decides what is proposed."}
+      - {title: Explain it, action: "rationale() → agent.run(): one short explanation", when: ok, path: [stack_rationale, rationale_pyd, ~rationale_pyd, ~stack_rationale, ~analyse_stack, ~bind_analyse],
+         text: "At most 2 requests and 20,000 tokens; on failure a fixed default sentence.",
+         result: success, outcome: "Proposals decided by the gate"}
+
+  - id: point4
+    title: Point 4 and the draft PR
+    summary: "emit runs check_action on every proposed action; only then does the tool open the draft PR, after one more kill switch read."
+    modes: [{id: allowed, label: Allowed}, {id: refused, label: Not in the catalog}]
+    steps:
+      - {title: Emit the findings, action: "bind_activities → emit(analysis, task, now)", path: [bind_emit],
+         text: "The analysis becomes artifacts: a finding and a proposed action per proposal."}
+      - title: Checks 1 to 3
+        when: allowed
+        action: "emit() → check_action(): catalog, level, ceiling"
+        path: [emit_ca, ca1, ca2, ca3]
+        text: "The action must be declared, at its catalog level, and under the task's and framework's ceiling."
+        detail: |
+          `check_action` runs six checks in order and returns at the first that fails:
+          1. the action is in the manifest's `actionCatalog` (`undeclared_action`);
+          2. its level equals the catalog's (`level_mismatch`);
+          3. its level is at most min(task `maxAutonomyLevel`, framework ceiling) (`autonomy`).
+          A draft PR is a level 1 action: output only, a person merges it.
+      - title: Checks 4 to 6
+        when: allowed
+        action: "check_action(): goal drift, ownership, L2+ owner → decision"
+        path: [ca4, ca5, ca6, ca_done]
+        text: "The agent must serve the task, the target must be in its domain, and level 2+ needs a mapped owner."
+        detail: |
+          4. the task's capability is one this agent serves (`goal_drift`);
+          5. a target owned by another domain becomes a `handoff`, not an action (`ownership`, decision 0011);
+          6. a level 2 or 3 action needs its target in the ownership map (`no_owner`).
+          Passed at level 1, the outcome is `output`; level 2 would be `needs-approval`, level 3 `within-bounds`.
+      - {title: Count the decision, action: "emit() → action_decision() metric", when: allowed, path: [~emit_ca, emit_metric],
+         text: "Every decision is counted by outcome and code, so refusals show up in Grafana."}
+      - title: Open the draft PR
+        when: allowed
+        action: "open_draft_pr() → GitHubWriter → is_engaged() again"
+        path: [~bind_emit, bind_openpr, openpr_writer, writer_is, ~writer_is]
+        text: "The only write: drift/ branch never main, same patch hash, and the kill switch read right before it."
+        detail: |
+          The workflow checked the kill switch before calling the activity; the tool checks it again just before writing.
+          The branch must start with the drift prefix and is never `main` or the default branch.
+          An open PR for the same key is reused, so a retry never opens a second one; `patchSha256` is checked again.
+          `DraftPrRefused` and `ScopeError` are not retried.
+      - {title: Draft PR on GitHub, action: "GitHubWriter ↔ GitHub: branch, commit, draft PR (443)", when: allowed, path: [writer_gh, ~writer_gh, ~openpr_writer, ~bind_openpr],
+         text: "A person reviews and merges it; the agent never merges.",
+         result: success, outcome: "Draft PR opened"}
+      - title: Refused at check 1
+        when: refused
+        action: "check_action(): action not in actionCatalog → rejected"
+        path: [emit_ca, ca1, ~ca1, ~emit_ca, emit_metric]
+        text: "An action the manifest doesn't declare is rejected with undeclared_action; the later checks don't run."
+        detail: |
+          The first failing check decides and the rest are skipped.
+          `emit` records `action_decision` and raises `PermissionError`, so nothing is written for this stack.
+          The workflow catches it per stack, so the other stacks go on, and the run record shows the refusal.
+      - {title: Nothing written, action: "emit(): PermissionError back to the workflow", when: refused, path: [~bind_emit],
+         text: "The refusal is counted and recorded; no PR is opened for this stack.",
+         result: fail, outcome: "Refused by point 4"}
+
+  - id: handoff
+    title: Handoff to change-correlator
+    summary: "A finding suggests asking change-correlator who made the change; the incident workflow asks wardens.handoff, which runs eight checks."
+    modes: [{id: planned, label: Planned}, {id: refused, label: Refused}]
+    steps:
+      - {title: Suggest a handoff, action: "emit() → _suggest_correlation(): suggestedHandoffs on the finding", path: [entry_suggest, ~entry_suggest],
+         text: "The finding names the drifted resources so change-correlator can look up who changed them."}
+      - {title: Plan it, action: "IncidentWorkflow.run() → Temporal → plan_handoff()", path: [inc_t, t_plan],
+         text: "After the child finishes, each suggestion becomes a plan_handoff activity with a cost share."}
+      - title: Checks 1 to 4
+        when: planned
+        action: "plan_child_task(): pair, route, hops, cycle"
+        path: [ph_fn, h1, h2, h3, h4]
+        text: "The pair must be enabled, the capability routable, hops left, and the target not already on the chain."
+        detail: |
+          Unlike point 4, every check runs and every reason is collected.
+          1. `terraform.drift.explain → change.correlate` must be enabled in `handoff.yaml`; everything else is denied by default.
+          2. the registry resolves `change.correlate` to a routable agent;
+          3. the parent has `hopBudget` left;
+          4. the target capability is not already on the chain, so two agents can't hand work back and forth.
+      - title: Checks 5 to 8
+        when: planned
+        action: "plan_child_task(): verified, cost share, deadline, inputs"
+        path: [h5, h6, h7, h8, h_done]
+        text: "The finding must be verified, the share affordable, the deadline ahead and the inputs valid."
+        detail: |
+          5. the finding that suggested it passed verification;
+          6. the cost share is above zero and within what the parent has left;
+          7. the parent's deadline has not passed;
+          8. the inputs match change.correlate's input schema.
+          The child gets the same `correlationId`, a level no higher than the parent's or the target's, cost min(share, target ceiling) and one hop fewer, then a schema check.
+      - title: Refused
+        when: refused
+        action: "plan_child_task(): all eight checks, every reason collected"
+        path: [ph_fn, h1, h2, h3, h4, h5, h6, h7, h8, h_done]
+        text: "A pair not in handoff.yaml, or any other failed check, raises HandoffRefused with every reason."
+        detail: |
+          Default deny: a pair that isn't enabled is refused even when every other check passes.
+          All reasons are returned together, so one run shows everything that would need changing.
+          The incident keeps the parent's result and sends its message without the child's.
+      - {title: Count it, action: "plan_handoff() → handoff_planned() metric and span", path: [~ph_fn, ph_metric],
+         text: "Planned or refused, the decision is counted with its reason and traced."}
+      - {title: Start the child, action: "IncidentWorkflow → Temporal: change-correlator child workflow", when: planned, path: [~t_plan, ~inc_t, inc_child],
+         text: "The child runs on change-correlator's queue; its finding joins the incident by reference.",
+         result: success, outcome: "Child task started"}
+      - {title: Go on without it, action: "IncidentWorkflow: no child; one message for the incident", when: refused, path: [~t_plan, ~inc_t],
+         text: "The refusal is in the run record and the trace; the drift result still goes out.",
+         result: done, outcome: "Handoff refused, incident goes on"}
+
+  - id: record
+    title: Run record and the message
+    summary: "At the end of every run, success or failure, _run_agent writes the run record: built, redacted, schema-checked, stored and exported, then the message."
+    steps:
+      - {title: Run ends, action: "_run_agent(): finally block, success or failure", lights: [w_run_agent],
+         text: "The record is written whatever happened, so a failed or stopped run leaves evidence too."}
+      - title: Shielded activity
+        action: "_run_agent() → Temporal → record_run activity"
+        path: [ra_t, t_bind]
+        text: "RECORD_ACTIVITY is shielded from cancellation and retried 5 times; a ContractError is not retried."
+        detail: |
+          The record activity runs in a `finally` block, so it runs on success, failure and cancellation.
+          It is shielded: cancelling the workflow (the kill switch, an operator) doesn't cancel the record.
+          5 attempts cover a short database or network blip; a `ContractError` means the record itself is wrong and retrying won't help.
+      - title: Build and redact
+        action: "record_run → build_run_record() → redact()"
+        path: [bind_brr, brr_redact, ~brr_redact, ~bind_brr]
+        text: "Model calls are priced, evidence and parameters masked, then the record is checked against the run-record schema."
+        detail: |
+          `build_run_record` prices each model call from `prices.yaml`.
+          Evidence text goes through `redact_text`; activity parameters through `redact(…, classification=…)`, which adds the classification's own patterns.
+          `validate("run-record")` rejects a record that doesn't match the contract.
+      - title: Store it
+        action: "sink.write() ↔ wardens-state-db (5432)"
+        path: [bind_sink, sink_db, ~sink_db, ~bind_sink]
+        text: "Inserted with a retention from its classification; if Postgres is unreachable it goes to the file sink."
+        detail: |
+          `PostgresRecordSink.write` catches `OperationalError`, writes to the file sink instead and counts `run_record_fallback`.
+          So a database outage never loses a record, and an alert can fire on the fallback counter.
+      - {title: Export it, action: "export_run() → OTel collector (OTLP gRPC 4317)", path: [bind_export, export_col],
+         text: "One root span per run with action events, and run metrics by capability, to the mon cluster."}
+      - {title: Record id returns, action: "record_run → Temporal → _run_agent(): the record's id", path: [~t_bind, ~ra_t],
+         text: "The workflow keeps the reference; the message links to it."}
+      - {title: Send the message, action: "notify() → Notifier.send() → Slack (443)", path: [bind_notify, notify_slack],
+         text: "The run's message goes to its audience; inside an incident the root sends one message for all.",
+         result: success, outcome: "Run recorded and reported"}
+
+  - id: chat
+    title: Chat turn with stack-author
+    summary: "One message in the Author tab: budget, guarded read tools, point 2 on every call, the model, a validator that prepares the diff and a recorded call."
+    modes: [{id: ok, label: Within budget}, {id: budget, label: Budget spent}]
+    steps:
+      - {title: Message arrives, action: "Engineer → console → Temporal signal → Conversation → _turn()", path: [eng_t, t_conv, conv_turn],
+         text: "One workflow per conversation; next_message returns the signal inside it."}
+      - {title: Turn is an activity, action: "_turn() → acts.chat_turn() → Temporal → chat_turn()", path: [turn_proxy, proxy_t, t_bind, bind_chat, chat_stage],
+         text: "The model call runs as an activity with no retries: a failure becomes a reply, not a failed conversation."}
+      - title: Set the budget
+        action: "chat_turn() → usage_limits(remaining_usd, REQUEST_LIMIT 14)"
+        path: [stage_usage, ~stage_usage]
+        text: "What the conversation has left becomes token and request limits for this turn."
+        detail: |
+          `remaining_usd` is the task's cost limit minus what earlier turns spent.
+          `usage_limits` prices tokens at the model's dearer rate and adds `REQUEST_LIMIT = 14` requests per turn.
+          No budget left raises `CostCeilingReached` before the model is called at all.
+      - {title: Budget spent, action: "chat_turn(): CostCeilingReached → fixed reply, call recorded", when: budget, path: [stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy],
+         text: "The person is told to start a new conversation; the model is never called.",
+         result: done, outcome: "Budget spent, no model call"}
+      - title: Guarded read tools
+        when: ok
+        action: "_toolset() → read_tools() → GuardedToolset()"
+        path: [stage_toolset, ts_read_tools, ~ts_read_tools, ts_guarded, ~ts_guarded, ~stage_toolset]
+        text: "Only the manifest's read tools are offered, each call to go through point 2."
+        detail: |
+          `read_tools(manifest, TOOL_PARAMETERS)` lists the read tools and their parameter names; act tools are never included.
+          `GuardedToolset.get_tools` hides anything not in that list, so the model can't even see an undeclared tool.
+          Stated limit: `_toolset` passes no manifest or audit log, so tool bounds aren't checked and a refusal writes no audit event.
+      - {title: Model asks for a tool, action: "chat_turn() → agent.run() → LiteLLM (443): read_stack", when: ok, path: [stage_pyd, pyd_lite, ~pyd_lite],
+         text: "stack-author's model goes straight to LiteLLM: model_from_env got no agent=, so there is no breaker."}
+      - title: Point 2
+        when: ok
+        action: "GuardedToolset.call_tool() → check_tool_call(caller=llm)"
+        path: [pyd_guarded, guarded_tc, tc1, tc2, tc3, tc4, tc_done]
+        text: "Declared, a read tool, declared arguments, inside the bounds: the first failure refuses the call."
+        detail: |
+          A refusal never runs the function: the model gets a `ModelRetry` with the reason as JSON and may try something else.
+          Every call opens an `execute_tool` span with redacted arguments and the guardrail's result.
+          `guardrail_decision(agent, "tool", allowed, code)` counts every decision.
+      - {title: Read the stack, action: "read_stack() ↔ GitHub: resources.yaml and common_vars.yaml", when: ok, path: [~guarded_tc, guarded_read, read_gh, ~read_gh, ~guarded_read, ~pyd_guarded],
+         text: "Paths outside environments/<cloud>/ are refused; the result, capped at 20,000 characters, is data, not instructions."}
+      - title: Proposal prepared in code
+        when: ok
+        action: "LiteLLM → output validator _prepared(): prepare the diff"
+        path: [pyd_lite, ~pyd_lite, pyd_prepared, ~pyd_prepared]
+        text: "A proposed change is prepared against the real stack and module inputs; errors send it back to the model."
+        detail: |
+          `_prepared` runs `prepare(Proposal(...), catalog, reader)` in code.
+          Errors raise `ModelRetry` with the list, so the model repairs the proposal, up to 2 retries.
+          Only a prepared change, with its diff and `patchSha256`, reaches the person; they press the button, and `_confirm` checks the same hash.
+      - {title: Reply, action: "chat_turn() → model_call() → activity → workflow → console", when: ok, path: [~stage_pyd, stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy],
+         text: "The call is recorded with its cost; the reply and the diff appear in the Author tab.",
+         result: success, outcome: "Reply with a prepared diff"}
