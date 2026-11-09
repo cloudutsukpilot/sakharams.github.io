@@ -2312,7 +2312,7 @@ Deeper: [test data](/posts/projects/platform-wardens/10-quality-assurance/#test-
 <div class="iq-role" data-role="developer" markdown="1">
 
 - **Harvesting cases:** drift's cases were harvested from real `infra-azure` scans into YAML with the expected classification and recommendation.
-- **Deterministic scoring:** `evaluation.py` runs stages 3 to 9 on a case's stored inputs, with no GitHub or Azure access, and checks attribute, YAML key, classification, allowed kinds and forbidden actions.
+- **Deterministic scoring:** `evaluation.py` runs stages 3 to 9 on a case's stored inputs, with no Azure access (GitHub only to clone the shared module at the case's pinned commit), and checks attribute, YAML key, classification, allowed kinds and forbidden actions.
 
 ```python
 if forbidden:
@@ -2320,7 +2320,7 @@ if forbidden:
 ```
 
 ```bash
-uv run --directory agents/devops/terraform-drift python -m terraform_drift.evaluation
+cd agents/devops/terraform-drift && GH_TOKEN=$(gh auth token) uv run python evals/run.py --model none   # deterministic stages only
 ```
 
 The gotcha: none of drift's 10 cases has labelled drift yet, so the most important behaviour is the least
@@ -3183,7 +3183,7 @@ Deeper: [retrospectives](/posts/projects/platform-wardens/18-continuous-improvem
 - **Typed outputs everywhere** paid off; I'd add the "fall back to unknown" path to every model stage on day one, not after the first malformed answer.
 
 ```bash
-uv run --directory agents/devops/terraform-drift python -m terraform_drift.evaluation
+cd agents/devops/terraform-drift && GH_TOKEN=$(gh auth token) uv run python evals/run.py --model none   # deterministic stages only
 ```
 
 The gap that remains: cases are still being collected for every agent.
