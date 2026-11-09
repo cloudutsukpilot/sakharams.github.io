@@ -49,7 +49,7 @@ framework is built:
 - Delta-temporality metrics left every `rate()` panel empty; workers now export cumulative metrics.
 - A daily drift scan failed before planning, so a scheduled run had no plans to explain: an agent is only
   as good as the pipeline that feeds it, and the scan's failure needs its own alert.
-- An image gate (Gitleaks) flagged the Event Hubs emulator's public development key; known false
+- An image gate (Gitleaks) flagged the published development key of Azurite, the storage emulator behind the local Event Hubs stack; known false
   positives go in an ignore file with a reason, not a disabled gate.
 
 ## Reliability reviews

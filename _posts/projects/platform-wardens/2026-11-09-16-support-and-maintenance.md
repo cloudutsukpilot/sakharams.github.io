@@ -74,7 +74,7 @@ Two kinds of bug, two paths:
 | Temporal SDK or server | Replay recorded histories before merging; workflow changes behind `workflow.patched` |
 | Pydantic AI | The agent's evals re-run; typed outputs re-validated |
 | The model | A new model or version is a re-evaluation; workers refuse a model with no price |
-| Base images | The image gates catch CVEs (an `apt` CVE needed a newer package in the first week) |
+| Base images | The image gates catch CVEs (an `apt` CVE needed a newer package before the base image had it) |
 | Kubernetes on `wardens` | The Cluster Upgrade Readiness agent's own report covers it |
 
 The homelab's chat model being renamed is a good example: the drift worker refused to start

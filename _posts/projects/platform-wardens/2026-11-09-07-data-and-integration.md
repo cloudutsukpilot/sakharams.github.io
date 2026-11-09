@@ -41,14 +41,13 @@ attribute values are stripped before anything leaves the tool.
 | Data | Kept | How it goes |
 |---|---|---|
 | Run records | 180 days; 30 for confidential data | `python -m wardens.state.maintenance` deletes expired rows |
-| Audit log | Insert-only; the chain's daily head is anchored in `mon` | Not deleted by the agents' roles |
+| Audit log | 365 days; insert-only, the chain's daily head anchored in `mon` | Maintenance deletes only from the oldest end, up to the first event still kept, so a gap in the middle would read as tampering |
 | Memory items | Until their own expiry, and only after review | Each item carries source, expiry and a review flag |
 | Temporal history | Temporal's namespace retention | Resettable: nothing depends on it after a run ends |
 | Drift's shared module checkout | One run | Deleted after the run |
 
-> **TODO:** What is the audit log's retention, and who may delete from it (if anyone)? The roles are
-> per writer, but the retention isn't written down.
-{: .prompt-warning }
+Retention is a constant in the framework's state module (180, 30 and 365 days), so changing it is a
+reviewed code change, not a setting someone can quietly turn down.
 
 ## Database schema and migrations
 {: #database-schema-and-migrations }

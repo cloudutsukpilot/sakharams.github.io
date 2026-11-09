@@ -128,9 +128,9 @@ it has none, is in the [system diagram](/posts/projects/platform-wardens/05-tech
 
 Images go through the platform's reusable build: Gitleaks, Semgrep, Trivy, Checkov, Hadolint, an SBOM
 and a Cosign signature, and Kyverno only admits images pinned by digest. The gates have bitten more
-than once in the first week: a CVE in `apt` needed a newer package, then the Checkov gate needed an
-`apt-get upgrade` in the image, and Gitleaks flagged the Event Hubs emulator's well-known development
-key. Python dependencies are pinned in one `uv.lock`, and CI runs `uv sync --frozen`.
+than once: a CVE in `apt` needed a newer package, then the Checkov gate needed an `apt-get upgrade` in
+the image, and Gitleaks flagged the published development key of Azurite, the storage emulator behind
+the local Event Hubs stack. Python dependencies are pinned in one `uv.lock`, and CI runs `uv sync --frozen`.
 
 MCP servers are a supply chain of their own: only reviewed servers are used, each tool definition is
 pinned by its SHA-256 when it's loaded and on every listing, and nothing is installed from a public

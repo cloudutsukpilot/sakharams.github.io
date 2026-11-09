@@ -95,7 +95,7 @@ Alert rules in Mimir, tested with promtool, each with a P1 to P4 priority label 
 |---|---|
 | Safety | A guardrail denial at the tool point (P1), the kill switch engaged |
 | Reliability | Run failures, a missed or paused schedule, a failed scheduled run, a run near its deadline, a worker that stops polling |
-| Cost | A run or a day near its ceiling |
+| Cost | A day over its ceiling (and at twice it), the average run over its per-run ceiling, cost per run twice its 7-day average |
 | Approvals | Approvals timing out |
 | Event bus | `WardensIngressDown`, `RelayRefusing`, `LagHigh`, `DeadLettered`, `BusReset` |
 
