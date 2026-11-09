@@ -234,7 +234,8 @@ new layout instead. Rules:
   `oneway: true` (a commit, a Slack post, `make up`); the validator flags any other request whose
   response never comes back.
 - **A banner line for every step:** `action`, under about 90 characters, saying what is happening
-  right now ("Keycloak ↔ core-db: read your account and groups"). It shows at the bottom of the canvas.
+  right now ("Keycloak ↔ core-db: read your account and groups"). It is the bold line on the step
+  card at the bottom of the canvas, under the step's number and title.
 - **End with the outcome:** the last step of each use case (and of each mode) has `result: success`,
   `done` or `fail` plus a short `outcome` ("Signed in to the portal"). The engine celebrates it at the
   last hop's target (`at: <id>` overrides): confetti, a ring and a check for success; a red cross and
@@ -243,8 +244,18 @@ new layout instead. Rules:
   before the reply).
 - A use case can have two modes for an alternative path (`Cache miss` / `Simulate a cache hit`), with
   `when:` on the steps of one path.
-- Every step has a `title` (2 to 5 words) and `text` (1 or 2 sentences, under about 200 characters)
-  naming the protocol and port where it matters.
+- Every step has a `title` (2 to 5 words) and `text` (1 or 2 sentences, under about 230 characters)
+  naming the protocol and port where it matters. `text` says what the step does and why, not only
+  where the packet goes, so the step card makes sense on its own.
+- **`detail` for the steps that need explaining:** 3 to 10 short lines (under about 160 words) of
+  Markdown: sentences, `- ` lines for a list, a blank line between paragraphs, `code` for names. It
+  replaces `text` on the step card when the reader ticks **Details** in the player (`details: true` at
+  the top level starts ticked; the reader's choice is remembered in their browser). Say what happens
+  inside the step that the arrow can't show: which function or check runs, what it decides, what
+  happens when it refuses, what the next step depends on. Facts from the post or the repo only; don't
+  repeat `text` or the arrow's `why`. With Details on, auto-play stays long enough to read it (about
+  250 words a minute, at most 25 s). Give every use case at least one; the validator warns otherwise.
+- The caption under the canvas shows the use case's title and summary; the step itself is on the card.
 
 ```yaml
 scenarios:
@@ -301,7 +312,8 @@ hover, the detail panel (status badge, chips, lead sentence, how it works, link 
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png` and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `step-details.png` (the card with Details ticked: readable, solid background, not
+covering the packet) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -321,8 +333,9 @@ read. Never commit.
 | `views` | Tabs for cross-cutting connections: `[{id, label, icon?}]`; the main view (`Main flows`) is always first and `Show all` (id `*`, built in) last; don't define a view with id `*` |
 | `edges` | `{id, from, to, why, certs, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `certs`: which certificate secures it (step 2); `detail`: an extra technical note (auth, token lifetime) |
 | `certs` | Certificate catalog: `{id: {label, type, by, issuer, valid, trust, key?, stored?, note?}}`, referenced by edges (step 2). `issuer` may be left out for `type: key` |
-| `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |
+| `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, detail?, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `detail`: 3 to 10 lines shown with the Details box. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |
 | `lock` | Always set when there are use cases: `false` (default) lets each step open the groups it needs; `true` opens the diagram in lock mode, so use cases play on the reader's layout. The padlock in the player toggles it |
+| `details` | `true` opens with the Details box ticked, so the step card shows each step's `detail`; default `false`. The reader's own choice, once made, wins |
 | `map` | Geo backdrop `{name: world, lon: [w, e], lat: [n, s], width, height}`; nodes use `lat`/`lon` |
 
 Colours: explicit `color` (blue, sky, teal, green, lime, amber, orange, red, rose, pink, violet, indigo,

@@ -39,6 +39,7 @@
 <button type="button" class="dgm-btn dgm-btn-lock" data-act="lock" aria-pressed="false" aria-label="Lock layout"><i class="fas fa-lock-open" aria-hidden="true"></i></button>
 <div class="dgm-dots" role="group" aria-label="Steps"></div>
 <label class="dgm-toggle-mode" hidden><input type="checkbox" data-act="mode"> <span></span></label>
+<label class="dgm-toggle-details" hidden title="Show each step's longer description"><input type="checkbox" data-act="details"> <span>Details</span></label>
 </div>
 {%- endif %}
 <div class="dgm-fallback">
@@ -53,14 +54,14 @@
 <p><strong>{{ scn.title | escape }}</strong>{% if scn.summary %}: {{ scn.summary | escape }}{% endif %}</p>
 <ol>
 {%- for step in scn.steps %}
-<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}</li>
+<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}{% if step.detail %} {{ step.detail | strip_newlines | escape }}{% endif %}</li>
 {%- endfor %}
 </ol>
 {%- endfor %}
 {%- if dg.tour.steps %}
 <ol>
 {%- for step in dg.tour.steps %}
-<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}</li>
+<li><strong>{{ step.title | escape }}</strong>{% if step.when %} ({{ step.when | escape }}){% endif %}: {{ step.text | escape }}{% if step.detail %} {{ step.detail | strip_newlines | escape }}{% endif %}</li>
 {%- endfor %}
 </ol>
 {%- endif %}
