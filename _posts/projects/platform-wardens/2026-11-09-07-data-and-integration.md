@@ -83,8 +83,8 @@ confirms every id in a finding appears in a tool's output.
 
 There's no bulk import or export. The two exports that matter are the run record (readable by people,
 linked from every notification) and the OTLP stream of spans and metrics to `mon`. The one import is
-eval cases: drift's cases were harvested from a real drift scan of `infra-azure`, and CI/CD triage's 42
-real cases from the failure lab's runs, each stored as YAML with the inputs and the expected outcome.
+eval cases: drift's cases were harvested from real drift scans of `infra-azure`, and CI/CD triage's
+42 real cases from harvested failed runs (plus 17 from the failure lab), each stored as YAML with the inputs and the expected outcome.
 
 ## External systems and third-party integrations
 {: #external-systems-and-third-party-integrations }

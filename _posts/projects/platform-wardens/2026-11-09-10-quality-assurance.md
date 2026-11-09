@@ -81,9 +81,14 @@ the agent got wrong becomes a new case.
 
 | Eval set | Cases | Scores |
 |---|---|---|
-| terraform-drift | harvested from a real `infra-azure` scan, plus synthetic injection cases | Attribute, YAML key, classification, allowed recommendation kinds, forbidden actions |
-| cicd-triage | 42 real cases from the failure lab | Failed step and category against their floors |
+| terraform-drift | 10: 8 harvested from real `infra-azure` scans, 2 synthetic; none yet with labelled drift | Attribute, YAML key, classification, allowed recommendation kinds, forbidden actions |
+| cicd-triage | 42 real cases (plus 17 from the failure lab), labels not yet confirmed by the owner | Failed step and category against their floors |
 | Routing | 40 labelled requests | The classifier's threshold recommendation |
+
+Every running agent is short of the framework's floor of 30 cases per action: drift has 10, Stack Author
+9, the Change Correlator and incident triage 1 each. On the homelab they went into shadow anyway, to
+collect real cases from live runs, which bends the lifecycle rule that asks for 30 before shadow. It's
+the biggest testing gap, and promotion stays blocked until it's closed.
 
 ## Performance and load testing
 {: #performance-and-load-testing }
@@ -136,7 +141,7 @@ events.
 
 | Data | Where it comes from |
 |---|---|
-| Drift cases | A real drift scan of `infra-azure` on 2026-11-01, harvested into YAML with the expected outcome |
+| Drift cases | Real drift scans of `infra-azure`, harvested into YAML with the expected outcome |
 | CI/CD cases | A private failure lab with 17 seeded faults across six build tools, each failing its own pipeline |
 | Routing cases | 40 hand-labelled requests |
 | Fixtures | Recorded API responses and logs, with secrets and identifiers scrubbed |
