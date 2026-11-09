@@ -1732,6 +1732,17 @@
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
       };
+      // With Details on, the card leaves the canvas and sits under it at the figure's full width, so a long
+      // description is easy to read and covers no component; with Details off it floats at the canvas bottom.
+      const body = this.root.querySelector('.dgm-body');
+      const placeCard = () => {
+        if (!banner || !body) return;
+        const below = !!this.details;
+        if (below && banner.previousElementSibling !== body) body.after(banner);
+        if (!below && banner.parentNode !== this.stage) this.stage.appendChild(banner);
+        banner.classList.toggle('is-below', below);
+      };
+      placeCard();
       this.setBanner = (text, state = 'run') => {
         if (!banner) return;
         if (!text) {
@@ -1832,8 +1843,8 @@
         const b = this.box(reps);
         if (!b) return;
         const W = this.stage.clientWidth;
-        // The step card covers the bottom of the canvas: frame the components in the space above it.
-        const card = this.root.querySelector('.dgm-banner.is-on');
+        // The step card covers the bottom of the canvas (unless it sits under it): frame the components above it.
+        const card = this.stage.querySelector('.dgm-banner.is-on');
         const cover = card ? Math.min(card.offsetHeight + 16, this.stage.clientHeight * 0.45) : 30;
         const H = this.stage.clientHeight - cover;
         const pad = 60;
@@ -2166,6 +2177,7 @@
         try {
           localStorage.setItem(detailKey, this.details ? '1' : '0');
         } catch (e) { /* storage blocked: the choice lasts for this page only */ }
+        placeCard();
         if (banner && banner.classList.contains('is-on') && this.stepRunning != null) this.setCard(this.stepRunning);
       });
       modeBox?.addEventListener('change', () => {
