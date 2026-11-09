@@ -1,0 +1,35 @@
+# Project playbook card for /tags/platform-wardens/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Company and team names are deliberately left out (public repo).
+name: Platform Wardens
+tag: Platform Wardens
+summary: 'A multi-agent framework for operations work: Pydantic AI agents on Temporal that observe, diagnose
+  and recommend for DevOps, SRE and DBA, with autonomy enforced in code and a person deciding every action.'
+status: In progress
+created: '2026-11-09'
+category: ai-automation
+clouds: [azure, agnostic]
+facts:
+- label: Type
+  value: Multi-agent framework for DevOps, SRE and DBA operations
+- label: Stack
+  value: Python, Pydantic AI, Temporal, OpenTelemetry
+- label: Models
+  value: From configuration (LiteLLM to local models by default)
+- label: Hosting
+  value: wardens k3d cluster on the Cloudutsuk homelab, via Argo CD
+- label: Autonomy
+  value: L0 observe and L1 recommend; a person decides
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture
+brief: >-
+  The author asked for this playbook to be written from the platform-wardens repo (2026-11-09), with no
+  company or team names. Source of truth: the repo's README, docs/project-goal.md, docs/phases,
+  docs/decisions (published as the ADR log), framework/README.md and the agents' manifests and
+  READMEs. Platform Wardens is a multi-agent framework for operations work: its agents do day-to-day
+  DevOps, SRE and DBA work, and the three teams build, govern and run the framework. v1 agents only
+  observe (L0) and recommend (L1). Three layers: Pydantic AI inside a stage, Temporal for durable
+  execution, and the wardens package for coordination and the rules every agent follows. First
+  deployment: the wardens k3d cluster of the Cloudutsuk Platform homelab.
