@@ -17,6 +17,7 @@ levels: [Context, Agents & modules, Files, Functions & checks]
 accent: "#2563EB"
 accent2: "#EC4899"
 lock: false
+details: true
 
 views:
   - {id: guardrails, label: Guardrails, icon: shield}
@@ -1117,359 +1118,765 @@ edges:
 scenarios:
   - id: startup
     title: Worker start-up
-    summary: "What run_worker wires before any task arrives: a priced model behind a breaker, the kill switch, the sinks, the binding, the queue and schedules."
+    summary: "What run_worker wires before any task arrives: a priced model behind a breaker, the kill switch, the sinks, the binding, the schedules and the queue."
     steps:
-      - {title: Worker starts, action: "terraform-drift worker.py: run_worker() starts", lights: [d_run_worker],
-         text: "The container's entry point. Everything the agent needs from wardens is wired here, once."}
+      - title: Worker starts
+        action: "terraform-drift worker.py: run_worker() starts"
+        lights: [d_run_worker]
+        text: "The container's entry point. Everything the agent needs from wardens is wired here, once."
+        detail: |
+          **What happens:** `run_worker()` is the first function that runs when the terraform-drift container starts. It sets up everything the agent needs before any work arrives.
+
+          **Why it matters:** the safety wiring (cost limits, the kill switch, record keeping) is done once, in one place, by the shared wardens framework. The agent can't skip it or do it differently from other agents.
+
+          **How:** it reads its settings from the environment (`WorkerSettings.from_env`), gets GitHub tokens from the agent's own GitHub App, then runs the next six steps in order. The worker takes no work until all of them succeed.
       - title: Model behind a breaker
         action: "_model() → model_from_env(agent=) → with_breaker → CircuitBreaker"
         path: [rw_model, model_mfe, mfe_breaker, breaker_circuit, ~breaker_circuit, ~mfe_breaker, ~model_mfe]
         text: "The model comes only from wardens.llm, pointed at LiteLLM, and every request will go through the agent's breaker."
         detail: |
-          `model_from_env` reads the endpoint and deployment from the environment; the agent holds no key and no provider SDK.
-          Because `agent=` is given, `with_breaker` wraps it in `BreakerModel`, using the process-wide `model` breaker for this agent.
-          The breaker opens after 5 failures in a row and lets one trial through after 60 s. While open, a stage gets `CircuitOpen` at once and takes its fallback.
-          stack-author calls `model_from_env` without `agent=`, so its model has no breaker today.
+          **What happens:** `_model()` asks the framework for the AI model with `model_from_env(agent=…)`, and `with_breaker` wraps it in a circuit breaker.
+
+          **Why it matters:** the agent never holds a model API key or talks to a provider directly; every request goes through LiteLLM, the platform's model gateway. The breaker works like an electrical fuse: if the model keeps failing, the agent stops waiting on it and uses its fallback.
+
+          **How:** after 5 failures in a row the breaker opens and later requests fail at once (`CircuitOpen`). After 60 seconds it lets one trial request through to see if the model is back. stack-author doesn't pass `agent=` today, so its model has no breaker.
       - title: Refuse an unpriced model
         action: "_model() → require_price(): is the model in prices.yaml?"
         path: [model_price, ~model_price, ~rw_model]
         text: "A model prices.yaml doesn't price stops the worker, so every later run can be held to a cost limit."
         detail: |
-          `require_price` raises `UnpricedModelError` at start-up instead of letting a run spend without a limit.
-          Later, `usage_limits` turns the task's remaining dollars into token and request limits using the same prices.
-          This is why a new model is added to `prices.yaml` before any agent can use it.
-      - {title: Kill switch and sink, action: "run_worker() → kill_switch() and record_sink()", path: [rw_ks, ~rw_ks, rw_sink, ~rw_sink],
-         text: "The activities get a switch that reads the Git file and the database row, and the sink run records go to."}
-      - {title: Bind the activities, action: "run_worker() → bind_activities(sink, prices, notifier, audit)", path: [rw_bind, ~rw_bind],
-         text: "Each DriftActivities method becomes a Temporal activity with its timeout and retries, plus record_run and notify."}
-      - {title: Poll the queue, action: "create_worker() ↔ Temporal: poll terraform-drift (gRPC 7233)", path: [rw_cw, cw_t, ~cw_t, ~rw_cw],
-         text: "The worker registers IncidentWorkflow, the drift workflow and every bound activity on its own queue."}
-      - {title: Sync the schedules, action: "sync_schedules() ↔ Temporal: one schedule per manifest entry", path: [rw_sync, sync_t, ~sync_t, ~rw_sync],
-         text: "Temporal's schedules now match the manifest; each fire starts the incident workflow.",
-         result: success, outcome: "Worker ready, guardrails wired"}
+          **What happens:** `require_price()` checks that the model is listed in `prices.yaml`, the file that says what each model costs per token.
+
+          **Why it matters:** every run has a dollar limit ($0.50 for a drift run). A model with no known price can't be held to that limit, so the worker refuses to start rather than run at an unknown cost.
+
+          **How:** an unlisted model raises `UnpricedModelError` and the container stops. During each run, `usage_limits()` uses the same prices to turn the remaining budget into a maximum number of tokens and requests. So adding a new model starts with adding its price.
+      - title: Kill switch and sink
+        action: "run_worker() → kill_switch() and record_sink()"
+        path: [rw_ks, ~rw_ks, rw_sink, ~rw_sink]
+        text: "The activities get a switch that reads the Git file and the database row, and the sink run records go to."
+        detail: |
+          **What happens:** `kill_switch()` and `record_sink()` give the agent two framework services: an emergency stop and a place to store its run records.
+
+          **Why it matters:** an operator can stop one agent, or all of them, without redeploying anything. And every run leaves an audit trail, whether it succeeded or failed.
+
+          **How:** the kill switch counts as engaged if either a file kept in Git (the break-glass) or a row in the wardens-state-db Postgres database says so. The sink writes records to Postgres, and to files on disk when the database isn't configured or can't be reached.
+      - title: Bind the activities
+        action: "run_worker() → bind_activities(sink, prices, notifier, audit)"
+        path: [rw_bind, ~rw_bind]
+        text: "Each DriftActivities method becomes a Temporal activity with its timeout and retries, plus record_run and notify."
+        detail: |
+          **What happens:** `bind_activities()` registers each method of `DriftActivities` (read the scan, analyse a stack, open a PR, …) with Temporal as an *activity*: a unit of work Temporal can time out and retry. It adds two framework activities, `record_run` and `notify`.
+
+          **Why it matters:** every piece of work that touches the outside world gets a time limit and a retry rule, so a slow GitHub call or a network blip is retried instead of failing the whole run.
+
+          **How:** each method has its own options: 15 seconds for the kill switch check, 15 minutes to analyse a stack, 3 attempts to open a PR. Errors that retrying can't fix (`ScopeError`, `DraftPrRefused`) are never retried.
+      - title: Sync the schedules
+        action: "sync_schedules() ↔ Temporal: one schedule per manifest entry"
+        path: [rw_sync, sync_t, ~sync_t, ~rw_sync]
+        text: "Temporal's schedules now match the manifest; each fire starts the incident workflow."
+        detail: |
+          **What happens:** `sync_schedules()` makes Temporal's timers match the `schedules:` list in the agent's manifest, the file that declares what the agent does and when.
+
+          **Why it matters:** the manifest is the single source of truth. A schedule change is a reviewed change to one file, applied at the next worker start; nobody edits schedules by hand in Temporal.
+
+          **How:** each entry becomes a Temporal schedule named `<agent>-<id>`, created if new and updated if it exists. terraform-drift has one: every day at 08:00 UTC for infra-azure. If a run is still going, the next fire is skipped; after an outage, a missed day still runs within a day.
+      - title: Poll the queue
+        action: "create_worker() ↔ Temporal: poll terraform-drift (gRPC 7233)"
+        path: [rw_cw, cw_t, ~cw_t, ~rw_cw]
+        text: "The worker registers IncidentWorkflow, the drift workflow and every bound activity on its own queue."
+        detail: |
+          **What happens:** `create_worker()` connects the worker to its own Temporal task queue, `terraform-drift`, and it starts waiting for work.
+
+          **Why it matters:** Temporal is the workflow engine that remembers how far each run got. If this container crashes or restarts, another worker picks up the queue and the run continues from its last finished step, not from the beginning.
+
+          **How:** the worker registers the drift workflows, the shared `IncidentWorkflow`, the schedule helpers and every bound activity. Just before, `Registry.discover()` read the other agents' manifests, so a handoff (for example to change-correlator) goes to the right queue.
+        result: success
+        outcome: "Worker ready, guardrails wired"
 
   - id: entry
     title: A task enters (point 1)
     summary: "How a root task is built and checked before any workflow starts, and the schedule path that skips the check today."
     modes: [{id: webhook, label: GitHub webhook}, {id: schedule, label: Schedule fires}]
     steps:
-      - {title: Scan job finished, action: "GitHub → GitHub Receiver: workflow_job delivery (443)", when: webhook, path: [gh_hook],
-         text: "Signed with X-Hub-Signature-256 and checked before the body is parsed; a DriftRule must match."}
-      - {title: Build the root task, action: "Receiver → Console.build() → create_root_task()", when: webhook, path: [hook_build, build_entry, ~build_entry],
-         text: "The channel's policy sets the deadline, autonomy level, cost limit and hop budget of the task."}
+      - title: Scan job finished
+        action: "GitHub → GitHub Receiver: workflow_job delivery (443)"
+        when: webhook
+        path: [gh_hook]
+        text: "Signed with X-Hub-Signature-256 and checked before the body is parsed; a DriftRule must match."
+        detail: |
+          **What happens:** when the drift-scan job in GitHub Actions finishes, GitHub sends a `workflow_job` webhook to the wardens GitHub receiver (`github_webhook.py`).
+
+          **Why it matters:** the agent can start as soon as there is something to analyse, instead of waiting for its daily schedule. But the request comes from the internet, so it is treated as untrusted.
+
+          **How:** `signature_valid()` checks the `X-Hub-Signature-256` signature against the shared secret before the body is read; a bad signature gets 401. Only five fields are read (repository, run id, job name, result, branch), and a `DriftRule` in `webhooks.yaml` must match them. Nothing from the payload reaches the model.
+      - title: Build the root task
+        action: "Receiver → Console.build() → create_root_task()"
+        when: webhook
+        path: [hook_build, build_entry, ~build_entry]
+        text: "The channel's policy sets the deadline, autonomy level, cost limit and hop budget of the task."
+        detail: |
+          **What happens:** `Console.build()` calls `create_root_task()` to turn the event into a *task*: a standard envelope that says what to do and within which limits.
+
+          **Why it matters:** the limits come from the channel the request arrived on, not from the request. A webhook can't ask for more money or more power than the `github-webhook` channel allows.
+
+          **How:** the channel's policy in `entry-points.yaml` sets a 2-hour deadline, autonomy level 1 (propose only; a person approves), a $0.50 cost limit and a hop budget of 1 (one handoff to another agent). The inputs are checked against the capability's schema.
       - title: Guardrail point 1
         action: "Console.build() → check_submission(task, manifest)"
         when: webhook
         path: [build_sub, ~build_sub]
         text: "The task is checked against the agent's manifest before any workflow exists."
         detail: |
-          `check_submission` collects every reason, not just the first:
-          - the capability must be in the manifest (`undeclared_capability`);
-          - `maxAutonomyLevel` must not exceed the agent's highest granted level or the framework ceiling (`autonomy`);
-          - `costLimitUsd` must not exceed `costCeiling.perRunUsd` (`cost_ceiling`);
-          - the agent must not be quarantined.
-          A refusal raises `Refused`, records `submission_decision` and an entry span; the webhook answers 422 and nothing starts.
-      - {title: Start the incident, action: "Receiver ↔ Temporal: start with an id from the delivery; 2xx to GitHub", when: webhook, path: [~hook_build, hook_t, ~hook_t, ~gh_hook],
-         text: "A repeated delivery gets the same workflow id, so Temporal refuses the duplicate.",
-         result: success, outcome: "Checked task started"}
-      - {title: Schedule fires, action: "Temporal: terraform-drift's daily schedule fires", when: schedule, lights: [temporal],
-         text: "The schedule workflow asks for the root task as an activity, because building it reads config files."}
+          **What happens:** `check_submission(task, manifest)` compares the task with the agent's manifest before anything runs. This is the framework's first guardrail checkpoint, *point 1*.
+
+          **Why it matters:** an agent only gets work it has declared and been approved for. A task asking for an undeclared capability, a higher autonomy level or a bigger budget is stopped at the door.
+
+          **How:** it collects every reason, not just the first:
+          - the capability is in the manifest;
+          - the autonomy level is within the agent's grant and the framework ceiling;
+          - the cost limit is within the agent's per-run ceiling;
+          - the agent is not quarantined.
+          A refusal is recorded, the webhook answers 422 and nothing starts.
+      - title: Start the incident
+        action: "Receiver ↔ Temporal: start with an id from the repo and scan run; 2xx to GitHub"
+        when: webhook
+        path: [~hook_build, hook_t, ~hook_t, ~gh_hook]
+        text: "A repeated delivery gets the same workflow id, so Temporal refuses the duplicate."
+        detail: |
+          **What happens:** the receiver starts an `IncidentWorkflow` in Temporal on the drift worker's queue, and answers GitHub with 202 (started) or 200 (already started).
+
+          **Why it matters:** GitHub may deliver the same event twice, and a job can be re-run. Each scan run must still give one analysis and one set of PRs.
+
+          **How:** the workflow id is built from the repository and the scan run number (`incident-drift-<owner>-<repo>-<run>`), and Temporal refuses a second workflow with the same id. The start waits about 5 minutes, so the scan's last jobs finish before the agent reads them.
+        result: success
+        outcome: "Checked task started"
+      - title: Schedule fires
+        action: "Temporal: terraform-drift's daily schedule fires"
+        when: schedule
+        lights: [temporal]
+        text: "The schedule workflow asks for the root task as an activity, because building it reads config files."
+        detail: |
+          **What happens:** Temporal's daily schedule for terraform-drift fires at 08:00 UTC. The schedule workflow first asks for the task to be built.
+
+          **Why it matters:** the schedule is the safety net: drift is analysed every day even when no webhook arrived.
+
+          **How:** building a task reads config files, and Temporal workflow code may not do any I/O, because it must replay exactly the same way after a crash. So the schedule workflow runs `make_task` as an activity, which does the reading on a worker.
       - title: Task without point 1
         action: "make_task() → create_root_task(channel=schedule)"
         when: schedule
         path: [t_make_task, make_entry, ~make_entry, ~t_make_task]
         text: "The task is built from the schedule channel's policy, but check_submission is not called on this path."
         detail: |
-          `make_task` calls `create_root_task` directly, not `Console.build`, so guardrail point 1 does not run for scheduled tasks.
-          The schedule's own values come from the agent's manifest, so in practice they stay inside it, but nothing checks that.
-          This is a stated gap: point 1 covers the console, webhooks and routing, not schedules.
-          Points 2 and 4 and the kill switch still apply inside the run.
-      - {title: Incident starts, action: "Temporal → IncidentWorkflow.run() on the agent's queue", when: schedule, path: [t_inc],
-         text: "The run goes ahead with the kill switch and points 2 and 4 still in place.",
-         result: done, outcome: "Started; point 1 not run (gap)"}
+          **What happens:** `make_task()` builds the task with `create_root_task(channel="schedule")` and the schedule channel's limits (2 hours, $0.50, level 1, one hop).
+
+          **Why it matters:** this is a known gap. Scheduled tasks don't go through `Console.build()`, so guardrail point 1 (`check_submission`) never runs for them.
+
+          **How:** the risk is low in practice: the schedule's inputs come from the agent's own reviewed manifest, so they stay inside it. But nothing verifies that. The kill switch and guardrail points 2 and 4 still apply during the run. Calling `check_submission` in `make_task` too would close the gap.
+      - title: Incident starts
+        action: "Temporal → IncidentWorkflow.run() on the agent's queue"
+        when: schedule
+        path: [t_inc]
+        text: "The run goes ahead with the kill switch and points 2 and 4 still in place."
+        detail: |
+          **What happens:** Temporal runs `IncidentWorkflow.run()` on the agent's queue with the scheduled task. From here, scheduled and webhook runs take the same path.
+
+          **Why it matters:** one incident workflow coordinates the whole job. The drift agent runs as its child, and any handoff (such as asking change-correlator who made a change) is planned and tracked under the same incident.
+
+          **How:** the task's limits travel with it. Every later step runs as a Temporal activity, so a crash resumes where it stopped.
+        result: done
+        outcome: "Started; point 1 not run (gap)"
 
   - id: killswitch
     title: Kill switch before a write
     summary: "One call from the workflow to the kill switch, through Temporal, the binding, the agent's activity and wardens' fail-closed check."
     modes: [{id: released, label: Switch released}, {id: engaged, label: Switch engaged}]
     steps:
-      - {title: Workflow needs a write, action: "workflow.run(): next stack, so check the switch first", lights: [d_run],
-         text: "The drift workflow runs as a child; before each stack and each write it asks for the kill switch."}
+      - title: Workflow needs a write
+        action: "workflow.run(): next stack, so check the switch first"
+        lights: [d_run]
+        text: "The drift workflow runs as a child; before each stack and each write it asks for the kill switch."
+        detail: |
+          **What happens:** inside `workflow.run()`, the drift workflow is about to start the next stack and may then write to GitHub. Before each stack and each write, it checks the kill switch.
+
+          **Why it matters:** the kill switch is the operator's emergency stop. Because it is checked before every stack and write, not only at the start, an engaged switch takes effect in the middle of a long run.
+
+          **How:** the workflow can't read a file or a database itself (Temporal workflow code must be repeatable), so it asks through an activity, shown in the next steps.
       - title: Call becomes an activity
         action: "run() → acts.kill_switch_engaged() → _ActivityProxy → Temporal"
         path: [run_proxy, proxy_t]
         text: "The workflow only decides; the proxy turns the call into a Temporal activity, so a crash resumes here."
         detail: |
-          Inside a workflow `acts` is `_ActivityProxy`, not the real `DriftActivities`.
-          `__getattr__` turns `kill_switch_engaged()` into `workflow.execute_activity("terraform-drift.kill_switch_engaged")` with the binding's timeout and retry policy.
-          Temporal saves the request and, later, the result. A worker that crashes resumes at the next step without repeating finished ones.
-          Each call is also logged as an `ActivityRecord` for the run record.
-      - {title: Worker runs it, action: "Temporal → bind_activities wrapper → DriftActivities.kill_switch_engaged()", path: [t_bind, bind_ks],
-         text: "The worker's activity poller takes the task and runs the agent's method."}
+          **What happens:** the workflow calls `acts.kill_switch_engaged()`. Inside a workflow, `acts` isn't the real agent code but a stand-in, `_ActivityProxy`, that forwards the call to Temporal.
+
+          **Why it matters:** this split is what makes runs durable. The workflow only makes decisions; anything that touches the outside world runs as an activity that Temporal saves, times out and retries.
+
+          **How:** the proxy turns the call into `execute_activity("terraform-drift.kill_switch_engaged")` with a 15-second limit and up to 3 attempts. Temporal saves the request and the answer, so after a crash the workflow resumes without repeating finished steps. Each call is also logged for the run record.
+      - title: Worker runs it
+        action: "Temporal → bind_activities wrapper → DriftActivities.kill_switch_engaged()"
+        path: [t_bind, bind_ks]
+        text: "The worker's activity poller takes the task and runs the agent's method."
+        detail: |
+          **What happens:** a terraform-drift worker takes the activity from its queue, and the wrapper made by `bind_activities` calls the real method, `DriftActivities.kill_switch_engaged()`.
+
+          **Why it matters:** any worker can run any activity, so the work isn't tied to one container. If one pod is busy or gone, another picks it up.
+
+          **How:** the agent's method is one line: it asks the framework's `is_engaged()` for this agent's name. The agent doesn't implement the switch itself, so every agent gets the same rule.
       - title: Fail-closed read
         action: "is_engaged() → AnyKillSwitch ↔ wardens-state-db (5432)"
         path: [ks_is, is_store, store_db, ~store_db, ~is_store]
         text: "The switch is read from the Git file and the database row for this agent or all; an error counts as engaged."
         detail: |
-          `is_engaged(switch, agent)` is the only kill switch check agents use.
-          `AnyKillSwitch` is engaged when either the Git file or the Postgres row says so, for this agent or for `all`.
-          Any exception while reading is treated as engaged: the agent stops rather than writes blind.
-          Every read records `killswitch_observed`, so Grafana shows how often each agent checked and what it saw.
-      - {title: Answer returns, action: "is_engaged() → activity → Temporal → workflow: engaged or not", path: [~ks_is, ~bind_ks, ~t_bind, ~proxy_t, ~run_proxy],
-         text: "The result is saved in the workflow's history, so a replay sees the same answer."}
-      - {title: Go ahead, action: "run(): released, so analyse, emit and open the PR", when: released, lights: [d_run],
-         text: "The tool checks the switch once more right before the write itself.",
-         result: success, outcome: "Released: the write may go ahead"}
-      - {title: Stop, action: "run(): engaged, so stop before the next write", when: engaged, lights: [d_run],
-         text: "Nothing more is written; the run record still says why it stopped.",
-         result: done, outcome: "Engaged: run stops, nothing written"}
+          **What happens:** `is_engaged()` reads the switch through `AnyKillSwitch`: the file in Git and the row in wardens-state-db, both for this agent and for `all` agents.
+
+          **Why it matters:** it *fails closed*. If the switch can't be read (the database is down, the file is unreadable), the answer is "engaged" and the agent stops. A broken safety check never turns into permission to write.
+
+          **How:** the switch is engaged if either source says so. Every read is counted (`killswitch_observed`), so Grafana shows how often each agent checked and what it saw.
+      - title: Answer returns
+        action: "is_engaged() → activity → Temporal → workflow: engaged or not"
+        path: [~ks_is, ~bind_ks, ~t_bind, ~proxy_t, ~run_proxy]
+        text: "The result is saved in the workflow's history, so a replay sees the same answer."
+        detail: |
+          **What happens:** the answer, engaged or released, goes back from `is_engaged()` through the activity and Temporal to the workflow.
+
+          **Why it matters:** Temporal stores the answer in the workflow's history. If the worker restarts and the workflow replays, it sees the same answer instead of asking again, so a run never changes its mind halfway through a step.
+
+          **How:** this is the pattern for every call in this diagram: the workflow decides, an activity does the I/O, and Temporal records both.
+      - title: Go ahead
+        action: "run(): released, so analyse, emit and open the PR"
+        when: released
+        lights: [d_run]
+        text: "The tool checks the switch once more right before the write itself."
+        detail: |
+          **What happens:** the switch is released, so `run()` goes on: analyse the stack, emit the findings and open the draft PR.
+
+          **Why it matters:** a released switch allows the next step, not the whole run. The check repeats for every stack.
+
+          **How:** the PR tool, `GitHubWriter`, reads the kill switch once more right before it writes. That covers the minutes the analysis can take between the workflow's check and the write itself.
+        result: success
+        outcome: "Released: the write may go ahead"
+      - title: Stop
+        action: "run(): engaged, so stop before the next write"
+        when: engaged
+        lights: [d_run]
+        text: "Nothing more is written; the run record still says why it stopped."
+        detail: |
+          **What happens:** the switch is engaged, so `run()` stops before the next write. Nothing more is written to GitHub.
+
+          **Why it matters:** this is how an operator stops an agent that misbehaves, or pauses all agents during an incident, without deleting or redeploying anything.
+
+          **How:** the run still ends in an orderly way: the run record is written and says why it stopped. Engaging the switch is a change to the file in Git or to the database row; releasing it undoes that change.
+        result: done
+        outcome: "Engaged: run stops, nothing written"
 
   - id: classify
     title: Classify drift with the model
     summary: "The LLM stage inside analyse: redaction, typed output, a validator, usage limits, the breaker, a recorded call and a deterministic fallback; the gate still decides."
     modes: [{id: ok, label: Model answers}, {id: down, label: Model failing}]
     steps:
-      - {title: Analyse one stack, action: "bind_activities → analyse() → analyse_stack()", path: [bind_analyse, analyse_stack],
-         text: "The analysis runs in one activity per stack; a failure in one stack doesn't stop the others."}
+      - title: Analyse one stack
+        action: "bind_activities → analyse() → analyse_stack()"
+        path: [bind_analyse, analyse_stack]
+        text: "The analysis runs in one activity per stack; a failure in one stack doesn't stop the others."
+        detail: |
+          **What happens:** the workflow calls the `analyse` activity, which runs `analyse_stack()` for one Terraform stack (one folder of infrastructure code).
+
+          **Why it matters:** each stack is analysed in its own activity, with its own 15-minute limit. A problem in one stack is reported, and the other stacks are still analysed.
+
+          **How:** `analyse_stack()` takes the drift the scan found (where the cloud differs from what the code says) and runs four stages: redact, classify with the model, decide with the gate, and explain. The next steps follow them.
       - title: Redact first
         action: "analyse_stack() → attribute_changes(): sensitive values replaced"
         path: [stack_attr, ~stack_attr]
         text: "Changed attributes are listed with sensitive values replaced before anything reaches a prompt."
         detail: |
-          `attribute_changes` reads the plan's drift for one resource and returns one change per attribute.
-          An attribute Terraform marks sensitive becomes `(sensitive value)`, so no secret reaches the model, the run record or a PR.
-          The scan's evidence is wrapped in the prompt as `<evidence>` and labelled untrusted data, not instructions.
+          **What happens:** `attribute_changes()` lists every changed setting (*attribute*) of each drifted resource, and replaces any value Terraform marks as sensitive with `(sensitive value)`.
+
+          **Why it matters:** secrets such as passwords or keys never reach the model, the run record or a pull request. Redaction happens before the AI sees anything, not after.
+
+          **How:** in the prompt, this evidence is wrapped in `<evidence>` tags and labelled untrusted data. So text hidden in a resource, such as a tag saying "ignore your instructions", is read as data, not as an order.
       - title: Ask the model
         action: "classify() → agent.run() → BreakerModel → LiteLLM (443)"
         path: [stack_classify, classify_pyd, pyd_breaker]
         text: "Typed output (ClassifyOutput), 2 retries, at most 4 requests and 60,000 tokens."
         detail: |
-          `Agent(output_type=ClassifyOutput, retries=2)` makes the model answer in a schema, not free text.
-          `USAGE_LIMITS` caps the stage at 4 requests and 60,000 tokens, whatever the model does.
-          The request goes through `BreakerModel`, so a failing endpoint is noticed after 5 failures and later requests fail fast.
+          **What happens:** `classify()` asks the model, through Pydantic AI's `agent.run()`, whether each change looks intended (someone changed it on purpose), unauthorised, or unclear. The request goes through the breaker to LiteLLM.
+
+          **Why it matters:** the model must answer in a fixed format (`ClassifyOutput`), not free text, so code can check the answer. And the stage has hard caps on usage, whatever the model does.
+
+          **How:** the stage allows at most 4 requests and 60,000 tokens (`USAGE_LIMITS`), and 2 retries for a bad answer. If the model is failing, the breaker makes the request fail fast instead of hanging until a timeout.
       - title: Validated answer
         when: ok
         action: "LiteLLM → BreakerModel → output validator _check → classify()"
         path: [breaker_lite, ~breaker_lite, ~pyd_breaker, ~classify_pyd]
         text: "The validator checks the verdicts cover every changed attribute exactly once and invent no change record."
         detail: |
-          The `@agent.output_validator` `_check` compares the answer with the input, in code.
-          A missing or repeated (address, attribute) pair, or a change record that isn't in the evidence, raises `ModelRetry` with the reason.
-          The model then answers again, up to 2 retries; after that the stage takes its fallback.
-      - {title: Breaker or timeout, action: "BreakerModel: CircuitOpen or a failed request", when: down, path: [breaker_circuit, ~breaker_circuit, ~pyd_breaker, ~classify_pyd],
-         text: "After 5 failures in a row the breaker is open: the next request fails at once instead of waiting on a timeout."}
-      - {title: Record the call, action: "classify() → model_call(result=…) for the run record", path: [classify_mc, ~classify_mc],
-         text: "Model, prompt version and tokens, or the failure, are recorded either way."}
+          **What happens:** the model's answer comes back, and the output validator `_check` compares it with the input, in code.
+
+          **Why it matters:** models can skip items, repeat them or make things up. The validator makes sure the answer covers every changed attribute exactly once and cites no change record that isn't in the evidence.
+
+          **How:** if the check fails, it raises `ModelRetry` with the reason and the model gets another try, up to 2 retries. If it still fails, the stage takes its fallback (every verdict "unknown"). Only a checked answer is used.
+      - title: Breaker or timeout
+        action: "BreakerModel: CircuitOpen or a failed request"
+        when: down
+        path: [breaker_circuit, ~breaker_circuit, ~pyd_breaker, ~classify_pyd]
+        text: "After 5 failures in a row the breaker is open: the next request fails at once instead of waiting on a timeout."
+        detail: |
+          **What happens:** the model endpoint is failing. `BreakerModel` either gets an error back or, after 5 failures in a row, refuses at once with `CircuitOpen`.
+
+          **Why it matters:** without a breaker, every stack would wait on a timeout from a model that is down, and a run could spend its 2-hour deadline doing nothing. Failing fast keeps the run moving.
+
+          **How:** the breaker is shared by the whole worker process, per agent. After 60 seconds it lets one trial request through; if that works, normal calls resume.
+      - title: Record the call
+        action: "classify() → model_call(result=…) for the run record"
+        path: [classify_mc, ~classify_mc]
+        text: "Model, prompt version and tokens, or the failure, are recorded either way."
+        detail: |
+          **What happens:** `model_call()` records the call: which model, which prompt version, how many tokens, or the error if it failed.
+
+          **Why it matters:** every model call is accounted for. The run record later prices each call from `prices.yaml`, so the cost of each run is known, and a reviewer can see which prompt produced which answer.
+
+          **How:** the record is kept during the run and written with the run record at the end (see "Run record and the message"). Failed calls are recorded too, so model outages show up in the evidence.
       - title: Fallback
         when: down
         action: "classify() → fallback: every attribute unknown → gate says investigate"
         path: [~stack_classify, stack_gate, ~stack_gate, ~analyse_stack, ~bind_analyse]
         text: "Any exception gives every attribute the verdict unknown, which the gate turns into investigate."
         detail: |
-          `fallback(changes, reason)` returns `unknown` for each attribute; the run goes on without the model.
-          `gate.evaluate` is deterministic: unknown never becomes a draft PR, only an investigate finding.
-          So a model outage lowers the quality of the explanation, never the safety of the output.
+          **What happens:** `classify()` catches the failure and calls `fallback()`, which marks every changed attribute "unknown". `gate.evaluate()` then turns "unknown" into "investigate".
+
+          **Why it matters:** a model outage makes the explanation worse, never the action riskier. "Investigate" means a person is asked to look; no pull request is proposed from a guess.
+
+          **How:** the run goes on without the model. The finding still lists what changed, and the run record shows the model failure and its reason.
         result: done
         outcome: "Model down: investigate, nothing proposed"
-      - {title: Gate decides, action: "analyse_stack() → gate.evaluate(): investigate, codify or revert", when: ok, path: [~stack_classify, stack_gate, ~stack_gate],
-         text: "Deterministic policy on secrets, scope and the verdicts; the model never decides what is proposed."}
-      - {title: Explain it, action: "rationale() → agent.run(): one short explanation", when: ok, path: [stack_rationale, rationale_pyd, ~rationale_pyd, ~stack_rationale, ~analyse_stack, ~bind_analyse],
-         text: "At most 2 requests and 20,000 tokens; on failure a fixed default sentence.",
-         result: success, outcome: "Proposals decided by the gate"}
+      - title: Gate decides
+        action: "analyse_stack() → gate.evaluate(): investigate, codify or revert"
+        when: ok
+        path: [~stack_classify, stack_gate, ~stack_gate]
+        text: "Deterministic policy on secrets, scope and the verdicts; the model never decides what is proposed."
+        detail: |
+          **What happens:** `gate.evaluate()` decides what to propose for the stack: *codify* (write the cloud's new value into the code), *revert* (re-apply the code, run by a person) or *investigate* (a person looks).
+
+          **Why it matters:** fixed rules in code decide, not the model. The model's verdicts are one input, and any failed rule turns the proposal into the safest one: investigate.
+
+          **How:** to codify, every change must be classified intended with at least 0.8 confidence, have a linked change record, map to a setting in the stack's YAML and not be sensitive. A value that looks like a secret, or a stack outside the agent's scope, means investigate. Only codify can become a draft PR.
+      - title: Explain it
+        action: "rationale() → agent.run(): one short explanation"
+        when: ok
+        path: [stack_rationale, rationale_pyd, ~rationale_pyd, ~stack_rationale, ~analyse_stack, ~bind_analyse]
+        text: "At most 2 requests and 20,000 tokens; on failure a fixed default sentence."
+        detail: |
+          **What happens:** `rationale()` asks the model for one short, plain explanation of the proposal, for the finding and the PR description.
+
+          **Why it matters:** reviewers get a readable reason with each proposal. But the explanation can't change the proposal: the gate has already decided.
+
+          **How:** this stage is capped at 2 requests and 20,000 tokens. If the model fails, `default_rationale()` writes a fixed sentence ("Proposed to codify … based on the classification of each attribute"), so a run never stops for want of prose.
+        result: success
+        outcome: "Proposals decided by the gate"
 
   - id: point4
     title: Point 4 and the draft PR
     summary: "emit runs check_action on every proposed action; only then does the tool open the draft PR, after one more kill switch read."
     modes: [{id: allowed, label: Allowed}, {id: refused, label: Not in the catalog}]
     steps:
-      - {title: Emit the findings, action: "bind_activities → emit(analysis, task, now)", path: [bind_emit],
-         text: "The analysis becomes artifacts: a finding and a proposed action per proposal."}
+      - title: Emit the findings
+        action: "bind_activities → emit(analysis, task, now)"
+        path: [bind_emit]
+        text: "The analysis becomes artifacts: a finding and a proposed action per proposal."
+        detail: |
+          **What happens:** the `emit` activity turns the analysis into *artifacts*: a finding (what was found) and, for each proposal, a proposed action (what the agent wants to do).
+
+          **Why it matters:** artifacts follow JSON schemas shared by every agent, so findings and proposals are stored, handed to other agents and audited the same way.
+
+          **How:** before a proposed action is accepted, `emit()` runs guardrail *point 4*, `check_action()`, on it. The next steps show its six checks.
       - title: Checks 1 to 3
         when: allowed
         action: "emit() → check_action(): catalog, level, ceiling"
         path: [emit_ca, ca1, ca2, ca3]
         text: "The action must be declared, at its catalog level, and under the task's and framework's ceiling."
         detail: |
-          `check_action` runs six checks in order and returns at the first that fails:
-          1. the action is in the manifest's `actionCatalog` (`undeclared_action`);
-          2. its level equals the catalog's (`level_mismatch`);
-          3. its level is at most min(task `maxAutonomyLevel`, framework ceiling) (`autonomy`).
-          A draft PR is a level 1 action: output only, a person merges it.
+          **What happens:** `check_action()` checks that the agent may take this action at all, at this level.
+
+          **Why it matters:** an agent's actions are declared in its manifest's `actionCatalog`, each with an autonomy level. Level 1 means output only: a draft PR a person merges. The checks stop an agent from doing something new or raising its own level.
+
+          **How:** checks run in order and stop at the first failure:
+          - **1.** the action is in the catalog (`undeclared_action`);
+          - **2.** its level matches the catalog's (`level_mismatch`);
+          - **3.** its level is within the task's limit and the framework ceiling (`autonomy`).
       - title: Checks 4 to 6
         when: allowed
         action: "check_action(): goal drift, ownership, L2+ owner → decision"
         path: [ca4, ca5, ca6, ca_done]
         text: "The agent must serve the task, the target must be in its domain, and level 2+ needs a mapped owner."
         detail: |
-          4. the task's capability is one this agent serves (`goal_drift`);
-          5. a target owned by another domain becomes a `handoff`, not an action (`ownership`, decision 0011);
-          6. a level 2 or 3 action needs its target in the ownership map (`no_owner`).
-          Passed at level 1, the outcome is `output`; level 2 would be `needs-approval`, level 3 `within-bounds`.
-      - {title: Count the decision, action: "emit() → action_decision() metric", when: allowed, path: [~emit_ca, emit_metric],
-         text: "Every decision is counted by outcome and code, so refusals show up in Grafana."}
+          **What happens:** `check_action()` then checks that the action serves the task and targets something this agent owns.
+
+          **Why it matters:** these stop *goal drift* (an agent doing work nobody asked for) and stop one domain's agent changing another domain's resources.
+
+          **How:**
+          - **4.** the task's capability is one this agent serves (`goal_drift`);
+          - **5.** a target owned by another domain becomes a handoff, not an action (`ownership`);
+          - **6.** a level 2 or 3 action needs a named owner for its target (`no_owner`).
+          A level 1 action that passes gets the outcome `output`: delivered for a person to act on.
+      - title: Count the decision
+        action: "emit() → action_decision() metric"
+        when: allowed
+        path: [~emit_ca, emit_metric]
+        text: "Every decision is counted by outcome and code, so refusals show up in Grafana."
+        detail: |
+          **What happens:** `action_decision()` adds the decision to a metric, labelled with its outcome and reason code.
+
+          **Why it matters:** a Grafana dashboard shows how often agents propose actions, how often the guardrails refuse them, and why. A sudden rise in refusals is an early warning that an agent or its config has changed.
+
+          **How:** the metric goes through OpenTelemetry to the platform's monitoring in the mon cluster, like every other wardens metric.
       - title: Open the draft PR
         when: allowed
         action: "open_draft_pr() → GitHubWriter → is_engaged() again"
         path: [~bind_emit, bind_openpr, openpr_writer, writer_is, ~writer_is]
         text: "The only write: drift/ branch never main, same patch hash, and the kill switch read right before it."
         detail: |
-          The workflow checked the kill switch before calling the activity; the tool checks it again just before writing.
-          The branch must start with the drift prefix and is never `main` or the default branch.
-          An open PR for the same key is reused, so a retry never opens a second one; `patchSha256` is checked again.
+          **What happens:** `open_draft_pr()` asks `GitHubWriter` to write the change, and the writer reads the kill switch with `is_engaged()` one last time.
+
+          **Why it matters:** this is the agent's only write to the outside world, so it has the most checks. The last-moment read honours an operator's stop even if it came during the analysis.
+
+          **How:**
+          - the branch starts with the drift prefix and is never `main`;
+          - an open PR for the same change is reused, so a retry never opens a second one;
+          - the patch hash (`patchSha256`) is checked again, so what is written is exactly what was checked.
           `DraftPrRefused` and `ScopeError` are not retried.
-      - {title: Draft PR on GitHub, action: "GitHubWriter ↔ GitHub: branch, commit, draft PR (443)", when: allowed, path: [writer_gh, ~writer_gh, ~openpr_writer, ~bind_openpr],
-         text: "A person reviews and merges it; the agent never merges.",
-         result: success, outcome: "Draft PR opened"}
+      - title: Draft PR on GitHub
+        action: "GitHubWriter ↔ GitHub: branch, commit, draft PR (443)"
+        when: allowed
+        path: [writer_gh, ~writer_gh, ~openpr_writer, ~bind_openpr]
+        text: "A person reviews and merges it; the agent never merges."
+        detail: |
+          **What happens:** `GitHubWriter` creates the branch and the commit, and opens a draft pull request on GitHub.
+
+          **Why it matters:** the agent proposes; a person decides. The PR goes through the infrastructure repository's normal review and CI, and only a person can merge it. The agent never merges and never applies changes to the cloud.
+
+          **How:** the agent writes as its own GitHub App. Write permission is minted only on workers where writing is turned on (`GITHUB_APP_WRITE`); elsewhere the worker runs in shadow mode and opens no PRs.
+        result: success
+        outcome: "Draft PR opened"
       - title: Refused at check 1
         when: refused
         action: "check_action(): action not in actionCatalog → rejected"
         path: [emit_ca, ca1, ~ca1, ~emit_ca, emit_metric]
         text: "An action the manifest doesn't declare is rejected with undeclared_action; the later checks don't run."
         detail: |
-          The first failing check decides and the rest are skipped.
-          `emit` records `action_decision` and raises `PermissionError`, so nothing is written for this stack.
-          The workflow catches it per stack, so the other stacks go on, and the run record shows the refusal.
-      - {title: Nothing written, action: "emit(): PermissionError back to the workflow", when: refused, path: [~bind_emit],
-         text: "The refusal is counted and recorded; no PR is opened for this stack.",
-         result: fail, outcome: "Refused by point 4"}
+          **What happens:** the proposed action isn't in the manifest's `actionCatalog`, so `check_action()` rejects it with `undeclared_action`. Checks 2 to 6 don't run.
+
+          **Why it matters:** an agent can only do what it has declared and been approved for. A new kind of action needs a manifest change, which is reviewed like code.
+
+          **How:** `emit()` counts the decision (`action_decision`) and raises `PermissionError`. The workflow catches it for this stack only, so the other stacks are still processed.
+      - title: Nothing written
+        action: "emit(): PermissionError back to the workflow"
+        when: refused
+        path: [~bind_emit]
+        text: "The refusal is counted and recorded; no PR is opened for this stack."
+        detail: |
+          **What happens:** the `PermissionError` goes back to the workflow, and no PR is opened for this stack.
+
+          **Why it matters:** a refused action leaves evidence, not silence. Anyone can see what the agent tried and why it was stopped.
+
+          **How:** the run record lists the refusal with its reason code, and the metric shows it on the dashboard. The rest of the run carries on.
+        result: fail
+        outcome: "Refused by point 4"
 
   - id: handoff
     title: Handoff to change-correlator
     summary: "A finding suggests asking change-correlator who made the change; the incident workflow asks wardens.handoff, which runs eight checks."
     modes: [{id: planned, label: Planned}, {id: refused, label: Refused}]
     steps:
-      - {title: Suggest a handoff, action: "emit() → _suggest_correlation(): suggestedHandoffs on the finding", path: [entry_suggest, ~entry_suggest],
-         text: "The finding names the drifted resources so change-correlator can look up who changed them."}
-      - {title: Plan it, action: "IncidentWorkflow.run() → Temporal → plan_handoff()", path: [inc_t, t_plan],
-         text: "After the child finishes, each suggestion becomes a plan_handoff activity with a cost share."}
+      - title: Suggest a handoff
+        action: "emit() → _suggest_correlation(): suggestedHandoffs on the finding"
+        path: [entry_suggest, ~entry_suggest]
+        text: "The finding names the drifted resources so change-correlator can look up who changed them."
+        detail: |
+          **What happens:** `_suggest_correlation()` adds a suggested handoff to the stack's first finding: ask change-correlator (`change.correlate`) who changed these resources, when, and with which tool.
+
+          **Why it matters:** drift says *what* changed, not *who* changed it. A specialist agent answers that, so terraform-drift stays focused on its own job.
+
+          **How:** the suggestion only names the resources and the question. It's a request, not an order: wardens decides in the next steps whether it runs.
+      - title: Plan it
+        action: "IncidentWorkflow.run() → Temporal → plan_handoff()"
+        path: [inc_t, t_plan]
+        text: "After the child finishes, each suggestion becomes a plan_handoff activity with a cost share."
+        detail: |
+          **What happens:** after the drift run finishes, `IncidentWorkflow.run()` turns each suggestion into a `plan_handoff` activity with a share of the remaining budget.
+
+          **Why it matters:** the framework coordinates agents, not the agents themselves. An agent can't call another agent directly; it can only suggest, and the framework decides.
+
+          **How:** each child may take up to half of what the parent task has left to spend (`cost_share` 0.5). `plan_handoff` calls `plan_child_task()`, which runs eight checks.
       - title: Checks 1 to 4
         when: planned
         action: "plan_child_task(): pair, route, hops, cycle"
         path: [ph_fn, h1, h2, h3, h4]
         text: "The pair must be enabled, the capability routable, hops left, and the target not already on the chain."
         detail: |
-          Unlike point 4, every check runs and every reason is collected.
-          1. `terraform.drift.explain → change.correlate` must be enabled in `handoff.yaml`; everything else is denied by default.
-          2. the registry resolves `change.correlate` to a routable agent;
-          3. the parent has `hopBudget` left;
-          4. the target capability is not already on the chain, so two agents can't hand work back and forth.
+          **What happens:** `plan_child_task()` checks that the handoff is allowed and safe to route.
+
+          **Why it matters:** these checks stop agents from sending work to each other freely, which could loop forever or spread a mistake.
+
+          **How:** unlike point 4, every check runs and every reason is collected:
+          - **1.** the pair terraform-drift → `change.correlate` is enabled in `handoff.yaml` (everything else is denied by default);
+          - **2.** the registry finds an agent that takes `change.correlate`;
+          - **3.** the parent has hops left (`hopBudget`);
+          - **4.** the target isn't already in the chain, so two agents can't pass work back and forth.
       - title: Checks 5 to 8
         when: planned
         action: "plan_child_task(): verified, cost share, deadline, inputs"
         path: [h5, h6, h7, h8, h_done]
         text: "The finding must be verified, the share affordable, the deadline ahead and the inputs valid."
         detail: |
-          5. the finding that suggested it passed verification;
-          6. the cost share is above zero and within what the parent has left;
-          7. the parent's deadline has not passed;
-          8. the inputs match change.correlate's input schema.
-          The child gets the same `correlationId`, a level no higher than the parent's or the target's, cost min(share, target ceiling) and one hop fewer, then a schema check.
+          **What happens:** `plan_child_task()` checks the finding, the money and the time.
+
+          **Why it matters:** a child task must be worth doing and affordable. It can't outlive or outspend its parent.
+
+          **How:**
+          - **5.** the finding that suggested it passed verification;
+          - **6.** the cost share is above zero and within the parent's remaining budget;
+          - **7.** the parent's deadline hasn't passed;
+          - **8.** the inputs match `change.correlate`'s input schema.
+          The child gets the same `correlationId` (so its trace joins the incident's), a level no higher than the parent's, and one hop fewer.
       - title: Refused
         when: refused
         action: "plan_child_task(): all eight checks, every reason collected"
         path: [ph_fn, h1, h2, h3, h4, h5, h6, h7, h8, h_done]
         text: "A pair not in handoff.yaml, or any other failed check, raises HandoffRefused with every reason."
         detail: |
-          Default deny: a pair that isn't enabled is refused even when every other check passes.
-          All reasons are returned together, so one run shows everything that would need changing.
-          The incident keeps the parent's result and sends its message without the child's.
-      - {title: Count it, action: "plan_handoff() → handoff_planned() metric and span", path: [~ph_fn, ph_metric],
-         text: "Planned or refused, the decision is counted with its reason and traced."}
-      - {title: Start the child, action: "IncidentWorkflow → Temporal: change-correlator child workflow", when: planned, path: [~t_plan, ~inc_t, inc_child],
-         text: "The child runs on change-correlator's queue; its finding joins the incident by reference.",
-         result: success, outcome: "Child task started"}
-      - {title: Go on without it, action: "IncidentWorkflow: no child; one message for the incident", when: refused, path: [~t_plan, ~inc_t],
-         text: "The refusal is in the run record and the trace; the drift result still goes out.",
-         result: done, outcome: "Handoff refused, incident goes on"}
+          **What happens:** a check fails, for example because the pair isn't enabled in `handoff.yaml`, and `plan_child_task()` raises `HandoffRefused` with every reason.
+
+          **Why it matters:** *default deny* means a new connection between agents has to be switched on deliberately, in a reviewed config file. Getting all the reasons at once shows everything that would need changing.
+
+          **How:** the incident keeps the parent's result. The drift findings still go out, just without the "who changed it" answer.
+      - title: Count it
+        action: "plan_handoff() → handoff_planned() metric and span"
+        path: [~ph_fn, ph_metric]
+        text: "Planned or refused, the decision is counted with its reason and traced."
+        detail: |
+          **What happens:** `plan_handoff()` records the decision, planned or refused, as a metric and a trace span (`handoff_planned`) with its reason.
+
+          **Why it matters:** operators can see how agents work together: how many handoffs are planned, how many are refused and why, and how long each part of an incident took.
+
+          **How:** the span sits in the incident's trace, and the child run's own span hangs under it. So one trace in Grafana shows the parent run, the handoff decision and the child run together.
+      - title: Start the child
+        action: "IncidentWorkflow → Temporal: change-correlator child workflow"
+        when: planned
+        path: [~t_plan, ~inc_t, inc_child]
+        text: "The child runs on change-correlator's queue; its finding joins the incident by reference."
+        detail: |
+          **What happens:** `IncidentWorkflow` starts change-correlator's workflow as a child, on change-correlator's own Temporal queue.
+
+          **Why it matters:** each agent runs on its own workers with its own permissions. change-correlator has the access to look up who changed a resource; terraform-drift doesn't need it.
+
+          **How:** when the child finishes, its finding joins the incident by reference, and the root sends one combined message: what drifted, and who changed it and when.
+        result: success
+        outcome: "Child task started"
+      - title: Go on without it
+        action: "IncidentWorkflow: no child; one message for the incident"
+        when: refused
+        path: [~t_plan, ~inc_t]
+        text: "The refusal is in the run record and the trace; the drift result still goes out."
+        detail: |
+          **What happens:** no child is started. The incident goes on with the drift result alone and sends one message.
+
+          **Why it matters:** a refused handoff never blocks the main result; the team still hears about the drift on time.
+
+          **How:** the refusal and its reasons are in the run record and the trace, so the missing "who changed it" answer has an explanation.
+        result: done
+        outcome: "Handoff refused, incident goes on"
 
   - id: record
     title: Run record and the message
     summary: "At the end of every run, success or failure, _run_agent writes the run record: built, redacted, schema-checked, stored and exported, then the message."
     steps:
-      - {title: Run ends, action: "_run_agent(): finally block, success or failure", lights: [w_run_agent],
-         text: "The record is written whatever happened, so a failed or stopped run leaves evidence too."}
+      - title: Run ends
+        action: "_run_agent(): finally block, success or failure"
+        lights: [w_run_agent]
+        text: "The record is written whatever happened, so a failed or stopped run leaves evidence too."
+        detail: |
+          **What happens:** `_run_agent()` reaches its `finally` block: code that runs at the end whatever happened, success, failure or a stop.
+
+          **Why it matters:** every run leaves evidence, including the ones that failed or were stopped by the kill switch. Those are often the runs people most need to look at.
+
+          **How:** the next steps build, store, export and announce the run record from what the workflow collected: the task, the activities it called, the model calls and the outcome.
       - title: Shielded activity
         action: "_run_agent() → Temporal → record_run activity"
         path: [ra_t, t_bind]
         text: "RECORD_ACTIVITY is shielded from cancellation and retried 5 times; a ContractError is not retried."
         detail: |
-          The record activity runs in a `finally` block, so it runs on success, failure and cancellation.
-          It is shielded: cancelling the workflow (the kill switch, an operator) doesn't cancel the record.
-          5 attempts cover a short database or network blip; a `ContractError` means the record itself is wrong and retrying won't help.
+          **What happens:** `_run_agent()` runs the `record_run` activity through Temporal, shielded from cancellation.
+
+          **Why it matters:** even if the workflow is cancelled (by the kill switch or an operator), the record of what it did is still written. An audit trail that can be cancelled isn't one.
+
+          **How:** the activity gets 2 minutes and up to 5 attempts, enough for a short database or network blip. A `ContractError` means the record itself is malformed, so it isn't retried: retrying wouldn't fix it.
       - title: Build and redact
         action: "record_run → build_run_record() → redact()"
         path: [bind_brr, brr_redact, ~brr_redact, ~bind_brr]
         text: "Model calls are priced, evidence and parameters masked, then the record is checked against the run-record schema."
         detail: |
-          `build_run_record` prices each model call from `prices.yaml`.
-          Evidence text goes through `redact_text`; activity parameters through `redact(…, classification=…)`, which adds the classification's own patterns.
-          `validate("run-record")` rejects a record that doesn't match the contract.
+          **What happens:** `build_run_record()` assembles the record and `redact()` masks sensitive text in it.
+
+          **Why it matters:** the record must be useful for audits without leaking secrets, and it states what the run cost in dollars.
+
+          **How:**
+          - each model call is priced from `prices.yaml`;
+          - evidence and activity parameters are masked by pattern, with extra patterns for the data's classification;
+          - `validate("run-record")` checks the result against the shared run-record schema, so every agent's records look the same.
       - title: Store it
         action: "sink.write() ↔ wardens-state-db (5432)"
         path: [bind_sink, sink_db, ~sink_db, ~bind_sink]
         text: "Inserted with a retention from its classification; if Postgres is unreachable it goes to the file sink."
         detail: |
-          `PostgresRecordSink.write` catches `OperationalError`, writes to the file sink instead and counts `run_record_fallback`.
-          So a database outage never loses a record, and an alert can fire on the fallback counter.
-      - {title: Export it, action: "export_run() → OTel collector (OTLP gRPC 4317)", path: [bind_export, export_col],
-         text: "One root span per run with action events, and run metrics by capability, to the mon cluster."}
-      - {title: Record id returns, action: "record_run → Temporal → _run_agent(): the record's id", path: [~t_bind, ~ra_t],
-         text: "The workflow keeps the reference; the message links to it."}
-      - {title: Send the message, action: "notify() → Notifier.send() → Slack (443)", path: [bind_notify, notify_slack],
-         text: "The run's message goes to its audience; inside an incident the root sends one message for all.",
-         result: success, outcome: "Run recorded and reported"}
+          **What happens:** `sink.write()` inserts the record into the wardens-state-db Postgres database.
+
+          **Why it matters:** records are kept for a fixed time, 180 days, or 30 days for confidential or restricted data. And a database outage never loses a record.
+
+          **How:** if Postgres can't be reached, `PostgresRecordSink` writes the record to a file instead and counts `run_record_fallback`, so an alert can tell operators the database needs attention.
+      - title: Export it
+        action: "export_run() → OTel collector (OTLP gRPC 4317)"
+        path: [bind_export, export_col]
+        text: "One root span per run with action events, and run metrics by capability, to the mon cluster."
+        detail: |
+          **What happens:** `export_run()` sends the run to the OpenTelemetry collector: a trace span for the run and metrics by capability.
+
+          **Why it matters:** the run shows up in Grafana next to everything else on the platform: how long it took, what it cost, what each step did and where it sits in its incident.
+
+          **How:** the run's span is placed in the incident's trace, under the handoff that started it, or else under the incident or the entry that created the task. Actions are events on the span. Telemetry goes over OTLP to the mon cluster.
+      - title: Record id returns
+        action: "record_run → Temporal → _run_agent(): the record's id"
+        path: [~t_bind, ~ra_t]
+        text: "The workflow keeps the reference; the message links to it."
+        detail: |
+          **What happens:** `record_run` returns the stored record's id through Temporal to `_run_agent()`.
+
+          **Why it matters:** the message and any later look-up point to exactly one stored record, so anyone can go from a chat message to the full evidence.
+
+          **How:** the id is kept in the workflow's history like every other activity result, and the next step puts it in the message.
+      - title: Send the message
+        action: "notify() → Notifier.send() → Slack (443)"
+        path: [bind_notify, notify_slack]
+        text: "The run's message goes to its audience; inside an incident the root sends one message for all."
+        detail: |
+          **What happens:** `notify()` builds the run's message and `Notifier.send()` posts it to the channel for its audience, here Slack.
+
+          **Why it matters:** people hear about results where they already work. Inside an incident the root agent sends one combined message instead of one per agent.
+
+          **How:** audiences map to channels in `notify.yaml`. The workflow tries once, because the channel retries on its own; a delivery problem is logged and never fails the run.
+        result: success
+        outcome: "Run recorded and reported"
 
   - id: chat
     title: Chat turn with stack-author
     summary: "One message in the Author tab: budget, guarded read tools, point 2 on every call, the model, a validator that prepares the diff and a recorded call."
     modes: [{id: ok, label: Within budget}, {id: budget, label: Budget spent}]
     steps:
-      - {title: Message arrives, action: "Engineer → console → Temporal signal → Conversation → _turn()", path: [eng_t, t_conv, conv_turn],
-         text: "One workflow per conversation; next_message returns the signal inside it."}
-      - {title: Turn is an activity, action: "_turn() → acts.chat_turn() → Temporal → chat_turn()", path: [turn_proxy, proxy_t, t_bind, bind_chat, chat_stage],
-         text: "The model call runs as an activity with no retries: a failure becomes a reply, not a failed conversation."}
+      - title: Message arrives
+        action: "Engineer → console → Temporal signal → Conversation → _turn()"
+        path: [eng_t, t_conv, conv_turn]
+        text: "One workflow per conversation; next_message returns the signal inside it."
+        detail: |
+          **What happens:** an engineer types a message in the console's Author tab. The console sends it to the conversation's workflow as a Temporal *signal*, and `_turn()` picks it up.
+
+          **Why it matters:** each conversation is one long-running workflow, so it survives restarts and keeps its history and budget across messages.
+
+          **How:** a conversation ends after 30 minutes without a message, after 40 turns, when its budget is spent or when the kill switch is engaged. The console signs the person in and checks the conversation is theirs.
+      - title: Turn is an activity
+        action: "_turn() → acts.chat_turn() → Temporal → chat_turn()"
+        path: [turn_proxy, proxy_t, t_bind, bind_chat, chat_stage]
+        text: "The model call runs as an activity with no retries: a failure becomes a reply, not a failed conversation."
+        detail: |
+          **What happens:** `_turn()` calls `acts.chat_turn()`, which runs the `chat_turn()` stage as a Temporal activity on a stack-author worker.
+
+          **Why it matters:** the model call happens outside the workflow, so the conversation itself stays durable and repeatable.
+
+          **How:** the activity has a 15-minute limit and a single attempt. If the model fails, the person gets an error reply and can ask again; the conversation itself doesn't fail.
       - title: Set the budget
         action: "chat_turn() → usage_limits(remaining_usd, REQUEST_LIMIT 14)"
         path: [stage_usage, ~stage_usage]
         text: "What the conversation has left becomes token and request limits for this turn."
         detail: |
-          `remaining_usd` is the task's cost limit minus what earlier turns spent.
-          `usage_limits` prices tokens at the model's dearer rate and adds `REQUEST_LIMIT = 14` requests per turn.
-          No budget left raises `CostCeilingReached` before the model is called at all.
-      - {title: Budget spent, action: "chat_turn(): CostCeilingReached → fixed reply, call recorded", when: budget, path: [stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy],
-         text: "The person is told to start a new conversation; the model is never called.",
-         result: done, outcome: "Budget spent, no model call"}
+          **What happens:** `usage_limits()` turns the money the conversation has left (`remaining_usd`) into limits for this turn: a token cap and at most 14 requests (`REQUEST_LIMIT`).
+
+          **Why it matters:** a chat can't run up an unbounded bill. Each turn can only spend what is left of the conversation's limit.
+
+          **How:** tokens are priced at the model's more expensive rate, so the limit is never underestimated. With nothing left, `CostCeilingReached` is raised before the model is called.
+      - title: Budget spent
+        action: "chat_turn(): CostCeilingReached → fixed reply, call recorded"
+        when: budget
+        path: [stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
+        text: "The person is told to start a new conversation; the model is never called."
+        detail: |
+          **What happens:** `chat_turn()` catches `CostCeilingReached`, replies with a fixed message and records the turn.
+
+          **Why it matters:** the limit is enforced in code, not by asking the model to stop, and the person is told plainly what happened.
+
+          **How:** the reply asks them to start a new conversation. No model request is sent, so nothing more is spent.
+        result: done
+        outcome: "Budget spent, no model call"
       - title: Guarded read tools
         when: ok
         action: "_toolset() → read_tools() → GuardedToolset()"
         path: [stage_toolset, ts_read_tools, ~ts_read_tools, ts_guarded, ~ts_guarded, ~stage_toolset]
         text: "Only the manifest's read tools are offered, each call to go through point 2."
         detail: |
-          `read_tools(manifest, TOOL_PARAMETERS)` lists the read tools and their parameter names; act tools are never included.
-          `GuardedToolset.get_tools` hides anything not in that list, so the model can't even see an undeclared tool.
-          Stated limit: `_toolset` passes no manifest or audit log, so tool bounds aren't checked and a refusal writes no audit event.
-      - {title: Model asks for a tool, action: "chat_turn() → agent.run() → LiteLLM (443): read_stack", when: ok, path: [stage_pyd, pyd_lite, ~pyd_lite],
-         text: "stack-author's model goes straight to LiteLLM: model_from_env got no agent=, so there is no breaker."}
+          **What happens:** `_toolset()` builds the tools the model may use: `read_tools()` picks the manifest's read-only tools and `GuardedToolset()` wraps them.
+
+          **Why it matters:** the model can look things up (stacks, modules) but has no tool that writes. A write happens only after the person presses a button.
+
+          **How:** `GuardedToolset.get_tools` hides every tool not on the list, so the model can't even see an undeclared one. Known limit: stack-author builds the toolset without the manifest or the audit log, so tool bounds aren't checked and a refusal isn't written to the audit log.
+      - title: Model asks for a tool
+        action: "chat_turn() → agent.run() → LiteLLM (443): read_stack"
+        when: ok
+        path: [stage_pyd, pyd_lite, ~pyd_lite]
+        text: "stack-author's model goes straight to LiteLLM: model_from_env got no agent=, so there is no breaker."
+        detail: |
+          **What happens:** `chat_turn()` runs the model with `agent.run()`. The model reads the message and asks to call `read_stack` to see the stack as it is.
+
+          **Why it matters:** the model works from the real files in the repository, not from memory, so its proposal starts from what is in the code today.
+
+          **How:** the request goes to LiteLLM, the platform's model gateway. Known gap: stack-author builds its model without `agent=`, so unlike terraform-drift it has no circuit breaker.
       - title: Point 2
         when: ok
         action: "GuardedToolset.call_tool() → check_tool_call(caller=llm)"
         path: [pyd_guarded, guarded_tc, tc1, tc2, tc3, tc4, tc_done]
         text: "Declared, a read tool, declared arguments, inside the bounds: the first failure refuses the call."
         detail: |
-          A refusal never runs the function: the model gets a `ModelRetry` with the reason as JSON and may try something else.
-          Every call opens an `execute_tool` span with redacted arguments and the guardrail's result.
-          `guardrail_decision(agent, "tool", allowed, code)` counts every decision.
-      - {title: Read the stack, action: "read_stack() ↔ GitHub: resources.yaml and common_vars.yaml", when: ok, path: [~guarded_tc, guarded_read, read_gh, ~read_gh, ~guarded_read, ~pyd_guarded],
-         text: "Paths outside environments/<cloud>/ are refused; the result, capped at 20,000 characters, is data, not instructions."}
+          **What happens:** `GuardedToolset.call_tool()` runs guardrail *point 2*, `check_tool_call(caller="llm")`, before the tool runs.
+
+          **Why it matters:** the model's request is checked, never trusted. The tool must be declared, read-only, called with declared arguments and inside its bounds.
+
+          **How:** the first failed check refuses the call and the function never runs; the model gets the reason (`ModelRetry`) and may try something else. Every call opens a trace span with masked arguments and is counted (`guardrail_decision`).
+      - title: Read the stack
+        action: "read_stack() ↔ GitHub: resources.yaml and common_vars.yaml"
+        when: ok
+        path: [~guarded_tc, guarded_read, read_gh, ~read_gh, ~guarded_read, ~pyd_guarded]
+        text: "Paths outside environments/<cloud>/ are refused; the result, capped at 20,000 characters, is data, not instructions."
+        detail: |
+          **What happens:** `read_stack()` reads the stack's `resources.yaml` and `common_vars.yaml` from GitHub.
+
+          **Why it matters:** the tool only reads inside `environments/<cloud>/`, the infrastructure folders. What it returns is treated as data, not instructions, so text inside a file can't take over the model.
+
+          **How:** a path outside that folder is refused. The result is capped at 20,000 characters, which keeps the prompt, and the cost, bounded.
       - title: Proposal prepared in code
         when: ok
         action: "LiteLLM → output validator _prepared(): prepare the diff"
         path: [pyd_lite, ~pyd_lite, pyd_prepared, ~pyd_prepared]
         text: "A proposed change is prepared against the real stack and module inputs; errors send it back to the model."
         detail: |
-          `_prepared` runs `prepare(Proposal(...), catalog, reader)` in code.
-          Errors raise `ModelRetry` with the list, so the model repairs the proposal, up to 2 retries.
-          Only a prepared change, with its diff and `patchSha256`, reaches the person; they press the button, and `_confirm` checks the same hash.
-      - {title: Reply, action: "chat_turn() → model_call() → activity → workflow → console", when: ok, path: [~stage_pyd, stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy],
-         text: "The call is recorded with its cost; the reply and the diff appear in the Author tab.",
-         result: success, outcome: "Reply with a prepared diff"}
+          **What happens:** the model answers with a proposed change, and the output validator `_prepared()` runs `prepare()` in code to build the real diff.
+
+          **Why it matters:** the model suggests; code checks. The change is applied to the real stack and checked against the module's real inputs, so a wrong field or a bad value is caught before a person sees it.
+
+          **How:** errors go back to the model as `ModelRetry` and it repairs the proposal, up to 2 retries. Only a prepared change, with its diff and hash (`patchSha256`), reaches the person.
+      - title: Reply
+        action: "chat_turn() → model_call() → activity → workflow → console"
+        when: ok
+        path: [~stage_pyd, stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
+        text: "The call is recorded with its cost; the reply and the diff appear in the Author tab."
+        detail: |
+          **What happens:** `chat_turn()` records the call with `model_call()`, and the reply and the diff go back through the activity and the workflow to the console.
+
+          **Why it matters:** the person reviews an exact diff, not a description, and every turn's cost counts against the conversation's budget.
+
+          **How:** if the person presses the button, `_confirm` checks that the hash still matches the diff they saw. Then the kill switch, guardrail point 4 and the draft PR follow, as in the drift use cases.
+        result: success
+        outcome: "Reply with a prepared diff"

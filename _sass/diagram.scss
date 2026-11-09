@@ -1342,6 +1342,35 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   left: calc((100% - min(360px, 92%)) / 2);
 }
 
+// With Details on, the script moves the card under the canvas: the figure's full width, the whole description
+// without a scroll box, and nothing on the canvas covered. `.dgm` in front outranks the phone rules further down.
+.dgm .dgm-banner.is-below {
+  position: static;
+  width: auto;
+  margin-top: 0.5rem;
+  box-shadow: none;
+  font-size: 0.9rem;
+  transform: none;
+  transition: border-color 0.25s ease;
+
+  &:not(.is-on) {
+    display: none;
+  }
+
+  .dgm-banner-head {
+    font-size: 0.8rem;
+  }
+
+  .dgm-banner-text {
+    max-height: none;
+    overflow: visible;
+
+    p {
+      margin-bottom: 0.45rem;
+    }
+  }
+}
+
 // Response packets (path hops marked ~) are green and travel backwards.
 .dgm-pointer.is-back {
   .dgm-halo {
@@ -1503,8 +1532,15 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 
   .dgm-legend,
   .dgm-caption,
-  .dgm-controls {
+  .dgm-controls,
+  .dgm-banner.is-below {
     flex: none;
+  }
+
+  // Full screen keeps most of the height for the canvas: a long description scrolls inside the card.
+  .dgm-banner.is-below .dgm-banner-text {
+    max-height: 24vh;
+    overflow-y: auto;
   }
 }
 

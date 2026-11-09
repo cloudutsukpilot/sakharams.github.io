@@ -358,13 +358,15 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
             if (!wasOn) await box.click();
             await dots[withDetail].click();
             await page.waitForTimeout(2500);
-            const card = await page.$eval(`${sel} .dgm-banner`, (b) => ({ on: b.classList.contains('is-detailed'), len: b.querySelector('.dgm-banner-text').textContent.length }));
+            const card = await page.$eval(`${sel} .dgm-banner`, (b) => ({ on: b.classList.contains('is-detailed'), len: b.querySelector('.dgm-banner-text').textContent.length,
+              below: !b.closest('.dgm-stage') && b.classList.contains('is-below'), full: b.getBoundingClientRect().width >= b.closest('.dgm').getBoundingClientRect().width - 40 }));
             check(card.on && card.len > 60, `Details shows the step's longer description (${card.len} chars)`);
+            check(card.below && card.full, 'with Details on, the card sits under the canvas at the figure\'s full width');
             await fig.screenshot({ path: path.join(args.out, 'step-details.png') });
             await box.click();
             await page.waitForTimeout(300);
-            const off = await page.$eval(`${sel} .dgm-banner`, (b) => b.classList.contains('is-detailed'));
-            check(!off, 'unticking Details goes back to the short text');
+            const off = await page.$eval(`${sel} .dgm-banner`, (b) => ({ long: b.classList.contains('is-detailed'), inside: !!b.closest('.dgm-stage') }));
+            check(!off.long && off.inside, 'unticking Details goes back to the short text, on the canvas');
             if (wasOn) await box.click();
           } else note('Details box shown, but no use case has a step with `detail` in its first mode');
         } else note('no step has `detail`, so there is no Details box');
@@ -385,7 +387,8 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await page.waitForTimeout(800);
         await page.click(`${sel} [data-act="play"]`);
         const moved = await page
-          .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 15000, polling: 100 })
+          // a first step with no packet stays up to 25 s while Details is on (reading time), so wait past that
+          .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 40000, polling: 100 })
           .then(() => true, () => false);
         check(moved, 'tour plays (a pointer travels an arrow)');
         await page.waitForTimeout(600);
@@ -399,7 +402,9 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       await page.waitForTimeout(900);
       const vh = page.viewportSize().height;
       const sh = await page.$eval(`${sel} .dgm-stage`, (x) => x.getBoundingClientRect().height);
-      check(sh > vh * 0.6, `fullscreen gives the canvas the window's height (${Math.round(sh)} of ${vh}px)`);
+      // With Details on, the step card sits under the canvas and takes its share of the height.
+      const ch = await page.$eval(`${sel}`, (f) => f.querySelector(':scope > .dgm-banner.is-below.is-on')?.getBoundingClientRect().height || 0);
+      check(sh + ch > vh * 0.6, `fullscreen gives the canvas the window's height (${Math.round(sh)}${ch ? ` + card ${Math.round(ch)}` : ''} of ${vh}px)`);
       await fig.screenshot({ path: path.join(args.out, 'fullscreen.png') });
       await page.keyboard.press('Escape');
       await page.waitForTimeout(600);

@@ -255,6 +255,14 @@ new layout instead. Rules:
   happens when it refuses, what the next step depends on. Facts from the post or the repo only; don't
   repeat `text` or the arrow's `why`. With Details on, auto-play stays long enough to read it (about
   250 words a minute, at most 25 s). Give every use case at least one; the validator warns otherwise.
+- **`detail` for a semi-technical reader** (leadership, product, a new team member), when the post
+  is for them: give every step one, as three short paragraphs with bold leads, each one or two plain
+  sentences: `**What happens:**` (the function or check in `code`, and what it does in everyday
+  words), `**Why it matters:**` (the risk it removes or the guarantee it gives: cost, safety, audit, a
+  person in the loop) and `**How:**` (the mechanism and its numbers, or a short `- ` list). Explain
+  each term the first time it appears, state known gaps plainly, and set `details: true`.
+- With Details off the step card floats at the bottom of the canvas; with Details on it sits under the
+  canvas at the figure's full width, with the whole description and nothing on the canvas covered.
 - The caption under the canvas shows the use case's title and summary; the step itself is on the card.
 
 ```yaml
@@ -312,8 +320,8 @@ hover, the detail panel (status badge, chips, lead sentence, how it works, link 
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `step-details.png` (the card with Details ticked: readable, solid background, not
-covering the packet) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `step-details.png` (the card with Details ticked: under the canvas at full width,
+the whole description readable) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
