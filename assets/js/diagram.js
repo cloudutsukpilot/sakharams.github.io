@@ -23,6 +23,9 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SPEEDS = [0.5, 1, 2];
   const DWELL_MS = 1600;
+  // Reading time for a step's `detail` while Details is on: about 250 words a minute, at most 25 s.
+  const READ_MS_PER_WORD = 240;
+  const READ_MAX_MS = 25000;
   const ALL_VIEWS = '*'; // the Show all tab's id
   const MOVE_MS = reduceMotion ? 0 : 450;
   const DISC = 46; // icon disc diameter of a component, in diagram units
@@ -1641,6 +1644,21 @@
       const modeLabel = ctl.querySelector('.dgm-toggle-mode');
       const modeBox = modeLabel && modeLabel.querySelector('input');
       const lockBtn = ctl.querySelector('[data-act="lock"]');
+      // Details: the step card shows each step's `detail` (3 to 10 lines) instead of its short `text`.
+      // `details: true` starts with it on; the reader's choice is remembered in this browser.
+      const detailLabel = ctl.querySelector('.dgm-toggle-details');
+      const detailBox = detailLabel && detailLabel.querySelector('input');
+      const hasDetail = list.some((x) => x.steps.some((y) => y.detail));
+      const detailKey = `dgm-details:${this.root.id}`;
+      let stored = null;
+      try {
+        stored = localStorage.getItem(detailKey);
+      } catch (e) { /* storage blocked: fall back to the diagram's default */ }
+      this.details = hasDetail && (stored === null ? this.data.details === true : stored === '1');
+      if (detailLabel) {
+        detailLabel.hidden = !hasDetail;
+        detailBox.checked = this.details;
+      }
       const setLockIcon = () => {
         if (!lockBtn) return;
         lockBtn.innerHTML = `<i class="fas fa-${this.locked ? 'lock' : 'lock-open'}" aria-hidden="true"></i>`;
@@ -1688,18 +1706,32 @@
           capEl.querySelector('.dgm-step-title').textContent = this.scn.title || 'Guided tour';
           capEl.querySelector('.dgm-step-text').textContent = `${this.scn.summary ? this.scn.summary + ' ' : ''}Press play, or step through with the arrows.`;
         } else {
-          const x = this.steps[i];
           capEl.querySelector('.dgm-counter').textContent = `${i + 1}/${this.steps.length}`;
-          capEl.querySelector('.dgm-step-title').textContent = x.title;
-          capEl.querySelector('.dgm-step-text').textContent = x.text;
+          capEl.querySelector('.dgm-step-title').textContent = this.scn.title || 'Guided tour';
+          capEl.querySelector('.dgm-step-text').textContent = this.scn.summary || '';
+          this.setCard(i);
         }
         [...dots.children].forEach((d, j) => {
           d.classList.toggle('is-done', j < i);
           d.classList.toggle('is-current', j === i);
         });
       };
-      // Banner at the bottom of the diagram: what the current step is doing, then its outcome.
+      // Step card at the bottom of the canvas: the step's number and title, the banner line (what the
+      // step is doing, then its outcome) and its description: `text`, or `detail` while Details is on.
       const banner = this.root.querySelector('.dgm-banner');
+      if (banner) banner.innerHTML = '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-title"></span></div><div class="dgm-banner-line"></div><div class="dgm-banner-text"></div>';
+      const part = (c) => banner && banner.querySelector(`.dgm-banner-${c}`);
+      this.setCard = (i) => {
+        const x = this.steps[i];
+        if (!banner || !x) return;
+        const long = this.details && x.detail;
+        part('n').textContent = `${i + 1}/${this.steps.length}`;
+        part('title').textContent = x.title || '';
+        // A blank line in `detail` starts a new paragraph; `- ` lines are a list.
+        part('text').innerHTML = String(long ? x.detail : x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
+        part('text').scrollTop = 0;
+        banner.classList.toggle('is-detailed', !!long);
+      };
       this.setBanner = (text, state = 'run') => {
         if (!banner) return;
         if (!text) {
@@ -1707,8 +1739,18 @@
           return;
         }
         const icon = { success: '✓ ', fail: '✗ ', done: '● ' }[state] || '';
-        banner.textContent = icon + text;
-        banner.className = `dgm-banner is-on is-${state}`;
+        part('line').textContent = icon + text;
+        banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done');
+        banner.classList.add('is-on', `is-${state}`);
+      };
+      // How long auto-play stays on a step after its packets arrive: the usual pause, or, with Details
+      // on, long enough to read the detail (time already spent on the step counts).
+      this.dwell = (x) => {
+        const base = DWELL_MS / this.speed;
+        if (!this.details || !x || !x.detail) return base;
+        const words = String(x.detail).split(/\s+/).filter(Boolean).length;
+        const read = Math.min(READ_MAX_MS, words * READ_MS_PER_WORD) / this.speed;
+        return Math.max(base, read - (performance.now() - (this.stepT0 || 0)));
       };
       this.computeLit = (k) => {
         if (k < 0) return (this.lit = empty());
@@ -1790,10 +1832,13 @@
         const b = this.box(reps);
         if (!b) return;
         const W = this.stage.clientWidth;
-        const H = this.stage.clientHeight;
-        const pad = 70;
+        // The step card covers the bottom of the canvas: frame the components in the space above it.
+        const card = this.root.querySelector('.dgm-banner.is-on');
+        const cover = card ? Math.min(card.offsetHeight + 16, this.stage.clientHeight * 0.45) : 30;
+        const H = this.stage.clientHeight - cover;
+        const pad = 60;
         const k = Math.min(1.3, (W - 2 * pad) / Math.max(1, b.x1 - b.x0), (H - 2 * pad) / Math.max(1, b.y1 - b.y0));
-        this.animateCam({ k, x: (W - k * (b.x1 + b.x0)) / 2, y: (H - k * (b.y1 + b.y0) - 30) / 2 });
+        this.animateCam({ k, x: (W - k * (b.x1 + b.x0)) / 2, y: (H - k * (b.y1 + b.y0)) / 2 });
       };
       // Packets travel one group at a time; within a group, along every arrow at once. Requests are
       // the accent2 pointer; responses (~) a green packet running backwards. 'stopped' if cancelled.
@@ -1954,6 +1999,7 @@
         i = Math.min(i, this.steps.length - 1);
         const x = this.steps[i];
         this.stepRunning = i;
+        this.stepT0 = performance.now();
         const ids = await this.ensureVisible(i);
         if (token !== this.run) return 'stopped';
         this.pointerLayer.textContent = '';
@@ -2005,7 +2051,7 @@
           const r = await this.showStep(this.k + 1, true);
           if (r === 'stopped' || !this.playing) break;
           const token = this.run;
-          await sleep(DWELL_MS / this.speed);
+          await sleep(this.dwell(this.steps[this.k]));
           if (token !== this.run || !this.playing) break;
           if (this.k >= this.steps.length - 1) {
             // End of this use case: auto-play moves on to the next one. After the last one the diagram
@@ -2076,7 +2122,7 @@
       }
       ctl.addEventListener('click', (ev) => {
         const b = ev.target.closest('[data-act]');
-        if (!b || b.dataset.act === 'mode') return;
+        if (!b || b.dataset.act === 'mode' || b.dataset.act === 'details') return;
         const a = b.dataset.act;
         if (a === 'play') {
           if (this.playing) this.stop();
@@ -2114,6 +2160,14 @@
           this.play();
         } else if (this.k >= 0) await this.showStep(this.k, true);
       };
+      // Details on or off: the card switches at once; auto-play reads the new setting at the next pause.
+      detailBox?.addEventListener('change', () => {
+        this.details = detailBox.checked;
+        try {
+          localStorage.setItem(detailKey, this.details ? '1' : '0');
+        } catch (e) { /* storage blocked: the choice lasts for this page only */ }
+        if (banner && banner.classList.contains('is-on') && this.stepRunning != null) this.setCard(this.stepRunning);
+      });
       modeBox?.addEventListener('change', () => {
         this.stop();
         this.mode = modeBox.checked && this.modes[1] ? this.modes[1].id : this.modes[0].id;

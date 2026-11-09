@@ -69,7 +69,7 @@ def validate(data, path):
     for key in ("accent", "accent2"):
         if key in data and not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(data[key])):
             E(f"`{key}` must be #RRGGBB")
-    for key in ("loop", "lock"):
+    for key in ("loop", "lock", "details"):
         if key in data and not isinstance(data[key], bool):
             E(f"`{key}` must be true or false")
     has_story = bool(data.get("scenarios") or (data.get("tour") or {}).get("steps"))
@@ -77,6 +77,8 @@ def validate(data, path):
         W("`lock` is missing: every diagram with use cases states it (`lock: false` by default)")
     if data.get("lock") and not has_story:
         W("`lock` only affects use cases; this diagram has none")
+    if data.get("details") and not (data.get("scenarios") or data.get("tour")):
+        W("`details` only affects use cases; this diagram has none")
 
     nodes, parent, depth = {}, {}, {}
 
@@ -371,7 +373,20 @@ def validate(data, path):
             if len(known) > 1 and not set.intersection(*[{e["from"]} for e in known]) and not set.intersection(*[{e["to"]} for e in known]):
                 E(f"{tag}: its arrows ({', '.join(eids)}) neither start nor end at the same component, so it combines separate actions; split it into one step per action")
             if len(str(st.get("text", ""))) > 230:
-                W(f"{tag}: caption over ~230 chars")
+                W(f"{tag}: text is {len(str(st['text']))} chars; keep it to 1 or 2 sentences under ~230 (longer explanations go in `detail`)")
+            # The longer description shown while Details is on: 3 to 10 lines.
+            if "detail" in st:
+                if not isinstance(st["detail"], str) or not st["detail"].strip():
+                    E(f"{tag}: `detail` must be text (Markdown: sentences, or `- ` lines for a list)")
+                else:
+                    lines = [x for x in st["detail"].strip().splitlines() if x.strip()]
+                    words = len(st["detail"].split())
+                    if len(lines) > 10 or words > 160:
+                        W(f"{tag}: detail is {len(lines)} lines and {words} words; keep it to 3 to 10 short lines (under ~160 words)")
+                    elif words < 20:
+                        W(f"{tag}: detail is only {words} words; it should say more than `text`, or leave it out")
+                    if " ".join(st["detail"].split()) == " ".join(str(st.get("text", "")).split()):
+                        W(f"{tag}: detail repeats text; add what the step does and why, or leave it out")
             # The banner line: what this step does, short.
             if not st.get("action"):
                 E(f"{tag}: needs `action`, the short banner line saying what the step does (\"Keycloak ↔ core-db: read your account\")")
@@ -393,6 +408,8 @@ def validate(data, path):
                 if prev and start != prev:
                     E(f"{tag}: path hop `{ref}` starts at `{start}` but the previous hop ended at `{prev}`; a path must be one continuous route")
                 prev = end
+        if steps and not any(st.get("detail") for st in steps):
+            W(f"{name}: no step has `detail`; give the steps that need explaining 3 to 10 lines (shown with the Details box)")
         # Every request that gets a reply should show the reply travelling back (~id), and a use case
         # should end with its outcome (`result`).
         for mode in mode_ids:
