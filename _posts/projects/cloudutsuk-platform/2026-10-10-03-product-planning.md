@@ -237,6 +237,8 @@ already runs and need no CI, so it depends on Phase 0 only.
 ### Phase 6 steps
 {: #phase-6-steps }
 
+Platform Wardens has its own playbook and roadmap: the [wardens phases and their steps](/posts/projects/platform-wardens/03-product-planning/#phase-steps) say which framework or agent phase each row below serves. This table keeps the homelab work as it was recorded (step numbers are never moved); new agent work that needs nothing from the homelab is added there, not here.
+
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
 | 1 | Alertmanager webhook into the SRE agents | `platform-wardens`, `homelab-gitops`, `infra-local` | A firing alert reaches the agent | In progress (2026-11-05: built with step 32; a test alert reaches a minimal `incident-triage`) |

@@ -7,6 +7,9 @@ tags: [Projects, Platform Wardens, Architecture, ADR]
 description: "Every architecture decision behind Platform Wardens, with its context, the options considered and the consequences."
 project: platform-wardens
 project_adrs: true
+image:
+  path: /assets/img/projects/platform-wardens/architecture-decision-records.webp
+  alt: "Platform Wardens: Architecture Decision Records - Projects hero image"
 ---
 
 Every significant decision in Platform Wardens is written down as an architecture decision record (ADR): what
