@@ -2,7 +2,7 @@
 # Edit the source in platform-wardens and port again, so the two stay the same.
 # platform-wardens as built on the homelab (checked 2026-11-09 against platform-wardens main and homelab-gitops
 # clusters/wardens, apps/wardens-console, charts/wardens-agent, apps/litellm, apps/mcp-web-search and
-# infra-local host/cloudflared/routes.yaml). The six use cases follow docs/how-docs/: scheduled drift with a
+# infra-local host/cloudflared/routes.yaml). The six use cases follow docs/how-docs/: drift with a
 # handoff, an alert or GitHub event through the ingress bus, an LLM stage with guardrails and MCP, a console chat,
 # shipping a new agent, and an L2 approval (planned: no hosted approval endpoint and no agent above L1).
 # Certificates: Let's Encrypt through cert-manager (cluster issuer `letsencrypt`, DNS-01 via Cloudflare) on every
@@ -336,7 +336,7 @@ nodes:
                 status: built
                 facts:
                   summary: "Explains drift between Azure and resources.yaml, and opens draft PRs that codify an intended change."
-                  how: "Daily schedule `daily-infra-azure` at 08:00 UTC under the incident workflow, or started by the GitHub webhook."
+                  how: "Started by the GitHub webhook when a drift scan finds resource drift (job `Drift Detection - Agent Trigger`), under the incident workflow. No schedule (decision 0032)."
                   where: "ns terraform-drift"
                   api: "Temporal queue `terraform-drift`"
                 children:
@@ -761,11 +761,11 @@ edges:
 
 scenarios:
   - id: drift-handoff
-    title: Scheduled drift with a handoff
-    summary: "The daily drift run under the incident workflow: analyse, guardrail, draft PR, hand off to change-correlator, one message (how-docs: durable execution, registry, state, run records)."
+    title: Drift with a handoff
+    summary: "A drift scan that found drift, under the incident workflow: analyse, guardrail, draft PR, hand off to change-correlator, one message (how-docs: durable execution, registry, state, run records)."
     steps:
-      - {title: Schedule fires, action: "Temporal: schedule terraform-drift-daily-infra-azure fires at 08:00 UTC", lights: [temporal],
-         text: "wardens.schedule makes a fresh root task (channel schedule: L1, 0.50 USD, 120 min) and starts wardens.incident."}
+      - {title: Drift found, action: "GitHub webhook → bus → ingress consumer → Temporal: wardens.incident starts", lights: [temporal],
+         text: "The scan's Agent Trigger job ran (resource drift only); the consumer builds the root task (channel github-webhook, with the run id) as in the bus use case. No schedule since decision 0032."}
       - {title: Run the drift workflow, action: "Temporal → workflow.py: the incident starts terraform-drift.task as a child", path: [~td_wf_t],
          text: "The incident resolves terraform.drift.explain in the registry and starts the child on queue terraform-drift (gRPC 7233)."}
       - {title: Schedule the reads, action: "workflow.py → Temporal → activities.py: select the scan run, list stacks", path: [td_wf_t, ~td_acts_t],
@@ -808,7 +808,7 @@ scenarios:
       - {title: Triage records it, action: "Temporal → incident-triage → Slack: Alert reached triage", when: alert, path: [~it_t, it_slack],
          text: "A finding and a message in #platform-warden.", result: success, outcome: "Alert reached triage"}
       - {title: Drift incident starts, action: "Temporal → terraform-drift: the drift incident's child workflow", when: github, path: [~td_wf_t],
-         text: "Started after startDelaySeconds, so the scan has finished; then it runs as in the scheduled use case.",
+         text: "Started after startDelaySeconds, so the scan has finished; then it runs as in the drift use case.",
          result: success, outcome: "Drift incident started"}
 
   - id: llm-guardrails

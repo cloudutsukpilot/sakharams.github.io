@@ -2,7 +2,7 @@
 # and the how-doc references dropped. Edit the source in platform-wardens and port again, so the two stay the same.
 # Call map: which Python function in an agent calls which function in the wardens framework, and which checks,
 # guardrails and LLM practices run on the way. Traced on platform-wardens main (2026-11-09) for two agents:
-# terraform-drift (scheduled, deterministic stages plus two LLM stages) and stack-author (a chat with tools).
+# terraform-drift (started on drift by the GitHub webhook, deterministic stages plus two LLM stages) and stack-author (a chat with tools).
 # Every component's API line is the file and line of the function; paths under agents/ are short for
 # agents/devops/<agent>/src/<package>/, paths under wardens/ for framework/src/wardens/.
 # Gaps the code shows today are drawn as stated limits, not as working paths:
@@ -77,7 +77,7 @@ nodes:
     children:
       - id: drift
         label: terraform-drift
-        sub: "scheduled · L1"
+        sub: "on drift · L1"
         icon: bolt
         status: built
         facts:
@@ -1179,7 +1179,7 @@ scenarios:
 
           **Why it matters:** the manifest is the single source of truth. A schedule change is a reviewed change to one file, applied at the next worker start; nobody edits schedules by hand in Temporal.
 
-          **How:** each entry becomes a Temporal schedule named `<agent>-<id>`, created if new and updated if it exists. terraform-drift has one: every day at 08:00 UTC for infra-azure. If a run is still going, the next fire is skipped; after an outage, a missed day still runs within a day.
+          **How:** each entry becomes a Temporal schedule named `<agent>-<id>`, created if new and updated if it exists. No agent has one today: terraform-drift's daily schedule was removed by decision 0032, and the agent starts only from the GitHub webhook on drift. With `overlap: skip` a fire is dropped while a run is still going; the catch-up window runs a fire missed during an outage.
       - title: Poll the queue
         action: "create_worker() ↔ Temporal: poll terraform-drift (gRPC 7233)"
         path: [rw_cw, cw_t, ~cw_t, ~rw_cw]
@@ -1206,7 +1206,7 @@ scenarios:
         detail: |
           **What happens:** when the drift-scan job in GitHub Actions finishes, GitHub sends a `workflow_job` webhook to the wardens GitHub receiver (`github_webhook.py`).
 
-          **Why it matters:** the agent can start as soon as there is something to analyse, instead of waiting for its daily schedule. But the request comes from the internet, so it is treated as untrusted.
+          **Why it matters:** the agent starts only when a scan found resource drift, and this is its only automatic start (no schedule since decision 0032; a lost delivery is sent again by the daily redelivery job). But the request comes from the internet, so it is treated as untrusted.
 
           **How:** `signature_valid()` checks the `X-Hub-Signature-256` signature against the shared secret before the body is read; a bad signature gets 401. Only five fields are read (repository, run id, job name, result, branch), and a `DriftRule` in `webhooks.yaml` must match them. Nothing from the payload reaches the model.
       - title: Build the root task
@@ -1250,14 +1250,14 @@ scenarios:
         result: success
         outcome: "Checked task started"
       - title: Schedule fires
-        action: "Temporal: terraform-drift's daily schedule fires"
+        action: "Temporal: an agent's schedule fires"
         when: schedule
         lights: [temporal]
         text: "The schedule workflow asks for the root task as an activity, because building it reads config files."
         detail: |
-          **What happens:** Temporal's daily schedule for terraform-drift fires at 08:00 UTC. The schedule workflow first asks for the task to be built.
+          **What happens:** a manifest schedule fires (terraform-drift had one at 08:00 UTC until decision 0032; no agent has one today). The schedule workflow first asks for the task to be built.
 
-          **Why it matters:** the schedule is the safety net: drift is analysed every day even when no webhook arrived.
+          **Why it matters:** a schedule runs an agent at a fixed time whatever happened. For drift that meant a run every day, drift or not, which is why decision 0032 replaced it with the webhook and a daily redelivery.
 
           **How:** building a task reads config files, and Temporal workflow code may not do any I/O, because it must replay exactly the same way after a crash. So the schedule workflow runs `make_task` as an activity, which does the reading on a worker.
       - title: Task without point 1
