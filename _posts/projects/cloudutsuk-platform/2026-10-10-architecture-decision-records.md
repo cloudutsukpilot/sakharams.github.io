@@ -898,6 +898,9 @@ answer quality. RAG tuning needs those views and evals.
 - Split of duties: Grafana covers operations (AI dashboards, SLOs, every alert); Phoenix covers answer
   quality (LLM-aware traces, retrieval and hallucination evals, embeddings map).
 - Added in Phase 5. Licence: Elastic License 2.0, free to self-host for this use.
+- Amended (2026-11-06, [ADR 0093](#adr-0093)): internal-only at
+  `phoenix.ai.home.cloudutsuk.com` with Keycloak sign-in, fed with LLM spans by the OTLP gateway, and the
+  LiteLLM gateway and the wardens agents as the first sources; the RAG services follow when they're built.
 
 #### Considered options
 
@@ -917,6 +920,7 @@ answer quality. RAG tuning needs those views and evals.
 - [ADR 0011](#adr-0011)
 - [ADR 0022](#adr-0022)
 - [ADR 0035](#adr-0035)
+- [ADR 0093](#adr-0093)
 
 ## ADR-0022: The whole AI stack in its own ai cluster behind a LiteLLM gateway
 {: #adr-0022 }
@@ -6243,6 +6247,470 @@ once a year, and when a model changes.
 
 - ADR 0022 (LiteLLM gateway), ADR 0029 (one key per caller, budgets)
 - ADR 0081, 0056, 0054, 0066 (the models priced here)
+
+## ADR-0090: Deployments keep at most 3 old ReplicaSets, set by a Kyverno MutatingPolicy that Argo CD ignores in its diffs
+{: #adr-0090 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Every rollout leaves the previous ReplicaSet behind, scaled to 0, so `kubectl rollout undo` can return to
+it. A Deployment keeps `spec.revisionHistoryLimit` of them, 10 when unset. On 2026-11-06 the clusters held
+87 ReplicaSets at 0 replicas (wardens 28, gpu 21, platform 19, mon 9, ai 6, core 4). They run nothing and
+cost only API objects, but they clutter Headlamp's resource map and `kubectl get rs`.
+
+Our own manifests already set 3. The rest come from Helm charts: about 90 Deployments on platform, mon, ai,
+gpu and wardens keep 10. Many of those charts (Kyverno, kube-state-metrics, KEDA, Temporal, external-dns,
+the OTel operator, the model apps) write the 10 into the manifest themselves, so Argo CD owns the field.
+
+Rollback here is a `git revert` in homelab-gitops, which Argo CD applies; a `kubectl rollout undo` would be
+undone by self-heal within minutes. The old ReplicaSets are not part of how we roll back.
+
+#### Decision
+
+1. **A Kyverno `MutatingPolicy`, `limit-revision-history`**, in `apps/kyverno-policies` (so on every cluster
+   labelled `homelab/addons=true`: platform, mon, ai, gpu, wardens), lowers a Deployment's missing or higher
+   `revisionHistoryLimit` to 3 at admission. It never raises one, so k3s's add-ons keep 0. With
+   `mutateExisting`, such a request also lowers every other Deployment above the limit; the Deployment
+   controller then deletes the extra ReplicaSets. Kyverno's background controller gets get, list, watch,
+   update and patch on Deployments for that.
+2. **Argo CD ignores `.spec.revisionHistoryLimit` on every Deployment** in its diffs
+   (`resource.customizations.ignoreDifferences.apps_Deployment` in `argocd-cm`, infra-local's Argo CD values).
+   Without it, charts that write 10 would show OutOfSync, and self-heal would reapply 10 against Kyverno.
+3. **Kyverno's own Deployments**, which Kyverno doesn't mutate, get 3 from the `kyverno` ApplicationSet's
+   chart values. `kube-system` (Traefik, from k3s) stays out of scope.
+4. The limit is 3, matching what our own manifests already set.
+
+#### Considered options
+
+1. **Kyverno mutation plus an Argo CD ignore rule** (chosen): one place covers every chart, today's and
+   future ones, and the existing ReplicaSets go without a manual step.
+2. **Set the value in each chart's Helm values**: no new moving parts, but about 20 charts name the setting
+   differently (some not at all), and every new chart has to remember it.
+3. **A scheduled job that deletes ReplicaSets at 0 replicas**: works around the setting instead of using it,
+   and needs delete rights on ReplicaSets in every namespace.
+4. **Leave the default**: harmless, but the clutter is what prompted this.
+
+#### Consequences
+
+- Good: at most 3 old ReplicaSets per Deployment on the five clusters, with no per-chart work.
+- Good: `kubectl rollout undo` still has 3 revisions for a break-glass rollback.
+- Bad: Argo CD no longer shows a change to `revisionHistoryLimit` in git as OutOfSync; it still applies on
+  the app's next sync.
+- Bad: the policy changes objects that Helm charts render, so the live value differs from the chart's
+  manifest. The README and this ADR say why.
+- Bad: core (no Kyverno) keeps the chart defaults.
+
+#### Related
+
+- ADR 0033 (Kyverno admission policies), ADR 0038 (Argo CD)
+
+## ADR-0091: The wardens agents' first MCP server is web search on wardens, behind mcp-guard, reached only through LiteLLM's MCP gateway
+{: #adr-0091 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`, `platform-wardens`, `infra-local`</span>
+
+#### Context
+
+platform-wardens decision 0031 says how agents make MCP calls:
+- through a gateway, with an MCP-only credential;
+- with a deny-by-default allow list per agent and tool, generated from the manifests;
+- with the run's trace id on every call;
+- with no token forwarded to a server.
+
+On the homelab, the gateway is the existing LiteLLM (ADR 0022) with its `mcp_jwt_signer` guardrail. Nothing used it yet. To test tool calls, identity and tool blocking for real, the agents need a server.
+
+Web search needs no credentials and has only read tools, and more than one agent can use it. The reviewed third-party server, `mcp-searxng` 2.7.0, can't verify LiteLLM's tokens: its OAuth mode wants claims LiteLLM doesn't send, and it has no rules per agent. So platform-wardens built a small guard, `mcp-guard`, to run beside it.
+
+#### Decision
+
+**`apps/mcp-web-search` on `wardens`:** one pod, three containers, namespace `mcp-web-search`.
+- **`mcp-guard`** (platform-wardens image, Zot `platform/mcp-guard`, signed) is the only listener, on `:8080`. For each request it:
+  - verifies LiteLLM's RS256 token against `https://llm.ai.home.cloudutsuk.com/.well-known/jwks.json` (`iss`, `aud: mcp`, expiry);
+  - takes the agent from `act.sub`, the caller's LiteLLM team;
+  - checks the agent and tool against `allowlist.yaml` and the token's `scope`;
+  - requires `x-wardens-run` and `traceparent`, and filters `tools/list`;
+  - forwards with mcp-searxng's own token.
+
+  It writes one JSON log line per request and serves Prometheus metrics (a ServiceMonitor).
+- **`mcp-searxng` 2.7.0** (docker.io, digest-pinned, reviewed in platform-wardens `framework/config/mcp-servers.yaml`) listens on `127.0.0.1:3000`, hardened, with a static token generated in the cluster and known only to the guard.
+- **Its own SearXNG** on `127.0.0.1:8888`, with the same settings as `apps/searxng`. That way `wardens` doesn't depend on the `platform` cluster for search.
+- **Ingress** `https://mcp-web-search.wardens.home.cloudutsuk.com` (tailnet only). The only caller that can pass the guard is LiteLLM.
+- **NetworkPolicy:**
+  - in: Traefik and the monitoring collector, to the guard only;
+  - out: DNS, LiteLLM's address (172.30.0.4) on 443 for the JWKS, and the internet on 80/443 except the private, CGNAT, link-local and loopback ranges. A page read can't reach the homelab even if mcp-searxng's own URL check failed.
+- `allowlist.yaml` is a copy of platform-wardens `deploy/mcp/web-search.allowlist.yaml`, which is generated from the agents' manifests.
+
+**`apps/litellm`:**
+- `mcp_servers.web_search` points at that URL, with `extra_headers: [x-wardens-run, traceparent]`.
+- The `mcp_jwt_signer` guardrail runs on MCP calls only: issuer `https://llm.ai.home.cloudutsuk.com`, audience `mcp`, 60-second tokens.
+- `MCP_JWT_SIGNING_KEY` comes from `kv/ai/litellm` `mcp_jwt_signing_key` (infra-local `host/litellm/configure.sh`).
+
+**The agents** (stack-author, terraform-drift, incident-triage, change-correlator) get two settings:
+- `WARDENS_MCP_URL` (LiteLLM's `/mcp`);
+- `WARDENS_MCP_API_KEY`, their MCP-only key, from infra-local `host/wardens/mcp-keys.sh`. That script creates one team per agent and one key per agent, both granted only the agent's servers and tools, and with `no-default-models`.
+
+LiteLLM blocks a tool an agent isn't granted first, and the guard blocks it again on its own.
+
+#### Considered options
+
+1. **A second LiteLLM, or agentgateway, as the MCP gateway:** rejected in platform-wardens decision 0031. The existing LiteLLM signs each call with the agent's team, and a guard at the server checks it.
+2. **mcp-searxng alone, with its static token held by LiteLLM:** rejected. The server couldn't tell agents apart, and LiteLLM would be the only check.
+3. **Use `platform`'s SearXNG (`apps/searxng`):** possible, but it would make `wardens` depend on another cluster and need a cross-cluster path. A second small SearXNG costs one container.
+4. **No Ingress; reach the guard through a cluster-internal path from `ai`:** there's no cross-cluster service network. The tailnet Ingress plus the guard's token check is the same pattern the other wardens endpoints use.
+
+#### Consequences
+
+- **Good:** each tool call shows the agent and the run in three places, which share the run's trace id:
+  - LiteLLM's key spend log;
+  - the guard's log line and metrics;
+  - the agent's run record.
+
+  A tool an agent isn't granted is refused twice, and a server never sees an agent's key. The guard and the pattern can be reused for the next third-party server.
+- **Bad:**
+  - The guard depends on LiteLLM's JWKS. If LiteLLM is down, no call can be made anyway.
+  - All MCP servers behind LiteLLM share one audience (`mcp`). Short token lifetimes, unique tool names and the guard's `scope` check limit replay between servers.
+  - The allow list is copied by hand from platform-wardens when manifests change.
+  - Search engines may throttle the homelab's egress address on busy days.
+
+#### Related
+
+- ADR 0022 (LiteLLM), ADR 0055 (SearXNG), ADR 0069 to 0072 (wardens cluster, agents' charts and identities)
+- platform-wardens decision 0031 and `docs/plans/mcp-web-search.md` (phase 4)
+
+## ADR-0092: Policy Reporter shows Kyverno's reports, with a core on every cluster and one UI on platform
+{: #adr-0092 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Kyverno (ADR 0033) writes a PolicyReport for every checked resource on platform, mon, ai, gpu and wardens.
+Today the only ways to read them are `kubectl get policyreports` on each cluster, and the Kyverno dashboard's
+counts in Grafana. Nothing shows, in one place, which resource fails which policy on which cluster, which is
+what a policy change in Audit mode, or a new exception, needs.
+
+[Policy Reporter](https://kyverno.github.io/policy-reporter/) (Kyverno project, Apache-2.0) has two parts in
+one chart: a core per cluster that reads the reports and serves metrics and a REST API, and a UI that can read
+several cores. Kyverno itself is installed by Argo CD, not by infra-local's Terragrunt (ADR 0038 keeps
+infra-local to the bootstrap releases).
+
+#### Decision
+
+1. **An ApplicationSet, `policy-reporter`**, next to `kyverno`, installs the upstream chart (3.11.2, through
+   Zot's ghcr.io mirror) in namespace `policy-reporter` on every cluster labelled `homelab/addons=true`, in
+   the `security` project. Values: `apps/policy-reporter/values.yaml` for every cluster, and
+   `values-<cluster>.yaml` on top where it exists (a second, git source).
+2. **The core runs on every cluster** with the REST API and metrics on, both behind basic auth. Its API is
+   published at `https://policy-reporter-api.<cluster>.home.cloudutsuk.com` (Traefik, Let's Encrypt), on the
+   tailnet only. One credential for every cluster, in `kv/shared/policy-reporter`.
+3. **One UI, on platform**, at `https://policy-reporter.platform.home.cloudutsuk.com`. It reads platform's
+   core in the cluster and the other clusters through their API hostnames, each listed in `ui.clusters`.
+4. **Sign-in through Keycloak**, with a confidential client `policy-reporter` and a gate for
+   `platform-admins/editors/viewers` and `policy-reporter-admin/editor/viewer` (ADR 0078). The UI is
+   read-only: the button that generates PolicyExceptions stays off, since exceptions are written in git
+   (`apps/kyverno-policies/templates/exceptions.yaml`).
+5. **Metrics without resource names** (custom labels: namespace, policy, rule, result, severity, source),
+   scraped every 60 s. The chart's Grafana dashboards are off; dashboards come from `dashboards/` (ADR 0027).
+6. Out of scope for now: the Kyverno plugin (policy details pages), notification targets (Slack, Loki) and a
+   public name behind Cloudflare Access.
+
+#### Considered options
+
+1. **A Terragrunt `helm_release` per cluster in infra-local**: rejected. Kyverno, its policies and every other
+   add-on are Argo CD's, and a reporter in a different tool from what it reports on would split one
+   component's upgrades and drift across two places.
+2. **A UI on every cluster**: five sign-in clients and five pages to visit; no API exposed between clusters.
+   Rejected for the single page.
+3. **Metrics only (no UI)**: the counts are already in Grafana; what's missing is the list of failing
+   resources, which needs the UI.
+4. **The UI reaching the cores through the Kubernetes API proxy** instead of Ingresses: would need a
+   kubeconfig for every cluster in platform; an Ingress with basic auth is what the chart supports.
+
+#### Consequences
+
+- Good: one page for every cluster's policy results, signed in like every other app; per-policy pass and fail
+  counts in Mimir.
+- Good: a new addons cluster gets the core with no change; the UI needs one line in `ui.clusters`.
+- Bad: each cluster now serves its policy results over HTTPS on the tailnet, guarded by one shared basic-auth
+  credential. They name resources and policies, not secrets. Rotating means a new value in OpenBao and a
+  restart of the cores and the UI.
+- Bad: the core keeps its results in SQLite on an emptyDir; after a restart it re-reads the reports, so the
+  UI's history starts again.
+
+#### Related
+
+- ADR 0027 (dashboards as code), 0033 (Kyverno policies), 0038 (Argo CD), 0078 (per-app access groups),
+  0090 (revision history)
+
+## ADR-0093: Phoenix runs internal-only in ai, fed with LLM spans by the OTLP gateway, LiteLLM and the wardens agents first
+{: #adr-0093 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-06 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+ADR 0021 chose Arize Phoenix for LLM and RAG traces. It was written before three changes:
+
+- ADR 0037 replaced the planned public UIs (`phoenix.cloudutsuk.com` behind Cloudflare Access) with private
+  access over Tailscale; every UI signs in with Keycloak (ADR 0028).
+- `rag-api` and `rag-ingest`, the first sources ADR 0021 named, aren't built yet (Phase 5 steps 3 and 4).
+  The `sre-agent` became the `platform-wardens` agents, which already export OTel GenAI spans (semantic
+  conventions 1.37) to the OTLP gateway in `mon`.
+- Phoenix 21 converts `gen_ai.*` spans to its own OpenInference model when it ingests them, so the agents'
+  spans show as LLM and tool spans without new instrumentation.
+
+Some prompts carry personal data: Hermes reads the owner's mail and calendars, and job-hunter reads CVs and
+job mail.
+
+#### Decision
+
+- **Phoenix 21.0.0** (non-root image, amd64 and arm64) in `ai`, namespace `phoenix`, one pod, at
+  `https://phoenix.ai.home.cloudutsuk.com` on the tailnet only. No public hostname.
+- **Data** in `ai-db`, database and owner role `phoenix` (ADR 0035). Phoenix's working folder is an `emptyDir`.
+- **Sign-in** through Keycloak's `homelab` realm, client `phoenix`, auto-login, password sign-in off.
+  The `platform-admins` and `phoenix-admin` groups map to ADMIN, every other user who passes the realm's
+  gate to VIEWER.
+- **Writes** come only from the OTLP gateway: a second trace pipeline, `traces/phoenix`, keeps spans that
+  carry a `gen_ai.*` or `openinference.span.kind` attribute, names the Phoenix project after the span's
+  `service.name` when the span doesn't name one, and sends them over OTLP HTTP with `PHOENIX_ADMIN_SECRET`
+  as the bearer token. Tempo's pipeline doesn't change, so both stores share trace IDs. Services keep one
+  exporter.
+- **First sources:** the LiteLLM gateway (its `arize_phoenix` callback, pointed at the OTLP gateway, so
+  every model call on the platform is traced) and the `platform-wardens` agents (unchanged). RAG traces
+  follow with `rag-api` and `rag-ingest` (roadmap step 6b).
+- **Content:** prompts and answers are kept, except for the Hermes and job-hunter virtual keys, whose
+  message content LiteLLM masks; their spans still carry model, tokens, latency and cost (owner decision,
+  2026-11-06).
+- **Retention:** 30 days for every project (`PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`, owner decision,
+  2026-11-06).
+- **No outbound calls of its own:** `PHOENIX_ALLOW_EXTERNAL_RESOURCES=false` (no web fonts, telemetry or
+  price downloads), the built-in agent assistant off, and no LLM providers configured in the playground.
+
+This amends ADR 0021's hostname, access and first sources; its choice of Phoenix over Langfuse stands.
+
+#### Considered options
+
+1. **Each service exports to Phoenix and to the gateway**: two exporters per service and Phoenix's API key in
+   every namespace. Rejected.
+2. **The gateway sends every span to Phoenix**: HTTP, database and Kubernetes spans would fill `ai-db`
+   with traces Phoenix can't show any better than Tempo. Rejected.
+3. **A filtered second pipeline on the gateway** (chosen).
+4. **A Phoenix system API key for the gateway**: it must be created in the UI after the first start, so
+   it can't be seeded with the other secrets. The admin secret is a static value OpenBao can generate.
+5. **Public hostname behind Cloudflare Access**: not needed for one user on the tailnet (ADR 0037).
+
+#### Consequences
+
+- Good: every model call on the platform is visible with its prompt, tokens and latency from the first
+  sync, before the RAG services exist.
+- Good: one place decides what reaches Phoenix (the gateway's filter), and one secret lets it write.
+- Bad: a dropped parent span (an HTTP span above an LLM span) leaves the LLM span as a root in Phoenix;
+  the full tree stays in Tempo.
+- Bad: the admin secret is all-powerful in Phoenix; it lives only in OpenBao and the gateway's Secret.
+
+#### Related
+
+- [ADR 0021](#adr-0021)
+- [ADR 0028](#adr-0028)
+- [ADR 0035](#adr-0035)
+- [ADR 0037](#adr-0037)
+- Plan
+
+## ADR-0094: Hermes posts the daily briefing to Flashy as cards stored in Cloudflare D1, with Web Push reminders that come more often until it's read
+{: #adr-0094 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-08 · `homelab-gitops`, `infra-local`, `flashy`</span>
+
+#### Context
+
+Hermes (ADR 0064) builds a morning brief from Gmail, Google Calendar, the Outlook calendar and its own reminders,
+and sends it to the owner's WhatsApp self-chat. The owner wants the brief to also appear in Flashy, the personal
+flashcards PWA (`cloudutsukpilot/flashy`, `https://flashy.cloudutsuk.com`):
+
+- one card per part of the brief: Gmail, Outlook meetings, pending work, and others;
+- the cards must be marked read before the other flashcards can be browsed;
+- while they're unread, the phone is reminded again and again, at shorter and shorter intervals.
+
+Flashy is a static site on Cloudflare Pages behind Cloudflare Access (admins only), with no server and no
+account: progress lives on the device. Hermes runs in `platform` and reaches the internet, but nothing in the
+homelab is reachable from the internet except through the Cloudflare tunnel (ADR 0058).
+
+The brief carries personal data: subjects and senders of mail, meeting titles, to-dos.
+
+#### Decision
+
+1. **Storage and API on Cloudflare.** Flashy gets Pages Functions and a D1 database (`flashy`). Hermes PUTs the
+   day's brief as JSON (`{date, cards: [{id, kind, title, body, items}]}`) to
+   `https://flashy.cloudutsuk.com/api/ingest/briefing/<date>`. Flashy reads the latest brief from
+   `/api/briefing/latest` and marks cards read with `POST /api/briefing/<date>/cards/<id>/read`, all same-origin
+   behind the existing Access app. Briefs older than 30 days are deleted on ingest.
+2. **Hermes authenticates as a machine.** A path-scoped Access application on `flashy.cloudutsuk.com/api/ingest`
+   admits only an Access **service token** (`hermes-flashy`), and the Function also requires a bearer ingest
+   token. `access.sh` learns `allow: service` and keeps the service token in OpenBao.
+3. **Reminders by Web Push.** The phone subscribes (Settings, once) with Flashy's VAPID public key; the
+   subscription is stored in D1. Pushes carry no payload: the service worker fetches the brief itself (with the
+   Access cookie) to write the notification, and falls back to a generic "Briefing unread" if the session has
+   expired, so no brief text passes through the browser vendor's push service. Unread reminders go out when
+   the brief arrives, then after 2 h, 1 h, 30 min and 15 min, then every 15 min, never between 22:00 and 07:00
+   Asia/Kolkata, and stop once every card is read.
+4. **The reminder clock lives in the homelab.** Pages Functions have no schedule, so a CronJob in `platform`
+   (`apps/hermes`, every 5 minutes) calls `/api/ingest/tick` with the same service token. The Function decides
+   whether a reminder is due, so the CronJob only knocks.
+5. **Hermes composes, a script posts.** A script in git (`apps/hermes/flashy-briefing/post_briefing.py`, copied
+   into `/opt/data/scripts` by `setup` like the Outlook scripts) validates the JSON and PUTs it. A skill tells
+   Hermes how to build the cards: the morning-brief cron job calls the script after sending to WhatsApp.
+
+#### Considered options
+
+1. **Pages Function + D1 (chosen).** Same-origin with Flashy, so one Access app and no CORS; works when the
+   homelab is down (the last brief stays readable, it just doesn't update); least new code.
+2. **Serve Flashy from `platform` with a small API, through the tunnel.** The brief would never leave the
+   homelab, but Flashy would go down with the homelab, and it would need an image, a chart and Kyverno-compliant
+   manifests for what is today a static site.
+3. **A brief API in `platform` on its own hostname, Flashy stays on Pages.** Data stays home, but Flashy would
+   call a second Access application cross-site: Access cookies are per hostname, so sign-in and CORS get fiddly.
+4. **Reminders over WhatsApp from Hermes, or in-app only.** WhatsApp needs no new plumbing but duplicates the
+   brief's channel; in-app only can't remind when Flashy is closed. The owner chose real phone notifications.
+5. **A Cloudflare Worker with a cron trigger for the reminder clock.** Runs without the homelab, but needs a
+   Workers deploy and a token with Workers Scripts Write; the homelab is already required to produce the brief.
+
+#### Consequences
+
+- Good: the brief is on the phone as cards, gated before study, and the phone nags until it's read.
+- Good: Flashy keeps working offline for flashcards; only the brief needs the network.
+- Bad: brief text is stored in Cloudflare D1 (the owner's account, behind Access), not only in the homelab.
+  Kept for 30 days.
+- Bad: no reminders while the homelab is down (no tick). The last brief still shows.
+- Bad: new secrets to keep: the Access service token, the ingest token and the VAPID private key.
+
+#### Related
+
+- ADR 0058 (public access through Cloudflare Access), ADR 0064 (Hermes as a personal assistant)
+- Plan: `flashy/docs/briefing-plan.md`
+
+#### Amendments
+
+- 2026-11-08, school mail: a second job (School mail, 06:45; an 18:00 run was dropped the same day, once a day is enough) posts a `school` card to the same day.
+  Posts now **merge** by default (the posted cards replace those with the same ids, the day's other cards stay),
+  so the Morning brief and the school job don't wipe each other. The owner asked for school events and holidays to
+  go on Google Calendar **without asking first**, the one exception to "changing Google Calendar asks first"
+  (ADR 0064); they're marked with a private property so later runs don't add them twice.
+- 2026-11-08, tech news: a third job (Tech news, 07:15 and 18:15) posts a `news` card (kind `news`): the top 5
+  trending stories across AI, agentic AI, DevOps, platform engineering and SRE/observability. Sources are a feed
+  list kept in git plus the Hacker News front page and SearXNG for trending signals; the script, not the model,
+  fetches them, and remembers what was posted so the evening card has only new stories. No links on the card
+  (source names only), like the other cards.
+- 2026-11-08, plan last: the owner wants the plan for the day at the bottom, built from every other card. The
+  Morning brief no longer writes it; a Plan for the day job at 07:30 reads the day's cards back (a new
+  `GET /api/ingest/briefing/:date`, same credentials as the PUT) and posts the `plan` card, which Flashy always
+  stores last.
+
+## ADR-0095: Private repos' CI runs only on the homelab runners, with a third scale set for the cloud IaC repos
+{: #adr-0095 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-09 · `homelab-gitops`, `terragrunt-shared-module`, `infra-azure`, `infra-aws`, `infra-gcp`, `infra-github`, `infra-cloudflare`, `infra-local`, `cicd-triage-lab`, `flashy`, `job-hunter-agent`, `shorts-studio`, `reusable-workflows`</span>
+
+#### Context
+
+The org is on GitHub's Free plan: 2,000 GitHub-hosted minutes a month for private repos, and a $0 spending
+limit. On 2026-11-09 the private repos had used 2,019 minutes, and from 15:29 UTC GitHub stopped starting
+`ubuntu-latest` jobs ("your spending limit needs to be increased"). The six `infra-*` drift-scan PRs, every
+scheduled drift scan and the drift agent's trigger job stopped with them. Public repos (the blog) don't count
+against the allowance.
+
+Most of the minutes were short jobs, because GitHub bills each job as at least one minute. Per workflow,
+1 to 9 November:
+
+| Repo | Workflow | Minutes | Jobs |
+|---|---|---|---|
+| infra-azure | terragrunt-cicd | 428 | 292 |
+| infra-github | terragrunt-cicd | 289 | 260 |
+| terragrunt-shared-module | compatibility test | 211 | 208 |
+| cicd-triage-lab | five language pipelines | 355 | 336 |
+| homelab-gitops | adr-check, dashboards-check | 201 | 201 |
+| infra-local | terragrunt-cicd helper jobs | 100 | 100 |
+| terragrunt-shared-module | code-quality, python-quality, terragrunt-cicd, docs-pages | 103 | 86 |
+| flashy | ci, deploy | 100 | 100 |
+| infra-aws, -gcp, -cloudflare | terragrunt-cicd | 140 | 140 |
+| job-hunter-agent, reusable-workflows, shorts-studio | ci, actionlint | 64 | 53 |
+
+Only `homelab-services`, `self-service-portal`, `platform-wardens` and `build-image.yaml` ran on the
+`homelab` scale set. The cloud `infra-*` repos ran their Terragrunt jobs on `ubuntu-latest`
+(`iac_runner` in their `config.yaml`), and the Terragrunt workflow template hard-codes `ubuntu-latest` for its
+helper jobs (Set Build Variables, Detect Changes, Manual Dispatch, the drift scan and notifications), even in
+`infra-local`, whose plans run on `homelab-iac`.
+
+Two gaps stood in the way:
+
+- **Tools.** Neither runner image has `yq` or `gh`. The helper jobs read `config.yaml` with `yq` and look PRs up
+  with `gh`. The shared module's `resolve-credentials` reads `common_vars.yaml` with `yq` and hides errors with
+  `2>/dev/null || true`, so on a runner without `yq` it picks no cloud credentials and doesn't fail.
+  `dashboards-check` needs `kubectl kustomize` and runs `promtool` in Docker.
+- **Where the cloud IaC jobs run.** `homelab-iac` is registered with `infra-local` alone and carries root on
+  the host (Docker over mTLS) and the cluster kubeconfigs (ADR 0040). The Free plan has only the Default runner
+  group, so a scale set registered with the org is open to every private repo.
+
+#### Decision
+
+- **Every private repo's CI runs on the homelab runners.** GitHub-hosted runners stay only for public repos
+  (the blog), which are free, and which ADR 0019 keeps off self-hosted runners. A job stays on `ubuntu-latest`
+  only where it needs something the runners can't give it, and is listed below.
+- **Three scale sets** in `platform`:
+  - `homelab` (org): build, test and lint jobs, and the Terragrunt workflow's helper jobs.
+  - `homelab-iac` (`infra-local` only): unchanged (ADR 0040, 0059, 0062).
+  - `homelab-cloud-iac` (org, new): the Terragrunt plans and applies of `infra-azure`, `-aws`, `-gcp`,
+    `-github` and `-cloudflare`, and the shared module's compatibility test. Same image as `homelab-iac`
+    (the IaC tools at `/opt/iac`) and the same memory gate, but no host access: no Docker, no kubeconfig, no
+    state-backend credentials in the pod. Each job brings its cloud credentials from its own repository's
+    secrets, as it did on `ubuntu-latest`. It has its own Terragrunt provider cache, because any private repo
+    can write to it. 0 to 3 runners.
+- **Tools.** `yq` and `gh` go into both tool sets (`ci/tools`, `ci/iac-tools`); `kubectl` and `promtool` into
+  `ci/tools`. `scripts/dashboards.py` uses a `promtool` on the PATH before Docker.
+- **How the workflows pick a runner.**
+  - Plain workflows: `runs-on: homelab`.
+  - The Terragrunt template and the shared module's reusable workflows: helper jobs use
+    `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`, and a **repository** variable `CI_RUNNER=homelab` on the shared
+    module and each `infra-*` repo sets it (private repos on GitHub Free can't read organization variables).
+    The `ubuntu-latest` fallback keeps forks without self-hosted runners working, as `IAC_RUNNER` already does.
+  - The cloud `infra-*` repos set `iac_runner: homelab-cloud-iac` in `config.yaml`.
+- **Docker builds without a Docker daemon.** Jobs that only check that an image builds (`cicd-triage-lab`'s
+  image jobs, `job-hunter-agent`'s `docker` job) use `docker buildx` with the remote driver against the
+  BuildKit in `platform`, as `build-image.yaml` does, and keep the result in the build cache.
+- **`docker://` actions** become the tool's release binary, checked against its published sha256
+  (`reusable-workflows`' `actionlint`).
+- **Stay on GitHub-hosted, for now:** `job-hunter-agent`'s `supabase` job (`supabase start` needs a Docker
+  daemon), the Copilot coding agent and Dependabot. About 30 minutes a month in all.
+
+#### Considered options
+
+1. **Raise the spending limit and keep GitHub-hosted runners.** Costs money every month for jobs the homelab
+   can run, and a forgotten limit stops CI again.
+2. **Run the cloud IaC jobs on `homelab`.** The generic image has no Terraform or Terragrunt, so every
+   ephemeral job downloads them (and the provider plugins) again; the shared module's `setup-environment`
+   would do it, slowly.
+3. **Register `homelab-iac` with the org.** Hands Docker on the host and the cluster kubeconfigs to every
+   private repo's workflows, which ADR 0040 exists to prevent.
+4. **A third scale set with the IaC image and no host access** (chosen).
+
+#### Consequences
+
+- Good: CI no longer depends on GitHub's allowance; the blocked drift scans and PRs run again.
+- Good: each Terragrunt job gets the baked IaC tools and a warm provider cache instead of downloads.
+- Good: `yq` on every runner makes credential resolution work everywhere, instead of failing quietly.
+- Bad: CI capacity is the DGX's (later the homelab PC's) spare memory. A burst of `infra-*` runs waits for
+  the memory gate and the 3-runner cap; ARCScaleSetAtCapacity and the dashboard show it.
+- Bad: cloud credentials (Azure prod among them) are now used on a runner any private repo can pick. They
+  still come from each repo's own secrets, so a job in another repo can't read them, but the pods share the
+  node and the BuildKit.
+- Bad: two images to rebuild when a tool changes, as before.
+
+#### Related
+
+- ADR 0019 (self-hosted runners for private repos only), ADR 0040 (repo-scoped `homelab-iac`)
+- ADR 0044 and 0059 (runner images and the memory gate), ADR 0062 (provider cache), ADR 0086 (runner alerts)
+- Plan and progress: docs/plans/ci-off-github-hosted-runners.md
 
 {% endraw %}
 <!-- adr:end -->
