@@ -882,3 +882,14 @@ lessons:
     fix: "Set the role's password again from the pod's variable once the pod had it, then restarted Phoenix. The documented command now waits for the rollout and refuses to run when the variable is empty."
     lesson: "A command that reads a secret from the environment must check the value is there before using it. Postgres, like many tools, treats an empty password as \"none\" instead of failing, so the mistake only shows up later, as an authentication error somewhere else."
     adrs: ["0021"]
+
+  - id: L082
+    date: 2026-11-09
+    step: "Phase 1, step 1g"
+    title: "Self-hosted runners didn't stop the GitHub-hosted minutes from running out"
+    tags: [github-actions, ci, runners, cost]
+    symptom: "Hosted jobs stopped starting nine days into the month (\"your spending limit needs to be increased\"), although builds and the homelab's Terragrunt plans already ran on our own runners. Drift scans and every IaC pull request stopped with them."
+    cause: "Two thousand minutes went on small jobs: GitHub bills each job as at least a minute, and one Terragrunt run fans out into a dozen helper jobs (build variables, change detection, summaries, notifications) that the shared workflow template hard-coded to ubuntu-latest, whatever runner the plans used. Lint and ADR checks added a minute per push each."
+    fix: "Every private repo's CI moved to the homelab runners (ADR 0095): helper jobs follow a CI_RUNNER variable, a third scale set runs the cloud IaC plans, and the runner images got the tools the hosted image had (yq, gh, kubectl, promtool, Maven and .NET installed per job). Organization variables aren't visible to private repos on the Free plan, so CI_RUNNER is set per repository."
+    lesson: "Count jobs, not minutes: per-job rounding makes many short jobs the expensive ones. And a self-hosted runner only saves minutes for the jobs that name it, so grep every workflow, including the reusable ones, for hosted labels. A shell step that hides errors (2>/dev/null || true) on a missing tool fails silently when it moves to a leaner image, so check the tools before moving."
+    adrs: ["0095", "0040"]
