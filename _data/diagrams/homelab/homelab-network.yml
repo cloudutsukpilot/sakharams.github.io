@@ -6,6 +6,7 @@ accent: "#76B900"
 accent2: "#F97316"
 level: 1
 levels: [Overview, Machines, Areas, Services]
+lock: false
 nodes:
   - id: you
     label: You

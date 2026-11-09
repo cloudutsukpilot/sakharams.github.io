@@ -69,6 +69,14 @@ def validate(data, path):
     for key in ("accent", "accent2"):
         if key in data and not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(data[key])):
             E(f"`{key}` must be #RRGGBB")
+    for key in ("loop", "lock"):
+        if key in data and not isinstance(data[key], bool):
+            E(f"`{key}` must be true or false")
+    has_story = bool(data.get("scenarios") or (data.get("tour") or {}).get("steps"))
+    if has_story and "lock" not in data:
+        W("`lock` is missing: every diagram with use cases states it (`lock: false` by default)")
+    if data.get("lock") and not has_story:
+        W("`lock` only affects use cases; this diagram has none")
 
     nodes, parent, depth = {}, {}, {}
 

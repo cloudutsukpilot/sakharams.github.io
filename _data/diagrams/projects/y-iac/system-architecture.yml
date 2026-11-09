@@ -10,6 +10,7 @@ accent: "#F472B6"
 accent2: "#FACC15"
 level: 1
 levels: [Overview, Systems, Areas, Components]
+lock: false
 views:
   - {id: security, label: Security, icon: lock}
   - {id: observability, label: Observability, icon: chart}

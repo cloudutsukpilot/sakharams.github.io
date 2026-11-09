@@ -12,6 +12,7 @@ accent: "#F472B6"
 accent2: "#FACC15"
 level: 1
 levels: [Overview, Clusters, Areas, Services, Components]
+lock: false
 # Tabs at the top centre: cross-cutting connections stay hidden in the main view until their tab is on.
 views:
   - {id: networking, label: Networking, icon: router}

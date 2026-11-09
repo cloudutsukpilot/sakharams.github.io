@@ -1305,6 +1305,28 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   animation: dgm-shake 0.45s ease-in-out 2;
 }
 
+// Lock mode: a hop hidden inside a closed component (or on an arrow the view tab hides) pulses it.
+.dgm-node.is-pulsing .dgm-disc,
+.dgm-group.is-pulsing .dgm-frame {
+  animation: dgm-pulse 0.9s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes dgm-pulse {
+  50% {
+    stroke: var(--dgm-accent2);
+    stroke-width: 4;
+    filter: drop-shadow(0 0 6px var(--dgm-accent2));
+  }
+}
+
+.dgm-btn-lock[aria-pressed="true"] {
+  border-color: var(--dgm-accent);
+  background: color-mix(in srgb, var(--dgm-accent) 16%, var(--dgm-host-bg));
+  color: var(--dgm-accent);
+}
+
 @keyframes dgm-win {
   50% {
     transform: scale(1.18);

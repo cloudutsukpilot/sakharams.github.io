@@ -8,6 +8,7 @@ accent: "#22D3EE"
 accent2: "#A3E635"
 level: 1
 levels: [Overview, Systems, Components, Subnets, VM]
+lock: false
 
 views:
   - {id: networking, label: Networking, icon: router}
