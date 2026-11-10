@@ -26,7 +26,7 @@ happens next and what an agent is allowed to do. Everything below follows from t
 {: #system-context-and-component-architecture }
 
 The diagram is the system as built on the homelab, checked against the repos on 2026-11-09. Start at
-the Homelab level, open the `wardens` cluster, and play a use case: a scheduled drift run with its
+the Homelab level, open the `wardens` cluster, and play a use case: a drift run with its
 handoff, an alert or a GitHub event through the ingress bus, an LLM stage behind its guardrails, a chat
 with Stack Author, shipping a new agent, and (planned) a level 2 approval. The *Identity & secrets*,
 *Observability* and *CI/CD* tabs show the cross-cutting paths.
@@ -52,7 +52,8 @@ breaks the design.
 A run starts one of two ways. **Reactive:** an alert, a GitHub event or a person in the console becomes
 a root task, routing picks the agent by capability, and the incident workflow runs it as a child.
 **Proactive:** each `schedules[]` entry in a manifest becomes a Temporal Schedule, and every fire is a
-fresh root task with its own correlation id.
+fresh root task with its own correlation id. No agent uses one today: the drift agent had a daily
+schedule until it moved to running only when a scan finds drift (2026-11-09).
 
 ## Technology and framework selection
 {: #technology-and-framework-selection }
@@ -197,7 +198,7 @@ Agent runs are bursty and slow (minutes, mostly waiting on a model or an API), s
 | Temporal is down | The webhooks still answer; the bus keeps the events and the consumer waits |
 | The state database is down | Run records fall back to a local file, a metric counts it and an alert fires |
 | The model endpoint fails | A circuit breaker per dependency opens; `CircuitOpen` is never retried by an activity |
-| A GitHub delivery is lost | The daily schedule still runs the drift agent; a redelivery job is planned |
+| A GitHub delivery is lost | A daily job lists the GitHub App's deliveries of the last 26 hours and re-sends every one that never got a 2xx (at most 100 a run) |
 | A running workflow's code changes | `workflow.patched` versioning, and recorded histories replayed in CI |
 | Something is wrong and spreading | The kill switch fails closed and stops the agent within 60 seconds |
 

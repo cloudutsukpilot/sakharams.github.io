@@ -893,3 +893,25 @@ lessons:
     fix: "Every private repo's CI moved to the homelab runners (ADR 0095): helper jobs follow a CI_RUNNER variable, a third scale set runs the cloud IaC plans, and the runner images got the tools the hosted image had (yq, gh, kubectl, promtool, Maven and .NET installed per job). Organization variables aren't visible to private repos on the Free plan, so CI_RUNNER is set per repository."
     lesson: "Count jobs, not minutes: per-job rounding makes many short jobs the expensive ones. And a self-hosted runner only saves minutes for the jobs that name it, so grep every workflow, including the reusable ones, for hosted labels. A shell step that hides errors (2>/dev/null || true) on a missing tool fails silently when it moves to a leaner image, so check the tools before moving."
     adrs: ["0095", "0040"]
+
+  - id: L083
+    date: 2026-11-09
+    step: "Phase 6, step 13d"
+    title: "Cancelling a GitHub Actions run didn't stop it, and every plan it finished started the drift agent again"
+    tags: [github-actions, ci, terragrunt, wardens]
+    symptom: "Six pull requests the drift agent had opened by mistake were closed and their runs cancelled, yet the runs kept going back to queued and planning. Each finished plan matched a webhook rule and started the agent again."
+    cause: "Closing a pull request cancels nothing. And the shared workflow template guarded nearly every job with if: always() && ..., a common workaround so a job still runs when an upstream job was skipped. GitHub runs always() jobs even after a cancel, so only the few jobs without it stopped."
+    fix: "The template uses !cancelled() instead: the same behaviour for skipped or failed upstream jobs, but a cancelled run stops. A concurrency group per pull request cancels an older run when a newer commit is pushed (runs on main are never cancelled, so an apply can't be cut off). The agent also checks that its own pull request is still open before reading its plan."
+    lesson: "Use !cancelled() rather than always() for the skipped-ancestor workaround: always() means always, including after a cancel. And a webhook event about a job says nothing about the pull request behind it, so check its state before acting on it."
+    adrs: []
+
+  - id: L084
+    date: 2026-11-10
+    step: "Platform"
+    title: "git add hung forever in one directory of a repo shared over NFS"
+    tags: [nfs, git, linux]
+    symptom: "On the machine that exports the shared repo folder, any new file in one directory (.git/objects/b0) hung: git add, git hash-object, even touch. Other directories worked, and the kernel log showed nothing."
+    cause: "The NFS server had lent the other machine a delegation on that directory: a promise that nobody else changes it while the client caches it. Before a local create, the kernel recalled the delegation, and the client never answered. The process's kernel stack showed __break_lease, and /proc/locks a DELEG line in BREAKING state."
+    fix: "Delegations turned off on the server (fs.leases-enable = 0 in sysctl.d) and the NFS server restarted, which dropped the 2,578 delegations it had lent."
+    lesson: "When a file operation hangs without an error, read the process's kernel stack (/proc/<pid>/stack): it names the wait. For one working copy edited from two machines, NFS delegations add a way to block the server's own writes; turning them off costs a little client caching."
+    adrs: []
