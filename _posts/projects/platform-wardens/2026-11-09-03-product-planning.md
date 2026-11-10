@@ -87,8 +87,8 @@ Phase N, step M". Phases 3 to 5 are refined when they start.
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Terraform drift explains drift between Azure and a stack's `resources.yaml` and recommends codify, revert or investigate; a daily schedule after the drift scan, in shadow | `platform-wardens`, `homelab-gitops` | A scheduled run posts findings to Slack and writes a run record | In progress (2026-11-01: worker and schedule live. Platform step 13) |
-| 2 | A drift scan that finds drift starts the drift agent at once, through the GitHub App's signed webhook | `platform-wardens`, `homelab-gitops`, `infra-local` | A drifted scan starts the incident within minutes; an unsigned request gets 401 | In progress (2026-11-03. Platform step 13b) |
+| 1 | Terraform drift explains drift between Azure and a stack's `resources.yaml` and recommends codify, revert or investigate, in shadow; started by a drift scan that finds drift (no schedule since 2026-11-09) | `platform-wardens`, `homelab-gitops` | A scheduled run posts findings to Slack and writes a run record | In progress (2026-11-01: worker and schedule live. Platform step 13) |
+| 2 | A drift scan that finds drift starts the drift agent at once, through the GitHub App's signed webhook | `platform-wardens`, `homelab-gitops`, `infra-local` | A drifted scan starts the incident within minutes; a clean scan, or one where stacks only failed to plan, starts nothing; an unsigned request gets 401 | Done (2026-11-10: the agent's only automatic start, checked end to end. Platform steps 13b and 13d) |
 | 3 | Drift opens draft PRs after clean shadow runs (a draft PR counts as L1, decision 0013) | `platform-wardens`, `homelab-gitops` | A drifted `infra-azure` stack gets a draft PR on its `resources.yaml` | Not started (Platform step 14) |
 | 4 | Change Correlator: who changed or deleted a cloud resource, when and with which client; drift hands each stack's drift to it | `platform-wardens`, `homelab-gitops`, `infra-azure` | A drift finding for a portal deletion is followed by who, when and how | Done (2026-11-02. Platform step 15) |
 | 5 | Incident triage reached by an alert: the Alertmanager webhook, rules from alert labels, a minimal L0 agent | `platform-wardens`, `homelab-gitops`, `infra-local` | A test alert reaches the agent and Slack; another alert starts nothing | In progress (2026-11-05: the route works. Platform steps 1 and 32) |
@@ -148,7 +148,7 @@ promises around it:
 
 | In the MVP | Why it has to be there |
 |---|---|
-| A scheduled and an event-started run of terraform-drift | Proves both entry points (proactive and reactive) on one agent |
+| An event-started run of terraform-drift, and the schedule path in the framework's tests | Proves both entry points (reactive and proactive) |
 | A handoff to the Change Correlator | Proves child tasks, narrowing limits and one message per incident |
 | Guardrails at submission, tool call and emit, and the kill switch | Autonomy enforced in code is the product; without it this is a script |
 | A run record per run, a trace per incident, the dashboards | "Observable by default" is a design rule, not a phase |
