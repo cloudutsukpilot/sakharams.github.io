@@ -915,3 +915,14 @@ lessons:
     fix: "Delegations turned off on the server (fs.leases-enable = 0 in sysctl.d) and the NFS server restarted, which dropped the 2,578 delegations it had lent."
     lesson: "When a file operation hangs without an error, read the process's kernel stack (/proc/<pid>/stack): it names the wait. For one working copy edited from two machines, NFS delegations add a way to block the server's own writes; turning them off costs a little client caching."
     adrs: []
+
+  - id: L085
+    date: 2026-11-11
+    step: "Phase 3, step 22a"
+    title: "The registry's garbage collection failed silently for days, until its search ran it out of memory"
+    tags: [zot, registry, monitoring, alerting]
+    symptom: "After a restart the registry wouldn't finish starting, and once it did, opening the UI's home page killed it for running out of memory. Signatures and SBOM attestations of long-deleted images had piled up in the busy repositories."
+    cause: "Zot v2.1.21's garbage collection deleted an old untagged image, then failed to delete that image's signatures from its metadata ('image meta not found') and abandoned the whole repository without saving. 14 of 18 of our repositories hit this on every daily pass. The registry counted every failure in a metric, but the core cluster sends no telemetry, so nobody saw it."
+    fix: "Zot v2.1.23, which fixes the abort; the first pass then cleaned all 67 repositories. Retention now keeps the 3 newest tags plus anything pulled in a week, and deletes orphaned referrers. The monitoring cluster now scrapes the registry's metrics with an account that can read only those, and two alerts fire when garbage collection fails two days in a row or stops running."
+    lesson: "A background clean-up job that fails quietly turns into an outage later, somewhere else. Alert on the job's own failure counter, not only on the service being up. And when a theory about corrupt data comes up, check it with a dry-run script before you fix anything: here the data was fine and the bug was in the registry."
+    adrs: ["0097", "0034"]
