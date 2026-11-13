@@ -926,3 +926,25 @@ lessons:
     fix: "Zot v2.1.23, which fixes the abort; the first pass then cleaned all 67 repositories. Retention now keeps the 3 newest tags plus anything pulled in a week, and deletes orphaned referrers. The monitoring cluster now scrapes the registry's metrics with an account that can read only those, and two alerts fire when garbage collection fails two days in a row or stops running."
     lesson: "A background clean-up job that fails quietly turns into an outage later, somewhere else. Alert on the job's own failure counter, not only on the service being up. And when a theory about corrupt data comes up, check it with a dry-run script before you fix anything: here the data was fine and the bug was in the registry."
     adrs: ["0097", "0034"]
+
+  - id: L086
+    date: 2026-11-13
+    step: "Phase 3, step 23"
+    title: "A storage account deleted by hand took the backups down for four days, and one cluster never alerted"
+    tags: [velero, backups, azure, monitoring, alerting]
+    symptom: "Every nightly backup failed from 2026-11-09. The 'backup too old' and 'location unavailable' alerts fired for two clusters; the core cluster, which holds the secrets store and the identity provider, raised nothing."
+    cause: "The cloud storage account that held the backups was deleted in the portal, outside Terraform, so the backup tool lost its target. Core sends no telemetry of its own, and nothing scraped its Velero, so the backup alerts had never covered it."
+    fix: "The backups moved to an S3-compatible store (Garage) on the DGX Spark, which is a different machine and disk from the clusters' host, with a bucket and a key per cluster. Terraform no longer manages the account. The monitoring cluster now scrapes core's Velero through an ingress with a metrics-only password, and the store's own health and disk use."
+    lesson: "An alert that can't see a cluster is the same as no alert for that cluster: list which clusters each critical alert actually has data for. And anything deleted by hand that Terraform still manages comes back on the next apply, or breaks it: change the code first."
+    adrs: ["0073", "0039"]
+
+  - id: L087
+    date: 2026-11-13
+    step: "Phase 3, step 23"
+    title: "Backups said 'partially failed' for a week, and the database dumps were in none of them"
+    tags: [velero, kyverno, backups, policy]
+    symptom: "Nightly backups of two clusters ended PartiallyFailed rather than Failed. Their Kubernetes objects were saved; the volume with the database dumps was not."
+    cause: "Since Velero 1.17 the node agent doesn't copy a volume itself: it starts a short-lived pod per volume, running as root with the volume's node directory mounted. Our admission policies (no host paths, read-only root, requests and limits) denied those pods. The node agent's own exception didn't cover them."
+    fix: "A narrow written exception for those pods only (namespace, Velero's label, its image, host paths under the kubelet's pod directory), and requests and a memory limit from the node agent's configuration, so the resource policy still applies. A restore into a throwaway cluster then brought back the dumps, and the identity provider's database loaded with its realms and users."
+    lesson: "Treat PartiallyFailed as failed, and check what's inside a backup, not just its status. After upgrading a backup tool, re-read what it starts at runtime: new helper pods meet the admission policies for the first time during the next backup."
+    adrs: ["0033", "0039", "0073"]
