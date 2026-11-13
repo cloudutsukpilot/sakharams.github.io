@@ -948,3 +948,14 @@ lessons:
     fix: "A narrow written exception for those pods only (namespace, Velero's label, its image, host paths under the kubelet's pod directory), and requests and a memory limit from the node agent's configuration, so the resource policy still applies. A restore into a throwaway cluster then brought back the dumps, and the identity provider's database loaded with its realms and users."
     lesson: "Treat PartiallyFailed as failed, and check what's inside a backup, not just its status. After upgrading a backup tool, re-read what it starts at runtime: new helper pods meet the admission policies for the first time during the next backup."
     adrs: ["0033", "0039", "0073"]
+
+  - id: L088
+    date: 2026-11-13
+    step: "Phase 3a, step 5b"
+    title: "Every Python image showed two critical CVEs that its distribution had already fixed"
+    tags: [dependency-track, sbom, vulnerabilities, debian, nvd]
+    symptom: "Once the SBOM inventory was running, all nine Python service images showed the same 2 critical and 15 high findings, mostly in OpenSSL. The image scanner in CI had passed the same images."
+    cause: "The SBOM tool gives each Debian package a CPE, and the inventory matched it against NVD's version ranges for the upstream project. Debian backports security fixes without changing the upstream version number, so NVD can't tell a patched package from a vulnerable one. Debian's security tracker listed every one of them as fixed in the version we ship."
+    fix: "The copy of the SBOM sent to the inventory drops the CPE of operating-system packages, so they are matched only through OSV's Debian, Ubuntu and Alpine data, which knows the backports (the signed SBOM keeps everything). A re-upload of every image's latest SBOM took the criticals across all images from 49 to 14, and the Python images to none."
+    lesson: "Before triaging a finding on an OS package, check where the match came from: an NVD match on a distribution package is often a backport the distribution already fixed. Match OS packages against the distribution's own advisories, and keep NVD for application dependencies."
+    adrs: ["0099", "0032"]

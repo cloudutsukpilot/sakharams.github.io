@@ -1520,6 +1520,7 @@ scanning) isn't free. Scanning must be free, open source and run on arm64.
 - [ADR 0031](#adr-0031)
 - [ADR 0033](#adr-0033)
 - [ADR 0044](#adr-0044)
+- [ADR 0099](#adr-0099): where the SBOMs are viewed and re-checked against new CVEs after the build.
 
 ## ADR-0033: Supply chain: Cosign signing with an OpenBao transit key and Kyverno admission
 {: #adr-0033 }
@@ -1599,6 +1600,7 @@ images should be pinned.
 - [ADR 0032](#adr-0032)
 - [ADR 0034](#adr-0034)
 - [ADR 0044](#adr-0044)
+- [ADR 0099](#adr-0099): Dependency-Track reads these SBOM attestations; where they are viewed.
 
 ## ADR-0034: Zot in core as the only container registry
 {: #adr-0034 }
@@ -1623,7 +1625,8 @@ through a local cache. The host is arm64. Harbor's official images are amd64 onl
   never push. Clusters pull public images anonymously through `registries.yaml` mirrors and our
   images with a `zot-pull` secret from ESO, added to pods by a Kyverno mutate policy.
 - Nodes resolve the name through a k3d host alias to `172.30.0.1`. People log in to the UI through
-  Keycloak. The k3d-managed plain-HTTP registry is dropped.
+  Keycloak (not configured until [ADR 0097](#adr-0097), 2026-11-10). The
+  k3d-managed plain-HTTP registry is dropped.
 
 - As built (2026-10-11): chart 0.1.125 (Zot 2.1.21) as a bootstrap release in `core` (ADR 0036), data
   on `/srv/homelab/zot/data`, served at `https://registry.core.home.cloudutsuk.com` with a Let's Encrypt
@@ -5036,7 +5039,7 @@ Every new deployment follows four rules:
 ## ADR-0073: Velero backups go to an S3-compatible store on the DGX Spark, in a folder on its disk, instead of Azure Blob
 {: #adr-0073 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-02 · `infra-local`, `homelab-gitops`, `infra-azure`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-02 · `infra-local`, `homelab-gitops`, `infra-azure`</span>
 
 #### Context
 
@@ -5123,6 +5126,30 @@ server in front of it.
 - [ADR 0039](#adr-0039): how; this ADR replaces its Azure Blob target
 - [ADR 0061](#adr-0061): the clusters' host
 - [ADR 0069](#adr-0069): `wardens` and `wardens-db`
+
+#### Changes when building it (owner accepted, 2026-11-13)
+
+The Azure storage account was deleted in the portal on 2026-11-09, before any of this was built, so every nightly
+backup failed from then until 2026-11-13 (`VeleroBackupLocationUnavailable` and `VeleroBackupTooOld` fired for
+`platform` and `ai`; `core` sends no Velero metrics to `mon`). The owner chose to keep it deleted and build this store
+(plan: docs/plans/velero-backups-on-spark.md). Building it changed five
+details of the decision above:
+
+- **A bucket per cluster** (`velero-core`, `velero-platform`, `velero-ai`) instead of one `velero` bucket with a
+  prefix each. Garage grants a key access to whole buckets, never to a prefix, so separate buckets are what keeps
+  each cluster's key to its own backups. `platform`'s key also reads `velero-core` and `velero-ai`, for its
+  read-only locations (the Velero UI lists every cluster's backups).
+- **Endpoint `https://backups.spark.home.cloudutsuk.com:9443`.** Garage serves plain HTTP, so a Traefik container
+  in the same Compose project terminates TLS with the Let's Encrypt DNS-01 certificate (the labs gateway's setup).
+  It listens on port 9443 on every Spark address: 443 is taken on the Spark by the `gpu` load balancer
+  (172.31.0.1), and a wildcard bind on 443 would clash with it.
+- **The name points at 172.31.0.1**, the Spark's `homelab-gpu` bridge, which the PC routes over the direct cable.
+  Not the cable address 10.10.10.1: it is inside `core`'s pod network (10.10.0.0/16), so flannel never masquerades
+  `core`'s traffic to it and the replies are lost (found on the first day).
+- **The Azure location went at once**, not after a week: the account was already gone. There are no backups
+  between 2026-11-08 and 2026-11-13.
+- **The store keys aren't in the offline recovery kit:** Garage keeps them on the Spark, readable without OpenBao.
+  The kit still holds each cluster's Kopia password.
 
 ## ADR-0074: The platform-wardens operator console runs on wardens behind an oauth2-proxy sidecar, with the signed-in user as requester
 {: #adr-0074 }
@@ -6035,7 +6062,8 @@ sees a listener pod that exists and fails.
 4. **Alerts:** `ARCListenerDown` (a scale set with no listener for 10 minutes) and `ARCScaleSetAtCapacity`
    (more jobs assigned than runners for 20 minutes) in `alerts/platform/arc-runners.yaml`; with the exporter,
    `GitHubActionsJobWaitingTooLong` (a job for our runners waiting over 15 minutes, by name) and
-   `CIQueueExporterDown`. Added 2026-11-06: `ARCJobsAssignedNoBusyRunners` (jobs assigned and no busy runner
+   `CIQueueExporterDown`. Added 2026-11-10: `ARCControllerReconcileErrors` (10 or more failed reconciles in an
+   hour, per controller; the normal rate was about 15 a day, all retried). Added 2026-11-06: `ARCJobsAssignedNoBusyRunners` (jobs assigned and no busy runner
    for 15 minutes) and an *Offline runners* stat on the dashboard (registered minus busy minus idle, with
    registered capped at the controller's running runners, because the listener's counts freeze between
    GitHub's messages). On
@@ -6061,8 +6089,10 @@ sees a listener pod that exists and fails.
 
 #### Consequences
 
-- Good: the dashboard's **Jobs waiting now** table names each waiting job with a link, and a job stuck longer
+- Good: the dashboard's **Jobs waiting and running now** table names each waiting job with a link, and a job stuck longer
   than 15 minutes alerts by name, which catches a runner label nothing serves.
+  Since 2026-11-10 the exporter also publishes `github_actions_job_running_seconds` (one series per running
+  job, with its runner), so the same table shows what the runners are busy with.
 - Good: the exporter can't change anything in GitHub, and its token expires within the hour.
 - Bad: the generator's spec holds the App ID and installation ID, so they're committed after the App is
   created and installed (not secrets).
@@ -6647,7 +6677,10 @@ Two gaps stood in the way:
 - **Tools.** Neither runner image has `yq` or `gh`. The helper jobs read `config.yaml` with `yq` and look PRs up
   with `gh`. The shared module's `resolve-credentials` reads `common_vars.yaml` with `yq` and hides errors with
   `2>/dev/null || true`, so on a runner without `yq` it picks no cloud credentials and doesn't fail.
-  `dashboards-check` needs `kubectl kustomize` and runs `promtool` in Docker.
+  `dashboards-check` needs `kubectl kustomize` and runs `promtool` in Docker. The IaC image also has no Azure
+  CLI, and the shared module runs `az login` / `az account show` for every `--cloud azure` or `entra` run
+  (found 2026-11-10: every infra-azure plan on `homelab-cloud-iac` failed with "Required tool not found on
+  PATH: az"). Cloudflare, AWS and GCP runs don't call it; their Azure state backend authenticates without it.
 - **Where the cloud IaC jobs run.** `homelab-iac` is registered with `infra-local` alone and carries root on
   the host (Docker over mTLS) and the cluster kubeconfigs (ADR 0040). The Free plan has only the Default runner
   group, so a scale set registered with the org is open to every private repo.
@@ -6667,7 +6700,9 @@ Two gaps stood in the way:
     secrets, as it did on `ubuntu-latest`. It has its own Terragrunt provider cache, because any private repo
     can write to it. 0 to 3 runners.
 - **Tools.** `yq` and `gh` go into both tool sets (`ci/tools`, `ci/iac-tools`); `kubectl` and `promtool` into
-  `ci/tools`. `scripts/dashboards.py` uses a `promtool` on the PATH before Docker.
+  `ci/tools`. `scripts/dashboards.py` uses a `promtool` on the PATH before Docker. The Azure CLI goes into
+  `ci/iac-tools`, hash-locked (`requirements-az.txt`) in its own venv at `/opt/iac/az` with `/opt/iac/bin/az`,
+  so its ~150 packages can't clash with the shared module's; it adds about 690 MB to the IaC image.
 - **How the workflows pick a runner.**
   - Plain workflows: `runs-on: homelab`.
   - The Terragrunt template and the shared module's reusable workflows: helper jobs use
@@ -6711,6 +6746,376 @@ Two gaps stood in the way:
 - ADR 0019 (self-hosted runners for private repos only), ADR 0040 (repo-scoped `homelab-iac`)
 - ADR 0044 and 0059 (runner images and the memory gate), ADR 0062 (provider cache), ADR 0086 (runner alerts)
 - Plan and progress: docs/plans/ci-off-github-hosted-runners.md
+
+## ADR-0096: Shared-module READMEs carry data blocks for agents, and each organisation states its preferences in a profile
+{: #adr-0096 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `terragrunt-shared-module`, `platform-wardens`, `infra-azure`</span>
+
+#### Context
+
+The Stack Author agent writes a stack's `resources.yaml` from a module's README (the first 9,000 characters),
+`example_resources.yaml` and the keys `terragrunt.hcl` reads. The terraform-drift agent reads `yaml import-spec` blocks
+from Azure and Entra READMEs. Apart from import specs, READMEs are free-form: 20-plus heading variants, parameter
+tables that drift from what the unit reads (the storage account README documented a key the unit never reads and the
+wrong private endpoint default), and nothing about expected drift.
+
+Organisations using the shared module can have different rules: one may require private endpoints, while the
+cloudutsuk tenant prefers service endpoints to avoid private endpoint cost. Today nothing records those rules, so
+an agent or a person picks per stack.
+
+#### Decision
+
+- Every module README follows one format (shared module `docs/module-readme-format.md`): fixed `##` sections in a fixed
+  order, prose and tables for people, and fenced data blocks for tools: `yaml module` (key, types, shape,
+  dependencies), `yaml module-preferences` (which org preferences the module supports and the `resources.yaml` keys
+  each value sets), `yaml import-spec` (unchanged), `yaml drift-notes` (expected drift and the action). A marker line
+  opts a README in; `tools/check_module_readme.py` and the module validator check it against the unit and `main.tf`.
+- A **preference catalogue** (`config/preferences/catalogue.yaml`) is the general list of choices (public access,
+  private endpoint vs service endpoint, NSG default, local auth, encryption key, TLS, diagnostics, zone redundancy,
+  deletion protection). An **org profile** (`config/preferences/orgs/<org>.yaml`) sets a value per preference and per
+  resource type; a consumer repo picks it with `org_profile` in `config.yaml`. Module READMEs never name an org.
+- Precedence: a value written in the stack, then the profile's per-resource value, then its org value, then the module
+  default. Stack Author writes the keys explicitly, so plans don't depend on the profile. Enforcement (OPA) comes later
+  and reads the same files.
+
+#### Considered options
+
+1. **Org profile file, modules list the knobs** (chosen): one file per org, no README edit when an org or a rule
+   changes; scales to 200 modules.
+2. **A per-org table in every README**: readable in one place, but every README changes when an org is added, and org
+   names spread through the module docs.
+3. **Preferences only in each consumer repo**: no shared list of values, so modules can't say how to meet them.
+4. **A separate `module.yaml` per module instead of README blocks**: cleaner for tools, but two files to keep in step
+   and the README stays free-form for people.
+
+#### Consequences
+
+- Good: agents parse exact data instead of prose; a checker catches README keys the unit never reads; org rules are
+  stated once and reviewed like code.
+- Good: drift notes let the drift agent tell expected differences from real drift.
+- Bad: READMEs convert one by one; until then agents fall back to prose. Tracked in the shared module's
+  `docs/plans/module-readme-format.md`.
+- Bad: a preference can only be met if the module supports it (Storage has no customer-managed key support); the
+  agent warns rather than blocks.
+
+#### Related
+
+- Shared module `docs/importing_resources.md` (import specs, the first data block)
+
+## ADR-0097: Zot's UI signs people in through Keycloak; machines keep their htpasswd accounts
+{: #adr-0097 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `infra-local`, `homelab-gitops`</span>
+
+#### Context
+
+ADR 0034 said people would log in to Zot's UI through Keycloak, but that part was never configured. The login
+page at `https://registry.core.home.cloudutsuk.com/login` offers only a username and password. Checked on
+2026-11-10: the live `zot-config` ConfigMap has `http.auth.htpasswd` and no `http.auth.openid`, and
+`/v2/_zot/ext/mgmt` (the endpoint the UI reads to decide which sign-in buttons to draw) reports
+`{"auth": {"htpasswd": {}, "allowAnonymousAccess": true}}`. The `ui` and `search` extensions and
+`http.externalUrl` were already set.
+
+The only accounts are `admin`, `puller` and `ci-pusher`, shared passwords in `kv/core/zot`. Using the UI as a
+person means using one of them. Machines depend on them and must keep working unchanged:
+
+- CI pushes with crane and cosign as `ci-pusher` (ADR 0043).
+- Kyverno adds the `zot-pull` secret (`puller`) to pods, and the nodes pull `mirror/*` anonymously through
+  `registries.yaml`.
+
+Access is assigned only with Keycloak groups (ADR 0078).
+
+#### Decision
+
+- **Zot gets an OpenID provider `oidc`** named Keycloak, issuer `https://auth.cloudutsuk.com/realms/homelab`,
+  scopes `openid profile email`, `claimMapping` username `email`, groups `groups`. The redirect URI comes
+  from `http.externalUrl`: `https://registry.core.home.cloudutsuk.com/zot/auth/callback/oidc`.
+- **A confidential Keycloak client `zot`**, created by `host/keycloak/configure-realm.sh` like the others: its
+  secret is generated into `kv/core/keycloak zot_client_secret` and set on the client. core's External Secrets
+  can read `kv/core/*`, so the `zot-oidc` ExternalSecret reads it there with no copy. It renders Zot's
+  `credentialsFile` (`credentials.json`) and `sessionKeysFile` (`session-keys.json`), mounted at
+  `/secret-oidc`.
+- **Groups to access.** `platform-admins` and `zot-admin` join Zot's `adminPolicy` (read, create, update,
+  delete everywhere). `platform-editors`, `platform-viewers`, `zot-editor` and `zot-viewer` get read on every
+  repository. Editors don't get push: images reach Zot only from CI, signed and pinned by digest (ADR 0033).
+  The `zot` client has a Keycloak gate for those six groups, so nobody else can sign in; without the gate
+  they would only get what anonymous gets (read on `mirror/*` and `charts/*`).
+- **Machines are unchanged.** htpasswd stays on, with the same three accounts and policies, and the anonymous
+  reads on `mirror/*` and `charts/*` stay.
+- **A fourth machine account, `metrics` (added 2026-11-11).** It may read `/metrics` (`accessControl.metrics`)
+  and no repository. mon's OTLP gateway scrapes Zot with it through the ingress, since `core` sends no telemetry
+  of its own (ADR 0038), for the GC alerts in `alerts/platform/zot.yaml`. Its password is generated into
+  `kv/core/zot metrics_password` and copied to `kv/mon/otlp-gateway zot_metrics` by infra-local
+  `host/zot/configure-metrics.sh`. Anonymous metrics were the alternative; they would show every repository's
+  name and size to anyone on the tailnet.
+- **Sessions.** `secureSession: true` (Traefik terminates TLS, so Zot wouldn't set the Secure flag on its own).
+  The session hash key is derived in the ExternalSecret template from the client secret
+  (`sha256("zot-session:" + secret)`), so sessions survive a Zot restart without another secret to keep, and
+  a new client secret signs everyone out.
+
+#### Considered options
+
+1. **OpenID provider in Zot (chosen)**: Zot has it built in (v2.1.21), maps the `groups` claim to its own
+   policies, and the UI draws the button from the config.
+2. **oauth2-proxy in front of the UI**: the UI and the registry API share one host and paths, so the proxy
+   would have to let `/v2/` through untouched for machines, and Zot would still see every person as
+   anonymous, with no admin role.
+3. **Per-person htpasswd entries**: passwords outside Keycloak, assigned by hand, against ADR 0078.
+
+#### Consequences
+
+- Good: people sign in with Entra through Keycloak, and their role in Zot comes from the same groups as in
+  every other app.
+- Good: no change for CI, Kyverno's `zot-pull` or the nodes.
+- Bad: Zot reads the issuer's discovery document when it starts and exits if it can't. A Zot restart now
+  needs Keycloak up (Keycloak's image comes from quay.io directly when Zot is down, since containerd falls
+  back to the upstream registry). After a cold start of `core`, Zot restarts until Keycloak is ready.
+- Bad: if `kv/core/keycloak zot_client_secret` is missing, the `zot-oidc` secret isn't created and the Zot pod
+  can't start. `configure-realm.sh` must run before this is applied.
+
+#### Related
+
+- [ADR 0034](#adr-0034): the registry; this builds its "people log in through Keycloak".
+- [ADR 0078](#adr-0078): groups as the only place access is assigned.
+- [ADR 0028](#adr-0028), [ADR 0058](#adr-0058): the issuer.
+
+## ADR-0098: The shared-module framework is named PaC - Platform as Code, and its package is renamed with no compatibility alias
+{: #adr-0098 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `terragrunt-shared-module`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+The shared module's Python package, project and command carried another organisation's name, and its docs, defaults,
+examples and tests named that organisation's GitHub orgs, domains, registries and secrets. The framework now
+deploys to many providers and platforms (Azure, AWS, GCP, Cloudflare, GitHub, JFrog, Kubernetes, Helm, k3d), so "IaC"
+undersells it, and the other organisation's names don't belong in it.
+
+Every consumer repo's `entrypoint.py` imports the package by name. CI is unaffected (the reusable workflows copy the
+shared module's own `entrypoint.py` over the consumer's), but a local run uses the consumer's copy with the sibling
+shared module checkout. The shared module refreshes that copy only after it has imported the package, so after a
+rename a consumer with the old file can't run locally until it gets the new one.
+
+#### Decision
+
+- The framework is **PaC - Platform as Code**. The package is `platform_as_code` (project `platform-as-code`, command
+  `pac`, base error `PacError`).
+- Every other organisation's name becomes a Cloudutsuk one: GitHub org `cloudutsukpilot`, `home.cloudutsuk.com` hosts,
+  `CLOUDUTSUK_*` secrets and variables, `cloudutsuk-*` Kubernetes secrets. Only the `cloudutsuk` org profile remains.
+- No compatibility alias: it would have to carry the old name. The shared module PR and the six consumer
+  `entrypoint.py` PRs merge the same day instead, and local checkouts pull `main` before the next run. The entrypoint also drops its fallback to the pre-`src/` layout.
+- The repository keeps its name (`terragrunt-shared-module`) for now; renaming it is a later decision.
+
+#### Considered options
+
+1. **Rename, merge the same day** (chosen): no old name left anywhere; only a local run with an out-of-date checkout
+   fails.
+2. **Rename with an alias package under the old name, removed later**: no failure window, but the old name stays in the
+   repo for weeks and needs a third round of PRs.
+3. **Consumers' entrypoint tries both names first**: same as 2, with the old name in six repos instead of one.
+4. **Keep the name**: no work, but the name stays wrong for a multi-platform framework.
+
+#### Consequences
+
+- Good: one name for the framework everywhere, and no other organisation's names in it.
+- Good: the terraform-drift, Stack Author and change-correlator agents need no code change: they read the shared
+  module's `cloud/` tree, plan artifacts and `config.yaml` keys, none of which change.
+- Bad: a local run fails until both the consumer and the sibling shared module checkout are on the new `main`.
+- Bad: infra-azure changes the `github-repository` tag in place on its resources (to `cloudutsukpilot/infra-azure`).
+
+#### Related
+
+- ADR 0096
+- Shared module plan: `docs/plans/rename-to-platform-as-code.md`
+
+## ADR-0099: Dependency-Track keeps the inventory of every SBOM CI builds, on platform, with its database in platform-db
+{: #adr-0099 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-12 · `homelab-gitops`, `infra-local`, `homelab-services`</span>
+
+#### Context
+
+Every `main` build of `build-image.yaml` writes a CycloneDX SBOM per platform with Syft and attests it on the
+image index in Zot (ADR 0033). Kyverno checks that the attestation exists, but nothing reads what is inside it:
+there is no list of the components and licences that run on the platform, and a CVE published after a build is
+only found if the image is rebuilt and Trivy runs again (ADR 0032). Roadmap Phase 3a step 5b asks for one
+dashboard with every `main` image's components, licences and open CVEs, where a new CVE shows up without a
+rebuild. The plan is `docs/plans/dependency-track.md`.
+
+OWASP Dependency-Track (Apache-2.0) does that: it takes SBOMs over its API, keeps the inventory, and re-checks
+it against advisory feeds on a schedule. Checked on 2026-11-12 for the release we would run:
+
+- **Release 5.2.1** (2026-10-25), Helm chart `dependency-track` 2.9.0, published as OCI on ghcr.io and pulled
+  through Zot's mirror (`mirror/ghcr.io/dependencytrack/helm-charts`). Version 5 needs only PostgreSQL: its
+  work queue runs in the database, and the chart renders an api-server, a frontend and a PVC, with no broker.
+- **Images** `dependencytrack/apiserver` and `dependencytrack/frontend` 5.2.1 are OCI indexes with linux/amd64
+  and linux/arm64, and both resolve through Zot's `mirror/docker.io`. Both run as numeric non-root users
+  (1000 and 101).
+- **Secrets.** The api-server needs a database login and a key encryption key (KEK, 32 random bytes) for the
+  secrets it stores in Postgres, such as feed tokens and notification webhooks. The chart doesn't generate
+  either; it reads existing Secrets.
+- **Admission.** The api-server's defaults already meet the restricted profile and a read-only root (it writes
+  `/data`, a PVC, and `/tmp`). The frontend's default is a writable root, because its start script rewrites
+  `static/config.json` (API and OIDC settings) and nginx renders `conf.d/default.conf` from a template. With the
+  config file mounted read-only from a ConfigMap and an `emptyDir` on `/etc/nginx/conf.d`, it starts and serves
+  the mounted config (tested with `docker run --read-only`, 2026-11-12); its script skips the rewrite when the
+  file can't be written. A render of the draft values passes all six platform policies with the Kyverno CLI
+  v1.19.1 (12 pass, 0 fail).
+- **Sign-in.** The SPA runs the OIDC code flow itself (`OIDC_FLOW=code`, callback
+  `/static/oidc-callback.html`); the api-server only validates the ID token against the issuer and client ID,
+  provisions the user, and syncs teams from a claim.
+- **Egress.** Version 5 refuses outbound connections outside `dt.outbound.allowed-destinations` (default
+  `external,private`); the database and the OIDC issuer are always allowed.
+
+#### Decision
+
+- **Run Dependency-Track 5.2.1 on `platform`**, namespace `dependency-track`, from the upstream chart 2.9.0
+  with values inline in the Application (ADR 0072 rule 3). Images by index digest. One api-server replica
+  (`monolith` topology) with a 10 GiB `local-path` PVC; requests 250m CPU and 2 GiB, limit 3 GiB to start,
+  resized from what mon shows after a week. Ingress
+  `dependency-track.platform.home.cloudutsuk.com` (Traefik, cert-manager `letsencrypt`); the chart routes
+  `/api` to the api-server and `/` to the frontend on one host, so the UI calls the API with relative URLs.
+- **The database is `dtrack` in `platform-db`**, with its own owner role `dtrack` (ADR 0035), created by an
+  init script for new data folders and once by hand on the existing one. platform-db already has host storage,
+  nightly dumps and Velero coverage; a second Postgres would need all three again.
+- **Secrets in OpenBao `kv/platform/dependency-track`**: `db_password`, `kek` (base64, 32 bytes, `config`
+  mode), and `admin_password`, seeded with `host/openbao/seed-random.sh`. The `dtrack` password also goes to
+  `kv/platform/platform-db dtrack_password` for the init script. ExternalSecrets render the chart's
+  `dependency-track-db` and `dependency-track-kek` Secrets. The KEK can't be rotated in place in `config`
+  mode; moving to a Tink keyset is a later change if rotation is needed. Losing the KEK loses only the secrets
+  stored in Dependency-Track (feed tokens, webhooks), which are re-entered.
+- **Feeds: NVD, GitHub Advisories, and OSV** for PyPI, npm, Go, Maven, Alpine, Debian and Ubuntu, set by
+  infra-local `host/dependency-track/configure-feeds.sh`. Only GitHub Advisories needs a credential: a GitHub
+  token with no permissions, kept in OpenBao `kv/platform/dependency-track github_token` and copied into
+  Dependency-Track's own secret store (encrypted with the KEK). NVD needs no key in 5.x: it mirrors NVD's public
+  JSON 2.0 feed files and has no key setting (checked on the live 5.2.1, 2026-11-12; corrected from "an NVD API
+  key" in the first draft). Outbound destinations are narrowed to `external`.
+- **OS packages are matched through their distribution's data, not NVD.** The SBOM copy uploaded to
+  Dependency-Track drops the CPE of every `pkg:deb`, `pkg:apk` and `pkg:rpm` component (the attested SBOM in
+  Zot keeps it). With the CPE, NVD's upstream version ranges flagged Debian packages whose fixes Debian had
+  backported: on 2026-11-13 every critical in the Python images (OpenSSL and Perl, 25 criticals and 123 highs
+  across 15 images) was such a false positive, all fixed in the versions we ship per Debian's tracker. Without
+  it, OSV's Debian, Ubuntu and Alpine data (matched by package URL, backport-aware) is the only source for them,
+  the same data Trivy's gate reads. Language packages keep NVD, GitHub and OSV.
+- **Sign-in through Keycloak** with a **public client `dependency-track`** (PKCE, `groups` claim with bare
+  group names), created by `host/keycloak/configure-realm.sh` and gated by its app groups (ADR 0078). The
+  api-server has `DT_OIDC_*` set: issuer `https://auth.cloudutsuk.com/realms/homelab`, username claim
+  `preferred_username`, user provisioning and team synchronisation on, teams claim `groups`. The frontend's
+  `config.json` comes from a ConfigMap. Teams and their group mappings:
+
+  | Team | Keycloak groups | Permissions |
+  |---|---|---|
+  | Administrators | `platform-admins`, `dependency-track-admin` | everything |
+  | Triage | `platform-editors`, `dependency-track-editor` | view portfolio, view and audit vulnerabilities, view policy violations |
+  | Viewers | `platform-viewers`, `dependency-track-viewer` | view portfolio, view vulnerabilities |
+  | `ci-upload` | none (API key only) | `BOM_UPLOAD`, `PROJECT_CREATION_UPLOAD`, `PORTFOLIO_MANAGEMENT_CREATE`, `VIEW_PORTFOLIO` |
+
+  The built-in `admin` account gets the random `admin_password` and is used only to create the teams and
+  mappings and for break-glass.
+- **Project model.** One parent project per image (`platform/<image>`), a **collection project**
+  (`AGGREGATE_LATEST_VERSION_CHILDREN`) that CI creates on the image's first upload, and one child per platform
+  (`platform/<image>/linux-amd64`, `.../linux-arm64`), version = the git SHA, uploaded with `isLatest=true` so the
+  parent and the portfolio count only the newest version. A BOM upload can create a project only under a parent
+  that already exists, so the `ci-upload` team also has `PORTFOLIO_MANAGEMENT_CREATE` (checked on 5.2.1,
+  2026-11-12). A weekly job keeps the last five versions of each project active.
+- **CI uploads on `main` only**, after the SBOMs are attested, to the in-cluster service with the `ci-upload`
+  API key from `kv/ci/dependency-track`. **An upload failure never fails the build**; it is reported in the job
+  summary, so Dependency-Track being down doesn't stop deploys. A one-off backfill uploads the attested SBOMs
+  of every digest currently pinned in this repo.
+- **Telemetry.** Metrics are on (management port 9000, `/metrics`), scraped by mon; dashboard and alerts as
+  code (ADR 0027): feed mirror older than 48 h, and a new critical in a latest project. New critical and high
+  findings on latest versions also go to Slack from Dependency-Track's own notifications.
+- **Scope of v1** is images built here. Not in v1: SBOMs for third-party images, matching projects to the
+  digests running in each cluster, licence and component policies, forwarding to DefectDojo (step 5a).
+
+#### Considered options
+
+1. **Dependency-Track on platform with platform-db (chosen).**
+2. **Dependency-Track with its own Postgres** (a second StatefulSet or the chart's quickstart database): one
+   more database to size, back up and restore, for a service whose data can be rebuilt from the SBOMs in Zot.
+3. **Dependency-Track 4.x** (chart 1.x): still patched, but 5.x is the line that gets new features, and a 4 to
+   5 move later is a reinstall with a data migration; starting on 5 avoids it.
+4. **GUAC** or **Trivy's server mode**: GUAC is a graph of supply-chain facts with no triage workflow or
+   dashboards; Trivy server rescans an image on request but keeps no inventory and doesn't re-check old SBOMs
+   on its own.
+5. **Only Trivy in CI** (today): finds CVEs at build time and never again.
+
+#### Consequences
+
+- Good: one place shows every component and licence in the images built here, and new advisories are matched
+  against them daily without a rebuild.
+- Good: the SBOMs ADR 0033 already produces get a reader; no new scanner in CI.
+- Good: sign-in and roles come from the same Keycloak groups as every other app.
+- Bad: about 2 to 3 GiB of memory on `platform` and one more database in platform-db; its dumps grow with the
+  inventory.
+- Bad: a KEK to keep. If `kv/platform/dependency-track kek` is lost, the stored feed tokens and webhooks must
+  be entered again.
+- Bad: a CVE that only NVD knows (not yet in the distro's data) isn't matched to an OS package. The distros
+  publish within days, and NVD matching of OS packages was mostly noise here.
+- Bad: "latest" means the newest `main` build, which Argo CD runs, but not proof of what runs in each cluster
+  until digest matching is added.
+
+#### Related
+
+- [ADR 0032](#adr-0032): Trivy at build time; this adds the inventory after it.
+- [ADR 0033](#adr-0033): the SBOM attestations this reads.
+- [ADR 0035](#adr-0035): one database and owner per service.
+- [ADR 0072](#adr-0072): third-party charts, values in the Application.
+- [ADR 0078](#adr-0078): app groups as the only place access is assigned.
+- [ADR 0027](#adr-0027): the dashboard and alerts.
+
+## ADR-0100: The shared module repository is renamed platform-as-code, and its checkout folder keeps its name
+{: #adr-0100 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-12 · `platform-as-code`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`, `reusable-workflows`</span>
+
+#### Context
+
+ADR 0098 named the framework PaC - Platform as Code and kept the repository name `terragrunt-shared-module` for later.
+The name appears in two different ways:
+
+- the **GitHub repository** `cloudutsukpilot/terragrunt-shared-module`: every consumer's `terragrunt-cicd.yaml` calls
+  its reusable workflows with `uses: <org>/<repo>/.github/workflows/*.yaml@main` (rendered from `iac_shared_repo` in
+  the consumer's `config.yaml`), Stack Author reads module docs from it, and the standards catalogue lists it;
+- the **checkout folder** `terragrunt_shared_module`: about 420 Terragrunt units find it with
+  `find_in_parent_folders("terragrunt_shared_module")`, and it is in `src/`, the CI checkout paths, every consumer's
+  `entrypoint.py` and the shared NFS path on the Spark and the homelab PC.
+
+GitHub redirects git clone, fetch and push and the web UI after a rename, but not `uses:` references to a renamed
+repository's workflows: those fail with `repository not found`. A new repository with the old name ends the redirects.
+
+#### Decision
+
+- Rename the GitHub repository to `cloudutsukpilot/platform-as-code`.
+- Keep the checkout folder `terragrunt_shared_module`. Nobody sees it, and changing it touches every unit and every
+  machine's path for no change in behaviour.
+- Prepare every pull request first (shared module, the six consumers, platform-wardens, reusable-workflows), rename,
+  then merge them straight away. Never create a new repository called `terragrunt-shared-module`.
+
+#### Considered options
+
+1. **Repository only** (chosen): about ten small pull requests, consumer CI down only between the rename and the
+   consumer merges.
+2. **Repository and folder**: one name everywhere, but a change to about 420 units, the CI paths, every consumer's
+   `entrypoint.py`, `.gitignore`, `.yamllint` and `Taskfile.yml`, and both machines' paths, while other sessions work
+   in the same checkout. No infrastructure change either way (Terraform only re-downloads module sources).
+3. **New repository, archive the old one** (GitHub's advice for renamed actions): no redirect gap, but it loses the
+   pull request history and the read token's and GitHub App's repository grants.
+4. **Keep the name**: no work, but the repository keeps a name the framework outgrew.
+
+#### Consequences
+
+- Good: the repository has the framework's name; nothing changes for Terraform state (keys are named after the
+  consumers), the read token or the GitHub App (both bound to the repository ID).
+- Good: the terraform-drift agent reads `iac_shared_repo` from each consumer, so it follows the consumers' change.
+- Bad: consumer CI fails with `repository not found` from the rename until each consumer's pull request merges.
+- Bad: two names to explain: the repository `platform-as-code`, the folder `terragrunt_shared_module`.
+
+#### Related
+
+- ADR 0098
+- Shared module plan: `docs/plans/rename-to-platform-as-code.md` (phase 2)
 
 {% endraw %}
 <!-- adr:end -->
