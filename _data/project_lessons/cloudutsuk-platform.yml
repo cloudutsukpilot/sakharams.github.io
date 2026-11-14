@@ -959,3 +959,14 @@ lessons:
     fix: "The copy of the SBOM sent to the inventory drops the CPE of operating-system packages, so they are matched only through OSV's Debian, Ubuntu and Alpine data, which knows the backports (the signed SBOM keeps everything). A re-upload of every image's latest SBOM took the criticals across all images from 49 to 14, and the Python images to none."
     lesson: "Before triaging a finding on an OS package, check where the match came from: an NVD match on a distribution package is often a backport the distribution already fixed. Match OS packages against the distribution's own advisories, and keep NVD for application dependencies."
     adrs: ["0099", "0032"]
+
+  - id: L089
+    date: 2026-11-14
+    step: "Phase 1, step 5b"
+    title: "A policy and an operator rewrote one Deployment a million times, and only the API servers' CPU showed it"
+    tags: [kyverno, opentelemetry, k3s, memory, policy]
+    symptom: "On the homelab PC each Kubernetes API server (k3s) held 2.5-3.4 GiB and 1-2.5 CPU cores, while the one cluster without Kyverno held 1 GiB at 5% CPU. No alert fired and no app was unhealthy."
+    cause: "A Kyverno mutating policy lowers every Deployment's revision history to 3. The OpenTelemetry operator owns its target allocator Deployment and writes 10 back on every reconcile, so the two took turns: the Deployment reached over a million generations per cluster, Kyverno kept about 1,000 pending update requests, and the API servers' datastores grew to 0.7-1.5 GiB against 37 MiB."
+    fix: "The policy now skips any Deployment with a controller owner reference, as trigger and as target. Operators keep their own value."
+    lesson: "Never mutate an object an operator owns: the operator is the source of truth and will undo it forever. When API server CPU or memory is high, look at write rates and object generations before blaming the object count."
+    adrs: ["0090", "0033"]

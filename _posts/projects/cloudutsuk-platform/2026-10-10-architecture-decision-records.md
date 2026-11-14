@@ -878,6 +878,7 @@ Without targets, "up" is undefined and alerts are either noisy or missing.
 
 - [ADR 0015](#adr-0015)
 - [ADR 0031](#adr-0031)
+- [ADR 0101](#adr-0101): how the Locust runs are built
 
 ## ADR-0021: Arize Phoenix for RAG and LLM trace visualisation, fed by the same OTel pipeline as Tempo
 {: #adr-0021 }
@@ -1455,6 +1456,7 @@ UI, an LLM and load-sensitive components on one box.
 - [ADR 0020](#adr-0020)
 - [ADR 0032](#adr-0032)
 - [ADR 0043](#adr-0043)
+- [ADR 0101](#adr-0101): how the Locust runs are built
 
 ## ADR-0032: Security scanning in the pipeline
 {: #adr-0032 }
@@ -1580,6 +1582,12 @@ images should be pinned.
     reports were clean while admission denied the runner pods. `features.policyExceptions` is now on.
   - `failurePolicy` is Ignore (one admission replica), so a pod created while Kyverno is down isn't
     checked at admission. An evaluation error, such as an unreadable signature, denies.
+- Amended (2026-11-13): a fifth exception, `velero-pod-volume-pods`. Since Velero 1.17 each file-system backup
+  or restore runs in its own short-lived pod (the node agent's image, as root, one pod volume as a hostPath
+  under `/var/lib/kubelet/pods`). Admission denied them on `platform` and `ai`, so those clusters' database
+  dumps were never in a backup (seen 2026-11-13, [ADR 0073](#adr-0073)). The
+  exception covers Pod Security and the read-only root only; their requests and memory limit come from the
+  node agent's ConfigMap, so `require-requests-limits` still applies.
 
 #### Considered options
 
@@ -2029,6 +2037,13 @@ What Velero offers and where it doesn't fit as-is (Velero 1.18 docs):
   its data in `/srv/backups/velero`; schedules, hooks, retention and Kopia encryption stay, and the
   `infra-azure` stack is destroyed after the migration. Retention becomes 7 days for every backup (the
   weekly schedule is removed).
+- Built (2026-11-13, [ADR 0073](#adr-0073) and its plan
+  velero-backups-on-spark): Garage on the Spark with a bucket and key
+  per cluster (`kv/<cluster>/velero`), the AWS plugin v1.14.4 instead of the Azure one, location `spark` in
+  every cluster. The Azure account had been deleted on 2026-11-09, so there are no backups from then to
+  2026-11-13. File-system backups on `platform` and `ai` had also failed since Velero 1.17+ (oldest kept: 2026-11-06): Kyverno
+  denied the pod-volume pods until the `velero-pod-volume-pods` exception (ADR 0033) and the node agent's
+  `podResources` (2026-11-13).
 
 #### Considered options
 
@@ -3863,6 +3878,28 @@ model weights (~256 GB) already live on the Spark.
 - **Every image we build is multi-arch** (amd64 + arm64). CI pushes and signs the image *index*, and
   Kyverno verifies the index digest. This replaces the arm64-only manifest digests of ADR 0043 and keeps a
   rollback to the Spark possible.
+- Amended (2026-11-13): arm64 is optional per image. `build-image.yaml` takes `arm64` (default `true`); callers
+  whose images run only on the PC set it to `false` and get an amd64-only index. With `platform` on the PC, the
+  in-cluster BuildKit is amd64, so every arm64 build runs under QEMU: the portal's took about 24 minutes against
+  about 1 natively, and its tests ran BuildKit out of memory (6Gi). arm64 stays on for the `gpu` cluster's images
+  (image-gen, video-gen, model-arbiter), which run on the Spark. Kyverno resolves an index to linux/amd64, so an
+  amd64-only index passes. Cost: those images can no longer roll back to the Spark without a rebuild with
+  `arm64: true`.
+- Amended (2026-11-14): amd64 is optional too. `build-image.yaml` takes `amd64` (default `true`); the `gpu`
+  cluster's images (image-gen, video-gen, model-arbiter) set it to `false`, since no amd64 node runs them, and
+  their amd64 build, Trivy scan and SBOM (about 3 minutes of every image-gen run) go. Those images are pushed and
+  pinned as the arm64 image itself, not as an index: Kyverno v1.19.1 loads an image with go-containerregistry's
+  `remote.Image` and no platform option, which resolves an index to its linux/amd64 child, so a pod naming an
+  arm64-only index fails `verify-image-signatures`. A plain arm64 image passes; checked on `gpu` with a
+  server-side dry run of image-gen's Deployment (its signed arm64 image admitted, a missing digest denied).
+  Signature and SBOM attestation sit on that image, as on an index. Cost: those images can't run on the PC
+  without a rebuild with `amd64: true`, which a 16 GB RTX 5070 Ti couldn't hold anyway.
+- Amended (2026-11-14): the Spark also runs one CI service, a rootless arm64 BuildKit (infra-local
+  `host/ci/buildkit-arm64.sh`), because emulating arm64 on the PC cost most of every gpu image's build: image-gen's
+  pip layer took 195 s under QEMU against about 10 s native. It listens only on the direct cable's address, takes
+  only the CI client certificate (`kv/ci/buildkit-arm64`), and is capped at 12 GB of memory, 8 CPUs and a 60 GB
+  cache so builds can't take the models' memory. `build-image.yaml` uses it when it answers within 20 s and falls
+  back to the emulated BuildKit in `platform` otherwise, so the Spark being down or busy never blocks a build.
 - **The move is a planned DR restore** (ADR 0015): rehearsed in full on the PC while the Spark stays live,
   then cut over in one maintenance window, with the Spark's old clusters stopped (not deleted) for a 14-day
   rollback period. The step-by-step runbook is
@@ -6311,6 +6348,13 @@ undone by self-heal within minutes. The old ReplicaSets are not part of how we r
 3. **Kyverno's own Deployments**, which Kyverno doesn't mutate, get 3 from the `kyverno` ApplicationSet's
    chart values. `kube-system` (Traefik, from k3s) stays out of scope.
 4. The limit is 3, matching what our own manifests already set.
+5. **Deployments an operator owns are left out** (added 2026-11-14): one with a controller `ownerReference`
+   is neither a trigger nor a target. Its operator writes the spec back on every reconcile, so mutating it is
+   a loop. The OpenTelemetry operator's `cluster-targetallocator`, the only such Deployment on the clusters,
+   was rewritten 1-2 times a second from the policy's first sync: 1.25-1.6 million generations per cluster,
+   about 1,000 pending UpdateRequests at a time (about 990,000 created and deleted on platform since k3s last
+   started), k3s at 1.1-2.4 cores and 2.5-3.4 GiB on each Kyverno cluster against 5% and 1 GiB on core, and
+   SQLite datastores of 0.7-1.5 GiB against 37 MiB. It keeps its operator's 10; it has one ReplicaSet.
 
 #### Considered options
 
@@ -6331,6 +6375,8 @@ undone by self-heal within minutes. The old ReplicaSets are not part of how we r
 - Bad: the policy changes objects that Helm charts render, so the live value differs from the chart's
   manifest. The README and this ADR say why.
 - Bad: core (no Kyverno) keeps the chart defaults.
+- Bad: a mutation that an operator undoes never settles, and nothing alerts on it: it showed up only as k3s
+  CPU and memory (decision 5). Operator-owned Deployments keep their operator's value.
 
 #### Related
 
@@ -6715,8 +6761,12 @@ Two gaps stood in the way:
   BuildKit in `platform`, as `build-image.yaml` does, and keep the result in the build cache.
 - **`docker://` actions** become the tool's release binary, checked against its published sha256
   (`reusable-workflows`' `actionlint`).
-- **Stay on GitHub-hosted, for now:** `job-hunter-agent`'s `supabase` job (`supabase start` needs a Docker
-  daemon), the Copilot coding agent and Dependabot. About 30 minutes a month in all.
+- **Integration tests that need a database run it inside the job, not in Docker.** `job-hunter-agent`'s
+  `supabase` job started with `supabase start` (needs a Docker daemon) and stayed on GitHub-hosted runners
+  until GitHub refused hosted jobs over billing (2026-11-13), which blocked its image. Since 2026-11-14
+  (job-hunter-agent#37) it runs on `homelab`: `scripts/local_supabase.py` starts Postgres 17 and PostgREST
+  from their release binaries (pinned by sha256) with Supabase's API roles, about 30 s a run.
+- **Stay on GitHub-hosted:** the Copilot coding agent and Dependabot.
 
 #### Considered options
 
@@ -7116,6 +7166,93 @@ repository's workflows: those fail with `repository not found`. A new repository
 
 - ADR 0098
 - Shared module plan: `docs/plans/rename-to-platform-as-code.md` (phase 2)
+
+## ADR-0101: Locust load tests run as CronJobs in perf on platform, report through OTLP and alert in Slack
+{: #adr-0101 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-14 · `homelab-gitops`, `homelab-services`</span>
+
+#### Context
+
+ADR 0031 chose Locust for nightly load tests in a `perf` namespace, with thresholds that fail the run and
+results on a Performance dashboard. ADR 0020's SLO targets stay `proposed` until a first Locust baseline exists.
+Neither says where the generator runs, how results reach `mon`, what a failed run does, or which of the
+platform's ~40 apps are worth loading. Phase 3a step 4 builds it now, ahead of the rest of Phase 3a (owner
+decision, 2026-11-14): nothing in it needs Phase 3. The plan is
+docs/plans/locust-load-testing.md.
+
+#### Decision
+
+- **Where:** two CronJobs in namespace `perf` on `platform`: `perf-nightly` (22:30 UTC, after the Velero
+  nightly and the 21:xx jobs) and `perf-weekly-gpu` (Sunday 23:30, after the nightly). On demand:
+  `kubectl create job --from=cronjob/<name>`. `concurrencyPolicy: Forbid`, `backoffLimit: 0`,
+  `activeDeadlineSeconds`, generator limits; the pod passes every Kyverno policy. One Locust process per
+  scenario (no master and workers): at most 50 users, which gevent handles in one process.
+- **Code:** `homelab-services/services/loadtest`, a `uv` workspace member with one locustfile per scenario and a
+  `thresholds.yaml`, built by `build-image.yaml` like any service (amd64, signed, digest in `apps/perf`).
+  Locust is pinned at 2.46.6: 2.47.0 is newer than the workspace's `exclude-newer` house rule allows.
+- **Targets:** nightly: hello-world (harness calibration), LiteLLM with `mock_response` (gateway overhead, no
+  GPU), embeddings, Qdrant search on `perf-*` collections, the portal's catalog and search APIs. Weekly GPU:
+  chat time to first token, then gemma (never together, the model arbiter would swap them), then image-gen at
+  1 to 2 users. On demand only: Keycloak's token endpoint, job-hunter, shorts-studio, lab-runner read endpoints.
+  `rag-api` joins when Phase 5 builds it.
+- **Never loaded:** anything through Cloudflare; `mon`'s stores; SearXNG and `mcp-web-search` (public search
+  engines behind them); Hermes (personal data); databases, Zot, OpenBao, PowerDNS, Temporal (other tools if
+  ever needed); `video-gen`; admin UIs and agent workers. Model-level throughput stays with `vllm bench serve`.
+- **Measurement:** step-load shapes to find the knee; GPU scenarios warm the model first and record cold start
+  apart from the p95; time to first token is its own request event from the streamed response.
+- **Results:** OpenTelemetry metrics (`--otel`, traces and logs off) through the cluster's collector to Mimir:
+  the harness's own histogram `loadtest_request_duration_seconds_*{job="perf/<scenario>", instance="<run id>",
+  request_type, name, failed}`, next to Locust's own metrics. Locust's `locust.client.duration` can't carry the
+  dashboard: the SDK's default buckets put every request under 5 s in one bucket, and it has no request type, so
+  time to first token merges with the full answer (found on the first run, 2026-11-14). Dashboard "Load tests" in
+  the Grafana **Performance** folder. No Locust traces to Tempo.
+- **A failed run:** the threshold check sets a non-zero exit code, the Job fails, and a Mimir rule
+  `LoadTestFailed` on kube-state-metrics alerts in **Slack** through Alertmanager. No GitHub issue (owner
+  decision, 2026-11-14): no GitHub token in the cluster for it.
+- **Phoenix:** `perf` calls go through LiteLLM with their own virtual key (`perf`, rpm limit, budget, tag
+  `perf`, `turn_off_message_logging`). LiteLLM's Phoenix callback stays on for them, so the gateway's
+  overhead is measured as it is in real use; the OTLP gateway drops their spans in `traces/phoenix`, so
+  Phoenix and `ai-db` hold only real traffic. Tempo keeps them. The exact span attribute to filter on is
+  checked against a real `perf` span when the filter is written.
+- **Credentials** in OpenBao under `kv/platform/perf/*`: the LiteLLM key, a Backstage static token (catalog
+  and search only), a Keycloak client `perf`, Qdrant access confined to `perf-*`.
+
+- Amended (2026-11-14, owner request): **a web UI as well**, for trying scenarios by hand. A Deployment
+  `locust-ui` in `perf` runs `loadtest ui` (Locust's web UI, every scenario in its class picker) at
+  `https://locust.platform.home.cloudutsuk.com`, internal only, behind an oauth2-proxy sidecar and the Keycloak
+  client `locust`, gated to `platform-admins` and `locust-admin` (ADR 0078), like the wardens console. Still no
+  Locust master or operator: the UI is one process, and the scheduled runs stay headless CronJobs, which own the
+  thresholds and the alert. UI runs report as `job="perf/ui"` and set no exit code; only the picked scenario's
+  warm-up and setup run. A UI run sends real load, so it is not started while a scheduled one is going.
+
+#### Considered options
+
+1. **Scheduled GitHub Actions on the ARC runners**: an HTML report artifact and an issue come for free, but a
+   30-minute run holds a CI runner, and it moves away from ADR 0031's `perf` namespace.
+2. **Locust operator or Helm chart with a standing master and web UI**: a UI nobody watches at 04:00, and one
+   more controller to keep up. A headless Job is enough at homelab scale. (The amendment adds a single-process
+   UI for runs by hand, without a master or operator.)
+3. **CronJob in `perf`, OTLP metrics, Slack alert** (chosen).
+4. **Phoenix: keep `perf` spans**: shows load next to real traffic, but tens of thousands of synthetic spans a
+   night bury real traces and fill `ai-db`; Grafana already shows the load metrics.
+
+#### Consequences
+
+- Good: ADR 0020's targets get data; regressions show up the morning after.
+- Good: Uses the platform's own paths (build, Kyverno, OTLP, Alertmanager); nothing new to operate.
+- Bad: The generator shares the homelab PC with `platform` and `ai`; the dashboard shows host CPU next to
+  latency so a starved generator isn't mistaken for a slow target.
+- Bad: A failure is a Slack message, not a tracked issue; follow-up is by hand.
+- Bad (amendment): one more signed-in UI to keep up (Keycloak client, two secrets, a Homarr tile), and an admin
+  can start load by hand at any time; the gate keeps that to admins.
+
+#### Related
+
+- [ADR 0020](#adr-0020)
+- [ADR 0031](#adr-0031)
+- [ADR 0063](#adr-0063)
+- [ADR 0093](#adr-0093)
 
 {% endraw %}
 <!-- adr:end -->
