@@ -970,3 +970,14 @@ lessons:
     fix: "The policy now skips any Deployment with a controller owner reference, as trigger and as target. Operators keep their own value."
     lesson: "Never mutate an object an operator owns: the operator is the source of truth and will undo it forever. When API server CPU or memory is high, look at write rates and object generations before blaming the object count."
     adrs: ["0090", "0033"]
+
+  - id: L090
+    date: 2026-11-15
+    step: "Phase 1, step 1g"
+    title: "A version bump in the shared CI quietly brought back a download in every IaC job"
+    tags: [github-actions, arc, python, runner-image]
+    symptom: "Every Terragrunt plan on the homelab IaC runners spent about 17 s in 'Set up Python 3.13': 'Version 3.13 was not found in the local cache', a download, then pip uninstalled and reinstalled. Nothing failed, so nobody noticed for two weeks."
+    cause: "The shared module moved its workflows to Python 3.13 (GitHub's new Ubuntu image has no 3.12 builds), but the runner image's venv was still on the base image's 3.12.3. The Python check didn't match, so setup-python ran, downloaded 3.13 into the ephemeral pod's empty tool cache, and its install script upgraded the bundled pip, as it does on every fresh install."
+    fix: "The image pins CPython 3.13 (python-build-standalone, checksum-verified) and builds its venv on it, so the check passes and setup-python is skipped."
+    lesson: "When a runner image bakes in versions that a shared workflow pins, a bump on one side quietly falls back to downloading, because the fallback is built not to fail. Keep the pins next to each other and look at setup step timings after every version bump."
+    adrs: ["0059"]
