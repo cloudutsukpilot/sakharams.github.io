@@ -2,6 +2,7 @@
 
 | You want… | Skill | Makes | Needs |
 |---|---|---|---|
+| A **new blog post** from a prompt: folder, front matter, 1,500–3,000 words in a human voice, cover image, htmlproofer (also what shorts-studio follows for its posts) | `create-blog` (`/create-blog <topic>`) | `_posts/<folder>/<date>-<slug>.md` and `assets/img/<folder>/<slug>.webp` | Pillow for the cover; Ruby for htmlproofer |
 | A cover/hero image for one post (the default) | `cloudutsuk-image-level-1` | Flat designed 1200×630 WebP: title, tags, tool icon | Nothing (offline) |
 | A 3D-rendered cover | `cloudutsuk-image-level-2` | Three.js scene + brand overlay | One-time Node setup |
 | An illustrated or photographic cover | `cloudutsuk-image-level-3` | Flux AI art + brand overlay | Cloudflare keys in `.env` |
