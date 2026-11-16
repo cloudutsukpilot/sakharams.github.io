@@ -981,3 +981,14 @@ lessons:
     fix: "The image pins CPython 3.13 (python-build-standalone, checksum-verified) and builds its venv on it, so the check passes and setup-python is skipped."
     lesson: "When a runner image bakes in versions that a shared workflow pins, a bump on one side quietly falls back to downloading, because the fallback is built not to fail. Keep the pins next to each other and look at setup step timings after every version bump."
     adrs: ["0059"]
+
+  - id: L091
+    date: 2026-11-16
+    step: "Phase 1, step 1g"
+    title: "Two merges a minute apart, and the older build deployed last"
+    tags: [github-actions, gitops, argo-cd, ci]
+    symptom: "Three pull requests to one app were merged within a minute. The newest version deployed, and two minutes later the app was back on the version before it, with its new feature gone. Nothing failed: every build was green."
+    cause: "Each merge starts its own build, and the shared build workflow commits its image digest to the GitOps repo when it finishes. The middle merge's build took 5 minutes and the last one's under 3, so the older build committed last and Argo CD deployed it."
+    fix: "Before committing a digest, the shared workflow reads which commit the last deploy of that app came from and asks GitHub whether this build's commit is behind it. If it is, the commit is skipped; it checks again after each rebase while pushing."
+    lesson: "In a pipeline that writes the desired state at the end of a build, the last writer wins, not the newest commit. Make the writer compare against what is already deployed, or deploys depend on which build happens to be fastest."
+    adrs: ["0083"]
