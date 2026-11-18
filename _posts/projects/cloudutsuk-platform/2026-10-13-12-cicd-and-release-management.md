@@ -154,9 +154,13 @@ take the digest from the upstream registry, not from `kubectl get pod`. Zot conv
 manifest lists to OCI when it mirrors a tag, so the digest a pod reports can exist only in Zot
 (lesson L052).
 
-> **TODO:** How long should Zot keep old `platform/` images and their signatures? Nothing prunes them
-> yet. A rollback needs the previous digest, so I'd keep at least the last 10 per image.
-{: .prompt-warning }
+How long Zot keeps our images (Phase 3 step 22b): a release tag such as `0.2.0` or `0.3.0rc1` stays
+for good, and every other tag stays while it is among the 20 newest of its repository or was pulled in
+the last 30 days. Any pull counts, by tag or by digest, so a pod that restarts on an old digest keeps it.
+What can still go is a digest nothing pulled for 30 days that has 20 newer tags in front of it. Signatures and SBOM attestations are OCI referrers of the
+image: Zot deletes a referrer only once the image it points to is gone, so they stay as long as the image
+does. Zot gives each tag to the first `keepTags` rule whose pattern matches it, not to all of them, so the
+release rule comes first and the count-and-age rule takes everything else (lesson L092).
 
 ## Deployment automation
 {: #deployment-automation }
@@ -312,6 +316,7 @@ What exists is a few fixed times to avoid, and a cadence for bumps:
 - [x] A PostSync smoke test fails the sync, and a revert rolls back
 - [ ] Integration tests with the lab runner, the first service with a database (Phase 3)
 - [ ] Schemathesis, and nightly Playwright, ZAP and Locust against the deployed platform (Phase 3a)
-- [ ] Renovate, image retention in Zot and a migration strategy for the first schema
+- [x] Image retention in Zot: release tags for good, the 20 newest and anything pulled in 30 days
+- [ ] Renovate and a migration strategy for the first schema
 
 {% include project-nav.html %}
