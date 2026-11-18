@@ -1003,3 +1003,14 @@ lessons:
     fix: "Release tags get their own first rule, with only a pattern, so they are kept for good. One rule after it holds both conditions for every other tag: among the 20 newest, or pulled in the last 30 days. Conditions inside one rule are combined with OR."
     lesson: "Read the code (or the tests) for the exact matching order before trusting a retention policy, and check what it deleted with its audit log or a dry run. A rule that reads well can be dead: here the docs said 'OR' and meant the conditions inside one rule, not the rules in the list."
     adrs: ["0034"]
+
+  - id: L093
+    date: 2026-11-05
+    step: "Phase 1, step 1f"
+    title: "Every runner pod was Running, and GitHub saw them all offline"
+    tags: [github-actions, arc, runners, alerting, network]
+    symptom: "Builds waited for hours with no error anywhere. The runners dashboard read 0 running, 0 busy and 0 idle with nine jobs waiting, which looked like a quiet queue, and no alert fired. Every runner pod in the cluster was Running."
+    cause: "The homelab PC had lost its path to GitHub's Actions service, so GitHub saw every runner as offline and sent them no jobs. The pods stayed up, because nothing in Kubernetes checks that a runner is still connected. The only queue alert fired when more jobs were assigned than the runner limit, and assigned never went past it."
+    fix: "An Offline runners stat (registered runners that are neither busy nor idle) on the dashboard, and an alert when a scale set has jobs assigned but no busy runner for 15 minutes, long enough for a start from zero."
+    lesson: "A pod that is Running says the process is up, not that it does its job. For a worker that pulls work from an outside service, alert on the outcome (work waiting while no worker is busy), not only on capacity."
+    adrs: ["0086"]
