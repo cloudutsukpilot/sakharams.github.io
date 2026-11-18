@@ -790,8 +790,8 @@ nodes:
         status: built
         facts:
           summary: "Plans a child task for another agent, or refuses with every reason."
-          how: "Default deny: only pairs in framework/config/handoff.yaml are allowed."
-          api: "`framework/src/wardens/handoff/policy.py`"
+          how: "Default deny, by consent in both manifests: the source lists the capability in handoffs.mayRequest, and the target capability's acceptsHandoffs.from names the source (or any, only on an agent with no actions). There is no central pair list."
+          api: "`framework/src/wardens/handoff/policy.py`, `consent.py`"
         children:
           - id: w_plan_child
             label: plan_child_task()
@@ -805,8 +805,8 @@ nodes:
             children:
               - {id: h_fn, label: plan_child_task(), icon: function, status: built,
                  facts: {summary: "Entry: parent task, chain, the finding, the target capability, spent and cost share.", how: "Raises HandoffRefused with every code, or returns the child task.", api: "`policy.py:56`"}}
-              - {id: h_pair, label: Pair allowed, icon: check, status: built,
-                 facts: {summary: "source → target must be enabled in handoff.yaml (default deny).", how: "Code pair_not_allowed.", api: "`policy.py:71`"}}
+              - {id: h_pair, label: Consent, icon: check, status: built,
+                 facts: {summary: "Source lists the capability in handoffs.mayRequest, target accepts the source in acceptsHandoffs.from, target's classification at least the source's (default deny).", how: "Codes not_requested, not_accepted, act_needs_named_source, classification.", api: "`consent.py`"}}
               - {id: h_route, label: Routable agent, icon: check, status: built,
                  facts: {summary: "The registry must resolve the capability to a routable agent.", how: "Code no_routable_agent.", api: "`policy.py:74`"}}
               - {id: h_hops, label: Hop budget, icon: check, status: built,
@@ -1607,16 +1607,16 @@ scenarios:
           **How:** each child may take up to half of what the parent task has left to spend (`cost_share` 0.5). `plan_handoff` calls `plan_child_task()`, which runs eight checks.
       - title: Checks 1 to 4
         when: planned
-        action: "plan_child_task(): pair, route, hops, cycle"
+        action: "plan_child_task(): consent, route, hops, cycle"
         path: [ph_fn, h1, h2, h3, h4]
-        text: "The pair must be enabled, the capability routable, hops left, and the target not already on the chain."
+        text: "Both manifests must consent, the capability be routable, hops left, and the target not already on the chain."
         detail: |
           **What happens:** `plan_child_task()` checks that the handoff is allowed and safe to route.
 
           **Why it matters:** these checks stop agents from sending work to each other freely, which could loop forever or spread a mistake.
 
           **How:** unlike point 4, every check runs and every reason is collected:
-          - **1.** the pair terraform-drift → `change.correlate` is enabled in `handoff.yaml` (everything else is denied by default);
+          - **1.** both manifests consent: terraform-drift lists `change.correlate` in `handoffs.mayRequest`, and the Change Correlator's capability accepts handoffs from any agent (`acceptsHandoffs.from: any`, allowed because it has no actions). Everything else is denied by default;
           - **2.** the registry finds an agent that takes `change.correlate`;
           - **3.** the parent has hops left (`hopBudget`);
           - **4.** the target isn't already in the chain, so two agents can't pass work back and forth.
@@ -1640,11 +1640,11 @@ scenarios:
         when: refused
         action: "plan_child_task(): all eight checks, every reason collected"
         path: [ph_fn, h1, h2, h3, h4, h5, h6, h7, h8, h_done]
-        text: "A pair not in handoff.yaml, or any other failed check, raises HandoffRefused with every reason."
+        text: "A handoff the manifests don't consent to, or any other failed check, raises HandoffRefused with every reason."
         detail: |
-          **What happens:** a check fails, for example because the pair isn't enabled in `handoff.yaml`, and `plan_child_task()` raises `HandoffRefused` with every reason.
+          **What happens:** a check fails, for example because the source's manifest doesn't list the capability in `handoffs.mayRequest`, and `plan_child_task()` raises `HandoffRefused` with every reason.
 
-          **Why it matters:** *default deny* means a new connection between agents has to be switched on deliberately, in a reviewed config file. Getting all the reasons at once shows everything that would need changing.
+          **Why it matters:** *default deny* means a new connection between agents has to be switched on deliberately, in both agents' reviewed manifests: the source says what it may ask for, the target says whom it accepts. Getting all the reasons at once shows everything that would need changing.
 
           **How:** the incident keeps the parent's result. The drift findings still go out, just without the "who changed it" answer.
       - title: Count it
