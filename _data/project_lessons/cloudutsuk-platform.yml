@@ -1002,4 +1002,4 @@ lessons:
     cause: "The policy listed two keepTags rules, the 3 newest tags and any tag pulled in 7 days, expecting either to keep a tag. Zot doesn't combine the rules: it gives each tag to the first rule whose patterns match it, and a rule with no patterns matches every tag. So every tag went to the 3-newest rule, and the pulled-within rule was never asked."
     fix: "Release tags get their own first rule, with only a pattern, so they are kept for good. One rule after it holds both conditions for every other tag: among the 20 newest, or pulled in the last 30 days. Conditions inside one rule are combined with OR."
     lesson: "Read the code (or the tests) for the exact matching order before trusting a retention policy, and check what it deleted with its audit log or a dry run. A rule that reads well can be dead: here the docs said 'OR' and meant the conditions inside one rule, not the rules in the list."
-    adrs: ["0034", "0109"]
+    adrs: ["0034"]
