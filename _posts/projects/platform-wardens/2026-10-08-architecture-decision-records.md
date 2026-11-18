@@ -1019,7 +1019,7 @@ We tested Microsoft's Azure MCP server (`@azure/mcp` 3.0.0, `--read-only`) on th
 
 **1. The Change Correlator agent is the one place that answers "who changed this, when, how, and is there a ticket".**
 - It is the shared agent already planned in phase 2 (capability `change.correlate`).
-- Other agents ask it through `wardens.handoff`; `terraform.drift.explain → change.correlate` is already in `framework/config/handoff.yaml`.
+- Other agents ask it through `wardens.handoff`. The drift agent lists `change.correlate` in its manifest's `handoffs.mayRequest`, and the Correlator's capability accepts handoffs from any agent (`acceptsHandoffs`), since it has no actions. (Updated November 2026: handoffs are consented in the two manifests; the central `framework/config/handoff.yaml` pair list this decision first named is gone.)
 - No agent queries audit logs on its own, and we do not build a change-evidence MCP server.
 
 **2. Per provider, it uses the provider's MCP server only where that server passes our acceptance test.** Otherwise it uses a small read tool of its own, in its `tools/`.
