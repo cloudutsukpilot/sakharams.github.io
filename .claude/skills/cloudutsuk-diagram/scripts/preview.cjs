@@ -140,11 +140,44 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       const [coll] = await visible('.dgm-node.is-collapsible');
       if (coll) {
         const before = await page.$$eval(`${sel} .dgm-group`, (x) => x.length);
+        // Stable layout: component centers (diagram units) and the camera, before and after.
+        const snap = () =>
+          fig.evaluate((f) => {
+            const d = f._dgm;
+            const c = {};
+            for (const [id, p] of d.pos) c[id] = p.c || [p.x + p.w / 2, p.y + p.h / 2];
+            return { stable: d.stable, cam: { ...d.cam }, c };
+          });
+        const s0 = await snap();
+        const cid = await coll.getAttribute('data-id');
         await coll.click();
         await page.waitForTimeout(1600);
         const after = await page.$$eval(`${sel} .dgm-group`, (x) => x.length);
         check(after > before, `click expands a component (groups ${before} → ${after})`);
         await fig.screenshot({ path: path.join(args.out, 'expanded.png') });
+        if (s0.stable) {
+          // Each component's anchor point (`c`, its layout center) on screen, before and after.
+          const s1 = await snap();
+          const scr = (s, id) => [s.cam.x + s.cam.k * s.c[id][0], s.cam.y + s.cam.k * s.c[id][1]];
+          const [a, b] = [scr(s0, cid), scr(s1, cid)];
+          const moved = Math.hypot(a[0] - b[0], a[1] - b[1]);
+          check(moved < 2, `stable layout: the opened component stays where it was on screen (moved ${moved.toFixed(1)}px)`);
+          const sign = (v) => (Math.abs(v) < 0.5 ? 0 : Math.sign(v));
+          const flipped = Object.keys(s0.c).filter(
+            (id) => id !== cid && s1.c[id] && [0, 1].some((i) => sign(s0.c[id][i] - s0.c[cid][i]) !== sign(s1.c[id][i] - s1.c[cid][i]))
+          );
+          check(!flipped.length, `stable layout: the others stay on their side of it${flipped.length ? ` (crossed: ${flipped.join(', ')})` : ''}`);
+          await fig.evaluate((f, id) => f._dgm.toggle(id), cid);
+          await page.waitForTimeout(1600);
+          const s2 = await snap();
+          const off = Object.keys(s0.c).filter((id) => !s2.c[id] || Math.hypot(s0.c[id][0] - s2.c[id][0], s0.c[id][1] - s2.c[id][1]) > 0.5);
+          check(!off.length, `stable layout: closing it puts every component back${off.length ? ` (not back: ${off.join(', ')})` : ''}`);
+          const back = Math.hypot(scr(s2, cid)[0] - a[0], scr(s2, cid)[1] - a[1]);
+          check(back < 2, `stable layout: and on screen it is where it started (${back.toFixed(1)}px off)`);
+          // Open it again, as the rest of the walk expects.
+          await fig.evaluate((f, id) => f._dgm.toggle(id), cid);
+          await page.waitForTimeout(1600);
+        }
       } else note('no expandable component in view at level 1');
       // Protocol card on hover.
       const [, pr] = await visible('.dgm-pill');

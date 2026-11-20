@@ -126,6 +126,11 @@ map: {name: world, lon: [-130, 150], lat: [65, -45]}   # optional geo backdrop (
 - [x] **6. Review with the user**, then swap the pilot into the 05-technical-architecture post
   (2026-10-11; `/diagram-pilot/` deleted). Every load now opens at the start level (Level 1); the
   URL no longer keeps the layout.
+- [x] **6b. Stable layout** (2026-11-20, from the interactive-diagrams plugin 1.4.1; the two engines
+  differ only in their header comment): every component keeps its place when another opens or closes
+  (ELK base layout per container, local push, orthogonal arrow router, the camera keeps the opened
+  component in place). `layout: auto` keeps the old full relayout. `validate.py` checks `layout`,
+  `preview.cjs` checks that the opened component stays put and that closing restores every position
 - [ ] **7. Migration** (after approval):
   - done by hand: `labs/azure-private-endpoint-lab/architecture` (parts 1 and 7 of the lab), 5
     levels, views Networking/Security/Observability/Provisioning, 6 use cases. Its old

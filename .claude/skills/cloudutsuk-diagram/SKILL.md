@@ -5,7 +5,7 @@ description: >-
   components nest in levels of detail (level 0 overview, then each level opens one more layer; click a
   component to expand or collapse it), every component's side panel shows its status, a lead sentence, how
   it works, where and when, link buttons and its API (plus notes or configuration), the canvas pans and zooms like a map, components are icons (built-in or real tool logos),
-  layout is automatic (ELK, left to right then top to bottom), and arrows carry protocol:port pills,
+  layout is automatic (ELK, left to right then top to bottom) and stays put when a component opens, and arrows carry protocol:port pills,
   communication-kind colours, continuous moving dots for streams (both ways for WebSocket) and hover
   cards that name the protocol chain; clicking an arrow opens a side panel with the whole exchange as one
   looping, animated sequence diagram grouped on a bracket rail (TCP → TLS 1.3 → HTTP, SSH, WireGuard,
@@ -21,7 +21,7 @@ description: >-
 # Cloudutsuk explorable diagrams
 
 Status and roadmap: [PLAN.md](PLAN.md). Engine: [assets/js/diagram.js](../../../assets/js/diagram.js)
-(model, levels, ELK layout, SVG, pan/zoom, panel, protocol cards, tour, geo),
+(model, levels, stable layout (ELK base layouts, local push, orthogonal arrow router), SVG, pan/zoom, panel, protocol cards, tour, geo),
 [_includes/diagram.html](../../../_includes/diagram.html), [_sass/diagram.scss](../../../_sass/diagram.scss).
 Reference diagram: [_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml](../../../_data/diagrams/projects/cloudutsuk-platform/system-architecture.yml)
 (111 components with status and facts, 5 levels, 109 arrows with certificates, 15 use cases). Do not edit the engine for one
@@ -315,7 +315,9 @@ CHROME=$CHROME node $SKILL/scripts/preview.cjs --url http://localhost:4123/<perm
 pkill -f "http.serve[r] 4123"
 ```
 
-Checked: layout at every level with no overlapping components, expand on click, the protocol card on
+Checked: layout at every level with no overlapping components, expand on click (with the stable layout:
+the opened component stays put on screen, the others stay on their side of it, and closing it puts every
+component back), the protocol card on
 hover, the detail panel (status badge, chips, lead sentence, how it works, link buttons, API), an
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
@@ -336,6 +338,7 @@ read. Never commit.
 | `level` | Level shown on every load (default 1; use 1 unless the post needs another). `levels: [names]` names the level buttons (Level 0 … deepest), one per level |
 | `direction` | Root flow (default `right`); per group `direction: down` |
 | `wrap`, `aspect` | `wrap: true` wraps a long single chain into rows (ELK MULTI_EDGE) |
+| `layout` | `stable` (default): every component keeps its place when another opens or closes. `auto`: the whole diagram is laid out again on every change (the old behaviour). Not for `map:` diagrams |
 | `min_zoom` | Opening zoom floor (default 0.62): large diagrams open at a readable zoom on their start |
 | `nodes` | Tree: `{id, label, sub?, icon?, color?, tone?, status, phase?, facts, detail?, config?, direction?, views?, children?}`. `status`: built, planned, deferred or external. `facts`: `{summary, how, where?, when?, url?, api?}` (step 1). `views`: shown only in those view tabs. `id`: lowercase, digits, `-` and `_` (appears in URLs). `icon`: built-in name or a logo path under `assets/img/icons/` (`scripts/enrich.py --find <word>` in the flow-anim skill lists logos). `config`: `{title, lang, code}` |
 | `views` | Tabs for cross-cutting connections: `[{id, label, icon?}]`; the main view (`Main flows`) is always first and `Show all` (id `*`, built in) last; don't define a view with id `*` |
@@ -351,8 +354,19 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
 
 ## How it behaves (for writing good data)
 
-- **Layout:** ELK `layered`, left to right. Each open group is laid out on its own (compact), and arrows
-  that cross groups leave through ports on the group borders, so their routes also arrange the groups.
+- **Layout (`layout: stable`, the default):** ELK `layered` places the children of every container (the
+  top level and each group) once, as closed components, with all arrows (every view and mode) lifted to
+  them. Each component keeps that center. Opening a component grows it around its center to fit its
+  children; only the components it would now touch move, straight away from it, and the push cascades
+  outward. The component just opened stays where it is on screen (the camera does not pan; it only
+  zooms out, around that component, if it no longer fits), and closing it puts everything back
+  exactly. The layout follows the order components were opened in: opening one starts from the layout
+  on screen, so a component pushed aside earlier stays where it is. A component hidden by the view tab keeps its space. Arrows are routed around the components
+  (orthogonal, fewest bends); parallel arrows get their own lanes, and pills avoid each other and the
+  components.
+- **Layout (`layout: auto`):** ELK lays out the whole visible diagram again after every change; each
+  open group is laid out on its own, and arrows that cross groups leave through ports on the group
+  borders. Compact, but components can move anywhere when one opens.
 - **Level buttons:** the toolbar has one button per level (`Level 0`, `Level 1`, … with the level's name). Clicking one walks there a layer at a time, each layer opening or closing with its own animation; a new click cancels a walk in progress.
 - **Opening view:** the whole diagram if it fits at a readable size, else a readable zoom on its start
   (drag to explore; ⤢ fits everything).

@@ -79,6 +79,10 @@ def validate(data, path):
         W("`lock` only affects use cases; this diagram has none")
     if data.get("details") and not (data.get("scenarios") or data.get("tour")):
         W("`details` only affects use cases; this diagram has none")
+    if "layout" in data and data["layout"] not in ("stable", "auto"):
+        E("`layout` must be `stable` (the default) or `auto`")
+    if data.get("layout") and data.get("map"):
+        W("`layout` doesn't apply to a `map:` diagram (components sit at their coordinates)")
 
     nodes, parent, depth = {}, {}, {}
 
