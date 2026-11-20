@@ -290,6 +290,429 @@
     return { k, lon0, lon1, lat0, lat1, x: (lon) => k * (lon - lon0), y: (lat) => k * (lat0 - lat) };
   }
 
+  const ELK_SPACING = {
+    'elk.algorithm': 'layered',
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.spacing.nodeNode': '24',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '44',
+    'elk.spacing.edgeNode': '14',
+    'elk.spacing.edgeEdge': '9',
+    'elk.layered.spacing.edgeNodeBetweenLayers': '14',
+    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+    'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'
+  };
+
+  // ---------------------------------------------------------------- stable layout
+  // Push siblings apart around the ones that grew. items: [{bx, by, bw, bh, w, h}] = base center, base
+  // size and current size (never smaller than the base). A sibling whose center lies right of a grown
+  // box's base band moves right by half the extra width, left of it moves left, inside it stays (same
+  // vertically). The grown box keeps its center. Each shift is monotone in position, so siblings that
+  // did not overlap still don't, the order never changes, and closing the box undoes it exactly.
+  function pushApart(items) {
+    return items.map((s) => {
+      let dx = 0;
+      let dy = 0;
+      for (const e of items) {
+        const ew = e.w - e.bw;
+        const eh = e.h - e.bh;
+        if (ew > 0) {
+          if (s.bx >= e.bx + e.bw / 2) dx += ew / 2;
+          else if (s.bx <= e.bx - e.bw / 2) dx -= ew / 2;
+        }
+        if (eh > 0) {
+          if (s.by >= e.by + e.bh / 2) dy += eh / 2;
+          else if (s.by <= e.by - e.bh / 2) dy -= eh / 2;
+        }
+      }
+      return { x: s.bx + dx, y: s.by + dy };
+    });
+  }
+
+  // Local push (the default): only siblings that now collide move, straight away from the one that
+  // pushes them, along the axis they were separated on in the base layout, keeping their base gap (up
+  // to 80). Pushes cascade outward. Who gives way: a pinned box (the component just opened and its
+  // open ancestors) never moves; an open one moves before a pinned one; a closed one moves first; among
+  // equals, the one farther from the nearest open box. Each box starts where the previous step of the
+  // open order left it (sx, sy; else its base center), so a box pushed earlier stays pushed. The result
+  // depends only on the base layout and the open order, so closing a component puts everything back.
+  // If it doesn't settle, pushApart.
+  // items: [{bx, by, bw, bh, sx?, sy?, box: {x0, y0, x1, y1} (current, relative to the center), grown, pinned}]
+  function pushLocal(items) {
+    const n = items.length;
+    const MAXGAP = 80;
+    const pos = items.map((s) => ({ x: s.sx ?? s.bx, y: s.sy ?? s.by }));
+    const grown = items.filter((s) => s.grown || s.pinned);
+    if (!grown.length) return pos;
+    const rank = items.map((s) => (s.pinned ? 0 : s.grown ? 1 : 2));
+    const dist = items.map((s) => Math.min(...grown.map((g) => (g === s ? Infinity : Math.hypot(g.bx - s.bx, g.by - s.by)))));
+    // The axis each pair was separated on in the base layout, its direction and the gap to keep.
+    const pairs = [];
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        const [a, b] = [items[i], items[j]];
+        const gx = Math.abs(a.bx - b.bx) - (a.bw + b.bw) / 2;
+        const gy = Math.abs(a.by - b.by) - (a.bh + b.bh) / 2;
+        const ax = gx >= gy ? 'x' : 'y';
+        const sign = Math.sign(ax === 'x' ? b.bx - a.bx : b.by - a.by) || 1;
+        pairs.push({ i, j, ax, sign, gap: Math.min(Math.max(gx, gy), MAXGAP) });
+      }
+    const ext = (k, ax) => {
+      const b = items[k].box;
+      return ax === 'x' ? [pos[k].x + b.x0, pos[k].x + b.x1] : [pos[k].y + b.y0, pos[k].y + b.y1];
+    };
+    for (let round = 0; round < 200; round++) {
+      let moved = false;
+      for (const p of pairs) {
+        const other = p.ax === 'x' ? 'y' : 'x';
+        const [o0, o1] = ext(p.i, other);
+        const [q0, q1] = ext(p.j, other);
+        if (o1 + 4 <= q0 || q1 + 4 <= o0) continue; // side by side on the other axis: no conflict
+        // Signed room between them along the axis (i before j in the direction `sign`).
+        const [a0, a1] = ext(p.i, p.ax);
+        const [b0, b1] = ext(p.j, p.ax);
+        const room = p.sign > 0 ? b0 - a1 : a0 - b1;
+        const need = p.gap - room;
+        if (need <= 0.5) continue;
+        // Who gives way.
+        let mover;
+        if (rank[p.i] !== rank[p.j]) mover = rank[p.i] > rank[p.j] ? p.i : p.j;
+        else if (rank[p.i] === 0) continue; // two pinned boxes can't both stay; leave it to the check
+        else mover = dist[p.i] > dist[p.j] ? p.i : p.j;
+        const dir = mover === p.j ? p.sign : -p.sign;
+        pos[mover][p.ax] += dir * need;
+        moved = true;
+      }
+      if (!moved) {
+        // Settled: make sure nothing overlaps (it shouldn't).
+        for (let i = 0; i < n; i++)
+          for (let j = i + 1; j < n; j++) {
+            const [ix0, ix1] = ext(i, 'x');
+            const [jx0, jx1] = ext(j, 'x');
+            const [iy0, iy1] = ext(i, 'y');
+            const [jy0, jy1] = ext(j, 'y');
+            if (ix0 < jx1 && jx0 < ix1 && iy0 < jy1 && jy0 < iy1) return null;
+          }
+        return pos;
+      }
+    }
+    return null;
+  }
+
+  // Binary min-heap of [cost, value] for the router.
+  class Heap {
+    constructor() {
+      this.a = [];
+    }
+    push(c, v) {
+      const a = this.a;
+      a.push([c, v]);
+      let i = a.length - 1;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (a[p][0] <= a[i][0]) break;
+        [a[p], a[i]] = [a[i], a[p]];
+        i = p;
+      }
+    }
+    pop() {
+      const a = this.a;
+      const top = a[0];
+      const last = a.pop();
+      if (a.length) {
+        a[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = 2 * i + 1;
+          const r = l + 1;
+          let m = i;
+          if (l < a.length && a[l][0] < a[m][0]) m = l;
+          if (r < a.length && a[r][0] < a[m][0]) m = r;
+          if (m === i) break;
+          [a[m], a[i]] = [a[i], a[m]];
+          i = m;
+        }
+      }
+      return top;
+    }
+    get size() {
+      return this.a.length;
+    }
+  }
+
+  // Orthogonal arrows for the stable layout (ELK only routes graphs it places itself). Each arrow is an
+  // A* search over a grid made of the lines just outside every box, the boxes' center lines and the
+  // channels between them, with a penalty per bend and for running along another arrow. Then
+  // overlapping parallel segments of different arrows are spread into lanes.
+  // boxes: Map id -> {x, y, w, h}; routes: [{key, from, to, skip: Set of ids that don't block it}].
+  const ROUTE_M = 10; // clearance around a box
+  const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // east, south, west, north
+  function routeOrtho(boxes, routes, flow = 'right') {
+    const M = ROUTE_M;
+    const all = [...boxes.values()];
+    const snap = (v) => Math.round(v * 2) / 2;
+    const uniq = (vals) => [...new Set(vals.map(snap))].sort((p, q) => p - q);
+    const lines = (lo, len) => {
+      const edges = uniq(all.flatMap((b) => [b[lo] - M, b[lo] + b[len] + M]));
+      const mids = [];
+      // The middle of each channel wide enough to be worth it (arrows look best down the middle).
+      for (let i = 1; i < edges.length; i++) if (edges[i] - edges[i - 1] > 24) mids.push((edges[i - 1] + edges[i]) / 2);
+      return uniq([...edges, ...mids, ...all.map((b) => b[lo] + b[len] / 2)]);
+    };
+    const xs = lines('x', 'w');
+    const ys = lines('y', 'h');
+    const NX = xs.length;
+    const NY = ys.length;
+    const ix = new Map(xs.map((v, i) => [v, i]));
+    const iy = new Map(ys.map((v, i) => [v, i]));
+    // Grid indices strictly inside the range (lo, hi).
+    const span = (vals, lo, hi) => {
+      let i = 0;
+      while (i < vals.length && vals[i] <= lo) i++;
+      let j = i;
+      while (j < vals.length && vals[j] < hi) j++;
+      return [i, j];
+    };
+    const N = NX * NY;
+    // How many boxes (grown by the clearance) cover each grid point, counted once for all arrows; an
+    // arrow subtracts the few boxes that don't block it (its open ancestors).
+    const range = new Map();
+    const cover = new Uint16Array(N);
+    for (const [id, b] of boxes) {
+      const [x0, x1] = span(xs, b.x - M, b.x + b.w + M);
+      const [y0, y1] = span(ys, b.y - M, b.y + b.h + M);
+      range.set(id, [x0, x1, y0, y1]);
+      for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) cover[j * NX + i]++;
+    }
+    // Arrows already on a grid segment: east of a point (H) and south of it (V).
+    const usedH = new Uint16Array(N);
+    const usedV = new Uint16Array(N);
+    const usedOn = (cell, ncell) => (ncell === cell + 1 ? usedH[cell] : ncell === cell - 1 ? usedH[ncell] : ncell > cell ? usedV[cell] : usedV[ncell]);
+    // Search state, reused by every arrow (stamp marks what this arrow has set).
+    const best = new Float64Array(N * 4);
+    const prev = new Int32Array(N * 4);
+    const stamp = new Uint32Array(N * 4);
+    let gen = 0;
+    const BEND = 36;
+    const SHARE = 0.6;
+    const prefDir = { right: 0, down: 1, left: 2, up: 3 }[flow] ?? 0;
+    const out = new Map();
+    for (const r of routes) {
+      const A = boxes.get(r.from);
+      const B = boxes.get(r.to);
+      if (!A || !B) continue;
+      gen++;
+      const skips = [...r.skip].map((id) => range.get(id)).filter(Boolean);
+      const blockedAt = (cell) => {
+        let c = cover[cell];
+        if (!c) return false;
+        const i = cell % NX;
+        const j = (cell - i) / NX;
+        for (const [x0, x1, y0, y1] of skips) if (i >= x0 && i < x1 && j >= y0 && j < y1) c--;
+        return c > 0;
+      };
+      // Ports at the middle of each side; the arrow leaves (or arrives) straight through the clearance.
+      const ports = (b) => {
+        const cx = b.x + b.w / 2;
+        const cy = b.y + b.h / 2;
+        return [
+          { d: 0, p: [b.x + b.w, cy], o: [b.x + b.w + M, cy] },
+          { d: 1, p: [cx, b.y + b.h], o: [cx, b.y + b.h + M] },
+          { d: 2, p: [b.x, cy], o: [b.x - M, cy] },
+          { d: 3, p: [cx, b.y], o: [cx, b.y - M] }
+        ]
+          .map((q) => ({ ...q, i: ix.get(snap(q.o[0])), j: iy.get(snap(q.o[1])) }))
+          .filter((q) => q.i != null && q.j != null && !blockedAt(q.j * NX + q.i));
+      };
+      // Leaving along the flow (or arriving with it) is free; the other sides cost a little.
+      const sideCost = (d, outgoing) => {
+        const want = outgoing ? prefDir : (prefDir + 2) % 4;
+        return d === want ? 0 : d === (want + 2) % 4 ? 2 * BEND : BEND * 0.6;
+      };
+      const starts = ports(A);
+      const goals = ports(B);
+      const goalAt = new Map(goals.map((g) => [g.j * NX + g.i, g]));
+      const gx = goals.map((g) => xs[g.i]);
+      const gy = goals.map((g) => ys[g.j]);
+      const h = (i, j) => {
+        let m = Infinity;
+        for (let k = 0; k < gx.length; k++) m = Math.min(m, Math.abs(xs[i] - gx[k]) + Math.abs(ys[j] - gy[k]));
+        return m;
+      };
+      const costOf = (st) => (stamp[st] === gen ? best[st] : Infinity);
+      const setCost = (st, c, from) => {
+        stamp[st] = gen;
+        best[st] = c;
+        prev[st] = from;
+      };
+      const heap = new Heap();
+      starts.forEach((s, si) => {
+        const st = (s.j * NX + s.i) * 4 + s.d;
+        const c = M + sideCost(s.d, true);
+        if (c < costOf(st)) {
+          setCost(st, c, -1 - si); // negative: a start port
+          heap.push(c + h(s.i, s.j), st);
+        }
+      });
+      let found = null;
+      let foundCost = Infinity;
+      let guard = 0;
+      while (heap.size && guard++ < 400000) {
+        const [f, st] = heap.pop();
+        if (f >= foundCost) break;
+        const g = best[st];
+        const d = st % 4;
+        const cell = (st - d) / 4;
+        const i = cell % NX;
+        const j = (cell - i) / NX;
+        if (f > g + h(i, j) + 1e-6) continue; // stale entry
+        const goal = goalAt.get(cell);
+        if (goal) {
+          // Arrive moving into the box: the port's outward direction reversed.
+          const inward = (goal.d + 2) % 4;
+          const c = g + (d === inward ? 0 : d === goal.d ? 2 * BEND : BEND) + M + sideCost(goal.d, false);
+          if (c < foundCost) {
+            foundCost = c;
+            found = { st, goal };
+          }
+        }
+        for (let nd = 0; nd < 4; nd++) {
+          if (nd === (d + 2) % 4) continue;
+          const ni = i + DIRS[nd][0];
+          const nj = j + DIRS[nd][1];
+          if (ni < 0 || nj < 0 || ni >= NX || nj >= NY) continue;
+          const ncell = nj * NX + ni;
+          if (blockedAt(ncell)) continue;
+          const len = Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]);
+          const c = g + len + (nd === d ? 0 : BEND) + usedOn(cell, ncell) * SHARE * len;
+          const nst = ncell * 4 + nd;
+          if (c < costOf(nst)) {
+            setCost(nst, c, st);
+            heap.push(c + h(ni, nj), nst);
+          }
+        }
+      }
+      let pts;
+      if (found) {
+        const cells = [];
+        let st = found.st;
+        let start = null;
+        for (;;) {
+          cells.push((st - (st % 4)) / 4);
+          const p = prev[st];
+          if (p < 0) {
+            start = starts[-1 - p];
+            break;
+          }
+          st = p;
+        }
+        cells.reverse();
+        for (let k = 1; k < cells.length; k++) {
+          const [a, b] = [Math.min(cells[k - 1], cells[k]), Math.max(cells[k - 1], cells[k])];
+          if (b === a + 1) usedH[a]++;
+          else usedV[a]++;
+        }
+        pts = [start.p, ...cells.map((c) => [xs[c % NX], ys[(c - (c % NX)) / NX]]), found.goal.p];
+      } else {
+        // No way around (not expected): a simple elbow between facing sides.
+        const a = [A.x + A.w, A.y + A.h / 2];
+        const b = [B.x, B.y + B.h / 2];
+        const mx = (a[0] + b[0]) / 2;
+        pts = [a, [mx, a[1]], [mx, b[1]], b];
+      }
+      out.set(r.key, simplify(pts));
+    }
+    spreadLanes(out, boxes, new Map(routes.map((r) => [r.key, [r.from, r.to]])));
+    return out;
+  }
+
+  // Drop repeated and collinear points of an orthogonal path.
+  function simplify(pts) {
+    const out = [];
+    for (const q of pts) {
+      const last = out[out.length - 1];
+      if (last && Math.abs(last[0] - q[0]) < 0.5 && Math.abs(last[1] - q[1]) < 0.5) continue;
+      if (out.length >= 2) {
+        const a = out[out.length - 2];
+        const b = last;
+        const vertical = Math.abs(a[0] - b[0]) < 0.5 && Math.abs(b[0] - q[0]) < 0.5;
+        const horizontal = Math.abs(a[1] - b[1]) < 0.5 && Math.abs(b[1] - q[1]) < 0.5;
+        if (vertical || horizontal) {
+          out[out.length - 1] = [q[0], q[1]];
+          continue;
+        }
+      }
+      out.push([q[0], q[1]]);
+    }
+    return out;
+  }
+
+  // Overlapping parallel segments of different arrows on the same line are moved apart into lanes.
+  // Moving a horizontal segment up or down only changes the length of its vertical neighbours (and
+  // the other way round), so the paths stay orthogonal.
+  // Lanes are as wide as the room allows (28, else 18, else 9), so arrows between the same two
+  // components have space for their pills; a lane never moves into a component it doesn't attach to.
+  function spreadLanes(paths, boxes, ends) {
+    const leaves = [...boxes.entries()].filter(([, b]) => !b.group);
+    const hitsBox = (key, axis, line, lo, hi) => {
+      const [a, b] = ends.get(key) || [];
+      return leaves.some(([id, r]) => {
+        if (id === a || id === b) return false;
+        const [r0, r1, s0, s1] = axis === 1 ? [r.y, r.y + r.h, r.x, r.x + r.w] : [r.x, r.x + r.w, r.y, r.y + r.h];
+        return line > r0 - 2 && line < r1 + 2 && hi > s0 && lo < s1;
+      });
+    };
+    for (const axis of [1, 0]) {
+      // axis 1: horizontal segments (same y); axis 0: vertical segments (same x).
+      const o = 1 - axis;
+      const byLine = new Map();
+      for (const [key, pts] of paths) {
+        for (let k = 1; k < pts.length; k++) {
+          const p = pts[k - 1];
+          const q = pts[k];
+          if (Math.abs(p[axis] - q[axis]) > 0.5) continue;
+          const line = Math.round(p[axis]);
+          if (!byLine.has(line)) byLine.set(line, []);
+          byLine.get(line).push({ key, k, line: p[axis], lo: Math.min(p[o], q[o]), hi: Math.max(p[o], q[o]) });
+        }
+      }
+      for (const group of byLine.values()) {
+        group.sort((p, q) => p.lo - q.lo);
+        let cluster = [];
+        let reach = -Infinity;
+        const flush = () => {
+          const keys = [...new Set(cluster.map((s) => s.key))];
+          if (keys.length > 1) {
+            const offs = (gap) => keys.map((key, li) => (li - (keys.length - 1) / 2) * gap);
+            const fits = (gap) =>
+              offs(gap).every((off, li) => cluster.every((s) => s.key !== keys[li] || !hitsBox(s.key, axis, s.line + off, s.lo, s.hi)));
+            const gap = [28, 18].find(fits) || 9;
+            keys.forEach((key, li) => {
+              const off = (li - (keys.length - 1) / 2) * gap;
+              const pts = paths.get(key);
+              const moved = new Set();
+              for (const s of cluster) {
+                if (s.key !== key) continue;
+                for (const idx of [s.k - 1, s.k]) {
+                  if (moved.has(idx)) continue;
+                  moved.add(idx);
+                  pts[idx][axis] += off;
+                }
+              }
+            });
+          }
+          cluster = [];
+        };
+        for (const s of group) {
+          if (cluster.length && s.lo >= reach - 0.5) flush();
+          if (!cluster.length) reach = -Infinity;
+          cluster.push(s);
+          reach = Math.max(reach, s.hi);
+        }
+        if (cluster.length) flush();
+      }
+    }
+  }
+
   class Diagram {
     constructor(root) {
       this.root = root;
@@ -483,6 +906,7 @@
 
     async setLevel(level) {
       this.level = level;
+      this.openOrder = [];
       this.expanded = this.expandedForLevel(level);
       this.updateLevelLabel();
       await this.relayout({ fit: true });
@@ -492,15 +916,23 @@
       const n = this.nodes.get(id);
       if (!n || !n.kids.length) return;
       this.before = null;
+      const p = this.pos.get(id);
+      const was = p && (p.c || [p.x + p.w / 2, p.y + p.h / 2]);
+      this.openOrder = this.openOrder || [];
       if (this.expanded.has(id)) {
         // Collapse the whole subtree, so re-expanding starts tidy.
         const drop = (x) => {
           this.expanded.delete(x.id);
+          this.openOrder = this.openOrder.filter((o) => o !== x.id);
           x.kids.forEach(drop);
         };
         drop(n);
-      } else this.expanded.add(id);
-      await this.relayout({ focus: id });
+      } else {
+        this.expanded.add(id);
+        this.openOrder.push(id);
+      }
+      // Stable layout: the component keeps its place on screen; the camera only zooms out if it must.
+      await this.relayout(this.stable ? { anchor: id, was } : { focus: id });
     }
 
     // ---------------------------------------------------------------- view tabs
@@ -613,16 +1045,247 @@
       return [...merged.values()];
     }
 
-    async relayout({ fit = false, focus = null, animate = true } = {}) {
+    // Stable layout (the default) keeps every component's center fixed; `layout: auto` lays the whole
+    // visible graph out again with ELK on every change (the behaviour before 1.4).
+    get stable() {
+      return !this.data.map && this.data.layout !== 'auto';
+    }
+
+    async relayout({ fit = false, focus = null, anchor = null, was = null, animate = true } = {}) {
       const token = (this.layoutToken = (this.layoutToken || 0) + 1);
       const vis = this.visibleEdges();
       this.vis = vis;
-      const placed = this.data.map ? this.geoLayout() : await this.elkLayout(vis);
+      const placed = this.data.map ? this.geoLayout() : this.stable ? await this.stableLayout(vis) : await this.elkLayout(vis);
       if (token !== this.layoutToken) return; // a newer layout started meanwhile
       this.render(placed, vis, animate && MOVE_MS > 0);
       if (fit) this.overview(animate);
+      else if (anchor && this.pos.has(anchor)) this.zoomToFit(anchor, was, animate);
       else if (focus && this.pos.has(focus)) this.focusOn([focus], animate);
       if (animate && MOVE_MS) await sleep(MOVE_MS + 30);
+    }
+
+    // Base layout of every container (the top level and each group), computed once: ELK places the
+    // container's children as closed components, with every arrow (all views, all modes) lifted to the
+    // children that hold its ends. Centers are kept; a group's are relative to its own center.
+    baseLayouts() {
+      if (this.basePromise) return this.basePromise;
+      this.basePromise = (async () => {
+        const elk = await loadElk();
+        const containers = [{ id: '__root', kids: this.top, dir: this.data.direction, root: true }];
+        for (const n of this.nodes.values()) if (n.kids.length) containers.push({ id: n.id, kids: n.kids, dir: n.direction });
+        const childIn = (cid, id) => {
+          for (let n = this.nodes.get(id); n; n = n.parent) if ((n.parent ? n.parent.id : '__root') === cid) return n.id;
+          return null;
+        };
+        const base = new Map();
+        await Promise.all(
+          containers.map(async (C) => {
+            const lifted = new Map();
+            for (const e of this.edges) {
+              const a = childIn(C.id, e.from);
+              const b = childIn(C.id, e.to);
+              if (!a || !b || a === b) continue;
+              const key = `${a}>${b}`;
+              if (!lifted.has(key)) lifted.set(key, { a, b, list: [] });
+              lifted.get(key).list.push(e);
+            }
+            const graph = {
+              id: 'g',
+              layoutOptions: {
+                ...ELK_SPACING,
+                'elk.direction': (C.dir || 'right').toUpperCase(),
+                ...(C.root
+                  ? { 'elk.layered.wrapping.strategy': this.data.wrap ? 'MULTI_EDGE' : 'OFF', 'elk.aspectRatio': String(this.data.aspect || 1.6) }
+                  : {})
+              },
+              children: C.kids.map((k) => {
+                const s = this.leafSize(k);
+                return { id: k.id, width: s.w, height: s.h };
+              }),
+              // Each arrow keeps room for its protocol pill, as in the full layout.
+              edges: [...lifted.values()].map((l, i) => {
+                const pill = this.pillText({ list: l.list });
+                return { id: `b${i}`, sources: [l.a], targets: [l.b], ...(pill ? { labels: [{ text: pill, width: pill.length * 6.8 + 16, height: 22 }] } : {}) };
+              })
+            };
+            let out;
+            try {
+              out = await elk.layout(graph);
+            } catch (err) {
+              console.warn('diagram: base layout retry without wrapping', err);
+              graph.layoutOptions['elk.layered.wrapping.strategy'] = 'OFF';
+              out = await elk.layout(graph);
+            }
+            const m = new Map();
+            for (const c of out.children) m.set(c.id, { x: c.x + c.width / 2, y: c.y + c.height / 2, w: c.width, h: c.height });
+            if (!C.root) {
+              // Center a group's children on (0, 0): the group grows around its own center.
+              let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+              for (const b of m.values()) {
+                x0 = Math.min(x0, b.x - b.w / 2);
+                x1 = Math.max(x1, b.x + b.w / 2);
+                y0 = Math.min(y0, b.y - b.h / 2);
+                y1 = Math.max(y1, b.y + b.h / 2);
+              }
+              for (const b of m.values()) {
+                b.x -= (x0 + x1) / 2;
+                b.y -= (y0 + y1) / 2;
+              }
+            }
+            base.set(C.id, m);
+          })
+        );
+        return base;
+      })();
+      return this.basePromise;
+    }
+
+    // Stable layout: each component sits at its base center. An open group's frame is centered on that
+    // same point and sized to its children (laid out by its own base layout); the siblings it would
+    // cover are pushed straight out (pushLocal). A component hidden by the view tab keeps its space.
+    // The layout is replayed in the order components were opened: first what the level opened, then
+    // each component the reader opened, starting from where the step before left everything, with that
+    // component and its open ancestors pinned. So opening one never moves a box pushed earlier back,
+    // and closing one gives back the layout from before it was opened.
+    async stableLayout(vis) {
+      const base = await this.baseLayouts();
+      let pinned = new Set();
+      // Each step's positions: container id → child id → center, relative to the container's center.
+      let prev = new Map();
+      let cur = new Map();
+      const PAD_X = 16;
+      const TOP = 48;
+      const BOTTOM = 16;
+      // A component's drawn box relative to its center (box) and the size it reserves among its siblings
+      // (w, h: symmetric around the center, so pushApart's growth is too). An open group's frame is
+      // drawn tight around its visible children (a hidden one keeps its place but no frame around it).
+      const frame = (n) => {
+        const s = this.leafSize(n);
+        if (!(this.expanded.has(n.id) && n.kids.some((k) => this.shown(k)))) {
+          return { w: s.w, h: s.h, size: s, group: false, box: { x0: -s.w / 2, y0: -s.h / 2, x1: s.w / 2, y1: s.h / 2 } };
+        }
+        const items = arrange(n.id, n.kids);
+        let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+        for (const it of items) {
+          if (!it.f) continue;
+          x0 = Math.min(x0, it.x + it.f.box.x0);
+          x1 = Math.max(x1, it.x + it.f.box.x1);
+          y0 = Math.min(y0, it.y + it.f.box.y0);
+          y1 = Math.max(y1, it.y + it.f.box.y1);
+        }
+        x0 -= PAD_X;
+        x1 += PAD_X;
+        y0 -= TOP;
+        y1 += BOTTOM;
+        // Wide enough for the header (icon, label, sub, info and collapse buttons), as in the ELK layout.
+        const minW = Math.ceil(Math.max(String(n.label).length * 8, String(n.sub || '').length * 6.8) + 110);
+        if (x1 - x0 < minW) {
+          const grow = (minW - (x1 - x0)) / 2;
+          x0 -= grow;
+          x1 += grow;
+        }
+        if (y1 - y0 < 80) y1 = y0 + 80;
+        const w = Math.max(2 * Math.max(-x0, x1), s.w);
+        const h = Math.max(2 * Math.max(-y0, y1), s.h);
+        return { w, h, group: true, items, box: { x0, y0, x1, y1 } };
+      };
+      const arrange = (cid, kids) => {
+        const b = base.get(cid);
+        const was = prev.get(cid);
+        const rows = kids.map((k) => {
+          const bb = b.get(k.id);
+          const f = this.shown(k) ? frame(k) : null;
+          const st = was && was.get(k.id);
+          return { k, f, bx: bb.x, by: bb.y, bw: bb.w, bh: bb.h, sx: st && st.x, sy: st && st.y, w: f ? Math.max(f.w, bb.w) : bb.w, h: f ? Math.max(f.h, bb.h) : bb.h };
+        });
+        // Local push among the visible children; the guaranteed (roomier) push if it doesn't settle.
+        const vis = rows.filter((r) => r.f);
+        const local = pushLocal(vis.map((r) => ({ ...r, box: r.f.box, grown: r.f.group, pinned: r.f.group && pinned.has(r.k.id) })));
+        const at = new Map();
+        if (local) vis.forEach((r, i) => at.set(r, local[i]));
+        else pushApart(rows).forEach((p, i) => at.set(rows[i], p));
+        const out = rows.map((r) => ({ k: r.k, f: r.f, x: (at.get(r) || { x: r.bx }).x, y: (at.get(r) || { y: r.by }).y }));
+        cur.set(cid, new Map(out.filter((o) => o.f).map((o) => [o.k.id, { x: o.x, y: o.y }])));
+        return out;
+      };
+      const placed = { nodes: new Map(), edges: new Map() };
+      const put = (items, ox, oy) => {
+        for (const it of items) {
+          if (!it.f) continue;
+          const cx = ox + it.x;
+          const cy = oy + it.y;
+          const b = it.f.box;
+          // c: the component's anchor point (its layout center; an open group's frame can sit off it).
+          placed.nodes.set(it.k.id, { x: cx + b.x0, y: cy + b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0, c: [cx, cy], group: it.f.group, size: it.f.group ? undefined : it.f.size });
+          if (it.f.group) put(it.f.items, cx, cy);
+        }
+      };
+      // Replay the open order (this.expanded is swapped for each step and put back).
+      const open = this.expanded;
+      const order = (this.openOrder || []).filter((id, i, a) => open.has(id) && a.indexOf(id) === i);
+      const first = new Set([...open].filter((id) => !order.includes(id)));
+      let top;
+      try {
+        for (let t = 0; t <= order.length; t++) {
+          this.expanded = t === order.length ? open : new Set([...first, ...order.slice(0, t)]);
+          const pin = t ? order[t - 1] : null;
+          pinned = new Set(pin && this.isVisible(this.nodes.get(pin)) ? [pin, ...this.ancestorsOf(pin).map((a) => a.id)] : []);
+          prev = cur;
+          cur = new Map();
+          top = arrange('__root', this.top);
+        }
+      } finally {
+        this.expanded = open;
+      }
+      put(top, 0, 0);
+      // Arrows: an open group that holds either end doesn't block the arrow; every other box does.
+      const routes = vis.map((v) => ({
+        key: v.key,
+        from: v.from,
+        to: v.to,
+        skip: new Set([...this.ancestorsOf(v.from), ...this.ancestorsOf(v.to)].map((a) => a.id))
+      }));
+      const paths = routeOrtho(placed.nodes, routes, this.data.direction || 'right');
+      // Pills: on the longest segment that has room, clear of components and of the pills placed
+      // before (an arrow's label sits just above its pill, so it counts too).
+      const leaves = [...placed.nodes.values()].filter((p) => !p.group);
+      const taken = [];
+      const area = (r, o) => Math.max(0, Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)) * Math.max(0, Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y));
+      // Overlap with components weighs more than with other pills.
+      const clash = (r) => taken.reduce((s, o) => s + area(r, o), 0) + 2 * leaves.reduce((s, o) => s + area(r, o), 0);
+      const TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9];
+      for (const v of vis) {
+        const pts = paths.get(v.key);
+        if (!pts) continue;
+        const text = this.pillText(v);
+        let label = null;
+        if (text) {
+          const w = text.length * 6.8 + 14;
+          const above = v.list.length === 1 && v.list[0].label ? 18 : 0;
+          const segs = [];
+          for (let k = 1; k < pts.length; k++) segs.push([pts[k - 1], pts[k], Math.abs(pts[k][0] - pts[k - 1][0]) + Math.abs(pts[k][1] - pts[k - 1][1])]);
+          segs.sort((p, q) => q[2] - p[2]);
+          // The middle of the longest segment if it is free, else the free spot nearest to it, else
+          // the spot with the least overlap.
+          let best = null;
+          for (const [p, q] of segs.slice(0, 3)) {
+            for (const t of TS) {
+              const at = { x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t };
+              const r = { x: at.x - w / 2 - 2, y: at.y - 12 - above, w: w + 4, h: 24 + above };
+              const score = clash(r);
+              if (!best || score < best.score) best = { at, r, score };
+              if (!score) break;
+            }
+            if (best && !best.score) break;
+          }
+          if (best) {
+            label = best.at;
+            taken.push(best.r);
+          }
+        }
+        placed.edges.set(v.key, { pts, label });
+      }
+      return placed;
     }
 
     // Layout: each open group is laid out on its own (compact), and an arrow that crosses group borders
@@ -632,17 +1295,7 @@
     async elkLayout(vis) {
       const elk = await loadElk();
       const sizes = new Map();
-      const spacing = {
-        'elk.algorithm': 'layered',
-        'elk.edgeRouting': 'ORTHOGONAL',
-        'elk.spacing.nodeNode': '24',
-        'elk.layered.spacing.nodeNodeBetweenLayers': '44',
-        'elk.spacing.edgeNode': '14',
-        'elk.spacing.edgeEdge': '9',
-        'elk.layered.spacing.edgeNodeBetweenLayers': '14',
-        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'
-      };
+      const spacing = ELK_SPACING;
       const elkNode = new Map();
       const parentOf = new Map(); // visible tree: id -> container id ('__root' at the top)
       const build = (n, parent) => {
@@ -1036,8 +1689,10 @@
       }
       const text = this.pillText(v);
       let pill = null;
+      let pillAt = null;
       if (text) {
         const at = pe.label ? nearestOnPath(m, pe.label.x, pe.label.y) : pointAt(m, m.total / 2);
+        pillAt = at;
         const w = text.length * 6.8 + 14;
         const inView = !!this.activeView && v.list.some((e) => e.viewList.includes(this.activeView));
         pill = make('g', { class: 'dgm-pill' + (inView ? ' is-view' : ''), transform: `translate(${at.x},${at.y})`, style: colour ? `--dgm-e: ${colour}` : '' }, this.pillLayer);
@@ -1045,7 +1700,8 @@
         make('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, pill).textContent = text;
       }
       if (e0.label && v.list.length === 1) {
-        const at = pointAt(m, m.total * 0.5);
+        // Just above the pill, so the two read together; else the middle of the arrow.
+        const at = pillAt || pointAt(m, m.total * 0.5);
         const lab = make('text', { class: 'dgm-link-label', x: at.x, y: at.y - (pill ? 18 : 8), 'text-anchor': 'middle' }, this.pillLayer);
         lab.textContent = e0.label;
       }
@@ -1469,6 +2125,36 @@
       const inView = (bx, by) => bx * k + sx > 0 && bx * k + sx < W && by * k + this.cam.y > 0 && by * k + this.cam.y < H;
       if (k === this.cam.k && inView(b.x0, b.y0) && inView(b.x1, b.y1)) return;
       this.animateCam({ k, x: W / 2 - (k * (b.x0 + b.x1)) / 2, y: H / 2 - (k * (b.y0 + b.y1)) / 2 }, animate);
+    }
+    // After opening or closing a component: its anchor point stays at the same place on screen (if the
+    // layout moved it at all, the camera follows by the same amount). Zoom out only if it doesn't
+    // fit, around that point.
+    zoomToFit(id, was, animate = true) {
+      const p = this.pos.get(id);
+      if (!p) return;
+      const W = this.stage.clientWidth;
+      const H = this.stage.clientHeight;
+      const pad = 28;
+      const top = this.viewBar ? this.viewBar.offsetHeight + 16 : 0;
+      const { k } = this.cam;
+      const [cx, cy] = p.c || [p.x + p.w / 2, p.y + p.h / 2];
+      const [ox, oy] = was || [cx, cy];
+      const sx = this.cam.x + k * ox;
+      const sy = this.cam.y + k * oy;
+      // Its center is off screen (opened from the keyboard after a pan): just bring it into view.
+      if (sx < pad || sx > W - pad || sy < top + pad || sy > H - pad) return this.focusOn([id], animate);
+      // Room on each side of the anchor point, against the component's extent on that side.
+      const fitK = Math.min(
+        k,
+        (sx - pad) / Math.max(1, cx - p.x),
+        (W - pad - sx) / Math.max(1, p.x + p.w - cx),
+        (sy - top - pad) / Math.max(1, cy - p.y),
+        (H - pad - sy) / Math.max(1, p.y + p.h - cy)
+      );
+      const nk = fitK >= k - 1e-3 ? k : Math.max(0.2, fitK);
+      const to = { k: nk, x: sx - nk * cx, y: sy - nk * cy };
+      if (Math.abs(to.k - k) < 1e-3 && Math.abs(to.x - this.cam.x) < 0.5 && Math.abs(to.y - this.cam.y) < 0.5) return;
+      this.animateCam(to, animate);
     }
     zoomBy(f, cx, cy) {
       const W = this.stage.clientWidth;
