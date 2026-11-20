@@ -25,11 +25,13 @@ happens next and what an agent is allowed to do. Everything below follows from t
 ## System context and component architecture
 {: #system-context-and-component-architecture }
 
-The diagram is the system as built on the homelab, checked against the repos on 2026-11-09. Start at
-the Homelab level, open the `wardens` cluster, and play a use case: a drift run with its
-handoff, an alert or a GitHub event through the ingress bus, an LLM stage behind its guardrails, a chat
-with Stack Author, shipping a new agent, and (planned) a level 2 approval. The *Identity & secrets*,
-*Observability* and *CI/CD* tabs show the cross-cutting paths.
+The diagram is the system as built on the homelab, checked against the repos on 2026-11-20. Start at
+the Homelab level, open the `wardens` cluster, and play a use case: a drift run with its handoff, an
+alert or a GitHub event through the ingress bus, asking wardens in Slack, an LLM stage behind its
+guardrails, a chat with Stack Author, a pull request's checks and security scans, an agent's life cycle
+from merge to shadow (with a reviewer's approval when it raises risk), and a framework release reaching
+every agent. Temporal shows one task queue per worker. The *CI/CD & SDLC*, *Security scans*, *Identity &
+secrets*, *State & audit* and *Observability* tabs show the cross-cutting paths.
 
 {% include diagram.html id="projects/platform-wardens/system-architecture" %}
 
