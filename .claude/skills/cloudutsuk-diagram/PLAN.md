@@ -207,6 +207,8 @@ map: {name: world, lon: [-130, 150], lat: [65, -45]}   # optional geo backdrop (
     pilot a **CI/CD** view from commit to running pods: new `you_push` (git push) and Argo CD `apply`
     arrows, and the "Code to cluster" use case now runs push → CI → OpenBao → gates → Zot → digest
     commit → sync → apply → image pull.
+- **Preview blocklist (2026-11-20):** `preview.cjs` blocks ads and analytics by host, not by URL: the GA4
+  post's slug contains `google-analytics`, so the page itself was aborted and Chrome's error page replaced it.
 
 ## Risks and mitigations
 

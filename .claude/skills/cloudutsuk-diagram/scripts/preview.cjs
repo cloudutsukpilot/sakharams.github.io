@@ -31,6 +31,8 @@ const VIEWS = [
   { name: 'dark-desktop', scheme: 'dark', width: 1280 },
   { name: 'light-phone', scheme: 'light', width: 390 }
 ];
+// Matched against the host only: a post's own path can name these (the GA4 post's slug has
+// "google-analytics" in it), and aborting the page itself loads Chrome's error page instead.
 const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|giscus|adservice/;
 
 (async () => {
@@ -38,7 +40,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
   let failed = false;
   for (const v of VIEWS) {
     const page = await browser.newPage({ viewport: { width: v.width, height: v.width < 600 ? 820 : 1000 }, colorScheme: v.scheme });
-    await page.route((u) => BLOCK.test(u.href), (r) => r.abort());
+    await page.route((u) => BLOCK.test(u.hostname), (r) => r.abort());
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && !/ERR_FAILED|ERR_BLOCKED/.test(m.text()) && errors.push(m.text()));
@@ -51,7 +53,17 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
     // A stale ?dgm-<id>=0~~~ (old builds saved the layout in the URL) must not change the start level.
     const stale = new URL(args.url);
     stale.searchParams.set(sel.slice(1), '0~~~');
-    await page.goto(stale.href, { waitUntil: 'load', timeout: 60000 }).catch(() => page.waitForLoadState('domcontentloaded'));
+    // A slow CDN may hold up 'load'; that is fine. Any other failure (404, refused, aborted) is not.
+    const gone = await page.goto(stale.href, { waitUntil: 'load', timeout: 60000 }).then(
+      (res) => (res && !res.ok() ? `HTTP ${res.status()}` : null),
+      (e) => (e.name === 'TimeoutError' ? page.waitForLoadState('domcontentloaded').then(() => null) : e.message.split('\n')[0])
+    );
+    if (gone) {
+      check(false, `page loads (${gone})`);
+      console.log(`[${v.name}]\n  ` + checks.join('\n  '));
+      await page.close();
+      continue;
+    }
     await page.evaluate((s) => document.documentElement.setAttribute('data-mode', s), v.scheme);
     const fig = await page.$(sel);
     if (!fig) {
