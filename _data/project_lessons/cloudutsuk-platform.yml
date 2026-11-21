@@ -1025,3 +1025,13 @@ lessons:
     fix: "The script reads PDF text (pypdf in the data volume), says why when an attachment stays unread, and the skill asks for a newsletter's points, or a line naming what couldn't be read and where to open it."
     lesson: "When a script gathers input for a model, make every gap explicit in that input (\"not read: why\"), and tell the model what to write when content is missing; otherwise it writes a confident summary of nothing."
     adrs: ["0094"]
+
+  - id: L095
+    date: 2026-11-22
+    step: "Phase 2, step 2c"
+    title: "A container's working set counts file cache it read, so a closed browser can look like it never let go"
+    tags: [memory, kubernetes, cadvisor, chromium, job-hunter]
+    symptom: "After each LinkedIn search, Job Hunter's browser sidecar closed Chromium within minutes, yet its memory stayed at 400-560 MiB for hours after almost half the searches, instead of the 100-140 MiB it holds overnight."
+    cause: "The working set Kubernetes reports is usage minus inactive file cache, so it includes the active file cache: the Chromium binary and the browser profile, read during the search and charged to the container. That cache isn't freed when the browser exits; it stays on the active list until the kernel ages it to the inactive list, and only then does the working set drop. The process memory (RSS) was back to 100-140 MiB within 5 minutes every time."
+    fix: "None needed: the cache is reclaimable, and the container never came near an OOM kill. The check now looks at RSS next to the working set."
+    lesson: "Before chasing a leak in a container's working set, split it into RSS and active file cache (container_memory_rss, container_memory_total_active_file_bytes). If the extra is all active file cache, it's the kernel keeping pages it may reuse, not your process holding memory."

@@ -131,7 +131,7 @@ One table decides who passes each gate:
 |---|---|
 | Hermes, Job Hunter, Headlamp, Temporal UI, Wardens console | `platform-admins` and the app's own `-admin` group |
 | LiteLLM | `platform-admins`, `litellm-admin`, `litellm-editor`, `litellm-viewer` |
-| Shorts Studio, Homarr | All six: the three platform-wide groups and the app's three |
+| Shorts Studio, Homarr, Zot registry | All six: the three platform-wide groups and the app's three |
 
 The table is the source of truth in both directions: applying it also takes the role away from any group
 no longer listed. That's what makes tightening an app as safe as opening one.
@@ -267,6 +267,7 @@ Keycloak knowing anything about Grafana or Argo CD. Here's what each tier gets:
 | LiteLLM | `proxy_admin_viewer` | `internal_user` | `proxy_admin` |
 | Shorts Studio | Reads everything except model settings | Plus making shorts, editing drafts, approving scripts | Plus approving videos, publishing and model settings |
 | Homarr | Views boards | Edits boards and apps | Admin |
+| Zot registry | Browses and pulls every repository except the CI artifacts | Same as viewer: images reach the registry only from CI, signed | Zot admin: push and delete anywhere |
 | Hermes, Job Hunter, Headlamp, Temporal UI, Wardens console | Refused by Keycloak | Refused by Keycloak | Full access |
 
 The last row is the honest answer for apps with no safe read-only mode. Hermes reads API keys, Headlamp holds
@@ -276,6 +277,10 @@ model stays uniform, and they'd only start to work if an app gained a role that'
 
 A viewer does see Homarr's board, which lists internal hostnames. It holds no credentials, and every tile
 still needs its own sign-in, so I'm comfortable with that.
+
+Zot's one exception is the CI artifacts: IaC plan files can hold secrets in clear text, so the editor and
+viewer groups get nothing there, and only the two machine accounts that write and read them, plus admins, do.
+Editors get no push anywhere, because an image that didn't come from CI, signed, has no business in the registry.
 
 The mechanism differs per tool, and it's worth seeing how small each one is.
 
