@@ -1483,7 +1483,9 @@ scanning) isn't free. Scanning must be free, open source and run on arm64.
 - Pipeline gates as built (2026-10-12, Phase 1 step 4): in the reusable `build-image.yaml`, on every
   run including pull requests, before anything is pushed. Tools are pinned in `homelab-gitops/ci/tools`
   and baked into the runner image (ADR 0044).
-  - Gitleaks scans the full history on every run (repos are small), not only the first.
+  - Gitleaks scans the full history of the commit being built on every run (repos are small), not only the first.
+    Only that commit's history (`--log-opts HEAD`, 2026-11-19): scanning every fetched ref let an open branch's fake
+    test secret fail every main build; each branch is still scanned by its own pull request build.
   - Semgrep CE uses the registry's `p/default` rules with metrics off; the rules aren't pinned. The gate
     is severity HIGH or ERROR.
   - Bandit runs on tracked `.py` files and gates on HIGH severity.
@@ -1499,7 +1501,9 @@ scanning) isn't free. Scanning must be free, open source and run on arm64.
   - Licences: reported (Trivy), not gated.
   - Exceptions live in the caller's repo: `.gitleaksignore`, `# nosemgrep`, `# nosec`, `.trivyignore`,
     `.checkov.yaml`, `.hadolint.yaml`.
-  - Reports are a `security-reports-<image>` artifact (30 days) and a gate table in the job summary,
+  - Reports are a `security-reports-<image>` artifact (its upload never fails the build: a full artifact quota had stopped every deploy; since
+    2026-11-18 uploaded only when a gate failed or for a `main` build, because passing PR builds' reports
+    filled the org's artifact storage; kept 1 day since 2026-11-20, after November's GB-hour allowance ran out at 3 days) and a gate table in the job summary,
     not a PR comment: a comment would need `pull-requests: write` in every caller.
   - A caller can narrow the SAST, dependency and IaC scans with `scan-path`. The runner image sets
     `image-gate: report` (ADR 0044).
@@ -1567,6 +1571,12 @@ images should be pinned.
     verification errored. `build-image.yaml` now builds without BuildKit's provenance attestation, and
     every image is a single manifest.
   - Deny: `disallow-latest-tag`, `restrict-image-registries` and `verify-image-signatures`.
+- Changed (2026-11-18): `verify-image-signatures` checks on CREATE only (pods, and by autogen the
+  workload controllers). It also checked UPDATE, so every Job status write, finalizer removal and Argo CD
+  prune re-verified the image. Once Zot's retention deleted a digest an old Job still named, Kyverno
+  denied those writes (`MANIFEST_UNKNOWN`): on the wardens cluster the retention and audit-anchor CronJobs
+  stopped and a schema Job couldn't be pruned. A changed template still makes new pods, verified at
+  creation. Zot's retention is widened in infra-local at the same time.
 - As built (2026-10-13, Phase 1 step 5a): all seven policies deny on platform, mon and ai.
   - Every add-on now meets them through its chart values, in homelab-gitops and in infra-local's
     releases. Public images are pinned by the digest of their upstream index; Zot converts Docker-format
@@ -1626,6 +1636,8 @@ through a local cache. The host is arm64. Harbor's official images are amd64 onl
 - Zot (CNCF, multi-arch) in `core`, served as `registry.core.home.cloudutsuk.com` on HTTPS 443 with
   a Let's Encrypt certificate; storage on `/srv/homelab/zot`; retention keeps the last 20 tags per
   repo, anything referenced by `homelab-gitops`, and mirror entries used in 30 days.
+  Retention as built is in [ADR 0109](#adr-0109)
+  (2026-11-18): release tags for good, other tags while among the 20 newest or pulled in 30 days.
 - Repositories: `platform/*` and `labs/*` (read `puller`, write `ci-pusher`), `mirror/*` (anonymous
   read, written only by Zot sync of docker.io, ghcr.io, quay.io, registry.k8s.io and nvcr.io; side-loading
   the 22 GB vLLM image into k3d took 4.5 minutes, the mirror makes it a one-time pull), `charts/*`.
@@ -1947,6 +1959,22 @@ app-of-apps in `homelab-gitops` over the Terraform Argo CD application layer.
 - [ADR 0028](#adr-0028)
 - [ADR 0029](#adr-0029)
 - [ADR 0036](#adr-0036)
+
+#### Note (2026-11-19): a second private repository, wardens-deploy
+
+Owner decision of 2026-11-19 (platform-wardens plan repo-per-agent phase 5 step 6, run with the phase 7 pilot). Argo CD
+also reads `cloudutsukpilot/wardens-deploy` (the wardens registry and deploy config, platform-wardens decision 0042),
+private like this repository, with **its own read-only SSH deploy key** on the same pattern:
+`infra-local/host/argocd/deploy-key.sh --repo cloudutsukpilot/wardens-deploy --kv platform/argocd-repo-wardens-deploy`
+writes the private half to OpenBao `kv/platform/argocd-repo-wardens-deploy`, and the ExternalSecret
+`repo-wardens-deploy` in `argocd-root`'s values makes the Argo CD repository secret. The script's defaults are
+unchanged (homelab-gitops, `kv/platform/argocd-repo`), and `--rotate` works per repository. `bootstrap/projects.yaml`
+lets the `wardens` project read it.
+
+Turned down: the `gitops-writer` GitHub App as Argo CD's credential (already installed on wardens-deploy, but it can
+write contents and pull requests here too, and Argo CD would then hold a write key); a new read-only GitHub App
+(short-lived tokens, but a new App to create, install and store for one repository, and a second kind of repository
+credential in Argo CD). A deploy key reads one repository and nothing else.
 
 ## ADR-0039: Backups with Velero: application dumps through file-system backup to Azure Blob
 {: #adr-0039 }
@@ -3709,6 +3737,13 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
   module's `setup-environment` now installs each one only when it is missing (terragrunt-shared-module#17),
   so GitHub-hosted runners get them too, and this image downloads nothing. Infracost stays on 0.10.x: 2.x
   replaced `breakdown`, which the cost gate uses.
+- **Amended 2026-11-15: Python 3.13 in the image.** The shared module moved every workflow to
+  `PYTHON_VERSION: "3.13"` on 2026-11-01 (`ubuntu-latest` 26.04 has no 3.12 builds), and the venv was on
+  the stock runner's python3 3.12.3. So every IaC job ran `actions/setup-python`, which downloaded 3.13 into
+  the ephemeral pod's empty tool cache and upgraded its bundled pip, about 17 s a job. `ci/iac-tools` now
+  pins CPython 3.13.18 from python-build-standalone (sha256-checked, in `tools.txt`), unpacks it at
+  `/opt/iac/cpython` and builds `/opt/iac/python` on it. The Azure CLI venv stays on the image's 3.12, for
+  which its lock is made.
 - **Built and promoted like ADR 0044:** `runner-image-iac.yml` uses `build-image.yaml` (same gates,
   `image-gate: report`, signed, with an SBOM). The digest goes into
   `clusters/platform/arc-runner-homelab-iac.yaml` by hand after a test job, and the `iac-setup` init
@@ -4969,6 +5004,11 @@ public HTTPS URL. A k3d API server is not public.
   private key field, and checks the result from the internet. The first agent with an Entra app is
   `change-correlator` (infra-azure `development/wardens-identities`: application, service principal,
   federated credential, Reader on every subscription).
+- **Kubernetes reads of the `wardens` cluster (2026-11-20):** an agent that reads the Kubernetes API (platform-wardens
+  decision 0017) uses its own service account through a projected token that expires after 15 minutes (roadmap
+  Phase 6 step 2's limit) and a read-only ClusterRole from its wrapper chart, with no stored credential
+  (`charts/wardens-agent` 0.1.9 `kube.inCluster`). The first is `cluster-upgrade-readiness`. Reads of the other
+  clusters (core, platform, mon, ai, gpu) need a short-lived token per cluster: Phase 6 step 2, not decided yet.
 
 #### Considered options
 
@@ -5225,6 +5265,9 @@ a Keycloak sign-in in front, a name with a certificate, Temporal access.
    browser flow), PKCE, `--allowed-group=platform-admins`, an 8-hour cookie. Its client secret and cookie
    secret live in OpenBao `kv/wardens/wardens-console` (infra-local `host/wardens/configure.sh`) and reach
    the pod through an ExternalSecret.
+   Amended (2026-11-16, proposed in [ADR 0102](#adr-0102)):
+   `wardens-console-editor` and `wardens-console-viewer` are let in too, and the console takes each person's role
+   (viewer, editor, admin) from the proxy's `X-Forwarded-Groups`.
 3. **The app listens on 127.0.0.1 inside the pod**, so the proxy is the only way in, and it **trusts the
    proxy's `X-Forwarded-Email`** as the requester (`WARDENS_CONSOLE_USER_HEADER`): no header, 401. A signed-in
    person can send as themselves or as a framework identity (to replay what a trigger sends, e.g.
@@ -5234,6 +5277,8 @@ a Keycloak sign-in in front, a name with a certificate, Temporal access.
 4. **Incident mode starts `wardens.incident` on the `terraform-drift` queue**
    (`WARDENS_CONSOLE_INCIDENT_QUEUE`), the worker that already runs it for the weekly schedule; the console
    runs no worker of its own.
+   Amended (2026-11-16, proposed in [ADR 0102](#adr-0102)):
+   every Send is an incident, published to the ingress bus and started by the ingress consumer on that queue.
 5. **Internal only**: `console.wardens.home.cloudutsuk.com` on the wardens load balancer (Traefik, cert-manager
    Let's Encrypt DNS-01, ExternalDNS to PowerDNS). No tunnel route, no Cloudflare Access application.
    Amended (2026-11-05, proposed in [ADR 0080](#adr-0080)): the console also has the
@@ -5970,6 +6015,8 @@ ADR records how that runs on the homelab.
 - **Router worker:** `wardens-router` in the same namespace (`templates/router.yaml`), same image, task queue
   `wardens-router`. It runs the classifier, and the incident workflow for routed alerts, so an alert doesn't depend on
   one agent's worker. It has its own LiteLLM key and reaches HTTPS for LiteLLM only through the namespace's policy.
+  Amended by [0104](#adr-0104): the router now runs as its own app
+  (`apps/wardens-router`, namespace `wardens-router`) and image, with two replicas.
 - **First target:** a minimal `incident-triage` worker (`apps/incident-triage`), which records the alert as a finding and
   a Slack message. Only the named test alert `WardensRoutingTest` routes to it until it can diagnose real ones.
 - **Secrets:** infra-local `host/wardens/configure.sh` generates the token once in `kv/wardens/alert-webhook`, copies it
@@ -6140,6 +6187,16 @@ sees a listener pod that exists and fails.
 
 - ADR 0019 (self-hosted runners, private repos only), ADR 0040 (the `homelab-iac` scale set), ADR 0026 (monitoring collection)
 - ADR 0027 (alert rules for the Mimir ruler)
+
+#### Update 2026-11-18: `homelab` raised to 10, with a node memory gate
+
+The owner raised the `homelab` scale set from 6 to 10 runners. Measured on platform-wardens PR #237, a framework
+change started 22 jobs that waited 258 job-minutes in the queue for 29 minutes of work. The `platform` node is a k3d
+container capped at 20 GiB (about 16 GiB in use that day), and the scheduler sees only each runner's 512Mi request,
+so each runner now has a `memory-gate` init container, like `homelab-iac`'s (ADR 0059). It reads the node
+container's working set and limit from the host's cAdvisor (`172.30.0.1:9101`) and holds the pod until the node has
+2 GiB free, failing open if cAdvisor doesn't answer. Up to 16 runners across both scale sets can now be requested at once;
+the gates, not the scheduler, keep the node within its limit.
 
 ## ADR-0087: LiteLLM's admin UI signs in through Keycloak only; the admin + master key login is off
 {: #adr-0087 }
@@ -6553,12 +6610,33 @@ job mail.
   `service.name` when the span doesn't name one, and sends them over OTLP HTTP with `PHOENIX_ADMIN_SECRET`
   as the bearer token. Tempo's pipeline doesn't change, so both stores share trace IDs. Services keep one
   exporter.
+- **Agent runs are roots in Phoenix** (amended 2026-11-16): a wardens run's `invoke_agent` span is a child of
+  a framework span (`wardens.entry`, `.incident` or `.handoff`) that the filter drops and that another service
+  writes. Phoenix keeps a dropped parent's id, so an agent project had no root span: `parent_id is None`
+  found nothing. The `traces/phoenix` pipeline clears the parent of `invoke_agent` spans
+  (`transform/phoenix-agent-roots`) on Phoenix's copy only; Tempo keeps the parent and the incident tree.
+  Spans written before the change stay without a root until the 30-day retention removes them.
+- **Live wardens spans and the gateway join** (amended 2026-11-18, platform-wardens plan repo-per-agent phase 3
+  step 13): the agents also write live spans while a run works (`wardens.live = true`): a stage
+  (`invoke_agent <stage>`), one `chat` span per model request and one `execute_tool` span per tool call, under
+  an activity span that has no LLM attributes. The stage span names its run's `invoke_agent` span in
+  `wardens.run_span_id`, and the same transform sets that as its parent on Phoenix's copy, so a run reads
+  run → stage → request → LiteLLM's spans. Every request carries the `chat` span's `traceparent` (LiteLLM's
+  spans are its children, in the incident's trace) and the run's ids as LiteLLM metadata. The run record's own
+  `chat` span of a call whose requests have live spans (`wardens.live_requests`) is dropped from Phoenix, so
+  tokens aren't counted twice; Tempo keeps both.
 - **First sources:** the LiteLLM gateway (its `arize_phoenix` callback, pointed at the OTLP gateway, so
   every model call on the platform is traced) and the `platform-wardens` agents (unchanged). RAG traces
   follow with `rag-api` and `rag-ingest` (roadmap step 6b).
 - **Content:** prompts and answers are kept, except for the Hermes and job-hunter virtual keys, whose
   message content LiteLLM masks; their spans still carry model, tokens, latency and cost (owner decision,
-  2026-11-06).
+  2026-11-06). **Wardens keys are masked by data classification** (amended 2026-11-18, platform-wardens decision
+  0040 rule 15): a wardens agent's text is kept only when its manifest's `dataClassification.highest` is Public
+  or Internal. For any other label, or an unknown one, every request carries
+  `x-litellm-enable-message-redaction: true` (LiteLLM v1.103.1 honours it per request), so Phoenix gets the
+  call without its messages; the agent's virtual key is masked as well (infra-local
+  `host/litellm/phoenix-masking.sh <key alias>`; today `wardens-change-correlator`, Confidential). The wardens'
+  own live spans never carry prompt or completion text, whatever the label.
 - **Retention:** 30 days for every project (`PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`, owner decision,
   2026-11-06).
 - **No outbound calls of its own:** `PHOENIX_ALLOW_EXTERNAL_RESOURCES=false` (no web fonts, telemetry or
@@ -6582,8 +6660,10 @@ This amends ADR 0021's hostname, access and first sources; its choice of Phoenix
 - Good: every model call on the platform is visible with its prompt, tokens and latency from the first
   sync, before the RAG services exist.
 - Good: one place decides what reaches Phoenix (the gateway's filter), and one secret lets it write.
-- Bad: a dropped parent span (an HTTP span above an LLM span) leaves the LLM span as a root in Phoenix;
-  the full tree stays in Tempo.
+- Bad: a dropped parent span (an HTTP span above an LLM span) leaves the LLM span with a parent id Phoenix
+  doesn't have, so the span isn't a root there (no `parent_id is None` match, not in the Traces tab). Wardens
+  agent runs are fixed by the gateway (above); another source with a dropped parent needs the same transform.
+  The full tree stays in Tempo.
 - Bad: the admin secret is all-powerful in Phoenix; it lives only in OpenBao and the gateway's Secret.
 
 #### Related
@@ -6682,6 +6762,13 @@ The brief carries personal data: subjects and senders of mail, meeting titles, t
   Morning brief no longer writes it; a Plan for the day job at 07:30 reads the day's cards back (a new
   `GET /api/ingest/briefing/:date`, same credentials as the PUT) and posts the `plan` card, which Flashy always
   stores last.
+- 2026-11-21, school mail reads PDFs: the 21 Nov card said only that a class newsletter had come, with none of
+  its contents. The script passed on the mail's text (up to 2,500 characters) and .docx attachments, but a PDF only
+  by name (the likely gap; the mail itself wasn't checked), and the pinned Hermes image has no PDF library. The setup container now installs `pypdf` (pure Python,
+  pinned) into `/opt/data/pylib`, once, never failing the pod; `school_mail.py` prints the text of PDF attachments
+  (first 12 pages) and up to 6,000 characters of each mail and attachment. The skill says a newsletter is written
+  as its points, never as "a newsletter arrived", and an attachment it couldn't read is named with where to open
+  it. Drop the install when a pinned image bakes `pypdf`.
 
 ## ADR-0095: Private repos' CI runs only on the homelab runners, with a third scale set for the cloud IaC repos
 {: #adr-0095 }
@@ -7253,6 +7340,1483 @@ docs/plans/locust-load-testing.md.
 - [ADR 0031](#adr-0031)
 - [ADR 0063](#adr-0063)
 - [ADR 0093](#adr-0093)
+
+## ADR-0102: The wardens console sends through the ingress bus, and lets in editors and viewers with roles from X-Forwarded-Groups
+{: #adr-0102 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-16 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+platform-wardens decision 0038 (2026-11-16) changes the operator console in three ways:
+
+- it adds an incident view;
+- a Send takes the ingress path: the console checks the request and publishes
+  `com.cloudutsuk.wardens.console.task.submitted` to the ingress hub, and the ingress consumer builds the root task,
+  claims the dedupe key and starts the incident workflow `incident-<correlationId>`;
+- the console has three roles (viewer, editor, admin), taken from the sign-in proxy's groups header.
+
+The image built from that code is already deployed: homelab-gitops `ec1426f` (`sha256:c44fe6b0375f`, from
+platform-wardens `5df0c51`). The ingress consumer (`templates/ingress.yaml`) runs the same digest, because it reads
+`wardens-web.image.digest`. The image runs the new code, but this deployment still has the old settings:
+
+- the console starts sends itself (`--mode` defaults to `direct`);
+- the consumer would start a console send on its default queue, `wardens-incident`. No worker listens there: on
+  wardens the incident workflow runs on `terraform-drift`;
+- the consumer has no `WARDENS_STATE_DSN`, so it would keep its dedupe claims in its process's memory;
+- the console has no groups header, so everyone the proxy lets in is an admin. Only `platform-admins` and
+  `wardens-console-admin` are let in, because the console had no read-only mode (ADR 0074).
+
+Decision 0038 asks for this order: the consumer must be ready before the console switches to relay mode, because an
+older consumer dead-letters the new event type.
+
+#### Decision
+
+One change to `apps/wardens-console`, in three parts. Each part is safe on its own, in this order:
+
+1. **The ingress consumer can start console sends** (`templates/ingress.yaml`):
+   - It gets `WARDENS_CONSOLE_INCIDENT_QUEUE` from the console's own value, `wardens-web.env.WARDENS_CONSOLE_INCIDENT_QUEUE`
+     (`terraform-drift`). With one key the two can't differ; if the key is unset, both fall back to the same default.
+   - It gets `WARDENS_STATE_DSN` as **`wardens_agent`** (`ingress.state: {enabled: true, role: wardens_agent}`). The DSN
+     comes from a new ExternalSecret `wardens-ingress-state`, made the same way as the console's `-state` secret, with
+     the password from OpenBao `kv/wardens/wardens-state-db` `agent_password`. The agent workers already use that
+     password, so no new OpenBao path or grant is needed.
+   - The agent role is enough. Migration `0002_dedupe_claims.sql` grants `INSERT, UPDATE` on `wardens.dedupe_claims`
+     to `wardens_agent`, and the default privileges in `apps/wardens-state-db/init/10-roles.sh` give it `SELECT`.
+     `wardens_console` is a member of `wardens_agent` and adds writes to kill switches and change events. The consumer
+     needs neither.
+   - The consumer's NetworkPolicy gains egress to `wardens-state-db` on 5432. The database admits the namespace
+     already: `wardens-console` carries `homelab/wardens-agent=true`.
+2. **The console sends in relay mode** (`values.yaml`):
+   - `wardens-web.env.WARDENS_CONSOLE_MODE: relay`.
+   - The hub's connection string comes from the same OpenBao secret as the webhooks' relays and the consumer
+     (`kv/wardens/eventhubs`, property `connection`), through the chart's `secretEnv` (ExternalSecret
+     `wardens-console-env`). The `wardens-eventhubs` Kubernetes Secret can't be used: `wardens-web` can only read
+     OpenBao.
+   - The console gets egress to the bus's AMQP port (`egress.extra`). The bus's NetworkPolicy admits the console only
+     while the mode is `relay`.
+   - The chart fails to render if the mode is neither `direct` nor `relay`, or if it is `relay` while
+     `eventhubs.enabled` or `ingress.enabled` is off.
+3. **Console roles** (`values.yaml`):
+   - `WARDENS_CONSOLE_GROUPS_HEADER: X-Forwarded-Groups`.
+   - `auth.allowedGroups` adds `wardens-console-editor` and `wardens-console-viewer`.
+   - The console's built-in group for each role already matches the realm: admin is `platform-admins` and
+     `wardens-console-admin`, editor is `wardens-console-editor`, viewer is `wardens-console-viewer`. So no
+     `WARDENS_CONSOLE_*_GROUPS` is set.
+   - `charts/wardens-web` needs no change. Its oauth2-proxy sidecar has run with `--pass-user-headers=true` since
+     0.1.0, and that flag already sends `X-Forwarded-Groups`. The chart README now says so.
+   - Two settings outside git must also admit the two groups, or Keycloak and Access keep turning them away:
+     - Keycloak's gate for the client: infra-local `host/keycloak/configure-realm.sh` `APP_ACCESS[wardens-console]`;
+     - Cloudflare Access for `console.cloudutsuk.com`: infra-local `host/cloudflare/access.yaml`.
+
+### Why the groups header can be trusted
+
+The console listens on 127.0.0.1 in the pod, so only the sidecar reaches it (ADR 0074). The sidecar also removes any
+`X-Forwarded-Groups` the browser sends before it sets its own. Evidence for oauth2-proxy **v7.13.0**, the deployed
+image:
+
+- The flag reference for 7.13.x (https://oauth2-proxy.github.io/oauth2-proxy/7.13.x/configuration/overview) says:
+  - `--pass-user-headers`: "pass X-Forwarded-User, X-Forwarded-Groups, X-Forwarded-Email and
+    X-Forwarded-Preferred-Username information to upstream";
+  - `--skip-auth-strip-headers` (default `true`): "strips `X-Forwarded-*` style authentication headers &
+    `Authorization` header if they would be set by oauth2-proxy".
+- The alpha config reference for 7.13.x (https://oauth2-proxy.github.io/oauth2-proxy/7.13.x/configuration/alpha-config)
+  says of a header's `preserveRequestValue`: "Defaults to false (headers that match this header will be stripped)".
+- The source at tag v7.13.0 shows how the legacy flags turn into those headers:
+  - `pkg/apis/options/legacy_options.go`, `getPassUserHeaders`: `--pass-user-headers` adds the header
+    `X-Forwarded-Groups` from the claim `groups`.
+  - `getRequestHeaders` sets `PreserveRequestValue = !SkipAuthStripHeaders` on every header it adds. The default is
+    therefore `false`, and the chart does not set the flag.
+  - `pkg/middleware/headers.go`: `newStripHeaders` collects each header with `PreserveRequestValue` false, and
+    `stripHeaders` deletes every request header with that name before the injector runs. The match ignores case and
+    treats `_` as `-` (`stripNormalizedHeader`).
+  - So a browser's `X-Forwarded-Groups` is deleted on every proxied request. That includes a person with no groups
+    claim, who then reaches the console with no header and gets a 403.
+
+The `groups` claim comes from the client's group-membership mapper in infra-local `host/keycloak/configure-realm.sh`
+(`claim.name: groups`, `full.path: false`): plain group names, which the console also accepts with a leading `/`.
+
+#### Considered options
+
+1. **Give the consumer the console's `wardens-console-state` secret**, as `hooks.changeLog` does: no new secret, but
+   the consumer would also be able to engage kill switches and write change events, which it never needs.
+2. **A new chart value in `wardens-web` for Kubernetes Secret references**, to read the `wardens-eventhubs` Secret:
+   a chart version for something `secretEnv` already does from the same OpenBao path.
+3. **A separate PR per part**: each part is safe alone and the order holds within one sync. Both parts the console
+   depends on are in the same render, and the guard in `templates/eventhubs.yaml` keeps relay mode from rendering
+   without the consumer.
+4. **One PR, three parts, the agent role for the consumer, `secretEnv` for the hub** (chosen).
+
+#### Consequences
+
+- Good: a console Send runs the same path as an alert or a GitHub event: the hub, the consumer, the
+  `wardens.ingress` span, handoffs and one digest message.
+- Good: editors can send and chat, and viewers can read incidents and runs without being able to start anything.
+- Bad: a console Send now depends on the bus. If the emulator is down, the page answers 503 and nothing starts. The
+  fix is the bus, or `direct` as the rollback.
+- Bad: Argo CD applies the two Deployments together, so for about a minute the new console pod can publish while the
+  old consumer pod still reads. The old pod runs the same image, so it accepts the event type. It has neither the
+  incident queue nor the DSN, though, so a Send made in that window would start on `wardens-incident`, where no worker
+  listens. Avoid sending during the rollout. If it happens, terminate that `incident-<id>` workflow in the Temporal UI.
+- Note: the consumer's alert and GitHub dedupe claims also move to Postgres. They are now shared across consumer
+  replicas and restarts, and they share the fingerprint space with the console's claims, which decision 0038
+  intends.
+- A Send that duplicates another task is reported by the consumer's logs, not on the page (decision 0038).
+
+#### Related
+
+- ADR 0074 (the console behind Keycloak; amended here), 0077 (wardens-state-db), 0080 (the public name and its
+  Access application), 0088 (the ingress bus and consumer)
+- platform-wardens decision 0038, decision 0030
+
+#### Rollback
+
+Each part can be rolled back alone, in the reverse order. Each rollback is a commit to `main`:
+
+1. Roles: remove `WARDENS_CONSOLE_GROUPS_HEADER` and the two groups from `auth.allowedGroups`. Everyone let in is an
+   admin again, and only the two admin groups are let in.
+2. Relay: set `WARDENS_CONSOLE_MODE: direct`. The console starts the incident itself, the bus stops admitting it, and
+   the connection string it still holds is ignored.
+3. Consumer: set `ingress.state.enabled: false` to drop the DSN; claims go back to the process's memory. The incident
+   queue does no harm while the console is in direct mode.
+
+#### Verified and assumed
+
+Verified:
+
+- The consumer and the console render with the same image digest, `sha256:c44fe6b0375f…`.
+- platform-wardens `5df0c51` has `--mode`, `--groups-header` and the consumer's `--incident-queue`.
+- `helm lint` passes. `helm template` shows the changes listed above, and nothing else, against the render of `main`.
+- `WARDENS_CONSOLE_MODE: direct` takes the console out of the bus's NetworkPolicy. A bad mode fails the render, and so
+  does relay with the consumer off.
+- The oauth2-proxy behaviour, from its documentation and source as cited above.
+
+Assumed, not checked on the cluster:
+
+- Keycloak sends the `groups` claim in the ID token that oauth2-proxy reads. `--allowed-group` already depends on it,
+  so it works today for the admin groups.
+- OpenBao `kv/wardens/wardens-state-db` holds `agent_password`. `apps/wardens-state-db` and `charts/wardens-agent`
+  read it.
+- The emulator accepts the console's publishes with the same connection string the relays use.
+
+#### Amendment (2026-11-16): console sends run on the router worker
+
+The check send after the rollout (an `alert.triage` test alert, correlation id `e6a7c472-…`) went hub, consumer,
+`incident-<id>` as designed, then was refused: "no routable agent for 'alert.triage'". The incident workflow ran on
+`terraform-drift`, whose worker image holds only the drift and change-correlator manifests. The router worker
+(ADR 0084) also runs the incident workflow, on `wardens-router`, reads every agent's manifest from the console's
+image, and hands each task to the agent's own queue. `WARDENS_CONSOLE_INCIDENT_QUEUE` is now `wardens-router`, for
+the console and the consumer alike. Rollback: set it back to `terraform-drift` (drift and change-correlator only).
+
+## ADR-0103: Taskboard runs on platform with SQLite on a volume, LiteLLM for AI, no voice features, admins only behind Access and Keycloak
+{: #adr-0103 }
+
+<span class="adr-status adr-status-deprecated">Deprecated</span> <span class="adr-meta text-muted">2026-11-16 · `taskboard`, `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Taskboard (`cloudutsukpilot/taskboard`) is the owner's task board: projects, boards and tasks, meeting boards with
+notes, notebooks, recurring daily tasks, a generated Today board, RSS, ICS calendar and Jira import, and Web Push
+reminders. It's a Flask app on SQLite with an APScheduler scheduler, run with Docker Compose on one machine. It has
+no sign-in, renders user and feed content as HTML without sanitising it, has no CSRF protection, keeps its database
+and VAPID private key in git, and starts its speech-to-text (faster-whisper) and summarizer (distilbart) containers
+through a mounted Docker socket. A Windows tray app records call audio and posts it for transcription.
+
+The owner wants it on the platform, reachable from anywhere. The plan is
+taskboard docs/plan.md.
+
+#### Decision
+
+- **Where:** namespace `taskboard` on `platform`, deployed by Argo CD from `apps/taskboard`. Image
+  `platform/taskboard` built by the reusable `build-image.yaml`, signed, pinned by digest (ADR 0008). Internal name
+  `tasks.platform.home.cloudutsuk.com`, public name `tasks.cloudutsuk.com` through the tunnel (ADR 0058).
+- **Data:** start fresh; the Compose instance's database isn't migrated. **SQLite on a 1Gi `local-path` volume**,
+  one replica, `Recreate` strategy, scheduler in a single process. Every night the app's own scheduler copies the
+  database with SQLite's online backup API to a second volume (seven kept), and Velero's file-system backup copies
+  both (ADR 0073). Schema changes move to Alembic.
+  *Amended 2026-11-17:* the backup is an app job (`backup_database`), not a CronJob: a second pod would have to land
+  on the data volume's node and race the app's writes.
+- **AI:** summaries, the daily briefing and agenda extraction go through LiteLLM in `ai` with a virtual key
+  `taskboard`. The distilbart summarizer, the GitHub Copilot SDK and the Docker-socket service manager are removed.
+- **Voice:** removed, not disabled. Call recording, the STT and summarizer services, the call-session API and model,
+  and the Windows audio-capture app are deleted from the repo. Call notes come from Microsoft 365 Copilot and are
+  pasted into a meeting board as a note; LiteLLM can extract tasks from them.
+- **Access:** admins only. A Cloudflare Access application `Taskboard` (`allow: groups`, `platform-admins` and
+  `taskboard-admin`, 168h session for the installed PWA), and Keycloak OIDC in the app itself with a confidential
+  client `taskboard` and a groups check (ADR 0078, `APP_ACCESS[taskboard]`). No machine clients, so no service token.
+- **Secrets:** OpenBao `kv/platform/taskboard` through an ExternalSecret: session key, OIDC client secret, LiteLLM
+  key, new VAPID keys, and optional Jira token and calendar URL. Nothing secret in the database or in git.
+- **Before deploy:** the app gets sign-in, DOMPurify and a Content-Security-Policy, a CSRF header check, a fail-closed
+  `SECRET_KEY`, refusal of private addresses for feed URLs, a non-root read-only image, `/healthz` and metrics.
+
+#### Considered options
+
+1. **Postgres in `platform-db`**: allows more than one replica and fits the shared database, but needs a
+   migration of the data layer for a single-user app; one replica on SQLite is enough, and Alembic keeps the move
+   open.
+2. **Migrate the existing database**: keeps the history, but it holds tokens and transcripts in plain text that
+   would have to be cleaned first. Starting fresh is simpler.
+3. **Port STT and the summarizer as KEDA-scaled Deployments**: keeps recording working, but recording captured the
+   most sensitive data, browser and tray capture through Access would need a service token, and Microsoft 365
+   Copilot already produces the call notes. Disabling behind a flag was rejected: the code would still have to
+   build and pass review.
+4. **Access only, no sign-in in the app**: less code, but one wrong tunnel route or Access rule would leave every
+   route open. The app checks groups itself, as job-hunter does.
+
+#### Consequences
+
+- Good: the app is signed-in, sanitised and backed up before it's public; the Docker socket and the two model
+  containers are gone; AI uses the platform's models and keys.
+- Good: no recorded audio or raw transcripts are stored anywhere on the platform.
+- Bad: one replica means a short outage on every deploy and node restart.
+- Bad: the history in the Compose instance stays there; the two instances don't sync.
+- Bad: call notes are a manual paste.
+
+#### Related
+
+- ADR 0008, ADR 0058, ADR 0073, ADR 0078
+
+## ADR-0104: The wardens router runs as its own app and image, with two replicas, and is the only host of the incident workflow
+{: #adr-0104 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-17 · `homelab-gitops`, `platform-wardens`</span>
+
+#### Context
+
+The router worker (`wardens.routing.worker`, ADR 0084) runs the classifier and the incident workflow on task queue
+`wardens-router`. It ran as one Deployment inside the console's app (`apps/wardens-console/templates/router.yaml`), from
+the console's image, with one replica. Two other processes also registered the incident workflow: the terraform-drift
+worker, because the GitHub webhook started drift incidents on its queue, and the console's own `--incident-worker` (a
+local option). platform-wardens decision 0040 moves every agent to its own repository and makes `wardens` a versioned
+library; its plan (repo-per-agent, phase 2) first gives the router its own image and makes it the only host of the
+incident workflow, so no agent's worker carries cross-agent coordination. With every entry point (alerts, console
+sends, drift scans) starting its incidents on one queue, the router's availability becomes every entry point's.
+
+#### Decision
+
+- **Own app:** `apps/wardens-router`, Argo CD Application `wardens-router` in namespace `wardens-router` (labelled
+  `homelab/wardens-agent=true` so Temporal's NetworkPolicy admits it). Its own templates, not `charts/wardens-agent`:
+  it isn't an agent (no manifest, capability or tools), and it needs a PodDisruptionBudget and an image switch the agent
+  chart doesn't have. Same task queue `wardens-router`, same OpenBao key `kv/wardens/wardens-router` (`litellm_api_key`),
+  OTLP as the agents.
+- **Own image:** `platform/wardens-router`, built by platform-wardens (`framework/router.Dockerfile`,
+  `.github/workflows/wardens-router.yaml`) through `build-image.yaml`, which writes its digest to
+  `apps/wardens-router/values.yaml` `.image.digest`. Until the first build, the digest is the console image's (which
+  holds the same router) and the chart pulls it from `platform/wardens-console` while `image.bootstrap.digest` equals it,
+  so the first CI digest commit switches the repository without a second commit.
+- **Highly available:** two replicas, `maxUnavailable: 0` on rollouts, a PodDisruptionBudget with `minAvailable: 1`, and
+  its own kill switch ConfigMap (engaged: every classification escalates to a person; rules and incidents keep running).
+- **Observed:** `alerts/wardens/wardens-router.yaml`: down, no pollers, backlog older than 2 minutes, and fast and slow
+  burn of a start-latency SLO (99% of the queue's tasks start within 5 s), from Temporal's matching-service metrics.
+- **While it's down:** events wait on the ingress bus and started workflows' tasks on the queue. Nothing is dropped; an
+  alert older than the consumer's 60 minutes starts nothing (ADR 0088).
+- **Cut-over:** the new app runs beside the console's router first (two workers on one queue is safe: Temporal gives each
+  task to one poller); then platform-wardens starts drift incidents on `wardens-router`; then the console's router is
+  turned off (`router.enabled: false`). The queue name never changes, so open workflows carry on. terraform-drift stops
+  registering the incident workflow only once no incident workflow is open on its queue.
+
+#### Considered options
+
+1. **Keep the router in the console's app with more replicas:** rejected. The router's image would still be the
+   console's, and decision 0040 gives each its own release.
+2. **Wrap `charts/wardens-agent`:** rejected for now. It has no PodDisruptionBudget, and its image name is fixed at
+   `platform/<agent>`, so the first deploy couldn't use the console's image. A PodDisruptionBudget can move into the
+   chart later, when agents need one too.
+3. **Wait for the first router image before deploying the app:** rejected. The image's CI writes its digest into this
+   app's values file, which must exist first; the bootstrap digest breaks that cycle.
+
+#### Consequences
+
+- Good: an incident no longer depends on one agent's worker; a pod lost or drained leaves the other polling.
+- Good: the router and the console release separately, as decision 0040 wants.
+- Bad: one more namespace and two more pods in `wardens` (160 MiB requested each).
+- Bad: the `image.bootstrap` block must be removed by hand after the first router build (harmless if left).
+
+#### Related
+
+- ADR 0084 (the router, amended here: it no longer runs in `wardens-console`), 0088 (the ingress bus), 0102 (console
+  sends through the bus), 0069 (the `wardens` cluster), 0072 (wrapper charts).
+- platform-wardens decisions 0029 (routing) and 0040 (one repository per agent), plan repo-per-agent phase 2.
+
+## ADR-0105: build-image.yaml takes extra release tags that never move, and publishes an image with no gitops path
+{: #adr-0105 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-17 · `homelab-gitops`, `platform-wardens`</span>
+
+#### Context
+
+`build-image.yaml` (ADR 0043) tags every image it pushes with the caller's commit only (`<sha>`, and `<sha>-<arch>` for
+each platform image), because gitops pins digests and nothing pulls by tag. platform-wardens decision 0040 makes
+`wardens` a versioned library that every agent repository installs from a wheel image, `platform/wardens-py`, a
+`FROM scratch` image holding only `/wheels/` (repo-per-agent plan, phase 4 step 1). That image has no app in this repo,
+and its consumers ask for it by version: `wardens-py:0.2.0`, and release candidates such as `wardens-py:0.3.0rc1`, then
+pin the digest they resolved. The workflow needed a way to add a version tag, and for that tag to be trustworthy: a tag
+that a later build could move would make "`0.2.0`" mean different wheels on different days.
+
+An image with no gitops path already worked: the `promote` job runs only when `gitops-path` or `gitops-values-file` is
+set (the runner images use this).
+
+#### Decision
+
+- **Input `tags`** (optional, space-separated, default empty): on `main`, after the image is signed and its SBOMs
+  attested, each tag is added to the same digest as `<sha>` (`crane tag`). Every existing caller passes none and builds
+  exactly as before.
+- **A tag never moves.** Before anything is pushed, each tag is looked up: it must not exist, or must name this commit's
+  earlier build (the `<sha>` tag, so re-running a failed `main` run of the same commit still works). Otherwise the build
+  fails. A lookup error other than "no such tag" fails the build too, rather than risk moving a tag. Releasing the same
+  version twice is therefore an error; the fix is a new version.
+- **Tags are checked on pull requests as well** (a valid OCI tag, not shaped like a commit tag, and not `latest`, which
+  could never move and so would name the first release for good), so a bad tag fails before the merge.
+- **No gitops path, no commit:** documented as the way to publish an image that no app deploys, such as the wheel image.
+- **The wheel image goes through every gate unchanged.** Its Dockerfile follows the same rules as any other (base images
+  pinned by digest, `scratch` exempt, a numeric non-root `USER` in the final stage); no gate is relaxed for it.
+
+#### Considered options
+
+1. **Tag with the existing `version` input**: rejected. `version` is already passed by shorts-studio, job-hunter-agent
+   and taskboard with a version per build (the commit count); turning it into a tag would change their builds and add a
+   tag per commit to those repositories.
+2. **Mutable tags (overwrite on every build)**: rejected. A release tag that moves breaks the meaning of a version, and
+   the agent repos' release-candidate checks would test a different wheel than the one released.
+3. **Immutability in Zot instead of the workflow**: Zot's access control grants `update` to `ci-pusher` for every
+   repository, which re-runs need for `<sha>`. Per-tag immutability isn't something its policy expresses, so the check
+   lives in the workflow, the only writer of `platform/*`.
+4. **A separate release workflow for the wheel image**: rejected. It would duplicate the security gates, the signing
+   and the OpenBao role binding that `build-image.yaml` already owns (ADR 0032, 0033, 0043).
+
+#### Consequences
+
+- Good: platform-wardens can publish `wardens-py:<version>` through the same gates, signing and SBOM attestation as
+  every other image, with no app folder here.
+- Good: a published version names one digest for good; a second build of it fails loudly.
+- Bad: immutability holds only for builds through this workflow; anyone with the `ci-pusher` credential could still
+  move a tag by hand. That credential is only given to role `main` (this workflow on `main`) and to admins.
+- Bad: once a version is tagged, a fix for it needs a new version, even minutes later. This is intended: the image may
+  already have been pulled and pinned. A `main` run that fails before the tag step leaves the version free (the tag is
+  added only after signing).
+
+#### Related
+
+- ADR 0032 (security gates), ADR 0033 (signing), ADR 0043 (the build path), ADR 0034 (Zot)
+- platform-wardens decision 0040 and its repo-per-agent plan, phase 4 step 1
+
+## ADR-0106: Hermes acts on WhatsApp messages through an auto-loaded router skill, a Flashy to-do list and its own Kanban board
+{: #adr-0106 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-18 · `homelab-gitops`, `flashy`</span>
+
+#### Context
+
+The owner talks to Hermes (ADR 0048, 0064) on WhatsApp in self-chat. They want what they send to turn into
+action without naming a skill: a task for themselves goes on a to-do list in Flashy (ADR 0094), and a link or
+an action for Hermes ("summarise this LinkedIn post", "compare two NAS boxes") is worked on in the background
+and reported back.
+
+- WhatsApp has no command menu. Hermes does accept a typed `/<skill-name>` there, but nobody remembers names on
+  a phone. Telegram shows a command menu, but it would be a second channel to pair and secure for no new
+  capability.
+- Hermes picks skills from their descriptions on its own, but nothing makes a chat message reliably go to one
+  of two specific skills, and the model (`qwen3.6-35b-a3b`) is a small one.
+- Flashy had no to-do list.
+- Hermes v2026.9.24 has a built-in Kanban board (`hermes kanban`): durable SQLite tasks, a dispatcher in the
+  gateway that runs a worker per assigned card, and notify subscriptions that tell a chat when a card is done.
+  `skills.auto_load` puts named skills into every session's system prompt.
+
+#### Decision
+
+- **A router skill, `whatsapp-router`, auto-loaded** (`skills.auto_load: [whatsapp-router]`, set by the
+  `setup` container): an ordered rule table for owner chat messages. `todo:`/`flashy:` or a to-do for the
+  owner go to `flashy-todo`; `task:`, a link or an action that takes research or work go to `hermes-kanban`;
+  reminders, mail, calendar and questions stay with Hermes' usual skills. When it's unclear, it asks one
+  question. Cron jobs and Kanban workers ignore it.
+- **`flashy-todo`**: Flashy gets a to-do list (D1 table `todos`, a ✅ To-do tile, `POST/GET
+  /api/ingest/todos`, `POST /api/ingest/todos/:id/done`, behind the same Access service token and ingest
+  token as the brief). `flashy_todo.py` adds, lists and ticks off; an open item with the same title is
+  returned instead of a copy.
+- **`hermes-kanban`**: `kanban_add.py` creates a card on Hermes' own board **assigned to the default
+  profile**, so every card is worked at once (the owner's choice), with a 30-minute cap, one retry and an
+  idempotency key from the title and link. It subscribes the WhatsApp home channel with `notify+wake`, so
+  Hermes reads the result and replies when the card is done or blocked. The card body says: read and research
+  only; no mail, posts, purchases, calendar changes, pushes or deletes; block with a question instead.
+- `kanban.max_in_progress: 2`: workers are processes in the gateway container (3Gi limit), and the default
+  cap, from the node's memory, would allow 8.
+- Skills, scripts and settings are owned by git and copied into `/opt/data` on every start, like the other
+  Hermes skills.
+
+#### Considered options
+
+1. **Router skill auto-loaded (chosen)**: always in context, deterministic prefixes as an override, no code
+   in Hermes.
+2. **Only the skills' descriptions**: no router; relies on the model choosing between two skills from short
+   descriptions for every message, with no place to say what *not* to do (reminders, mail).
+3. **Typed slash commands (`/flashy-todo …`)**: work on WhatsApp but need the owner to remember names; they
+   still work as a fallback.
+4. **Telegram for its command menu**: a second channel to pair and secure for a menu only.
+5. **A gateway hook or plugin that classifies before the agent**: more reliable routing, but code against
+   Hermes' plugin API, which moves between releases.
+6. **Taskboard (ADR 0103) instead of Hermes' Kanban**: it's the owner's own task app; Hermes' board comes
+   with workers, retries and WhatsApp reports built in.
+
+#### Consequences
+
+- Good: sending a link or a task on WhatsApp is enough; prefixes force a route when the model guesses wrong.
+- Good: Flashy's to-do list also works on its own, from the app.
+- Bad: the router is in every session's prompt (about 600 tokens), including cron jobs, which it tells to
+  ignore it.
+- Bad: every link or action starts a worker on the shared chat model; a burst of messages queues behind the
+  cap of 2.
+- Bad: a worker has Hermes' full toolset; the "read and research only" rule is in the card body, not
+  enforced. Revisit with a restricted worker profile if a card ever does something it shouldn't.
+- LinkedIn often shows tools a login wall; the worker then uses the text pasted with the link.
+
+#### Related
+
+- ADR 0048, 0049 (Hermes), 0064 (personal assistant on WhatsApp), 0094 (Flashy brief), 0103 (Taskboard)
+- Plan: docs/plans/hermes-whatsapp-actions.md
+
+## ADR-0107: Claude Code works Hermes Kanban cards as an outside lane on the DGX Spark
+{: #adr-0107 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-18 · `homelab-gitops`, `infra-local`</span>
+
+#### Context
+
+Hermes (ADR 0048) has a Kanban board: cards are claimed atomically and worked by a Hermes profile, which runs on
+`qwen3.6-35b-a3b` through LiteLLM (ADR 0081). The owner wants coding cards, such as a feature in platform-wardens,
+written by Claude Code instead, from the same board.
+
+The code, the git and `gh` credentials and the owner's Claude Code login are on the DGX Spark, in the single working
+copy of the repos. The Hermes pod in `platform` has none of them: a read-only root, uid 10000, Kyverno's restricted
+profile, and no checkouts.
+
+Hermes v0.21.5 supports outside workers. Its dispatcher starts workers only for assignees that are Hermes profiles.
+A card assigned to any other name stays `ready` for an outside worker to claim (its "control-plane lane" bucket,
+`skipped_nonspawnable`, counted as idle and not stuck). That worker uses `hermes kanban claim`, `heartbeat`,
+`comment`, `request-review` and `block`.
+
+#### Decision
+
+- **Lane `spark-cc`.** A card assigned to `spark-cc` is worked by Claude Code on the Spark. To hand a card to Claude,
+  assign it to `spark-cc` and move it to `ready`.
+- **A timer on the Spark** (`infra-local/host/hermes-lane`, a systemd user unit with linger, every 5 minutes, one
+  card at a time) reaches the board with `kubectl exec deploy/hermes -- hermes kanban …`. It claims the top card
+  with a claim TTL longer than the run, then runs `claude -p` in `/home/sakharam/gitrepos/cloudutsuk`. It
+  heartbeats as the run's owner (`HERMES_KANBAN_TASK` and `HERMES_KANBAN_RUN_ID`). A CLI claim records no worker
+  PID, so Hermes' crash sweep doesn't reclaim it; only an expired TTL would.
+- **Claude Code runs headless in `auto` permission mode** and inherits the owner's CLAUDE.md, each repo's AGENTS.md
+  and the skills. A contract appended to its system prompt says:
+  - Edit only in git worktrees under `/home/sakharam/gitrepos/cloudutsuk-lane/<card>/`. Never edit in the shared
+    checkouts.
+  - Open one pull request per repo. Never merge, push to `main`, force-push, run sudo or change a live system.
+  - Answer with a JSON result: `review` or `blocked`, a summary and the PR links.
+
+  Hard denials back this up: `gh pr merge`, `sudo`, force pushes and `hermes kanban`.
+- **Hand-back:**
+  - The worker posts the summary and PR links as a comment from `spark-cc`.
+  - If the work is done, it moves the card to `review`, with the PRs in the run's metadata. Otherwise it moves the
+    card to `blocked` (`needs_input`) with Claude's question. A crash or timeout ends in `blocked` (`transient`).
+  - A review card whose PRs are all merged is completed on the next pass, and its worktrees are removed.
+  - The owner's `reopen-review` with a reason sends the card back to `ready`, with the reason as a comment. Claude
+    then continues on its `lane/<card>-…` branch and open PR. (`request-changes` is for Hermes reviewer profiles: it
+    needs an active review run.)
+- **Stopping it:**
+  - Block or reclaim a running card, or move it by hand: two missed heartbeats stop that run.
+  - `touch ~/.local/state/hermes-lane/paused` pauses the lane.
+  - `host/hermes-lane/install.sh --remove` removes it.
+
+#### Considered options
+
+1. **An outside lane on the Spark (chosen):** no change to the Hermes image, pod, secrets or Kyverno policies. Claude
+   works where the repos and credentials already are, under the same rules as an interactive session. It works only
+   while the Spark is up.
+2. **A Hermes profile whose model is Claude** (plugin `claude-subscription-directsdk`): Hermes' own agent loop and
+   tools would do the work. Rejected: the `claude` CLI and its login would have to go into a pod with a read-only
+   root, along with repo checkouts and GitHub credentials, all kept in OpenBao.
+3. **Hermes (qwen) calls `claude -p` through its `claude-code` skill:** the same pod changes as option 2, with qwen
+   still deciding the work.
+
+#### Consequences
+
+- Good: any coding task can go from the board to a reviewed pull request without opening a terminal. The board shows
+  progress, questions and PR links, and Hermes' notifications cover the lane like any other assignee.
+- Good: the merge stays with the owner. Every change arrives as a PR that CI checks.
+- Bad: runs use the owner's Claude subscription, and a long card can take a large share of it.
+- Bad: only one card runs at a time, and the lane stops while the Spark is down. Cards wait in `ready`.
+- Bad: Claude runs unattended with the owner's GitHub and kubectl access. The auto-mode classifier, the contract
+  and the hard denials limit what it does, and each run's transcript is kept in `~/.local/state/hermes-lane/runs`.
+
+#### Related
+
+- ADR 0048 (Hermes on `platform`), ADR 0081 (Hermes' model)
+- ADR 0106 (WhatsApp messages become Kanban cards for the `default` profile; a route that assigns coding cards to
+  `spark-cc` would be a follow-up)
+- `infra-local/host/hermes-lane/README.md`, `docs/plans/hermes-claude-code-lane.md`
+
+## ADR-0108: The channel's YouTube analytics arrive as a daily Flashy card from a Hermes job with no model
+{: #adr-0108 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `homelab-gitops`, `infra-local`, `flashy`</span>
+
+#### Context
+
+The owner's morning reading is Flashy's daily brief (ADR 0094). Hermes jobs post most of its cards: Gmail and
+meetings, school mail, tech news and the plan. The owner wants the YouTube channel's numbers there too, every day:
+views, subscribers and the other metrics worth tracking. Today those are only in YouTube Studio.
+
+- **Where the numbers come from:** the YouTube Analytics API v2 (scope `yt-analytics.readonly`) gives per-day
+  numbers for the channel: views, watch time, average view duration and percentage, subscribers gained and lost,
+  likes, comments, shares. It can also split them by content type, video and traffic source. The Data API (scope
+  `youtube.readonly`) gives the channel totals and video titles. Impressions and click-through rate aren't in
+  either API.
+- **When a day is ready:** YouTube finishes counting a day 2-3 days later, in Pacific time.
+- **Existing access:** Shorts Studio already has a Desktop app OAuth client and the channel's refresh token in
+  `kv/platform/shorts-studio`, but that token only has `youtube.upload`.
+
+#### Decision
+
+- **One job, no model.** A Hermes cron job at 07:10 IST runs `youtube_analytics.py` with `--no-agent`. The script
+  reads the APIs, builds one `youtube` card and posts it with `post_briefing.py` in merge mode. It prints nothing
+  on success. When it fails, it prints one line, which Hermes delivers to WhatsApp. The numbers never pass
+  through a model, so the card can't misquote them. The 07:30 Plan for the day job sees the card like any other.
+- **The day it reports** is the latest day the Analytics API returns. The card names that day and says it's the
+  latest YouTube has finished counting. It compares the day with the average of the 7 days before it, and the
+  last 7 days with the 7 before those.
+- **What the card shows:**
+  - views, and watch time with average view duration and percentage;
+  - subscribers gained, lost and net;
+  - likes, comments and shares;
+  - views by content type (Shorts, videos, live);
+  - the day's top 3 videos;
+  - the top traffic sources over 7 days;
+  - in the body, the channel totals.
+
+  Each optional part (content type, top videos, traffic sources) is skipped on its own if the API refuses it.
+- **Its own read-only token.**
+  - The OAuth client is Shorts Studio's, so the same Google Cloud project, with the YouTube Analytics API
+    enabled.
+  - The refresh token is a new one, with only `yt-analytics.readonly` and `youtube.readonly`. It's stored in
+    `kv/platform/hermes` with a copy of the client id and secret, and mounted in the gateway from the
+    `hermes-youtube` Secret.
+  - Shorts Studio keeps its upload token, and neither app gets the other's scopes.
+  - infra-local `host/hermes/youtube-consent.sh` does the sign-in. It checks that the token reads the channel and
+    its analytics before storing it, and `--check` re-checks a stored one.
+- **Flashy** gets a `youtube` card kind (📺).
+
+#### Considered options
+
+1. **A job with no model (chosen):** exact numbers, no wait for the chat model to scale up (ADR 0051), and no
+   prompt to keep in step with the script.
+2. **A Hermes job whose model writes the card from the script's output** (like Tech news): it could add a sentence
+   of interpretation, but it could also misquote the numbers. The model isn't needed to choose anything here.
+3. **Reuse Shorts Studio's token with more scopes:** one sign-in less, but the upload token would then also read
+   analytics, and Hermes would hold a token that can upload. Rejected.
+4. **A Kubernetes CronJob** like `flashy-tick.yaml`: no model either, but a failure would only show in the
+   CronJob's status. Inside Hermes, a failure reaches WhatsApp, and the job shows in `hermes cron list` next to
+   the other brief jobs.
+
+#### Consequences
+
+- Good: the channel's numbers arrive with the rest of the morning brief, already compared with the week before.
+- Good: the token can't change anything on the channel.
+- Bad: the card is always 2-3 days behind: that's when YouTube's numbers are final. Real-time numbers are only in
+  Studio.
+- Bad: one more Google token that can expire. The consent screen must stay published (a Testing app's tokens last
+  7 days); the job reports `invalid_grant` on WhatsApp, and `youtube-consent.sh` fixes it.
+
+#### Related
+
+- ADR 0094 (the Flashy brief), ADR 0064 (Hermes as a personal assistant), ADR 0051 (models scaled to zero)
+- Shorts Studio's OAuth client: infra-local `host/shorts-studio/configure.sh --youtube`
+
+## ADR-0109: Zot keeps release tags for good, and other tags while among the 20 newest or pulled in 30 days
+{: #adr-0109 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `infra-local`, `homelab-gitops`, `platform-wardens`</span>
+
+#### Context
+
+Zot's retention for `platform/**` and `labs/**` (infra-local `helm/core/zot/zot-values.yaml`) was written as
+two `keepTags` rules, `{"mostRecentlyPushedCount": 3}` and `{"patterns": [".*"], "pulledWithin": "168h"}`,
+expecting a tag to be kept when either matched. Zot (v2.1.23, `pkg/retention`) doesn't work that way: each tag
+goes to the **first** `keepTags` entry whose `patterns` match it (no `patterns` matches every tag), and only that
+entry's conditions apply. The conditions inside one entry are OR'd. So every tag went to the 3-newest entry and
+the 7-day pull rule never ran.
+
+What that cost:
+
+- An older wardens console digest that old Jobs still named was deleted; Kyverno then refused those Jobs
+  (their pods' image had no signature left to verify). Fixed separately in homelab-gitops.
+- `platform/wardens-py:0.2.0`, a release tag that never moves (ADR 0105), would have been deleted after about two
+  more builds of that repository.
+- A pod pinned to an older digest could not be pulled again after a node restart.
+
+Each build adds two or three tags (`<sha>`, `<sha>-amd64`, and `<sha>-arm64` on a multi-arch build), so a count of
+3 tags was barely one build.
+
+#### Decision
+
+Retention in `zot-values.yaml`, decided by the owner on 2026-11-18:
+
+- `platform/**` and `labs/**`:
+  `keepTags: [{"patterns": ["^[0-9]+\\.[0-9]+\\.[0-9]+(rc[0-9]+)?$"]}, {"mostRecentlyPushedCount": 20, "pulledWithin": "720h"}]`.
+  A release tag (`1.2.3`, `1.2.3rc1`, the format `wardens release` allows; no repository tags images with a
+  leading `v`) matches the first entry, which has only a pattern, so it is kept for good. Every other tag goes to
+  the second entry and is kept if it is among the 20 most recently pushed of those tags in its repository **or**
+  was pulled (or pushed) in the last 30 days. A pull by digest counts for every tag on that digest.
+- `charts/**`: the same release entry first, then `{"mostRecentlyPushedCount": 20}`. Chart versions are semver,
+  and Argo CD and the bootstrap releases pin them, so a pinned version is never dropped by newer pushes.
+- `mirror/**`: unchanged tag rule (pulled in 30 days), plus `keepUntagged: {"pulledWithin": "720h"}`. Nodes pull
+  mirrored images by digest (Kyverno requires digests), and Zot stores a digest-only pull as an untagged
+  manifest, which `deleteUntagged` removed 24 hours after it was cached; the next pull then went upstream again.
+- `deleteReferrers` and `deleteUntagged` stay on everywhere.
+
+Signatures and SBOM attestations (Cosign v3 writes them as OCI referrers, untagged manifests with a `subject`):
+
+- `deleteUntagged` never removes a referrer: GC marks every manifest with a `subject` as referenced before it
+  looks for untagged manifests.
+- `deleteReferrers` removes a referrer only when its subject digest is no longer a row in the repository's
+  `index.json`, and only after the retention `delay` (24h). A kept tag keeps its digest as a row, so the
+  signature and SBOM attestations on that index (what gitops pins and Kyverno verifies) stay with it.
+- The per-platform images inside an index stay while the index does, but their own signatures and attestations
+  (made "for anyone who pulls one by its digest") stay only while the `<sha>-<platform>` tag is kept, because the
+  child digest is a row only through that tag. Kyverno doesn't check them.
+
+#### Considered options
+
+1. **Keep the two-rule list, fix only the numbers**: still dead code for the pull rule; rejected.
+2. **One entry with all conditions and no release rule**: a release tag would go once it had 20 newer tags and
+   no pull in 30 days. Releases must outlive that (ADR 0105); rejected.
+3. **Keep everything (no retention)**: meta.db's growth already made start-up take minutes and OOMKilled Zot
+   (2026-11-05, 2026-11-10); rejected.
+4. **`mostRecentlyPulledCount` instead of a time window**: a burst of pulls of new images would push out an old
+   digest still in use; rejected.
+
+#### Consequences
+
+- Good: release tags never disappear; a deployed digest stays while anything pulls it within 30 days, and a
+  roll-back target stays among the 20 newest tags; the signatures and attestations Kyverno checks stay with their
+  image.
+- Good: the policy now does what it says; the GC audit log ("applied policy", "retained by …") shows which rule
+  kept each tag.
+- Bad: more data in Zot and meta.db, and so a slower full parse at start-up. 20 tags is about 7 to 10 builds per
+  repository; storage and start-up time are watched with the ZotGC alerts and the node's memory.
+- Bad: a digest no one has pulled for 30 days, with 20 newer non-release tags in front of it, is still deleted.
+  A long-idle CronJob pinned to such a digest needs a re-pull or a release tag.
+- Changing `storage` config makes Zot do a full meta.db parse on its next start (`fastRestart` skips it only
+  when the storage config is unchanged), so applying this restarts the registry for several minutes.
+
+#### Related
+
+- [ADR 0034](#adr-0034) (Zot registry; its retention line is replaced by this ADR)
+- [ADR 0033](#adr-0033) (signing and admission)
+- [ADR 0097](#adr-0097) (Zot sign-in, fastRestart and deleteReferrers notes)
+- [ADR 0105](#adr-0105) (release tags that never move)
+
+## ADR-0110: A script chat on every short proposes changes you accept, Claude judges on demand with its own budget, and approving re-renders
+{: #adr-0110 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `shorts-studio`</span>
+
+#### Context
+
+Shorts Studio renders a new short straight away (`schedule.review_scripts` has been off since 2026-11-18). Fixing a
+rendered short's script meant the Script editor or **Update with LLM**: one instruction in, a whole new draft back,
+with no way to ask why a line says what it says, check a claim against the research, or try an idea first. The
+producer wants to talk the script through with an agent that has read what the short was made from, have Claude
+judge the result, and approve it to render again.
+
+#### Decision
+
+- **Chat** on the episode page opens a panel with a conversation kept per episode (`chat_messages`). The agent
+  reads the script (the draft when there is one) as numbered lines, the research brief and its sources, the board
+  or diagram plan, the evaluator's review, the feedback, the earlier turns, and pages linked in the message. It
+  may run one web search per turn.
+- The chat works on the shorts whose script may change (rendered, awaiting review, rejected, failed). Review
+  before rendering stays off: the producer chats about a video they have seen.
+- The agent's changes are a **proposal** (lines rewritten, inserted or cut; title, takeaway, comment question,
+  description), shown as a word diff. **Accept** writes them to the draft; **Reject** drops them. A change whose
+  line has changed since is stale and applies nothing.
+- The chat agent is its own entry on the Models page (`providers.agents.chat`), the local LiteLLM by default.
+- **Ask Claude to judge** sends the current script to Claude through the Pro subscription (ADR 0067's accounts,
+  breakers and daily limit). Claude scores it with the editor's rubric and suggests fixes per line, which are a
+  proposal. Chat calls are counted apart (`provider_calls.purpose = chat`), at most
+  `judge.claude.max_chat_calls_per_short` (5) per short, so they never spend the 6 a generation may use.
+- **Approve & re-render** saves the draft as a version by `chat` (Claude's verdict becomes its review when it
+  judged exactly that script), queues the render, and the learning agent reads the version like the producer's
+  own edits.
+- Replies run on a small thread pool in the web process, not in the job queue, and the page polls: a chat turn
+  doesn't wait behind a render, and a Claude call that takes minutes never holds a request open past
+  Cloudflare's 100 s.
+
+#### Considered options
+
+1. **Proposal to accept (chosen)**: nothing changes without a click, and each change is visible as a diff.
+2. **The agent writes the draft directly**: faster, but a misread request rewrites lines the producer liked, and
+   undoing it means the Versions tab.
+3. **Discussion only**: safe, but every agreed fix is retyped by hand.
+4. **Claude for every chat turn**: the best answers, but a long conversation would reach the subscription's
+   40 calls a day and leave none for generation. Claude stays the judge; the chat model is switchable.
+5. **Chat turns as jobs in the queue**: survive restarts, but jobs run one at a time, so a reply would wait for a
+   render of up to 15 minutes.
+
+#### Consequences
+
+- Good: a script can be discussed, checked against its sources, corrected and re-rendered from one panel; Claude's
+  verdict is on demand and bounded per short.
+- Good: the learning agent gets more evidence (versions by `chat`).
+- Bad: a reply being written when the pod restarts is lost (it shows as failed; ask again).
+- Bad: an edited line on a board format keeps its cues; a cue whose word is gone falls back to even spacing at
+  render until the line is re-cued, as with the producer's own edits.
+
+#### Related
+
+- ADR 0067 (Claude judges Shorts Studio's scripts through the Pro subscription)
+- shorts-studio `docs/script-chat-plan.md`
+
+#### Amendment (2026-11-18): Claude writes the chat's replies, and the model is picked per message
+
+The owner chose option 4 after the first live check, where the local chat model contradicted itself and proposed
+a wrong fix:
+
+- The `chat` agent defaults to Claude through the subscription (`provider: claude`, `claude-opus-5-5`, effort
+  `chat.claude_effort`, medium), with the local model as its fallback. Claude may now be the provider of two
+  agents on the Models page: the judge and the chat.
+- The chat window has a **Model** picker: Claude's models (the chat agent's own, then `judge.claude.model` and
+  `fallback_model`) and the chat agent's other model ("agent": its provider, or its fallback when the provider is
+  Claude). The pick is sent with each message and remembered in the browser.
+- Claude's replies are counted apart again (`provider_calls.purpose = chat-reply`), at most
+  `judge.claude.max_chat_replies_per_short` (40) per short. They count towards each account's daily limit (40),
+  which protects the subscription; a long chat session can leave fewer calls for the night's generations, which
+  then fall back to the local judge as before.
+- When Claude can't answer (a usage limit, a breaker, no token, a reply that doesn't fit), the other model
+  answers and the reply says why.
+
+The same change widens the panel on request and adds **Full script**: the whole script with every changed line as
+a word diff against a saved version you pick.
+
+## ADR-0111: agent-ci.yaml is the only publish path for wardens agents, with its own OpenBao role and attestation key
+{: #adr-0111 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+platform-wardens decision 0040 moves every wardens agent to its own repository, `warden-<agent>`, which installs the
+`wardens` library from a signed wheel image (`platform/wardens-py`, ADR 0105). The org stays on GitHub Free, so private
+repositories can't require reviews or status checks: an agent's guarantees (its manifest rules, `wardens check-agent`,
+the replay tests, the eval gate) have to come from the path that publishes its image, an attestation of what that path
+checked, and admission on the `wardens` cluster (plan repo-per-agent, phase 4 steps 3 to 5, section 13 layer 3).
+
+Today any repository in the org that calls `build-image.yaml` from `main` gets OpenBao role `main` (ADR 0043): Zot push,
+the transit key `cosign`, and the homelab-gitops writer App. An agent repository could do the same and skip every check.
+
+GitHub's OIDC token names the workflow file a job is defined in (`job_workflow_ref`). For a job in a reusable workflow
+called by another reusable workflow, that is the innermost file, so an `agent-ci.yaml` that only ran its checks and then
+called `build-image.yaml` would get role `main` like any caller, and no role could tell an agent's build from any other.
+Checked against GitHub's OIDC claims documentation (2026-11-18); to be confirmed live with a throwaway repository.
+
+#### Decision
+
+1. **`.github/workflows/agent-ci.yaml` in this repo** is the reusable workflow every `warden-*` repository calls at
+   `@main`. It lives next to `build-image.yaml`, not in platform-wardens: this repo already holds the publish path's
+   trust roots (the build workflow, the Kyverno policies, the public keys) and its `main` is already a deploy;
+   it is already open to the org's repositories for reusable workflows and actions, and platform-wardens isn't. What is
+   specific to wardens (the check rules, the eval gate) is in the `wardens` command the job runs, versioned with the
+   wheel, so the workflow changes rarely.
+2. **It builds, pushes, signs and attests in its own jobs**, not by calling `build-image.yaml`. Both workflows run the
+   same steps from **composite actions in `.github/actions/`**: `openbao-login`, `openbao-logout`, `image-build-start`,
+   `image-gates`, `image-build-finish`, `image-push`, `image-sign`, `sbom-upload`, `gate-report` and `gitops-commit`
+   (plus `security-tools`, and `wardens-wheel` for agent-ci only). `build-image.yaml` keeps its inputs, outputs and
+   behaviour for every caller.
+3. **No agent code runs in a job that can ask for an OIDC token.** agent-ci's jobs: `wheel` (id-token, role `pr`:
+   verifies the pinned wheel image's Cosign signature with the platform key and copies the wheel; reads files only),
+   `test` (no id-token: `uv sync --frozen`, ruff, `wardens check-agent`, unit tests, replay tests, the deterministic
+   eval tier), `gates` (no id-token: the source security gates, since Checkov can load Python checks from a
+   repository's `.checkov.yaml`), `image` (id-token: the Dockerfile runs on BuildKit, not the runner; image scan, then on
+   `main` push, sign, attest) and `promote` (id-token: the digest commit; no checkout).
+4. **OpenBao role `agent-ci`** (infra-local `host/openbao/configure-ci.sh`, policy `ci-agent`): bound to
+   `job_workflow_ref` = `cloudutsukpilot/homelab-gitops/.github/workflows/agent-ci.yaml@refs/heads/main`, `ref` =
+   `refs/heads/main`, `repository` matching `cloudutsukpilot/warden-*`, the org's id and a self-hosted runner. It gets
+   what role `main` gets (Zot push, transit `cosign`, the writer App, Dependency-Track, BuildKit) plus the transit key
+   **`agent-ci`**, which no other role can sign with.
+5. **The agent-ci attestation**: `cosign attest --type https://cloudutsuk.com/attestations/agent-ci/v1` with
+   `hashivault://agent-ci` on the index and each platform image. Predicate: the agent and its version, the commit and
+   run, the wardens version, wheel image digest and wheel SHA-256, the check-agent result and report hash, the replay
+   result, and the eval reports' hashes. The public key goes to `apps/kyverno-policies/agent-ci.pub` for Kyverno on
+   `wardens` (plan phase 4 step 5). The signature proves that agent-ci built this image from this commit after its
+   test job passed; the results in it are what that job reported, so they are evidence, not the security boundary.
+6. **`build-image.yaml` refuses role `main` to `warden-*` repositories** (in `openbao-login`, which role `main` can only
+   be reached through, since the role accepts only `build-image.yaml` at `main`). A pull request build from an agent
+   repository still gets role `pr` and builds and scans only.
+7. Publishing the agent's registry entry to `wardens-deploy` (plan phase 5): built 2026-11-19, on since 2026-11-19 (note below).
+
+8. **The image is built from the wheel the `wheel` job verified** (owner decision, 2026-11-18). The `image` job restores
+   that wheel from the Actions cache, checks its SHA-256 against the `wheel` job's output again and puts it into the
+   build context as `.wheels/`; the agent's Dockerfile copies it (`COPY .wheels/ /app/.wheels/`) and installs with
+   `uv sync --frozen --no-dev`. The Dockerfile keeps `ARG WARDENS_PY=…/wardens-py:<version>@sha256:…` as the pin's one
+   record (the `wheel` job reads and verifies it), but the build never pulls it. A committed `.wheels/` is refused.
+   Why: the image holds exactly the file whose signature and hash were checked (uv records no hash for a `find-links`
+   wheel, so the hash check is this one); there is no second fetch to trust; and the shared BuildKits stay unchanged:
+   they are plain Docker containers without the homelab's split DNS and can't resolve `registry.core…`, which the
+   first agent-ci run (`warden-ci-check`, 2026-11-18) hit with `FROM ${WARDENS_PY}`.
+
+#### Considered options
+
+1. **agent-ci.yaml in platform-wardens**: next to the framework it checks. Turned down: platform-wardens' workflows are
+   closed to other repositories (Actions access "none"), opening them exposes every workflow there, and the build
+   and signing steps would still live here, so the publish path would span two repositories' `main` branches.
+2. **agent-ci.yaml calling build-image.yaml after its checks**: no duplication, but the OIDC token of the build job names
+   `build-image.yaml`, so OpenBao can't give agent builds a credential of their own, and any caller could still publish.
+3. **A repository list on role `main` instead of the refusal**: OpenBao's bound claims can't exclude a pattern, and
+   listing every other repository breaks each new one.
+4. **Copying build-image.yaml's steps into agent-ci.yaml**: two copies of the gates and signing to keep in step.
+
+5. **`FROM ${WARDENS_PY}` in the agent's Dockerfile** (BuildKit pulls the wheel image): turned down by the owner on
+   2026-11-18 (decision 8). The BuildKits can't resolve Zot without a DNS or host-entry change to the shared builders,
+   and the build would fetch the wheel a second time, after the `wheel` job verified it.
+
+#### Consequences
+
+- Good: an agent's image, digest commit and attestation come only from agent-ci at `main`, after its checks; a bypass
+  gives an image without the attestation, which Kyverno will refuse (phase 4 step 5).
+- Admission (phase 4 step 5, 2026-11-18): `apps/kyverno-policies` policy `verify-agent-ci-attestation`, on `wardens`
+  only, checks every `platform/warden-*` image for the agent-ci attestation signed with `agent-ci.pub`, whose
+  predicate names `agent-ci.yaml@refs/heads/main` and a `warden-*` repository with check-agent `pass`. CREATE only,
+  like `verify-image-signatures`. It starts as Audit (with Warn) and `failurePolicy: Ignore`, and moves to Deny with the
+  platform-wardens phase 7 pilot (the chart's README lists what that needs). Kyverno 1.19.1 reads the Cosign v3
+  bundles agent-ci writes: the CLI passed `warden-ci-check` and failed an image without the attestation.
+- Good: the build steps are written once; `build-image.yaml` is shorter and its behaviour unchanged.
+- Bad: a composite action is referenced at `@main`, so a change to one can't be tried from a branch of this repo before
+  it merges; a caller pinned to a branch of `build-image.yaml` still runs the actions at `main`. Large changes go in two
+  pull requests (the action first, unused, then its use).
+- Bad: roadmap step 25 (moving `build-image.yaml` to `reusable-workflows`) now moves the actions and `agent-ci.yaml`
+  with it, and the role bindings change in the same step.
+- The owner runs `configure-ci.sh` once with the OpenBao admin token to create role `agent-ci`, policy `ci-agent` and
+  the key `agent-ci` (it writes `agent-ci.pub` here). Done 2026-11-18: the role, policy and key exist, and
+  `apps/kyverno-policies/agent-ci.pub` is committed.
+
+#### Related
+
+- ADR 0032, 0033, 0043, 0072, 0099, 0105
+- platform-wardens decision 0040 and plan `docs/plans/repo-per-agent.md` (phase 4 steps 3 to 5, phase 6 step 3)
+
+#### Note (2026-11-19): the registry job
+
+Plan phase 5 step 3 (platform-wardens decision 0042). The `registry` job publishes the agent's entry
+(`registry/<agent>/<version>/` in `cloudutsukpilot/wardens-deploy`) in the same `main` run as the image, after the
+`image` job, in a job of its own: the writer App's token for wardens-deploy never shares a job with the signing keys.
+It runs `.github/actions/wardens-registry-publish`:
+
+- **The wardens that wardens-deploy pins** (`tools/Dockerfile` and `tools/pyproject.toml`), fetched and verified with
+  the `wardens-wheel` action like an agent's, runs `wardens registry publish`; not the agent's own pin. The job writes
+  to wardens-deploy, so the publishing code is the version wardens-deploy's CI checks with, and the agent's checkout is
+  read as data (YAML and JSON; no agent code runs in the job, as in the `image` job).
+- **Role `agent-ci`** reads `kv/ci/gitops-writer` and Zot pull credentials; the OpenBao token is revoked as soon as
+  the App key is read. The installation token is for wardens-deploy only, contents and pull requests write, and is
+  revoked at the end.
+- **A commit or a pull request:** a non-risk-raising entry is committed to wardens-deploy's `main`; a risk-raising one
+  (decision 0040 rule 5, `wardens registry diff --risk`) goes to a pull request on `registry/<agent>/<version>`, which
+  needs its approval record. Without the risk check every entry is a pull request (fails closed).
+- **On since 2026-11-19.** Before that it was off until the App could open pull requests: the homelab-gitops writer App (`cloudutsuk-gitops-writer`) is installed
+  on `cloudutsukpilot/wardens-deploy` (added 2026-11-19) but has contents write only. The owner adds the pull requests
+  write permission to the App and accepts it on the installation; then a PR here sets `REGISTRY_PUBLISH: "true"` in
+  `agent-ci.yaml`. The owner granted it on 2026-11-19 and the switch is on; the `registry` input defaults to true, so
+  every agent's main build publishes its entry.
+
+#### Note 2026-11-19: the first real agent, warden-incident-triage (plan phase 7)
+
+The pilot's image is `platform/warden-incident-triage`, not the monorepo's `platform/incident-triage`: the agent
+template's CI names every agent image `warden-<agent>`, which is also what `verify-agent-ci-attestation` matches, so no
+image built outside agent-ci can carry an agent's name. The Argo CD app and its values file keep their names
+(`apps/incident-triage`); the values set `image.repository` once. Cut-over: platform-wardens #265 stopped the
+monorepo's build and promote of the old image first; the first `main` build (warden-incident-triage run 44481279669,
+no gitops target yet) pushed `sha256:66e33e65…`, signed, with the agent-ci attestation (agent 0.2.0, wardens 0.4.0,
+check-agent pass, evals pass) and opened wardens-deploy #4 (`registry/incident-triage/0.2.0`, merged after its CI);
+this repo's PR switched repository and digest together; the agent's CI then got `gitops-values-file` so later builds
+promote themselves. Kyverno `verify-agent-ci-attestation` moved to Deny the same day (README of
+`apps/kyverno-policies`), once that image showed `pass` under Audit and was the only `platform/warden-*` image on
+`wardens`.
+
+#### Note 2026-11-19: warden-stack-author (plan phase 8)
+
+The same cut-over as the pilot: platform-wardens #274 stopped the monorepo's build and promote of `platform/stack-author`;
+warden-stack-author's first `main` build (run 44521322613, no gitops target) pushed `platform/warden-stack-author`
+`sha256:3d659082…`, signed, with the agent-ci attestation (agent 0.2.0, wardens 0.4.0, check-agent pass, evals pass,
+replay pass), and committed `registry/stack-author/0.2.0` to wardens-deploy (no risk raised); `apps/stack-author` then
+switched repository and digest together. The app keeps its name and its chart version.
+
+#### Note 2026-11-19: warden-change-correlator (plan phase 8 wave 2)
+
+The same cut-over: platform-wardens #288 stopped the monorepo's build of `platform/change-correlator` and
+`platform/terraform-drift`; warden-change-correlator's first `main` build (no gitops target) pushed
+`platform/warden-change-correlator` `sha256:587c0272…`, signed, with the agent-ci attestation (agent 0.2.0, wardens
+0.5.0), and committed `registry/change-correlator/0.2.0` to wardens-deploy (no risk raised; platform-wardens #290 copies
+it into the router's registry); `apps/change-correlator` then switched repository and digest together. terraform-drift
+follows once its 0.2.0 entry (it raises risk: team-chat follow-ups) has a signed approval record.
+
+#### Note 2026-11-19: warden-terraform-drift (plan phase 8 wave 2, last)
+
+warden-terraform-drift's `main` build (run 44564683461, no gitops target) pushed `platform/warden-terraform-drift`
+`sha256:2641a034…` (an OCI index with the amd64 image), signed, with the agent-ci attestation (agent 0.2.1, wardens
+0.5.0), and opened `registry/terraform-drift/0.2.1` in wardens-deploy as a pull request: its team-chat follow-ups
+(`interaction.chat.enabled`) counted as risk-raising. The owner decided on 2026-11-19 that turning chat on alone isn't
+(platform-wardens decision 0043 decision 7, wardens 0.5.1; ADR 0112 note), so wardens-deploy #8 merged without an
+approval record once its `tools/` moved to 0.5.1. `apps/terraform-drift` then switched repository and digest together,
+and reads its registry entries (its cell's agents and change-correlator) and the deploy config from wardens-deploy, as
+incident-triage does.
+
+#### Note 2026-11-20: warden-ci-check deleted
+
+The throwaway repository `cloudutsukpilot/warden-ci-check`, which proved agent-ci's first `main` run and the
+attestation check above on 2026-11-18, was deleted on 2026-11-20 (infra-github #28, owner go-ahead): no app here,
+no wardens-deploy registry entry and no pod used its `platform/warden-ci-check` images. The images may stay in Zot
+until retention or a manual cleanup removes them; nothing references them. The Kyverno CLI example in
+`apps/kyverno-policies/README.md` now uses incident-triage's image.
+
+## ADR-0112: The wardens console signs approval records with its own OpenBao transit key
+{: #adr-0112 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `homelab-gitops`, `infra-local`, `platform-wardens`</span>
+
+#### Context
+
+platform-wardens decision 0040 rule 5: a risk-raising change to an agent's manifest (a higher action level, a new act
+tool, a wider credential, a raised budget or classification, chat on an acting agent, and the rest of `wardens
+registry diff --risk`) needs an approval record from a person in the cell's reviewer group who is not the requester. `wardens-deploy`
+CI and the router must both be able to check that record, offline and without trusting whoever committed it (plan
+repo-per-agent phase 5 step 4). Team chat's level-2 URL buttons (team-chat plan C7) need the same approval page.
+
+The approver is identified only by an OIDC sign-in: the console already signs people in through Keycloak with an
+oauth2-proxy sidecar (ADR 0074) and takes roles from their groups (ADR 0102).
+
+#### Decision
+
+1. **The console hosts the approval endpoint** (`/approvals/<id>`): it shows the risk items and the entry, lets a
+   member of the Keycloak group `wardens-<cell>-reviewers` who is not the requester approve or reject it, audits the
+   decision and returns the signed `approval.json`. Reviewer groups are not a console role: a reviewer also needs one
+   of the console's groups to get in.
+2. **Records are signed with the OpenBao transit key `wardens-approval`** (ECDSA P-256, not exportable). Only the
+   console's service account may sign with it: role `kubernetes-wardens/wardens-approval`, policy `wardens-approval`
+   (infra-local `host/openbao/configure-approval.sh`). The console signs in with a projected service account token
+   mounted in its app container only (`charts/wardens-web` `openbao.role`, with `system:auth-delegator` for OpenBao's
+   TokenReview, as `apps/shorts-studio` does); the pod still has no Kubernetes API token.
+3. **The public half is committed**, every key version, as `apps/wardens-router/wardens-approval.pub`: the router
+   mounts it (`WARDENS_APPROVAL_PUBLIC_KEYS`) and refuses an unapproved risk-raising registry version
+   (`approval_missing`); `wardens-deploy` keeps a copy for `wardens registry verify-approval`.
+
+**Note (2026-11-19, owner decision):** turning team chat on for an agent (`chat_enabled`) is no longer risk-raising by
+itself, so it needs no approval record: a chat `ask` is read-only and level 0 (level cap, `ask_read_only`, budget, kill
+switch, hold), and the owner has no second reviewer account. `chat_act_capability` (`acceptsChat` on an agent with act
+actions), `chat_level1_confirm` (`interaction.confirmFromChat`) and every other rule still need one. platform-wardens
+decision 0043 decision 7, wardens 0.5.1.
+
+**Note (2026-11-20, owner decision "owner self approval is fine"):** the owner is the homelab's only real reviewer (the
+second GitHub account is the same person), so an owner may approve their own registry request. An owner is a member of
+the Keycloak group `wardens-owners` (the console's `WARDENS_APPROVAL_OWNER_GROUPS`; infra-local `configure-realm.sh`)
+who is also in the cell's `wardens-<cell>-reviewers`. The console asks for a written reason, signs `selfApproved: true`
+and `selfApprovalReason` into the record and audits `approval.self_granted`; a requester who isn't an owner is still
+refused, and chat actions keep two people. `wardens registry verify-approval` and the router accept a signed
+self-approval unless `WARDENS_APPROVAL_TWO_PERSON=true` (or `--require-two-person`), which wardens-deploy CI and the
+router get when a second real reviewer joins. platform-wardens decision 0040, note of 2026-11-20.
+
+#### Considered options
+
+1. **A key per cell or per reviewer**: more keys to rotate for no gain; the record already names the approver and group,
+   and only the console can sign.
+2. **Git-signed approvals (a reviewer's signed commit or a PR review)**: GitHub Free can't require reviews on private
+   repositories, and a commit signature doesn't prove a Keycloak group membership.
+3. **Cosign's key (`cosign`) or `agent-ci`**: those are CI's; mixing them would let CI produce approvals.
+
+#### Consequences
+
+- Good: a record verifies anywhere with a public key; the private key never leaves OpenBao; one endpoint serves registry
+  approvals and team chat.
+- Bad: approvals depend on OpenBao being up (a decision answers 503 until it is, and nothing is approved unsigned); a
+  key rotation needs the new public key committed before records signed with it are accepted.
+
+#### Related
+
+- ADR 0074, 0102 (the console and its roles), 0111 (agent-ci's key)
+- platform-wardens decision 0040 rule 5; plan repo-per-agent phase 5 step 4
+
+## ADR-0113: The nightly wardens evals read production feedback from a console route that takes a GitHub OIDC token
+{: #adr-0113 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `homelab-gitops`, `platform-wardens`, `infra-local`</span>
+
+#### Context
+
+platform-wardens' nightly eval run (`evals-nightly.yaml`, on the ARC runners in `platform`) must read people's
+verdicts on agent runs from `wardens-state-db`, as the read-only role `wardens_eval` (platform-wardens decision 0043
+decision 5; the role and migration 0015 are live since #343). The database is a ClusterIP in the `wardens` cluster,
+which the runner pods can't reach. The owner was offered a Traefik TCP route to Postgres on the `wardens` load
+balancer, a 5432 port on the k3d load balancer (recreates the cluster), running the job inside `wardens`, or a
+read-only endpoint on the operator console, which is already served on the `wardens` load balancer (ADR 0074).
+
+#### Decision
+
+The owner chose the console endpoint on 2026-11-19 (platform-wardens decision 0044).
+
+1. **The route.** `GET /api/evals/feedback?agent=…` on the console answers a page of one agent's verdicts with only
+   run id, stage, verdict, state and case id. The runner calls the internal name
+   `console.wardens.home.cloudutsuk.com`; the public name stays behind Cloudflare Access.
+2. **Its identity is a GitHub OIDC token, checked by the console.** Audience `wardens-console-evals`; the console
+   accepts only `job_workflow_ref` `cloudutsukpilot/platform-wardens/.github/workflows/evals-nightly.yaml@refs/heads/main`,
+   `ref` `refs/heads/main`, `runner_environment` `self-hosted` and the org's numeric id (`WARDENS_EVAL_READER_*` in
+   `apps/wardens-console/values.yaml`). No secret is stored in GitHub and no Keycloak client is added.
+3. **The sign-in proxy skips only that path.** `charts/wardens-web` 0.7.0 adds `auth.skipAuthRoutes`
+   (oauth2-proxy `--skip-auth-route`); the console sets `GET=^/api/evals/feedback$`, matched on the path only
+   (oauth2-proxy 7.13). The console answers that path before it reads the proxy's user and groups headers, so a
+   browser's headers give nothing there, and every other path still needs a Keycloak session.
+4. **The route reads as `wardens_eval`, not as the console's role.** `state.evalRole: wardens_eval` adds
+   `WARDENS_EVAL_STATE_DSN` to the console's state secret from OpenBao `kv/wardens/wardens-state-db` `eval_password`.
+   The console's own role, which writes kill switches, verdicts and approvals, is never used for it.
+
+#### Considered options
+
+1. **Traefik TCP (TLS with SNI) to Postgres on the `wardens` load balancer's 443:** opens the database beyond its
+   cluster and puts a database password in CI.
+2. **A 5432 port on the k3d load balancer:** the same, and the cluster is recreated.
+3. **The nightly job inside `wardens`:** a second runner scale set where only agents run today, or a CronJob that
+   can't write a GitHub job summary.
+4. **A Keycloak client-credentials client:** a client secret in GitHub, and a service account in a console group
+   would carry a person's role on every route.
+
+#### Consequences
+
+- Good: no database port, no CI credential, a token bound to one workflow on main; the database role stays read-only.
+- Bad: the oauth2-proxy sidecar is no longer the only check on every path; a new skip route must name a route that
+  checks its own token. The console fetches GitHub's JWKS over HTTPS (its egress already allows 443). When the console
+  is down the nightly report says feedback "not checked".
+- OpenBao's `github-actions/wardens-evals` role, its policy `ci-wardens-evals` and `kv/ci/wardens-evals` are not used
+  (infra-local `configure-ci.sh` no longer writes them).
+
+#### Related
+
+- ADR 0074 (the console behind Keycloak), 0077 (wardens-state-db), 0080 (its public name), 0102 (console roles)
+- platform-wardens decisions 0043 (decision 5) and 0044; plan repo-per-agent phase 3 step 14
+
+## ADR-0114: The portfolio map runs read-only on platform; its actions stay on the homelab PC
+{: #adr-0114 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `homelab-gitops`, `infra-local`, `portfolio-map`</span>
+
+#### Context
+
+`portfolio-map` draws every cloudutsukpilot repo as a mind map of components and features from each repo's
+`docs/project.yaml` and `docs/features/`. Its local instance on the homelab PC also writes: it onboards repos and
+adds features as pull requests, and starts the software factory, by running git, gh and a coding agent on the DGX
+Spark (the workspace's rule: git runs only there). It should also open from any device, like the other portals.
+
+#### Decision
+
+A second instance runs on `platform` (Phase 3 step 25), deployed like the other UIs: an image built, gated and
+signed by `build-image.yaml`, Argo CD, an oauth2-proxy sidecar with a gated Keycloak client (`portfolio-map`,
+platform-admins and portfolio-map-admin), an Ingress at `portfolio.platform.home.cloudutsuk.com` and a Homarr tile.
+
+It is **read-only**: `discovery: github` lists the org's repos from GitHub instead of local clones, and
+`actions_enabled: false` refuses every write. It reads GitHub with its own read-only App
+`cloudutsuk-portfolio-reader` (contents, pull requests, metadata), whose installation token External Secrets'
+generator mints, as for `ci-queue-exporter` (ADR 0086). Writes stay on the local instance.
+
+#### Considered options
+
+1. **Read-only in the cluster, writes on the PC** (chosen): nothing in a pod can push to a repo or reach the Spark.
+2. **Full instance in the cluster**, with an SSH key into the Spark for git and the agent: one compromised pod
+   would get a shell where every repo and the agent's credentials live.
+3. **Reuse an existing App** (the portal's `backstage-cloudutsukpilot` reads contents but not pull requests, and
+   would mix two apps' identities): no.
+
+#### Consequences
+
+- Good: the portfolio opens from any device on the tailnet behind Keycloak, with no write path in the cluster.
+- Good: the App is least privilege and separate; revoking it touches nothing else.
+- Bad: two instances; the cluster one can't start an action, and it lists repos that have no local clone.
+- Bad: creating the App needs one browser click and one install (GitHub has no API for it).
+
+#### Related
+
+- ADR 0115 (amends this: the pod may open code-graph pull requests with its own writer App)
+- ADR 0065 (Homarr), ADR 0078 (per-app access groups), ADR 0086 (read-only GitHub App token from the generator),
+  ADR 0101 (the Locust UI's oauth2-proxy pattern)
+
+## ADR-0115: The portfolio map pod opens code-graph pull requests with its own writer App
+{: #adr-0115 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-20 · `homelab-gitops`, `infra-local`, `portfolio-map`</span>
+
+#### Context
+
+ADR 0114 made the cluster instance of `portfolio-map` read-only: every write (onboarding, new features, the
+factory) runs on the homelab PC, because those writes need git, a clone and a coding agent. portfolio-map now
+shows a code graph per repo: graphify's code-only output (tree-sitter parsing, no LLM), committed under
+`docs/graph/` (`graph.html`, `graph.json`, `GRAPH_REPORT.md`). Refreshing it needs none of what kept the other
+writes off the cluster: the repo arrives as a tarball from the GitHub API, graphify runs for a few seconds with no
+model and no network, and the result is committed through the Git Data API. The owner wants to refresh graphs
+from the cluster URL and review each change as a pull request.
+
+#### Decision
+
+The pod may make exactly one kind of write: a **code-graph pull request**. `graph_refresh_enabled: true` with
+`actions_enabled: false` lets only `POST /api/repos/{name}/graph` through. It commits `docs/graph/` to a new
+`portfolio/graph-<timestamp>` branch and opens a PR; a person merges it. No PR is opened when the graph has not
+changed, nor while another graph PR is open.
+
+The commit uses a separate App, `cloudutsuk-portfolio-writer` (contents and pull requests write, metadata read, all
+repositories), whose key is in `kv/platform/portfolio-map-writer`; External Secrets' generator mints its
+installation token into `github-write-token`, mounted at `/var/run/github-write/token` (the pattern of ADR 0086).
+The reader App of ADR 0114 still does all reads. graphify (`graphifyy`, pinned) is installed in the image with
+`GRAPHIFY_BACKEND=none`. The app container's memory limit rises to 768Mi and `/tmp` to 512Mi for the run.
+
+#### Considered options
+
+1. **A writer App used only by the graph refresh** (chosen): least privilege for what is needed, revocable
+   alone, every change reviewed as a PR.
+2. **Refresh only from the local instance** (the gh login): keeps the pod read-only, but the cluster URL could
+   then only show graphs.
+3. **One App with read and write**: simpler, but every read would carry write rights.
+
+#### Consequences
+
+- Good: graphs refresh from any device behind Keycloak; the change is always a reviewed PR.
+- Bad: GitHub Free has no branch protection or rulesets on private repos, so the token **could** push to a default
+  branch; only the app's code limits it to `portfolio/graph-*` branches. A compromised pod could write to every
+  repository's contents. Mitigations: the endpoint sits behind oauth2-proxy (platform-admins,
+  portfolio-map-admin) and the CSRF header check, the token lives an hour, and the App can be suspended or
+  uninstalled in one step without touching the reader.
+- Bad: each refresh adds 0.5 to 7 MB of graph files to a repo's history.
+
+#### Related
+
+- ADR 0114 (the read-only cluster instance, amended by this one), ADR 0086 (App token from the generator)
+
+## ADR-0116: The portfolio map pod runs CodeGraphContext and a chat with the code through LiteLLM
+{: #adr-0116 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-20 · `homelab-gitops`, `infra-local`, `portfolio-map`</span>
+
+#### Context
+
+ADR 0115 added graphify's code graphs to portfolio-map. graphify colours its graph by community; it does not show
+what each node is (file, class, function) or answer "who calls this". CodeGraphContext (CGC, MIT, pinned 0.6.13)
+indexes a repo with tree-sitter into a typed graph (Repository, File, Module, Class, Function, ... with CALLS,
+IMPORTS, INHERITS edges), ships an explorer page coloured by kind, and exposes read-only query tools (find code,
+callers and callees, class hierarchy, complexity, dead code, Cypher). The owner wants a button that opens that
+graph and a chat that answers questions about a repo's code with the homelab models.
+
+CGC keeps its graph in an embedded database (Kuzu) that only one process may open, and parsing a large repo peaks
+at about 4 GB (platform-wardens), which a long-lived Python process does not give back.
+
+#### Decision
+
+The portfolio-map pod gets a third container, `codegraph`: the same image, running `codegraph/launcher.py` from its
+own venv (`/opt/codegraph`). One process owns the database and serves two ports:
+
+- the **gateway** on `127.0.0.1:8814` (CGC's tool router plus `POST /index`), behind an API key; only the app
+  container uses it.
+- the **explorer** on `127.0.0.1:8813`: CGC's graph page narrowed to one indexed repo's structure, source files
+  under `/codegraph/src`, and its static files (no custom Cypher, no AI query). A second oauth2-proxy,
+  `auth-codegraph` (same Keycloak client `portfolio-map`, same groups, cookie `_codegraph`), publishes it at
+  `https://codegraph.platform.home.cloudutsuk.com`.
+
+Indexing runs `cgc index --force` as a **child process** while the server has the database closed (reads answer
+503 meanwhile): the child returns its memory on exit, and past the container's 5Gi limit the kernel kills the
+child, not the server. The parser grammars are downloaded at image build time, so the container needs no internet
+access. The database and the unpacked sources live on a 5Gi `local-path` PVC (`codegraph`), a cache GitHub can
+rebuild, so no backup.
+
+The app container downloads a repo's default branch as a tarball (the reader App, as for graphs) into
+`/codegraph/src/<repo>` and asks the gateway to index it ("Index for CodeGraphContext", allowed on this read-only
+instance like the graph refresh: it writes nothing to GitHub). "Chat with code" sends the question to LiteLLM
+(`qwen3.6-35b-a3b`, virtual key `portfolio-map` in `kv/platform/portfolio-map`) with seven read-only tools that the
+app pins to the repo: CGC's tools with the repo path filled in by the app, results from other repos dropped, and
+source read only from that repo's folder; at most six tool rounds per question. Phoenix gets the calls without their
+message text (ADR 0093, as for job-hunter).
+
+#### Considered options
+
+1. **CGC in the pod, one launcher process, indexing in a child** (chosen): typed graph and query tools as they are,
+   one database owner, bounded memory.
+2. **CGC's own `cgc api start` and `cgc visualize`**: two processes on one embedded database fail on the lock, and
+   the visualizer also serves custom Cypher and its own AI query (Gemini or OpenAI only).
+3. **Extend graphify's output with kinds and build our own viewer and tools**: no new component, but a viewer and
+   a query layer to write and maintain, for what CGC already does.
+4. **CGC with a Neo4j or FalkorDB server**: no single-process limit, but another stateful service to run for a cache.
+
+#### Consequences
+
+- Good: a typed, explorable graph per repo and a chat grounded in it, behind Keycloak, with homelab models only;
+  no repo is written to.
+- Good: the explorer cannot run arbitrary queries; the gateway, which can write, is reachable only inside the pod.
+- Bad: the pod's memory limit grows by 5Gi (request 512Mi): indexing the largest repo takes about two minutes and
+  most of that limit. The platform node has room for the request; the limit is overcommitted.
+- Bad: the chat sends code snippets from private repos to LiteLLM on the ai cluster (still in the homelab).
+- Bad: the image grows by about 300 MB (CGC, Kuzu and 26 grammars).
+
+#### Related
+
+- ADR 0114 (the read-only instance), ADR 0115 (graphify code graphs), ADR 0081 (the chat model, qwen3.6-35b-a3b), ADR 0093
+  (Phoenix without message text)
+
+## ADR-0117: The homelab clusters trust the wardens service-account issuer for read-only agent access
+{: #adr-0117 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-20 · `homelab-gitops`, `infra-local`, `warden-cluster-upgrade-readiness`, `platform-wardens`</span>
+
+#### Context
+
+The cluster-upgrade-readiness agent (platform-wardens decision 0017) runs in `wardens` and must read every homelab
+cluster: `core`, `platform`, `mon`, `ai` on the homelab PC and `gpu` on the DGX Spark. Its worker reads `wardens`
+with its own service account's 15-minute projected token (chart 0.1.9 `kube.inCluster`, roadmap Phase 6 step 2), but
+the other API servers know nothing about that token. Options were a stored token per cluster (a long-lived secret in
+OpenBao, copied and rotated by hand) or letting each API server verify the `wardens` token itself.
+
+The `wardens` issuer is already public (ADR 0071): `https://oidc.cloudutsuk.com/wardens` serves the discovery
+document and the public keys, and every k3d node reaches it over the internet (checked from inside each node's
+network namespace, 2026-11-20). The API servers already trust one issuer, Keycloak (ADR 0028), through `--oidc-*`
+flags in the k3s drop-in `/srv/homelab/k3s/<cluster>/oidc.yaml` (core has none yet). Kubernetes allows a second
+issuer only through the structured `AuthenticationConfiguration` (v1, GA in 1.34; the clusters run k3s v1.35.5), and
+the API server refuses to start with both that file and `--oidc-*` flags. Any change to a cluster's rendered k3d
+config recreates the cluster, so the change has to stay inside the drop-in folder that the nodes already mount.
+
+#### Decision
+
+The owner chose this on 2026-11-20 (option A).
+
+- **Each cluster's API server trusts the `wardens` issuer as a second JWT authenticator**, through a structured
+  `AuthenticationConfiguration` in the existing drop-in folder: infra-local `host/k3s/authentication-config.conf`
+  (core: `authentication-config-core.conf`) and the drop-in `authentication.yaml` that sets
+  `--authentication-config`. `host/k3s/authentication.sh install <cluster>` writes both and moves `oidc.yaml` aside
+  in one step; the node reads them on `k3d cluster stop/start`. Nothing in the rendered k3d config changes.
+- **Keycloak moves into the same file unchanged**: issuer `https://auth.cloudutsuk.com/realms/homelab`, audience
+  `kubernetes`, username from `email` (an `email_verified` claim, when present, must still be true), groups from
+  `groups`, both prefixed `oidc:`. Every binding to `oidc:<group>` keeps working. core gets no Keycloak entry: it has
+  no Keycloak sign-in today, and adding one stays with its planned rebuild.
+- **The `wardens` entry accepts only**: audience `homelab-cluster-read` (a token minted for Entra or for the
+  `wardens` API server is refused), and subjects in an explicit list, today only
+  `system:serviceaccount:cluster-upgrade-readiness:cluster-upgrade-readiness`. The username is the subject prefixed
+  `wardens:`, so it can never match a local service account; no groups are mapped, so the identity has only
+  `system:authenticated`.
+- **Anonymous requests stay refused**: k3s stops passing `--anonymous-auth=false` once a config file is given, and the
+  API server's default is on, so the file sets `anonymous.enabled: false`.
+- **What the identity may do is RBAC per cluster, read-only**: the same read set as the agent's ClusterRole in
+  `wardens` (get/list on nodes, pods, deployments, statefulsets, PDBs, admission webhooks, EndpointSlices and Velero
+  backups; get on `/version` and `/metrics`; no Secrets, no ConfigMaps, no logs, no writes). `apps/wardens-cluster-readers`
+  renders it on the Argo CD clusters (platform, mon, ai, gpu) through the `wardens-cluster-readers` ApplicationSet;
+  core, which Argo CD doesn't manage, gets the same objects from infra-local `helm/core/wardens-readers`.
+- **The pod holds nothing**: one more projected token in the agent's pod, audience `homelab-cluster-read`, 900 s,
+  renewed by the kubelet, and one kubeconfig context per cluster with that cluster's public CA (wardens-agent chart
+  `kube.contexts`), plus NetworkPolicy egress to each API server's address and port.
+- **Another agent** that needs to read the clusters adds its subject to the list in both config files (the API
+  server re-reads the file when it changes, no restart) and its rules to the readers chart and the core release.
+
+#### Considered options
+
+1. **Trust the wardens issuer in every API server (chosen)**: no stored credential, 15-minute tokens, the identity is
+   the agent's own service account, and the API server re-reads the file when it changes. Costs a one-time restart
+   of each cluster and moving the Keycloak flags into the structured file.
+2. **A long-lived service-account token per cluster in OpenBao**: no API server change, but a standing credential per
+   cluster to store, rotate and revoke, which the platform-wardens identity rules (framework category 8) forbid.
+3. **Short-lived tokens minted by a broker in each cluster**: no standing secret in the agent, but a new service with
+   cluster-wide token-minting rights in every cluster, more to run than the API server already does.
+4. **Keep `--oidc-*` flags for Keycloak and add the second issuer some other way**: not possible; the flags allow one
+   issuer and can't be combined with the structured config.
+
+#### Consequences
+
+- Good: the agent reads every cluster with credentials that expire in 15 minutes and are never stored; one place per
+  cluster says which outside identities may sign in.
+- Good: later issuer changes (another agent's subject, a new audience) are file edits the API server picks up live.
+- Bad: each cluster needs one restart to switch (core's means unsealing OpenBao again), and a malformed file stops
+  that cluster's API server from starting until it's rolled back (`host/k3s/authentication.sh rollback <cluster>`).
+- Bad: the clusters now depend on `oidc.cloudutsuk.com` for the agent's sign-in; if it's down, the agent's reads fail
+  (people's Keycloak sign-in is unaffected). If `wardens` is recreated, its keys change and `host/wardens/publish-oidc.sh`
+  must run again before the agent can read the other clusters.
+- Bad: each context carries its cluster's CA in git; a recreated cluster needs its CA updated in the app's values.
+
+#### Related
+
+- ADR 0028 (Keycloak sign-in for the API servers), ADR 0058 (the public Keycloak issuer), ADR 0069 (the wardens
+  cluster), ADR 0071 (agent identities; the public wardens issuer)
+- platform-wardens decision 0017 (cluster upgrade readiness)
+
+## ADR-0118: Labelled pull requests run the software factory headless on the homelab runners
+{: #adr-0118 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-20 · `homelab-gitops`, `infra-local`, `portfolio-map`, `claude-skills`</span>
+
+#### Context
+
+The software factory (the `software-factory` plugin in claude-skills) turns a feature file with `status: ready` into a
+reviewed pull request: intake, spec, build, the repo's checks, reviewers and an approver. Until now it ran only in an
+interactive Claude Code session on the Spark, and the portfolio map's local instance started it. The owner decided on
+2026-11-20 that no portfolio-map instance runs outside the cluster, and that work queued from the portfolio is started
+by CI instead: when a pull request labelled `portfolio:implement` is merged, each ready feature it adds or changes is
+built on the homelab ARC runners, headless, and ends in the factory's pull request. Nothing merges by itself.
+
+Four things make that harder than a normal CI job:
+
+- **Nobody answers during the run.** The factory stops at `needs-info` when intake has a question and at
+  `needs-human` when the builder is blocked, and an interactive session waits there for the owner. A runner pod is
+  thrown away after the job, with the factory's job state in it.
+- **The runner has no `~/.claude`.** The factory and other skills are installed per user on the Spark.
+- **Claude Code holds credentials and reads untrusted text.** The session needs Claude Code's token and a GitHub
+  token that can push and open pull requests, and it reads feature text and code. A job with `id-token: write` lets
+  any process in it ask GitHub for an OIDC token and sign in to OpenBao (the reason for agent-ci's job split,
+  ADR 0111).
+- **A factory run can outlast a GitHub installation token** (one hour).
+
+#### Decision
+
+1. **Trigger and caller.** A repo calls `.github/workflows/portfolio-tasks.yaml@main` from a short caller on
+   `pull_request` (opened, synchronize, labeled) and `pull_request_target` (closed), when the PR has the label
+   `portfolio:implement`. The label is the same in every repo and always means "run the software factory on the
+   ready features this PR adds or changes". portfolio-map keeps the caller as a template.
+2. **A readiness check before the merge, so the run never has to ask.** On the pull request, `check-run` checks each
+   ready feature against the profile's plugin rules and the factory's fixed rules (`factory.py check`: frontmatter,
+   `status: ready`, non-empty What, Why and Done when, a known `component:`, the repo onboarded to the factory), then
+   runs intake as a preflight (the `Mode: preflight` prompt that `factory.py check` prints, plugin 0.2.0): strict, it
+   returns NEEDS-INFO for every decision an unattended run would have to guess. The fixed rules run in the job, so
+   this session gets no Bash: it reads the PR's own text, and only spawns intake and writes in the check folder. The `check` job posts the result as one PR comment (updated on every push)
+   and fails unless every feature is ready; as a required check it blocks the merge. After the merge, `plan` starts
+   nothing unless the check passed for exactly the merged files (a hash in the comment, posted by
+   `github-actions[bot]`), and refuses a repo without `.factory/` with the onboarding message.
+3. **The run after the merge.** `portfolio-task.yaml` runs once per feature (at most two at a time, one per feature
+   via `concurrency`): `/software-factory:factory run <feature>` with `FACTORY_NON_INTERACTIVE=1`, so every agent's
+   prompt says `Mode: non-interactive` and intake and the builder decide with stated `## Assumptions` instead of
+   stopping. The report job comments the outcome on the pull request that queued the feature: `recommended` and
+   `needs-human` end in a factory PR that waits for the owner; anything else fails the run with the reason.
+4. **Skills from the marketplace, pinned, chosen by task.** `.github/actions/portfolio-tasks/lib/profiles.yaml` pins
+   Claude Code (version and sha256 from Anthropic's release manifest, never "latest") and the claude-skills commit,
+   and says which plugins a session loads: every task's defaults (`software-factory`), extras by the repo's
+   `docs/project.yaml` type, and those a feature asks for with `plugins:`, only from an allow-list. They load with
+   `--plugin-dir` from the checkout; nothing is installed in the runner image. The owner's rules that matter in CI go
+   in with the session: `attribution: false` and denied tools (web access, merging, force-push, repo settings) in
+   `claude-settings.json`, the no-AI-artifacts and never-merge rules in `ci-rules.md`
+   (`--append-system-prompt-file`). Repo rules come from the repo's own AGENTS.md / CLAUDE.md.
+5. **Secrets never share a job with Claude Code.** A job that may sign in to OpenBao runs no repo code and no session:
+   it reads the secrets and passes them on in a single-use OpenBao response-wrapping token (30 minutes) as its only
+   output. The job that runs Claude Code has no `id-token`, unwraps once, and starts the session with `exec env -u`
+   so neither the session nor a shell above it holds the Actions runtime or OIDC request tokens. Two roles
+   (infra-local `configure-ci.sh`): `portfolio-check` (Claude Code's token; `portfolio-tasks.yaml@refs/heads/main`
+   on `pull_request`) and `portfolio-tasks` (Claude Code's token and the App; `portfolio-task.yaml@refs/heads/main`,
+   ref `refs/heads/main`, `pull_request_target`).
+6. **A GitHub App for the commits, and a token broker for long runs.** `cloudutsuk-portfolio-tasks` (contents and
+   pull requests write, metadata read, installed on all repositories; key at `kv/ci/portfolio-tasks`). Pull requests
+   opened with it start the repo's CI, which `GITHUB_TOKEN`'s would not. `token-broker.sh` keeps the key in its own
+   memory, never on disk or in an environment, and writes a token scoped to the one repository every 40 minutes; git
+   and gh read it. The host kernel's Yama `ptrace_scope` is 1 and the runner drops every capability, so the session
+   can read tokens but not the key.
+7. **Claude Code signs in with a long-lived token** from `claude setup-token`, stored at `kv/ci/claude-code` by the
+   owner. It is the owner's subscription; the runs show in its usage.
+
+#### Considered options
+
+1. **Headless in the runner pod, the workflow above (chosen)**: the factory runs where the repo's checks run, on the
+   homelab, and its pull request is the record. The readiness check moves the questions to the PR, where the owner is.
+2. **The runner only starts a Claude Code cloud session (`claude --cloud`) and finishes**: no long runner jobs, but
+   the work leaves the homelab, the repo's checks run in another environment, and the pinned plugins and CI rules
+   would have to be set up there too. The owner chose headless (2026-11-20).
+3. **The portfolio-map pod runs the factory**: gives a long-running pod write access to every repo and a Claude login;
+   the cluster instance stays read-only (ADR 0115) and keeps its one write, code-graph PRs.
+4. **Install the plugins into the runner image**: every plugin change would need an image build and a hand rollout
+   (ADR 0044); a pinned commit moves in a reviewed one-line change.
+5. **One job with `id-token` that also runs Claude Code**: simpler, but a prompt-injected session could sign in to
+   OpenBao as the job's role and read the App key.
+6. **`GITHUB_TOKEN` instead of an App**: pull requests it opens don't start workflows, so the factory's PR would get
+   no CI; it also can't outlive the job's permissions model.
+
+#### Consequences
+
+- Good: features queued from the portfolio (or by hand) are built on the homelab with no machine of the owner's
+  involved, each ending in a reviewed pull request; questions arrive on the PR before the merge instead of stalling a
+  run; the plugins, Claude Code version and CI rules are one reviewed file.
+- Good: no secret is in GitHub; each credential has its own OpenBao role bound to one workflow file on `main`.
+- Bad: a run uses the owner's Claude subscription and a runner (up to three hours per feature by default).
+- Bad: the factory's job state goes with the pod. Feedback on a factory PR (another round) is given by hand with
+  `/factory feedback` on the Spark, or by a new feature file through the same label.
+- Bad: the wrapping token is a job output, visible to readers of the repository's runs; it opens once and only for
+  30 minutes, and a second unwrap fails loudly (rotate both secrets if that happens without a reason).
+- Bad: the session can still use the repo-scoped token for anything contents and pull requests write allow on that
+  repository until the job ends; the factory's protected paths, the denied tools and the owner's review of every PR
+  are the guard.
+
+#### Related
+
+- ADR 0111 (agent-ci: no agent code in a job that can ask for an OIDC token)
+- ADR 0115 (the portfolio-map pod opens code-graph pull requests)
+- ADR 0044 (the runner image)
+- ADR 0043 (OpenBao sign-in for CI through GitHub OIDC)
+
+## ADR-0119: CI artifacts go to Zot, and package installs go through Nexus Repository Community Edition
+{: #adr-0119 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-21 · `homelab-gitops`, `platform-as-code`, `infra-local`, `platform-wardens`, `warden-terraform-drift`</span>
+
+#### Context
+
+The org used up GitHub Free's Actions artifact storage in November 2026 (about 372 GB-hours of about 360
+included; the allowance is monthly, so deleting artifacts doesn't free it). Every `upload-artifact` failed until
+the 1st: image builds stopped deploying until the report upload got `continue-on-error`, and terraform-drift
+recorded stacks whose plan file didn't upload as "failed to plan". Every job that uploads already runs on the
+homelab ARC runners. Separately, every `uv sync`, `yarn install` and `npm ci` in CI downloads from the internet:
+the runners start empty and `setup-uv` turns its cache off on self-hosted runners.
+
+The inventory, the comparison, the load estimate and the plan are in
+docs/plans/ci-artifacts-off-github.md; the public write-up is on the blog
+(roadmap Phase 3 step 26).
+
+#### Decision
+
+Owner, 2026-11-21:
+
+1. **CI uploads go to Zot** (ADR 0034) with ORAS, under a `ci/` namespace: security reports, Terraform plan files
+   and the apply marker. Kept 7 days by their own retention rule, no anonymous read, a read-only account for
+   terraform-drift. The GitHub upload stays behind an input for one release as a fallback, then goes.
+2. **Nexus Repository Community Edition is the proxy for PyPI and npm.** One replica on `platform`
+   (`apps/nexus`), its database in `platform-db`, proxies `pypi-proxy` and `npm-proxy` behind the groups `pypi` and
+   `npm`, configured by infra-local `host/nexus/configure-repos.sh`.
+3. **Every install signs in**: no anonymous access. CI uses the `ci-reader` account (`kv/ci/nexus-read`, read on
+   the two groups only), through `openbao-login`; Docker builds get it as a BuildKit secret, never a build argument.
+4. **The UI is public behind Cloudflare Access** at `nexus.cloudutsuk.com` (ADR 0058), since Community Edition has no
+   Keycloak sign-in; CI and lockfiles use the internal name `nexus.platform.home.cloudutsuk.com`.
+5. **On `platform`, not `core`**: `core`'s node is capped at 6 GB and Zot alone may use 4.6 GiB; raising the cap
+   recreates `core`. The blob store (only cached public packages) is a `local-path` claim until the next planned
+   `platform` recreation, then the host folder `/srv/homelab/nexus`.
+
+#### Considered options
+
+1. **Stay on GitHub artifacts with shorter retention**: already at 1 day for reports; plan files must outlive a run
+   (apply, drift). Doesn't fix installs.
+2. **Nexus for everything, uploads included**: Community Edition is limited to 40,000 components and 100,000
+   requests a day (older docs: 100,000 and 200,000). Over a limit, after a 30 to 45 day grace period, it **blocks
+   writes** while reads go on, and the request figure is the busiest day of the last 30. A day like the repo split
+   (estimated 100,000 to 400,000 install requests) could then stop plan uploads, and so applies. Uploads stay in Zot,
+   which has no limits; a blocked proxy still serves what it cached.
+3. **Harbor**: OCI-only like Zot, so no help with packages; adds scanning and "signed only", which CI and Kyverno
+   already do; seven-plus services and a migration of every image and signature. Not taken.
+4. **The last OSS Nexus (3.76) or a self-built Nexus Core**: no limits, but 3.76 gets no fixes, and Core has no
+   binaries and lacks features. Not taken.
+5. **Nexus Repository Cloud**: no free tier for repositories (usage-based, 25 GB included, then about $1.10/GB).
+
+#### Consequences
+
+- Good: no CI job depends on GitHub's storage allowance; plan files stay inside the homelab; installs stop
+  downloading the same packages from the internet every run; one place to block or audit public packages.
+- Good: the egress to pypi.org and the npm registry can be denied for the runner and BuildKit pods once every
+  repository is moved, so a missed one fails loudly.
+- Bad: one more JVM service (about 1.3 GiB) to run and upgrade, and a second sign-in (local `admin` behind Access).
+- Bad: uv lockfiles name the Nexus URL, so local runs on the Spark and the PC need the two `UV_INDEX_NEXUS_*`
+  variables, and GitHub-hosted jobs (Cloudflare Pages deploys) keep the public registry.
+- Bad: Nexus 3.98 serves nothing until its End User License Agreement is accepted, which is the owner's step
+  (`configure-repos.sh --accept-eula`).
+- Watch: usage against the Community Edition limits, with an alert at 70%; plan files hold secrets in clear text
+  (stored on the homelab PC, accepted by the owner), and why they do is a follow-up (plan row 16).
+
+#### Related
+
+- ADR 0034 (Zot), 0035 (platform-db), 0058 (public access), 0109 (Zot retention), 0044 (runner image), 0062
+  (provider cache)
 
 {% endraw %}
 <!-- adr:end -->
