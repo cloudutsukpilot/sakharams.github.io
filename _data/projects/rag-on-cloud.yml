@@ -1,0 +1,61 @@
+# Project playbook card for /tags/rag-on-cloud/ (see _includes/project-index.html).
+# Created by the cloudutsuk-project skill. `facts` are shown as chips on the index;
+# `brief` is the author's own description and is the source of truth for the posts.
+# Built in phases: areas are added as each phase gives them facts (the plan lives in the lab's private repo).
+name: RAG on Cloud
+tag: RAG on Cloud
+summary: A lab that builds retrieval-augmented generation end to end on Azure, then AWS and GCP from the same
+  code, standard and agentic side by side over the blog's own posts, scored on one golden question set and
+  compared with the homelab RAG.
+status: Planning
+created: '2026-11-18'
+category: ai-automation
+clouds: [azure, aws, gcp]
+facts:
+- label: Type
+  value: Hands-on lab, RAG end to end
+- label: Clouds
+  value: Azure first (Foundry, Azure AI Search), then AWS (Bedrock Knowledge Bases) and GCP (Vertex AI RAG Engine)
+- label: Stack
+  value: Python, FastAPI, Microsoft Agent Framework, Terraform
+- label: Corpus
+  value: This blog's public posts
+- label: Access
+  value: Keyless, Entra ID and RBAC; public endpoints first
+- label: Architecture
+  value: System diagram
+  url: /posts/projects/rag-on-cloud/05-technical-architecture/#system-context-and-component-architecture
+diagrams:
+- {type: system-context, title: "System architecture (standard and agentic RAG on Azure)", url: /posts/projects/rag-on-cloud/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/rag-on-cloud/system-architecture, format: animated}
+- {type: data-model, title: "Posts, chunks and golden questions", url: /posts/projects/rag-on-cloud/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
+brief: >-
+  From the blog tracker (B-010, 2026-11-18), in the author's words: To deploy a Retrieval-Augmented
+  Generation (RAG) system on Azure, provision your core AI and data services in the same region, index and
+  embed your source documents, and connect an orchestrator or agent to a chat model. 1. Provision Core Azure
+  Resources: create a resource group in your chosen region and set up the required services (via the Azure
+  portal, Microsoft Foundry, or Infrastructure-as-Code like Terraform or azd): Microsoft Foundry / Azure
+  OpenAI (deploy an embedding model for vectorizing text/queries and a chat/reasoning model for generating
+  responses); Azure AI Search (the retrieval layer and vector index); Storage (Azure Blob Storage or Azure
+  Files) for the raw source documents (PDFs, text files, CSVs); App Hosting (optional): Azure App Service or
+  Azure Container Apps for a web frontend, API backend, or custom orchestrator. 2. Ingest, Chunk, and Index
+  Your Data: upload your knowledge files to your storage container or file share; use Azure AI Search (or an
+  ingestion pipeline) to extract text, split documents into smaller chunks, generate vector embeddings via
+  your embedding model, and store them in a search index; enable hybrid or semantic search/ranking where
+  helpful. 3. Connect Retrieval, Orchestration, and Generation: Standard RAG, where an orchestrator (Microsoft
+  Agent Framework, Semantic Kernel, LangChain, or custom API code) takes a user query, searches the Azure AI
+  Search index, injects the top matching chunks into the prompt as context, and calls the chat model;
+  Foundry / Agentic RAG, where for multi-step reasoning or managed web app integration you connect your app
+  to Foundry Agent Service or a knowledge base so retrieval and grounding are handled alongside agent
+  orchestration. 4. Test, Secure, and Deploy: test grounding and prompt behavior in the playground or local
+  dev environment before exposing endpoints; configure Microsoft Entra ID authentication, Azure RBAC roles,
+  and access controls for sensitive data; deploy your application code and index configuration, then
+  monitor query quality and latency. For architectural patterns and trade-offs between standard and agentic
+  pipelines, see Design and Develop a RAG Solution on Azure.
+  Author's answers (2026-11-18): deliverable is this playbook plus a plan with a progress table in a new
+  repo; code, index-as-code and evals in a new lab repo, Azure resources in the platform's infra-azure
+  Terraform; scope is standard RAG, agentic RAG, evaluation and monitoring, and a comparison with the
+  homelab RAG; network posture is public endpoints with keyless Entra ID and RBAC first, the lowest Search
+  tier that supports it, torn down between sessions, private endpoints in a later phase; corpus is the
+  blog's own public posts.
+  Author (2026-11-19): implement a similar RAG system on AWS and GCP using the same repo, multiple folders if
+  required or the same code if it is independent of the cloud provider; start with Azure.

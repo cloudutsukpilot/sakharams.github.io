@@ -1,0 +1,59 @@
+# RAG on Cloud: system architecture, Phases 1 to 4 (public endpoints, keyless).
+# Belongs to the Technical Architecture post of the "RAG on Cloud" project playbook
+# (_posts/projects/rag-on-cloud/2026-11-18-05-technical-architecture.md). Made with the cloudutsuk-flow-anim skill.
+# Every Azure call is HTTPS :443 with an Entra ID token; the homelab RAG is the comparison target (Phase 4).
+title: RAG on Cloud system architecture (standard and agentic RAG on Azure)
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 640]
+lanes:
+  - {label: "Sources and people", x: 8, y: 8, w: 984, h: 122}
+  - {label: "Azure dev subscription (rag-on-cloud stack, one region)", x: 8, y: 160, w: 984, h: 310}
+  - {label: "Evaluation and comparison", x: 8, y: 500, w: 984, h: 130}
+modes:
+  - {id: standard, label: "Standard RAG"}
+  - {id: agentic, label: "Agentic RAG (knowledge base + agent)"}
+nodes:
+  - {id: user, label: "You", sub: "browser, CLI", x: 110, y: 70, w: 140, h: 56, shape: terminal, color: blue, icon: browser, icon_pos: corner}
+  - {id: entra, label: "Entra ID", sub: "sign-in, tokens", x: 340, y: 70, w: 150, h: 56, color: rose, icon: "iam/entraid/azuread-18.svg", icon_pos: corner}
+  - {id: blog, label: "Blog posts", sub: "Markdown", x: 620, y: 70, w: 140, h: 60, shape: cylinder, color: slate}
+  - {id: gha, label: "GitHub Actions", sub: "corpus sync", x: 860, y: 70, w: 150, h: 56, color: orange, icon: "devops/cicd/github-18.svg", icon_pos: corner}
+  - {id: api, label: "rag-api", sub: "Container Apps", x: 110, y: 230, w: 140, h: 56, color: violet, icon: "cloud/azure/services/container-apps.svg", icon_pos: corner}
+  - {id: agent, label: "Foundry agent", sub: "Agent Service", x: 340, y: 230, w: 150, h: 56, color: violet, icon: server, icon_pos: corner}
+  - {id: kb, label: "Knowledge base", sub: "Foundry IQ", x: 580, y: 230, w: 150, h: 56, color: indigo}
+  - {id: blob, label: "Blob corpus", sub: "container", x: 860, y: 230, w: 130, h: 66, shape: cylinder, color: amber, icon: bucket, icon_pos: corner}
+  - {id: chat, label: "Chat model", sub: "Foundry", x: 110, y: 400, w: 130, h: 56, color: violet, icon: message, icon_pos: corner}
+  - {id: embed, label: "Embeddings", sub: "Foundry", x: 340, y: 400, w: 140, h: 56, color: violet}
+  - {id: index, label: "Search index", sub: "hybrid+semantic", x: 580, y: 400, w: 150, h: 66, shape: cylinder, color: amber, icon: search, icon_pos: corner}
+  - {id: appi, label: "App Insights", sub: "traces, metrics", x: 860, y: 400, w: 150, h: 56, color: green, icon: chart, icon_pos: corner}
+  - {id: eval, label: "Eval harness", sub: "make eval", x: 340, y: 565, w: 150, h: 56, color: green, icon: gear, icon_pos: corner}
+  - {id: home, label: "Homelab RAG", sub: "Qdrant, vLLM", x: 620, y: 565, w: 150, h: 56, color: slate, icon: "databases/qdrant-18.svg"}
+edges:
+  - {id: blog_gha, from: blog, to: gha, kind: control, label: "push"}
+  - {id: gha_blob, from: gha, to: blob, proto: HTTPS, port: 443}
+  - {id: blob_idx, from: blob, to: index, points: [[830, 263], [830, 330], [640, 330], [640, 367]], label: "indexer", label_at: [735, 320], kind: data}
+  - {id: idx_emb, from: index, to: embed, exit: left, enter: right, label: "skillset", kind: request}
+  - {id: user_entra, from: user, to: entra, proto: OIDC, kind: control}
+  - {id: user_api, from: user, to: api, proto: HTTPS, port: 443}
+  - {id: api_idx, from: api, to: index, points: [[80, 258], [80, 310], [530, 310], [530, 367]], proto: HTTPS, port: 443, proto_at: [300, 310]}
+  - {id: api_chat, from: api, to: chat, points: [[130, 258], [130, 372]], kind: request}
+  - {id: api_agent, from: api, to: agent, kind: request}
+  - {id: agent_kb, from: agent, to: kb, proto: MCP, kind: request}
+  - {id: kb_idx, from: kb, to: index, points: [[580, 258], [580, 367]], kind: data}
+  - {id: api_appi, from: api, to: appi, points: [[160, 258], [160, 290], [900, 290], [900, 372]], kind: telemetry, label: "OpenTelemetry", label_at: [720, 280]}
+  - {id: eval_api, from: eval, to: api, points: [[265, 565], [25, 565], [25, 230], [40, 230]], kind: request, label: "golden set", label_at: [140, 555]}
+  - {id: eval_home, from: eval, to: home, proto: HTTPS, port: 443}
+steps:
+  - {title: "A post is published", text: "The corpus is the blog's own public posts, so every answer can be checked and nothing private is indexed.", lights: [blog, user, eval]}
+  - {title: "Sync starts", text: "A push to the blog's main branch starts the corpus sync workflow.", edges: [blog_gha]}
+  - {title: "Upload the corpus", text: "Changed posts land in the corpus container, with title, URL, date and tags as blob metadata.", edges: [gha_blob]}
+  - {title: "Indexer picks it up", text: "The Search indexer reads new blobs with the service's managed identity: no storage key exists.", edges: [blob_idx]}
+  - {title: "Chunk and embed", text: "The skillset splits each post into chunks and the embedding model turns each chunk into a vector.", edges: [idx_emb]}
+  - {title: "Sign in and ask", text: "You get an Entra ID token and ask rag-api on Container Apps, which scales to zero between sessions.", edges: [user_entra, user_api]}
+  - {title: "Hybrid retrieval", text: "Standard RAG: one hybrid query (keywords plus vectors), reranked by the semantic ranker, returns the top chunks.", edges: [api_idx], when: standard}
+  - {title: "Grounded answer", text: "The top chunks and the question go to the chat model, which answers with citations to the blog posts.", edges: [api_chat], when: standard}
+  - {title: "Hand to the agent", text: "Agentic RAG: rag-api calls a Foundry agent, which decides whether to search and how often.", edges: [api_agent], when: agentic}
+  - {title: "Call the knowledge base", text: "The agent calls the Foundry IQ knowledge base as an MCP tool.", edges: [agent_kb], when: agentic}
+  - {title: "Plan and retrieve", text: "The knowledge base splits the question into subqueries over the same index and returns chunks with references.", edges: [kb_idx], when: agentic}
+  - {title: "Trace every call", text: "Each request's spans, tokens and latency go to Application Insights, tagged with the mode.", edges: [api_appi]}
+  - {title: "Score and compare", text: "The eval harness runs the golden question set through every mode and through the homelab RAG with the same scorer.", edges: [eval_api, eval_home]}
