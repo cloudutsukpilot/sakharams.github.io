@@ -1014,3 +1014,14 @@ lessons:
     fix: "An Offline runners stat (registered runners that are neither busy nor idle) on the dashboard, and an alert when a scale set has jobs assigned but no busy runner for 15 minutes, long enough for a start from zero."
     lesson: "A pod that is Running says the process is up, not that it does its job. For a worker that pulls work from an outside service, alert on the outcome (work waiting while no worker is busy), not only on capacity."
     adrs: ["0086"]
+
+  - id: L094
+    date: 2026-11-21
+    step: "Phase 3, step 8h"
+    title: "A model summing up mail can only report what the script hands it, and won't say what it couldn't see"
+    tags: [hermes, llm, flashy, pdf]
+    symptom: "The morning school card said only \"weekly newsletter from the class\", with none of the newsletter's contents, and nothing said anything was missing."
+    cause: "The script that feeds the job passed on the mail's text and .docx attachments, but a PDF only by its name, and the pinned Hermes image has no PDF library. The model wrote the one fact it had."
+    fix: "The script reads PDF text (pypdf in the data volume), says why when an attachment stays unread, and the skill asks for a newsletter's points, or a line naming what couldn't be read and where to open it."
+    lesson: "When a script gathers input for a model, make every gap explicit in that input (\"not read: why\"), and tell the model what to write when content is missing; otherwise it writes a confident summary of nothing."
+    adrs: ["0094"]
