@@ -127,7 +127,7 @@ nodes:
           how: Modules, the CLI, unit templates, the config catalog and reusable workflows; it isn't deployed anywhere.
           where: GitHub, private repo
           when: checked out on every run
-          api: Checked out as `./terragrunt_shared_module` at `iac_shared_module_ref`
+          api: Checked out as `./platform-as-code` at `iac_shared_module_ref`
         children:
           - id: cli-src
             label: CLI package
@@ -792,7 +792,7 @@ edges:
   - {id: wf_detect, view: cicd, main: true, oneway: true, from: consumer-wf, to: detect, kind: control, label: uses @ref, why: "Every run: the consumer job calls Y-IaC's detect-changes workflow at the ref pinned in config.yaml."}
   - {id: detect_plan, view: cicd, main: true, oneway: true, from: detect, to: plan-wf, kind: control, label: stack matrix, why: "Used when at least one stack changed: each cloud, environment and stack in the matrix gets a plan job."}
   - {id: plan_stub, view: cicd, main: true, oneway: true, from: plan-wf, to: stub, kind: control, label: plan, why: "Every plan job: the runner runs entrypoint.py with plan for its stack."}
-  - {id: src_boot, view: cicd, main: true, oneway: true, from: cli-src, to: bootstrap, kind: data, label: checkout @ref, why: "Every run: Y-IaC is checked out into ./terragrunt_shared_module at iac_shared_module_ref (a sibling checkout on a laptop)."}
+  - {id: src_boot, view: cicd, main: true, oneway: true, from: cli-src, to: bootstrap, kind: data, label: checkout @ref, why: "Every run: Y-IaC is checked out into ./platform-as-code at iac_shared_module_ref (a sibling checkout on a laptop)."}
   # Inside the CLI
   - {id: stub_boot, oneway: true, from: stub, to: bootstrap, kind: control, label: sys.path, why: "Every run: the stub puts the shared src/ on sys.path and hands over to the CLI, which bootstraps first."}
   - {id: boot_root, view: inputs, oneway: true, from: bootstrap, to: root-hcl, kind: data, label: sync, why: "Used when the shared module's content hash changes: bootstrap rewrites root.hcl and the other synced files."}

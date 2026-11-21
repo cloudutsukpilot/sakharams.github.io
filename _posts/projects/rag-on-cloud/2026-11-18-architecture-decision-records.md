@@ -87,7 +87,7 @@ metadata. Liquid tags and includes are stripped before upload.
 ## ADR-0003: Azure resources through infra-azure; index objects as code in this repo
 {: #adr-0003 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `terragrunt_shared_module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
 
 #### Context
 
@@ -315,7 +315,7 @@ comparing them.
 ## ADR-0011: Infrastructure in each cloud's IaC repo through the shared module
 {: #adr-0011 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `rag-on-cloud`, `infra-azure`, `infra-aws`, `infra-gcp`, `terragrunt_shared_module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `rag-on-cloud`, `infra-azure`, `infra-aws`, `infra-gcp`, `platform-as-code`</span>
 
 #### Context
 

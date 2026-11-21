@@ -119,7 +119,7 @@ For a CLI, "responsive" means two things. First, output must work in an 80-colum
 GitHub Actions log, which wraps differently. Wide tables belong in the job summary (Markdown), not in
 the console. Second, the CLI should behave the same on a laptop and on a runner. It does, by design:
 `entrypoint.py` only differs in where it looks for the shared module (`GITHUB_ACTIONS=true` means
-`./terragrunt_shared_module`, otherwise the sibling folder).
+`./platform-as-code`, otherwise the sibling folder).
 
 ## Accessibility design
 {: #accessibility-design }
@@ -157,7 +157,7 @@ The missing-backend error in `root.hcl` is the model:
 Repository: infra-example
 ⚠️  Backend configuration not found in config.yaml
 📝 Action Required:
-   1. Open: terragrunt_shared_module/config/config.yaml
+   1. Open: platform-as-code/config/config.yaml
    2. Add backend configuration for repo: infra-example
    ...
 ```

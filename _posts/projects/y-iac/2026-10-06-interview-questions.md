@@ -525,7 +525,7 @@ The modular monorepo in code:
 
 ```hcl
 terraform {
-  source = "${dirname(find_in_parent_folders("terragrunt_shared_module"))}/terragrunt_shared_module/cloud/azure/terraform/azurerm_key_vault"
+  source = "${dirname(find_in_parent_folders("platform-as-code"))}/platform-as-code/cloud/azure/terraform/azurerm_key_vault"
 }
 ```
 
@@ -533,7 +533,7 @@ That path-based source is what makes the whole thing a library rather than a set
 consumer at a given ref gets exactly the modules at that ref, with no registry or version matrix.
 
 Gotcha: because units find the shared module by searching parent folders, a stray folder named
-`terragrunt_shared_module` higher up the tree (for example a second checkout) wins the search. The CI
+`platform-as-code` higher up the tree (for example a second checkout) wins the search. The CI
 layout avoids it; on laptops it's a real source of "it plans differently on my machine".
 
 </div>
@@ -1018,7 +1018,7 @@ def _resolve_cli_main():
         from <org>_iac.cli.app import main as cli_main
         return cli_main
     except ImportError:
-        from terragrunt_shared_module.python.lib.cli import main as cli_main
+        from platform_as_code.python.lib.cli import main as cli_main
         return cli_main
 ```
 
@@ -3256,7 +3256,7 @@ Deeper: [Environments](/posts/projects/y-iac/11-infrastructure-and-environments/
 Local development:
 
 ```bash
-git clone <shared-repo> terragrunt_shared_module
+git clone <shared-repo> platform-as-code
 git clone <consumer-repo> infra-x
 cd infra-x
 python entrypoint.py --cloud azure --environment development --stack <stack> --terragrunt plan
@@ -3826,7 +3826,7 @@ yq '.workflow[0].iac_shared_module_ref' config.yaml
 # 2. Which attribute forces replacement?
 terraform -chdir=.terragrunt-stack/azurerm_storage_account show -json tfplan | jq '.resource_changes[] | select(.change.actions|index("delete")) | {address, replace_paths: .change.replace_paths}'
 # 3. Did provider pins change at that ref?
-git -C terragrunt_shared_module log -5 --oneline -- config/providers.yaml
+git -C platform-as-code log -5 --oneline -- config/providers.yaml
 # 4. Contain: pin back both refs if it's the platform
 ```
 

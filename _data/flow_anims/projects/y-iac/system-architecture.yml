@@ -54,7 +54,7 @@ steps:
     text: The consumer's terragrunt-cicd.yaml calls the reusable workflows in Y-IaC at the ref set by iac_shared_module_ref in config.yaml.
   - edges: [GHACLI, SHAREDCLI]
     title: The runner runs the CLI
-    text: The runner checks Y-IaC out into ./terragrunt_shared_module and runs entrypoint.py. On a laptop the same CLI runs from a sibling checkout.
+    text: The runner checks Y-IaC out into ./platform-as-code and runs entrypoint.py. On a laptop the same CLI runs from a sibling checkout.
   - edges: [CLITG]
     title: YAML becomes a Terragrunt stack
     text: The CLI validates, authenticates and writes terragrunt.stack.hcl with one unit per resource type. Parts 1 and 2 below zoom in on this.

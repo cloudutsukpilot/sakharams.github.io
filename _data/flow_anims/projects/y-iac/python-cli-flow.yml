@@ -59,7 +59,7 @@ steps:
     text: "In infra-aws you run python entrypoint.py --cloud aws --environment dev --stack hello-world --terragrunt plan. Everything else the run needs is already on disk or in the environment."
   - edges: [CMDEP]
     title: The stub finds the platform
-    text: The identical entrypoint stub finds the shared module (sibling folder locally, ./terragrunt_shared_module in CI), adds src/ to sys.path and calls cli/app.py.
+    text: The identical entrypoint stub finds the shared module (sibling folder locally, ./platform-as-code in CI), adds src/ to sys.path and calls cli/app.py.
   - edges: [EPBOOT, SMBOOT]
     title: Bootstrap sync
     text: A content hash decides whether the shared module changed. If so it is copied in, the stub is refreshed and root.hcl, the CI workflow, Taskfile and .gitignore are written.

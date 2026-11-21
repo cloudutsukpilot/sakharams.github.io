@@ -139,7 +139,7 @@ month of data:
 - vLLM can use the GB10 GPU, inside k3d or as a plain container.
 
 **Dependencies:**
-- [Y-IaC](/tags/y-iac/) (`terragrunt_shared_module`) for the cluster and tag conventions.
+- [Y-IaC](/tags/y-iac/) (`platform-as-code`) for the cluster and tag conventions.
 - `infra-github` to create the new repos.
 - The existing `self-service-portal` and `sre-agent` repos.
 - The lab cards in this blog, which become the lab registry.

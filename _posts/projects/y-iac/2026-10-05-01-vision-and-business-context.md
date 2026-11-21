@@ -30,7 +30,7 @@ Terraform setup, the same decisions get made over and over: which azurerm versio
 which tags are mandatory, which checks run before an apply. Some repos get them right. Others drift, and
 nobody notices until an audit or an outage.
 
-The shared module repository (`terragrunt_shared_module` on disk, `y-iac` on GitHub for the cloudutsukpilot
+The shared module repository (`platform-as-code` on disk, `y-iac` on GitHub for the cloudutsukpilot
 consumers) puts those decisions in one place:
 
 - **175 Terraform modules**: 146 under `cloud/` (Azure alone has 94, plus AWS, GCP, Entra, GitHub, JFrog,
@@ -155,7 +155,7 @@ Assumptions and constraints I'm working with:
 
 - The repository is the **source of truth**. Shared code is never patched inside a consumer's synced
   copy; the bootstrap sync would overwrite it on the next run anyway.
-- The directory name `terragrunt_shared_module` is load-bearing. `entrypoint.py`, `root.hcl` and every
+- The directory name `platform-as-code` is load-bearing. `entrypoint.py`, `root.hcl` and every
   unit template find the module by that name with `find_in_parent_folders`.
 - Python 3.12 or newer, Terraform 1.9.8 or newer (from the generated `required_version`), and a
   Terragrunt release that supports `terragrunt stack`.

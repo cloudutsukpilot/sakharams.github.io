@@ -80,7 +80,7 @@ steps:
     text: Only the providers the stack listed, plus one aliased azurerm per subscription. The backend (local, azurerm, s3 or gcs) keys state by repo, cloud and unit path.
   - edges: [UNITMOD]
     title: Point at the shared module
-    text: terraform.source resolves to terragrunt_shared_module/cloud/aws/terraform/aws_vpc. Consumers never hold their own copy of module code.
+    text: terraform.source resolves to platform-as-code/cloud/aws/terraform/aws_vpc. Consumers never hold their own copy of module code.
   - edges: [MODINIT, PROVINIT, BACKINIT]
     title: terraform init
     text: Terragrunt runs the tflint hook, downloads providers through a plugin cache and writes the generated files next to the module code.

@@ -843,7 +843,7 @@ Each row comes from the comparison. The section numbers refer to framework-compa
 
 Decision 0007 ships L0 and L1 only in v1. At L1 the agent proposes an action and people decide and act. The Terraform drift agent's most useful output is a change to a consumer repository's `resources.yaml`. As patch text in a `proposed-action`, a person has to copy it into a branch and open the pull request by hand. That step adds work and a chance for error, and no control: every control that matters sits after the pull request is opened.
 
-The baseline is the IaC estate the agent was first built for: `terragrunt-shared-module` and its consumers: `infra-devops-sandbox` (the first target) and two more consumer repositories (checked 2026-10-31). In those repositories, opening a pull request changes nothing in Azure:
+The baseline is the IaC estate the agent was first built for: `platform-as-code` and its consumers: `infra-devops-sandbox` (the first target) and two more consumer repositories (checked 2026-10-31). In those repositories, opening a pull request changes nothing in Azure:
 
 - A pull request runs `terragrunt plan` per changed stack, with the OPA gate (and Wiz and Infracost where a repository enables them).
 - The organisation ruleset on default branches requires a pull request with one approval, dismisses stale approvals on push, and requires approval of the last push. No direct or force pushes.
@@ -1868,7 +1868,7 @@ Decision 0013 counts a draft pull request as L1 because opening it changes nothi
 | --- | --- | --- | --- |
 | `job-hunter-agent`, `shorts-studio` | 0 | GitHub-hosted; the image job is skipped | Low |
 | `self-service-portal` | 0 | Some self-hosted | The homelab network |
-| `terragrunt-shared-module` | 2 | Plans with cloud credentials | High |
+| `platform-as-code` | 2 | Plans with cloud credentials | High |
 | `infra-local`, `infra-github`, `infra-azure` | 2, 6, 8 | Real plans | High |
 
 GitHub can't close this gap. Its org policy limits `uses:`, not steps or jobs, and required reviewers and environment secrets aren't available on private repositories on the Free plan.
@@ -1885,7 +1885,7 @@ GitHub can't close this gap. Its org policy limits `uses:`, not steps or jobs, a
 | Any fix in a **low-reach** repository | L1 | Reach check, code checks, LLM reviewer | 0013's reasoning holds |
 | Any fix elsewhere, recipes included | L2 | Approval of the exact diff | Opening runs code that can reach secrets |
 | Workflow files, in consumers and in `reusable-workflows` | L2, its own grant | Approval | Adds `workflows: write` |
-| `terragrunt-shared-module/.github`, `template/terragrunt-cicd.yaml` | L2, its own grant | Approval | Plans run with cloud credentials |
+| `platform-as-code/.github`, `template/terragrunt-cicd.yaml` | L2, its own grant | Approval | Plans run with cloud credentials |
 
 **The low-reach check runs on every run, in code.** If any part fails, the fix goes to approval, or stays as text until L2 is available.
 
@@ -1907,7 +1907,7 @@ A repository that gains a secret or a self-hosted job drops off the path on its 
 
 **The LLM reviewer can only block.** A different model sees only the diff and no logs, so a poisoned log can't reach it. A flag sends the fix to approval, or to text if it's mid-loop. A pass skips nothing.
 
-**Where a fix goes for IaC pipelines.** Shared workflows live in `terragrunt-shared-module/.github`. An `infra-*` workflow change gets the same change in `template/terragrunt-cicd.yaml` and in the failing repository's rendered `.github/workflows/terragrunt-cicd.yaml`, under one approval. Once that pull request is verified, the same change goes to the other `infra-*` repositories, covered by the first approval because the repositories and hunks are known. There's no loop on those, and a copy that has fallen behind is skipped and reported. `cloud/`, `providers/` and `src/` get a recommendation, never a pull request.
+**Where a fix goes for IaC pipelines.** Shared workflows live in `platform-as-code/.github`. An `infra-*` workflow change gets the same change in `template/terragrunt-cicd.yaml` and in the failing repository's rendered `.github/workflows/terragrunt-cicd.yaml`, under one approval. Once that pull request is verified, the same change goes to the other `infra-*` repositories, covered by the first approval because the repositories and hunks are known. There's no loop on those, and a copy that has fallen behind is skipped and reported. `cloud/`, `providers/` and `src/` get a recommendation, never a pull request.
 
 **Central changes must stay compatible.** No removed input, output or secret; no new required input without a default; no type change. A breaking change is written up as text, with the callers listed.
 
