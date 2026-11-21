@@ -13,7 +13,7 @@ image:
 ---
 
 The first rule of working on Y-IaC is where *not* to make a change: never inside a consumer's synced
-copy of `terragrunt_shared_module`. The next bootstrap sync overwrites it, and the fix disappears without
+copy of `platform-as-code`. The next bootstrap sync overwrites it, and the fix disappears without
 a trace. Everything in this post follows from that rule: one source of truth, a local loop that runs
 the real CLI against a real consumer, and checks that prove a change is safe for every consumer.
 
@@ -52,7 +52,7 @@ that a review criterion for any new module in `src/`.
 {: #project-structure }
 
 ```text
-terragrunt_shared_module/
+platform-as-code/
 ├── entrypoint.py            # the stub every consumer copies
 ├── src/<org>_iac/           # the CLI package
 │   ├── bootstrap/           # sync, templates, hash cache
@@ -85,10 +85,10 @@ module outside CI:
 
 ```bash
 mkdir -p ~/gitrepos/cloudutsuk && cd ~/gitrepos/cloudutsuk
-git clone git@github.com:cloudutsukpilot/y-iac.git terragrunt_shared_module   # directory name matters
+git clone git@github.com:cloudutsukpilot/y-iac.git platform-as-code   # directory name matters
 git clone git@github.com:cloudutsukpilot/infra-aws.git
 
-cd terragrunt_shared_module
+cd platform-as-code
 python3.12 -m venv venv && . venv/bin/activate
 pip install -r requirements.txt && pip install -e '.[visualize]'
 bash docs/local-setup/local-setup.sh       # terragrunt, tflint, cloud CLIs
@@ -97,7 +97,7 @@ cd ../infra-aws
 python entrypoint.py --cloud aws --environment dev --stack hello-world --terragrunt plan
 ```
 
-A change in `../terragrunt_shared_module` is picked up on the consumer's next run, because the
+A change in `../platform-as-code` is picked up on the consumer's next run, because the
 bootstrap hash changes. To force it, pass `--script-clear-cache` or use `init -reconfigure`.
 
 The script supports **WSL (Ubuntu) and native Ubuntu/Debian** only; it stops on anything else. macOS

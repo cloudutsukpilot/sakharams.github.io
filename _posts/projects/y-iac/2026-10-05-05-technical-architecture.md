@@ -200,9 +200,9 @@ reviews these assignments quarterly.
 
 Y-IaC itself isn't deployed anywhere; it's a repository that consumers execute. Delivery works like this:
 
-- **Locally**, a consumer clones Y-IaC next to itself (`../terragrunt_shared_module`). Bootstrap syncs the
+- **Locally**, a consumer clones Y-IaC next to itself (`../platform-as-code`). Bootstrap syncs the
   needed parts into the consumer on each run when the content hash changes.
-- **In CI**, the reusable workflow checks out Y-IaC into `./terragrunt_shared_module` at the ref from the
+- **In CI**, the reusable workflow checks out Y-IaC into `./platform-as-code` at the ref from the
   consumer's `config.yaml` (`iac_shared_module_ref`), on the runner named there (`ubuntu-latest` for the
   cloudutsukpilot consumers).
 - **Infrastructure** is created in the consumer's targets: Azure subscriptions for most consumers, AWS

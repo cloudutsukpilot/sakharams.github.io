@@ -27,7 +27,7 @@ post covers both, with an animated walk through the first.
 Nothing in Y-IaC is compiled. "Build" means preparing a runner and generating the stack:
 
 - `set-build-variables` reads the consumer's `config.yaml` workflow block: shared repo, Y-IaC ref
-  (`iac_shared_module_ref`, falling back to the `TERRAGRUNT_SHARED_MODULE_VERSION` input, then `main`)
+  (`iac_shared_module_ref`, falling back to the `PLATFORM_AS_CODE_VERSION` input, then `main`)
   and runner.
 - The composite action `.github/actions/setup-environment` installs Terragrunt, TFLint, kubelogin and
   Wiz CLI in parallel, with a shared cache keyed on their versions.

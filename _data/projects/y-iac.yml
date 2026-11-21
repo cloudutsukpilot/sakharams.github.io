@@ -33,9 +33,9 @@ diagrams:
 - {type: cicd, title: "Consumer CI/CD pipeline", url: /posts/projects/y-iac/12-cicd-and-release-management/#deployment-automation, diagram: projects/y-iac/cicd-pipeline, format: animated}
 - {type: observability, title: "Drift detection loop", url: /posts/projects/y-iac/14-operations-and-observability/#alerting-and-escalation, diagram: projects/y-iac/drift-loop, format: animated}
 brief: |
-  Author's request: "Please create a new project for terragrunt shared module repo and name it as
+  Author's request: "Please create a new project for platform-as-code repo and name it as
   y-iac (or if you can suggest anything better). Please refer to the attached document for more
-  information on the y-iac project and also refer to the terragrunt_shared_module repo as well as
+  information on the y-iac project and also refer to the platform-as-code repo as well as
   infra-* repo in the same folder which are consuming repositories. I also need to create an animated
   diagram which shows the flow of the python code as it processes the yaml files, env var, root.hcl,
   terraform providers, and so on, which will provide a better understanding of how it works."
@@ -43,7 +43,7 @@ brief: |
   Name: Y-IaC. The infra-aws consumer already sets `iac_shared_repo: y-iac` in its config.yaml.
 
   Source material: the author's "Project Readiness and Delivery Guide" for the shared module (an
-  18-section planning baseline, summarised here), a read-only look at the terragrunt_shared_module repo,
+  18-section planning baseline, summarised here), a read-only look at the platform-as-code repo,
   and the infra-aws and infra-github consumers (infra-azure and infra-gcp are still empty).
 
   From the guide: an internal IaC platform and shared module repository. Users are platform engineers,

@@ -24,7 +24,7 @@ time, so that nothing reaches a consumer unannounced.
 ## Sprint or iteration planning
 {: #sprint-or-iteration-planning }
 
-There's already a backlog seed in the repo: `terragrunt_shared_module-stories.json` holds an epic and 92
+There's already a backlog seed in the repo: `platform-as-code-stories.json` holds an epic and 92
 stories (one per module family, plus CLI, workflow and policy work), all still marked pending. Importing
 them into the tracker is the first planning task, because right now the work is real but invisible.
 

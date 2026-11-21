@@ -221,7 +221,7 @@ desired state, but must never touch the cluster definitions.
   - `homelab-gitops`: Argo CD desired state and this ADR log.
   - `homelab-services`: Python services, one image each.
 - Existing repos are extended: `self-service-portal`, `sre-agent`, `sakharams.github.io`,
-  `infra-github`, `terragrunt_shared_module` and the `infra-*` repos (the `lab` tag).
+  `infra-github`, `platform-as-code` and the `infra-*` repos (the `lab` tag).
 
 #### Considered options
 
@@ -245,7 +245,7 @@ desired state, but must never touch the cluster definitions.
 ## ADR-0006: Long-lived k3d clusters as code with the shared module (k3d config files); lab clusters stay Makefile-owned
 {: #adr-0006 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-10 · `infra-local`, `terragrunt_shared_module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-10 · `infra-local`, `platform-as-code`</span>
 
 #### Context
 
@@ -560,7 +560,7 @@ charges $0.01 per call) and cost data lags up to 24 hours anyway.
 ## ADR-0013: Cost attribution through the existing common_tags plus an optional lab tag
 {: #adr-0013 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-10 · `terragrunt_shared_module`, `infra-azure`, `infra-aws`, `infra-gcp`, `homelab-services`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-10 · `platform-as-code`, `infra-azure`, `infra-aws`, `infra-gcp`, `homelab-services`</span>
 
 #### Context
 
@@ -1745,13 +1745,13 @@ schema changes and bugs couple them, and backups and privacy are hard to reason 
 ## ADR-0036: Bootstrap charts through the shared module's Helm layer; Argo CD for the rest
 {: #adr-0036 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `terragrunt-shared-module`, `homelab-gitops`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-11 · `infra-local`, `platform-as-code`, `homelab-gitops`</span>
 
 #### Context
 
 `core` boots first and must run OpenBao, External Secrets, cert-manager, PowerDNS, ExternalDNS and Zot
 before Argo CD or any other cluster exists (ADR 0025). Those releases need a tool other than Argo CD.
-The owner already installs platform charts with the Terragrunt shared module's Helm layer in other
+The owner already installs platform charts with the platform-as-code's Helm layer in other
 application repositories, and wants the same workflow here.
 
 #### Decision
@@ -3701,7 +3701,7 @@ Pending, to pick up later:
 ## ADR-0059: IaC runner image with the Terragrunt tools baked in, and up to four runners gated on host memory
 {: #adr-0059 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `homelab-gitops`, `infra-local`, `terragrunt-shared-module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `homelab-gitops`, `infra-local`, `platform-as-code`</span>
 
 #### Context
 
@@ -3734,7 +3734,7 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
   on `/opt/iac/bin`, sha256-checked, matching the shared module's new `OPA_VERSION`, `TRIVY_VERSION` and
   `INFRACOST_VERSION`. Before, nothing installed them on any runner, so every plan logged `opa / trivy /
   infracost not installed - skipping` and the policy, security and cost gates never ran. The shared
-  module's `setup-environment` now installs each one only when it is missing (terragrunt-shared-module#17),
+  module's `setup-environment` now installs each one only when it is missing (platform-as-code#17),
   so GitHub-hosted runners get them too, and this image downloads nothing. Infracost stays on 0.10.x: 2.x
   replaced `breakdown`, which the cost gate uses.
 - **Amended 2026-11-15: Python 3.13 in the image.** The shared module moved every workflow to
@@ -3760,7 +3760,7 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
 
 #### Considered options
 
-1. **Keep downloading in every job** (with the retried download in terragrunt-shared-module#8): works,
+1. **Keep downloading in every job** (with the retried download in platform-as-code#8): works,
    but it's slow and every job still depends on four download hosts.
 2. **Download the tools in the `iac-setup` init container**: a failure restarts the init container
    instead of failing a job, but the tools are still downloaded once per pod.
@@ -3789,7 +3789,7 @@ its available memory dropped to 2 GiB that week. Kubernetes schedules on the pla
 ## ADR-0060: Cloudflare zone rules as Terraform in a new infra-cloudflare repo, starting with the WAF rate limit
 {: #adr-0060 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `infra-cloudflare`, `infra-github`, `terragrunt-shared-module`, `infra-local`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-26 · `infra-cloudflare`, `infra-github`, `platform-as-code`, `infra-local`</span>
 
 #### Context
 
@@ -3801,7 +3801,7 @@ review of what will change. It also needs Zone WAF Write on a token that otherwi
 Access.
 
 Every other cloud estate here (infra-aws, infra-azure, infra-gcp, infra-github, infra-local) is
-Terraform through the Terragrunt shared module, with plans on pull requests, applies on `main` and a
+Terraform through the platform-as-code, with plans on pull requests, applies on `main` and a
 weekly drift scan. The shared module has no Cloudflare provider yet.
 
 On 2026-10-26 the zone had no `http_ratelimit` ruleset: the script had never been run. So there's nothing
@@ -3984,7 +3984,7 @@ model weights (~256 GB) already live on the Spark.
 ## ADR-0062: IaC runners: the tool image rolled out, one runner kept warm, up to six, and a shared provider cache
 {: #adr-0062 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-27 · `homelab-gitops`, `infra-local`, `terragrunt-shared-module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-27 · `homelab-gitops`, `infra-local`, `platform-as-code`</span>
 
 #### Context
 
@@ -4022,7 +4022,7 @@ requested.
   `TG_PROVIDER_CACHE_DIR`. platform has a single node, so the ReadWriteOnce volume is shared by every
   runner pod on it. Terragrunt locks each provider while it downloads it, so concurrent jobs can share
   the directory.
-- **terragrunt-shared-module's `setup-environment`** skips the `actions/cache` restore when every tool
+- **platform-as-code's `setup-environment`** skips the `actions/cache` restore when every tool
   is already installed at its pinned version. It installs wizcli only when Wiz credentials are present,
   because without them the Wiz validator skips the scan anyway.
 
@@ -5041,7 +5041,7 @@ public HTTPS URL. A k3d API server is not public.
 ## ADR-0072: Deployment standard: Terragrunt for a workload's infrastructure, a wrapper chart per app, Applications from git, the digest in the app's values
 {: #adr-0072 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `homelab-gitops`, `infra-local`, `infra-azure`, `infra-github`, `terragrunt-shared-module`, `platform-wardens`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-01 · `homelab-gitops`, `infra-local`, `infra-azure`, `infra-github`, `platform-as-code`, `platform-wardens`</span>
 
 #### Context
 
@@ -5058,7 +5058,7 @@ Deployments on the platform grew three ways:
 The platform-wardens agents (ADR 0069) are the first set of apps that share one deployment shape: one
 worker per agent, the same security context, network policy, identity wiring and kill switch, different
 values. Copying a kustomize base per agent loses that sharing; a chart can't take its digest from
-`kustomize edit`. The terragrunt-shared-module also offers `providers/argocd` (Applications and projects
+`kustomize edit`. The platform-as-code also offers `providers/argocd` (Applications and projects
 created by Terraform), which ADR 0038 chose not to use for apps.
 
 #### Decision
@@ -5321,7 +5321,7 @@ a Keycloak sign-in in front, a name with a certificate, Temporal access.
 ## ADR-0075: A drift scan that finds drift starts the drift agent through the GitHub App's signed webhook, public only at one tunnel path
 {: #adr-0075 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-03 · `homelab-gitops`, `infra-local`, `platform-wardens`, `terragrunt-shared-module`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-03 · `homelab-gitops`, `infra-local`, `platform-wardens`, `platform-as-code`</span>
 
 #### Context
 
@@ -5383,7 +5383,7 @@ consumer's CI sends would need a secret in every infra-* repository.
 ## ADR-0076: The stack-author agent: a chat in the operator console that ends in a draft pull request, one Temporal workflow per conversation
 {: #adr-0076 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `infra-local`, `platform-wardens`, `terragrunt-shared-module`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `homelab-gitops`, `infra-local`, `platform-wardens`, `platform-as-code`</span>
 
 #### Context
 
@@ -5399,7 +5399,7 @@ has the agent's design; this record covers how it runs on the homelab.
   channel. It's closed after 30 idle minutes, and the channel's deadline is 4 hours. Only the person who started it can
   read it or send to it.
 - **Identity:** its own GitHub App, `cloudutsuk-wardens-stack-author` (ADR 0071), with contents and pull requests write
-  and actions read, installed on `terragrunt-shared-module` and the infra-* repositories only. Its tokens are narrowed
+  and actions read, installed on `platform-as-code` and the infra-* repositories only. Its tokens are narrowed
   further in code: the write token doesn't cover the shared module.
 - **Model:** the local model through LiteLLM with its own virtual key. Another provider is a setting.
 - **Memory:** short-term is the workflow's state. Long-term is a small volume (`memory.enabled` in the chart, 0.1.4)
@@ -5622,7 +5622,7 @@ The owner wants to assign a person's access in one place and have every app hono
 ## ADR-0079: Keycloak's configuration moves from configure-realm.sh to a Terragrunt stack; group membership stays out of git
 {: #adr-0079 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `terragrunt_shared_module`, `infra-local`, `homelab-gitops`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-04 · `platform-as-code`, `infra-local`, `homelab-gitops`</span>
 
 #### Context
 
@@ -5658,7 +5658,7 @@ The [`keycloak/keycloak` Terraform provider](https://registry.terraform.io/provi
 
 #### Decision
 
-- **Modules go in the shared module.** `terragrunt_shared_module` gains a `providers/keycloak` family, the same
+- **Modules go in the shared module.** `platform-as-code` gains a `providers/keycloak` family, the same
   shape as `providers/grafana`, because Keycloak is a provider against a running application and not a cloud. One
   module per resource type, as everywhere else. The list is in that repo's `pending_resource_types.md`.
 - **The stack goes in `infra-local`**, under `environments/k3d/homelab/`, with state in the existing backend. CI
@@ -5941,7 +5941,7 @@ Three repositories hold shared workflows:
 | What runs | Lives in | Callers |
 |---|---|---|
 | Image build and security gates | `homelab-gitops/.github/workflows/build-image.yaml` | 14 call sites in 6 repositories |
-| IaC | `terragrunt-shared-module/.github/workflows` | All 6 `infra-*` repositories |
+| IaC | `platform-as-code/.github/workflows` | All 6 `infra-*` repositories |
 | Language CI, Sonar, JFrog, Azure deploy | `reusable-workflows` | One external caller |
 
 `reusable-workflows` was meant to be the standard, but its content is behind: 2 of 135 third-party actions pinned to a SHA, 1 of 52 jobs with a timeout, and 10 files with runner labels this org doesn't have. Application pipelines should have one home, which the standards catalog and the `cicd-triage` agent (platform-wardens decisions 0027 and 0028) can both rely on.
@@ -5958,7 +5958,7 @@ job_workflow_ref = cloudutsukpilot/homelab-gitops/.github/workflows/build-image.
 
 - **`reusable-workflows` becomes the central repository for application pipelines.** `build-image.yaml`, `.github/actions/security-tools` and `policies/conftest` (with `policies-check.yml`) move there. Whether `ci/tools` moves depends on what the runner images need from it, checked during the move.
 - **The digest commit and the Argo CD refresh stay pointed at `homelab-gitops`,** which is still the deploy repository.
-- **IaC stays out of this migration.** The workflows in `terragrunt-shared-module/.github`, its `template/`, and the `infra-*` pipelines don't move. The older Terragrunt copies in `reusable-workflows` are left alone and aren't accepted references.
+- **IaC stays out of this migration.** The workflows in `platform-as-code/.github`, its `template/`, and the `infra-*` pipelines don't move. The older Terragrunt copies in `reusable-workflows` are left alone and aren't accepted references.
 - **Fix `reusable-workflows`' application workflows first:** runner labels and JFrog hosts become inputs, `continue-on-error` comes off gates, leftovers go, then SHA pins, `permissions` and timeouts. `sonarqube-ci.yaml` stays compatible, because the shared module calls it at `@main`.
 - **Order, so that nothing breaks at any step:**
   1. Copy the files. The old ones keep working.
@@ -6046,7 +6046,7 @@ ADR records how that runs on the homelab.
 ## ADR-0085: Stack Author offers choices and only the clouds that can create the resource; a weekly job refreshes its resource list through its own GitHub App
 {: #adr-0085 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `platform-wardens`, `infra-local`, `homelab-gitops`, `terragrunt-shared-module`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-05 · `platform-wardens`, `infra-local`, `homelab-gitops`, `platform-as-code`</span>
 
 #### Context
 
@@ -6078,7 +6078,7 @@ repositories on a schedule, and proposing the change as a pull request. No CI id
    target lists. When the block changes, it opens or updates a pull request on `stack-author/targets-refresh`. The
    notes name modules no kind covers. A person merges, and the agent's build deploys the change.
 4. **The job has its own GitHub App, `cloudutsuk-stack-author-refresh`.** It's installed on platform-wardens,
-   terragrunt-shared-module and the `infra-*` repositories. Its key is in OpenBao `kv/ci/wardens-targets-refresh`, read
+   platform-as-code and the `infra-*` repositories. Its key is in OpenBao `kv/ci/wardens-targets-refresh`, read
    through role `github-actions/wardens-targets-refresh`. The role is bound like `main`: the org's ID, `refs/heads/main`,
    a self-hosted runner, and `job_workflow_ref` set to that workflow file. Each run mints two tokens: contents read
    for reading, and contents and pull requests write on platform-wardens only for the pull request. Both are revoked
@@ -6773,7 +6773,7 @@ The brief carries personal data: subjects and senders of mail, meeting titles, t
 ## ADR-0095: Private repos' CI runs only on the homelab runners, with a third scale set for the cloud IaC repos
 {: #adr-0095 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-09 · `homelab-gitops`, `terragrunt-shared-module`, `infra-azure`, `infra-aws`, `infra-gcp`, `infra-github`, `infra-cloudflare`, `infra-local`, `cicd-triage-lab`, `flashy`, `job-hunter-agent`, `shorts-studio`, `reusable-workflows`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-09 · `homelab-gitops`, `platform-as-code`, `infra-azure`, `infra-aws`, `infra-gcp`, `infra-github`, `infra-cloudflare`, `infra-local`, `cicd-triage-lab`, `flashy`, `job-hunter-agent`, `shorts-studio`, `reusable-workflows`</span>
 
 #### Context
 
@@ -6790,11 +6790,11 @@ Most of the minutes were short jobs, because GitHub bills each job as at least o
 |---|---|---|---|
 | infra-azure | terragrunt-cicd | 428 | 292 |
 | infra-github | terragrunt-cicd | 289 | 260 |
-| terragrunt-shared-module | compatibility test | 211 | 208 |
+| platform-as-code | compatibility test | 211 | 208 |
 | cicd-triage-lab | five language pipelines | 355 | 336 |
 | homelab-gitops | adr-check, dashboards-check | 201 | 201 |
 | infra-local | terragrunt-cicd helper jobs | 100 | 100 |
-| terragrunt-shared-module | code-quality, python-quality, terragrunt-cicd, docs-pages | 103 | 86 |
+| platform-as-code | code-quality, python-quality, terragrunt-cicd, docs-pages | 103 | 86 |
 | flashy | ci, deploy | 100 | 100 |
 | infra-aws, -gcp, -cloudflare | terragrunt-cicd | 140 | 140 |
 | job-hunter-agent, reusable-workflows, shorts-studio | ci, actionlint | 64 | 53 |
@@ -6887,7 +6887,7 @@ Two gaps stood in the way:
 ## ADR-0096: Shared-module READMEs carry data blocks for agents, and each organisation states its preferences in a profile
 {: #adr-0096 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `terragrunt-shared-module`, `platform-wardens`, `infra-azure`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `platform-as-code`, `platform-wardens`, `infra-azure`</span>
 
 #### Context
 
@@ -7020,7 +7020,7 @@ Access is assigned only with Keycloak groups (ADR 0078).
 ## ADR-0098: The shared-module framework is named PaC - Platform as Code, and its package is renamed with no compatibility alias
 {: #adr-0098 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `terragrunt-shared-module`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-10 · `platform-as-code`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`</span>
 
 #### Context
 
@@ -7042,7 +7042,7 @@ rename a consumer with the old file can't run locally until it gets the new one.
   `CLOUDUTSUK_*` secrets and variables, `cloudutsuk-*` Kubernetes secrets. Only the `cloudutsuk` org profile remains.
 - No compatibility alias: it would have to carry the old name. The shared module PR and the six consumer
   `entrypoint.py` PRs merge the same day instead, and local checkouts pull `main` before the next run. The entrypoint also drops its fallback to the pre-`src/` layout.
-- The repository keeps its name (`terragrunt-shared-module`) for now; renaming it is a later decision.
+- The repository keeps its old name for now; renaming it is a later decision (ADR 0100 renamed it to `platform-as-code`).
 
 #### Considered options
 
@@ -7202,57 +7202,61 @@ it against advisory feeds on a schedule. Checked on 2026-11-12 for the release w
 - [ADR 0078](#adr-0078): app groups as the only place access is assigned.
 - [ADR 0027](#adr-0027): the dashboard and alerts.
 
-## ADR-0100: The shared module repository is renamed platform-as-code, and its checkout folder keeps its name
+## ADR-0100: The shared module repository and its checkout folder are renamed platform-as-code
 {: #adr-0100 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-12 · `platform-as-code`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`, `reusable-workflows`</span>
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-22 · `platform-as-code`, `infra-aws`, `infra-azure`, `infra-cloudflare`, `infra-gcp`, `infra-github`, `infra-local`, `platform-wardens`, `reusable-workflows`, `warden-cicd-triage`, `warden-terraform-drift`, `rag-on-cloud`</span>
 
 #### Context
 
-ADR 0098 named the framework PaC - Platform as Code and kept the repository name `terragrunt-shared-module` for later.
-The name appears in two different ways:
+ADR 0098 named the framework PaC - Platform as Code and left the repository's old name for later.
+The name appeared in two different ways:
 
-- the **GitHub repository** `cloudutsukpilot/terragrunt-shared-module`: every consumer's `terragrunt-cicd.yaml` calls
-  its reusable workflows with `uses: <org>/<repo>/.github/workflows/*.yaml@main` (rendered from `iac_shared_repo` in
-  the consumer's `config.yaml`), Stack Author reads module docs from it, and the standards catalogue lists it;
-- the **checkout folder** `terragrunt_shared_module`: about 420 Terragrunt units find it with
-  `find_in_parent_folders("terragrunt_shared_module")`, and it is in `src/`, the CI checkout paths, every consumer's
-  `entrypoint.py` and the shared NFS path on the Spark and the homelab PC.
+- the **GitHub repository**: every consumer's `terragrunt-cicd.yaml` calls its reusable workflows with
+  `uses: <org>/<repo>/.github/workflows/*.yaml@main` (rendered from `iac_shared_repo` in the consumer's `config.yaml`),
+  Stack Author reads module docs from it, and the standards catalogue lists it;
+- the **checkout folder**: about 420 Terragrunt units find it with `find_in_parent_folders("<folder>")`, and it is in
+  `src/`, the CI checkout paths, every consumer's `entrypoint.py`, `.gitignore`, `.yamllint` and `Taskfile.yml`,
+  the workflow inputs and outputs that carry the module version, and the shared NFS path on the Spark and the
+  homelab PC.
 
 GitHub redirects git clone, fetch and push and the web UI after a rename, but not `uses:` references to a renamed
 repository's workflows: those fail with `repository not found`. A new repository with the old name ends the redirects.
 
 #### Decision
 
-- Rename the GitHub repository to `cloudutsukpilot/platform-as-code`.
-- Keep the checkout folder `terragrunt_shared_module`. Nobody sees it, and changing it touches every unit and every
-  machine's path for no change in behaviour.
-- Prepare every pull request first (shared module, the six consumers, platform-wardens, reusable-workflows), rename,
-  then merge them straight away. Never create a new repository called `terragrunt-shared-module`.
+- 2026-11-12: rename the GitHub repository to `cloudutsukpilot/platform-as-code`. Done.
+- 2026-11-22: rename the checkout folder to `platform-as-code` too, and every other mention of the old name in every
+  repository (identifiers become `platform_as_code` / `PLATFORM_AS_CODE`, for example the `PLATFORM_AS_CODE_VERSION`
+  workflow input and the `PLATFORM_AS_CODE_PATH` override). Hard cutover: no fallback to the old folder name.
+- Order: open every pull request, merge platform-as-code, then the six consumers straight away, then the rest; move
+  the folder on the Spark (`iac/platform-as-code`, seen as `/mnt/gitrepos/cloudutsuk/iac/platform-as-code` on the
+  PC) in the same window. Never create a new repository with the old name.
 
 #### Considered options
 
-1. **Repository only** (chosen): about ten small pull requests, consumer CI down only between the rename and the
-   consumer merges.
-2. **Repository and folder**: one name everywhere, but a change to about 420 units, the CI paths, every consumer's
-   `entrypoint.py`, `.gitignore`, `.yamllint` and `Taskfile.yml`, and both machines' paths, while other sessions work
-   in the same checkout. No infrastructure change either way (Terraform only re-downloads module sources).
-3. **New repository, archive the old one** (GitHub's advice for renamed actions): no redirect gap, but it loses the
+1. **Repository only** (chosen first, 2026-11-12): about ten small pull requests, but two names to explain.
+2. **Repository and folder** (chosen 2026-11-22): one name everywhere; a change to about 420 units, the CI paths,
+   every consumer's generated files and both machines' paths. No infrastructure change (Terraform only re-downloads
+   module sources; state keys are named after the consumers).
+3. **Folder rename with a fallback to the old name**: no broken moment, but the old name stays in every unit until
+   a second change removes it.
+4. **New repository, archive the old one** (GitHub's advice for renamed actions): no redirect gap, but it loses the
    pull request history and the read token's and GitHub App's repository grants.
-4. **Keep the name**: no work, but the repository keeps a name the framework outgrew.
 
 #### Consequences
 
-- Good: the repository has the framework's name; nothing changes for Terraform state (keys are named after the
-  consumers), the read token or the GitHub App (both bound to the repository ID).
-- Good: the terraform-drift agent reads `iac_shared_repo` from each consumer, so it follows the consumers' change.
-- Bad: consumer CI fails with `repository not found` from the rename until each consumer's pull request merges.
-- Bad: two names to explain: the repository `platform-as-code`, the folder `terragrunt_shared_module`.
+- Good: one name, `platform-as-code`, for the repository, the folder and the docs.
+- Good: nothing changes for Terraform state, the read token or the GitHub App (bound to the repository ID). The
+  terraform-drift agent reads `iac_shared_repo` from each consumer, so it follows the consumers' change.
+- Bad: between the platform-as-code merge and each consumer's merge, that consumer's CI fails (it passes the renamed
+  workflow input under its old name), and local runs fail until the folder is moved.
+- Bad: local Terragrunt caches hold the old absolute path; clear them (`--clear-cache`) on the first run after the move.
 
 #### Related
 
 - ADR 0098
-- Shared module plan: `docs/plans/rename-to-platform-as-code.md` (phase 2)
+- platform-as-code plan: `docs/plans/rename-to-platform-as-code.md` (phases 2 and 3)
 
 ## ADR-0101: Locust load tests run as CronJobs in perf on platform, report through OTLP and alert in Slack
 {: #adr-0101 }
@@ -8817,6 +8821,147 @@ Owner, 2026-11-21:
 
 - ADR 0034 (Zot), 0035 (platform-db), 0058 (public access), 0109 (Zot retention), 0044 (runner image), 0062
   (provider cache)
+
+## ADR-0120: Log levels and volume across the platform, a default of INFO with no access or health-check lines
+{: #adr-0120 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-22 · `homelab-gitops`, `homelab-services`, `platform-wardens`, `infra-local`</span>
+
+#### Context
+
+Loki on `mon` gets every container's stdout and stderr through each cluster's agent collector (ADR 0026, ADR 0042;
+`apps/monitoring-pack/templates/collectors.yaml`), and the platform-wardens processes' JSON lines the same way. No rule
+said what a service should log, so each one logs what its chart or framework defaults to. Two fixes so far came from
+looking at a dashboard: the ingress consumer's Azure SDK INFO lines (about 10,500 an hour, platform-wardens #89) and the
+Event Hubs emulator logging only its startup (homelab-gitops #184).
+
+A review on 2026-11-22 counted lines per container over 24 hours with
+`sum by (k8s_cluster_name, k8s_namespace_name, k8s_container_name) (count_over_time({k8s_cluster_name=~".+"}[24h]))`
+and sampled what fills each one. Lines an hour, averaged over the day (about 288,000 an hour in all):
+
+| Container | Lines/h | What fills it |
+|---|---:|---|
+| platform `arc-runners/runner` | 244,000 | The runner's own diagnostic trace (`[WORKER … INFO ActionManifestManagerLegacy]` and friends), printed to stdout because the runner image sets `ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1`. The job's own output goes to GitHub, not here. 85% of all lines |
+| platform `argocd/application-controller` | 12,100 | INFO per reconcile: refreshing, comparing, "No status changes. Skipping patch", "Ignore status for all objects" |
+| platform `argocd/repo-server` | 7,500 | INFO "started call" / "finished call" per gRPC request and a trace per `git` command |
+| mon `monitoring/grafana-init-sc-dashboard` | 4,200 | The dashboard sidecar's watch reconnects every minute and logs every dashboard ConfigMap again |
+| mon `monitoring/loki` | 3,200 | INFO per index upload, flush and compaction cycle |
+| platform `velero/velero`, ai `velero/velero` | 1,900, 750 | Nightly backup progress, a storage-location check per minute |
+| platform `arc-systems/manager`, `arc-systems/listener` | 1,900, 1,600 | INFO per reconcile and per long poll; the listeners also log go-retryablehttp at DEBUG (300 an hour): the chart's default level is `debug` |
+| wardens `wardens-console/emulator` | 725 | Every line `WRN`: the emulator's Debug channel (a handled exception in the tenant cache refresh, cancelled operations) |
+| platform `portal/portal` | 650 | Two thirds are the kubelet's `/.backstage/health/v1/readiness` and `liveness` probes, then blackbox |
+| ai `litellm/litellm` | 620 | 90% uvicorn access lines for `/health/readiness`, `/health/liveliness` and `/metrics/` |
+| ai `phoenix/phoenix` | 550 | 99% `GET /healthz` access lines |
+| platform `job-hunter`, `hello-world`, `shorts-studio` (`app`) | 540 each | Nearly all `GET /readyz` and `/healthz` access lines |
+| platform `dependency-track/frontend` | 480 | nginx access lines for the probe on `/static/config.json` |
+| wardens `temporal/temporal-web` | 420 | `/healthz` request lines, and Loki reads every one as an **error** (the JSON has an empty `error` field) |
+| platform `homarr/homarr` | 390 | The embedded Redis's "Background saving" notices |
+| wardens `temporal/temporal-matching`, `-history`, `-frontend` | 370, 240, 120 | INFO "No metadata in context" interceptor lines |
+| Kyverno `controller` (wardens, platform, others) | 310, 175, 90 | Trace-level cosign verification lines at `--v=2`, ANSI-coloured text, so no level reaches Loki |
+| mon `monitoring/tempo` | 290 | A warning and an **error** pair per minute: the backend worker's "no jobs found" |
+| Collectors (`otc-container`, every cluster) | 60 to 190 | One real warning a minute: the `policy-reporter` scrape answers 401 on every cluster, and gpu scrapes a gone `vllm` pod |
+| wardens agents, router, relays, consumer | under 10 each | platform-wardens JSON (its `wardens.telemetry.logs`); the GitHub relay writes one INFO line per delivery (about 100 an hour) |
+| wardens `wardens-console/azurite` | 14 | One line per request; about 700 an hour when the hub was busy (2026-11-06) |
+
+Whether warnings and errors reach Loki at all:
+
+- **core sends nothing.** `core` has no collector: it isn't an Argo CD cluster (it boots first, ADR 0025), so the
+  monitoring pack's ApplicationSet never selects it. OpenBao, Keycloak, Zot, PowerDNS, core-db and its cert-manager and
+  Velero log only to `kubectl logs`.
+- Host services (cloudflared, the exporters, the labs gateway) aren't containers in a cluster and don't reach Loki.
+- A level Loki can't read is no level: Kyverno, Homarr, Dependency-Track's frontend and Kubernetes events arrive as
+  `unknown`. A level that lies is worse: temporal-web's health checks and Tempo's idle worker are `error`, and every
+  emulator line is `warn`, so an error panel or a level filter shows noise and hides the real ones.
+- The rest do: the platform-wardens processes' JSON has its `level` parsed into `detected_level`, and the Go services'
+  logfmt and JSON lines (Argo CD, Loki, Mimir, Velero, ARC, Temporal) carry theirs.
+
+#### Decision
+
+Proposed; the owner decides. Every workload on the platform follows these rules, set in one place per service: Helm
+values or environment in homelab-gitops for a third-party service, the framework's logging setup for platform-wardens
+(its docs/framework/12-observability.md), the service's own logging setup for homelab-services and the app repos.
+
+1. **Default level INFO** in steady state, for our services and third-party ones. DEBUG and trace only while debugging,
+   switched on and off in a change. A chart whose default is DEBUG gets INFO in its values (ARC's `flags.logLevel`).
+2. **Third-party libraries at WARNING** in our Python services: `azure`, `httpx`, `httpcore`, `uamqp` (as
+   platform-wardens already does), `urllib3`, `botocore`, `openai`, `litellm` used as a library, and `kubernetes`.
+   A library that logs one line per call it makes is never at INFO.
+3. **No access log for health, readiness, liveness and metrics requests**, ever. A failed probe shows in the
+   kubelet's events and in kube-state-metrics, and a failed scrape in the collector's warning, so the success lines
+   carry nothing. Where the server can't filter by path, its access log is off.
+4. **Per-request access logs off by default** for internal services. A service turns its access log on only when
+   that log is the record someone reads (none today: Traefik's is off). A line per business event (a webhook
+   delivery, a published event, a started workflow) is an event log, not an access log, and stays at INFO.
+5. **Lines Loki can read**: JSON with a `level` field (or logfmt with `level=`), no ANSI colour. A severity in a line
+   means that severity: a routine condition is never `error` or `warn`; where a component can't be changed (the
+   emulator, Tempo's idle worker) its known routine lines are left out of panels and alerts by name.
+6. **Every workload's warnings and errors reach Loki.** `core` gets a collector (option below), and a new cluster or
+   host service is not done until its lines show in Loki.
+7. **A volume check**: a container above 1,000 lines an hour in steady state needs a reason written next to its
+   values. The query above, per cluster, is the review, repeated when a service is added.
+
+What each noisy source gets, under these rules:
+
+| Source | Change | Status |
+|---|---|---|
+| Azurite | `--silent` (rule 4) | PR |
+| Temporal UI | `TEMPORAL_HIDE_LOGS=true` (rules 3, 5) | PR |
+| Grafana dashboard sidecar | `ignoreAlreadyProcessed: true` (each ConfigMap logged once per change, not once a minute) | PR |
+| ARC controller and listeners | `flags.logLevel: info` (rule 1) | PR |
+| Event Hubs emulator | Its known Debug-channel lines left out of the Event bus logs panel (rule 5); it has no level setting (`LoggingConfig` takes only `Console` or `File`) | PR |
+| ARC runner diagnostic trace | Owner decision, below | Proposed |
+| Argo CD repo-server, Temporal server, Loki | Owner decision, below | Proposed |
+| Our uvicorn apps (job-hunter, shorts-studio, hello-world, portfolio-map), Phoenix, LiteLLM, the portal, Dependency-Track's frontend | Drop probe paths from the access log (rule 3): a `logging.Filter` on `uvicorn.access` in our apps; `--no-access-log` or the equivalent setting for the third-party ones, checked one by one | Planned, one change per service |
+| Kyverno | `--loggingFormat=json` for each controller (rule 5) | Planned |
+| Tempo's "no jobs found" pair | Left out of panels by name (rule 5); look for a scheduler setting first | Planned |
+| `core` | A collector (rule 6), option below | Owner decision |
+
+#### Considered options
+
+1. **The rules above, one change per service** (proposed): each fix is small and its own revert, and the rules say
+   what the next service does.
+2. **Drop lines in the collectors**: one filter processor in the agent collector, by namespace and pattern, for
+   everything. Quick, and it is the only place that can trim a component we can't configure, but the service still
+   writes the lines (`kubectl logs` stays noisy), and a filter written once hides new messages that match it. Kept as
+   the tool for the runner trace and the emulator only, if the owner prefers it there.
+3. **Raise everything to WARNING**: least volume, but it loses the INFO lines that explain a deploy, a sync or a
+   workflow, which is what the logs panels are for.
+4. **Do nothing**: Loki copes with 290,000 lines an hour today, but 85% of them are a trace nobody reads, error
+   panels show health checks, and core's errors are invisible.
+
+Owner decisions this ADR leaves open:
+
+- **The ARC runner trace** (244,000 lines an hour): (a) `ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=0` in the three scale
+  sets' runner templates: nothing in Loki, the trace stays in the pod's `_diag` folder until the pod goes;
+  (b) a collector filter that drops the runner's INFO lines in `arc-runners` and keeps its WARN and ERR lines
+  (recommended: the runner's own failures, such as a lost connection, stay findable); (c) keep it.
+- **Argo CD**: `reposerver.log.level: warn` (its INFO is a per-request access log, rule 4) and the application
+  controller left at INFO (its lines explain syncs), or both at WARN.
+- **Temporal server**: `server.config.logLevel: warn` instead of `info` (the INFO lines are interceptor chatter), or
+  keep INFO.
+- **Loki**: `loki.server.log_level: warn`, or keep its 3,200 INFO lines an hour.
+- **core's collector**: (a) the monitoring pack's agent collector installed by infra-local's Terragrunt Helm stack for
+  core, with its own OTLP token, the same way the other add-ons reach core; (b) register core in Argo CD with the
+  `homelab/addons` label and let the ApplicationSet install it (core then depends on `platform` for its telemetry,
+  against ADR 0025's boot order only for monitoring); (c) leave core out and read it with `kubectl logs`.
+- **The GitHub relay's line per delivery** (rule 4: an event log, kept at INFO) or DEBUG.
+
+#### Consequences
+
+- Good: the platform's line volume drops by about 85% if the runner trace goes, and by about 6,000 lines an hour from
+  the five small changes alone.
+- Good: a level filter means something: an `error` panel shows errors, not health checks.
+- Good: one written rule for the next service, checked by the same query.
+- Bad: health-check and access lines are gone, so "was the probe hitting it" is answered from the kubelet's events
+  and metrics, not from Loki.
+- Bad: a panel that leaves known lines out by name can hide a new message that happens to match; the names stay
+  narrow (whole message prefixes).
+- Bad: rules 3 and 5 need a change in each app repo and chart, done service by service.
+
+#### Related
+
+- ADR 0026, ADR 0042 (the collectors), ADR 0025 (core boots first), ADR 0088 (the wardens ingress bus)
+- platform-wardens docs/framework/12-observability.md, section Logs (the same standard for the wardens processes)
 
 {% endraw %}
 <!-- adr:end -->
