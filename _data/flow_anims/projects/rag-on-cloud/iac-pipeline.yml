@@ -1,0 +1,53 @@
+# RAG on Cloud: how an infrastructure change reaches Azure (infra-azure's Terragrunt CI/CD, platform-as-code workflows).
+# Belongs to the CI/CD and Release Management post of the "RAG on Cloud" project playbook
+# (_posts/projects/rag-on-cloud/2026-11-18-12-cicd-and-release-management.md). Made with the cloudutsuk-flow-anim skill.
+# Mode "fail" shows the plan-time OPA rule that repeats the tenant's deny policy on GlobalStandard deployments.
+title: RAG on Cloud infrastructure pipeline, plan on PR and apply on main
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 500]
+lanes:
+  - {label: "Pull request: plan and gates", x: 8, y: 8, w: 984, h: 280}
+  - {label: "Merge to main: plan again, then apply", x: 8, y: 308, w: 984, h: 184}
+modes:
+  - {id: pass, label: "Gates pass"}
+  - {id: fail, label: "Simulate a GlobalStandard deployment (OPA blocks)"}
+nodes:
+  - {id: pr, label: "Pull request", sub: "resources.yaml", x: 95, y: 150, w: 150, h: 56, shape: terminal, color: blue, icon: "devops/cicd/github-18.svg", icon_pos: corner}
+  - {id: detect, label: "Detect changes", sub: "changed stacks", x: 280, y: 150, w: 150, h: 56, color: orange, icon: gear, icon_pos: corner}
+  - {id: plan, label: "Terragrunt plan", sub: "one unit per type", x: 470, y: 150, w: 160, h: 56, color: violet, icon: "devops/iac/terraform-18.svg", icon_pos: corner}
+  - {id: trivy, label: "Trivy", sub: "misconfigurations", x: 680, y: 70, w: 150, h: 50, color: rose, icon: shield, icon_pos: corner}
+  - {id: opa, label: "OPA", sub: "tags, SKUs", x: 680, y: 150, w: 150, h: 50, color: rose, icon: lock, icon_pos: corner}
+  - {id: cost, label: "Infracost", sub: "cost estimate", x: 680, y: 230, w: 150, h: 50, color: amber, icon: chart, icon_pos: corner}
+  - {id: summary, label: "Plan summary", sub: "on the PR", x: 890, y: 150, w: 150, h: 56, color: blue, icon: file, icon_pos: corner}
+  - {id: merge, label: "Merge", sub: "squash to main", x: 95, y: 400, w: 150, h: 56, shape: terminal, color: blue, icon: git, icon_pos: corner}
+  - {id: plan2, label: "Plan on main", sub: "same gates", x: 300, y: 400, w: 150, h: 56, color: violet, icon: "devops/iac/terraform-18.svg", icon_pos: corner}
+  - {id: check, label: "Changes?", x: 480, y: 400, w: 110, h: 76, shape: diamond}
+  - {id: apply, label: "Terragrunt apply", sub: "per unit", x: 660, y: 400, w: 150, h: 56, color: orange, icon: rocket, icon_pos: corner}
+  - {id: azure, label: "Azure", sub: "sandbox sub", x: 900, y: 400, w: 120, h: 56, shape: cylinder, color: sky, icon: cloud, icon_pos: corner}
+edges:
+  - {id: pr_detect, from: pr, to: detect}
+  - {id: detect_plan, from: detect, to: plan}
+  - {id: plan_trivy, from: plan, to: trivy, exit: right, enter: left}
+  - {id: plan_opa, from: plan, to: opa}
+  - {id: plan_cost, from: plan, to: cost, exit: right, enter: left}
+  - {id: trivy_sum, from: trivy, to: summary, exit: right, enter: left}
+  - {id: opa_sum, from: opa, to: summary}
+  - {id: cost_sum, from: cost, to: summary, exit: right, enter: left}
+  - {id: sum_merge, from: summary, to: merge, points: [[890, 178], [890, 300], [95, 300], [95, 372]], label: "reviewed", label_at: [490, 292]}
+  - {id: merge_plan2, from: merge, to: plan2}
+  - {id: plan2_check, from: plan2, to: check}
+  - {id: check_apply, from: check, to: apply, label: "yes"}
+  - {id: apply_azure, from: apply, to: azure, proto: HTTPS, port: 443}
+steps:
+  - {title: "Change the stack", text: "A pull request edits the stack's resources.yaml: here, a gpt-5-mini deployment and a budget.", lights: [pr]}
+  - {title: "Find what changed", text: "Only stacks with changed files are planned, so one lab's PR doesn't plan the whole subscription.", edges: [pr_detect]}
+  - {title: "Generate and plan", text: "The shared module turns resources.yaml into one Terragrunt unit per resource type and plans them all.", edges: [detect_plan]}
+  - {title: "Three gates", text: "Trivy scans for misconfigurations (minus accepted findings), OPA checks policy, Infracost estimates the fixed monthly cost.", edges: [plan_trivy, plan_opa, plan_cost], when: pass}
+  - {title: "Policy says no", text: "A model deployment on GlobalStandard in the lab's tenant fails a mandatory OPA rule. The plan stops here; no override.", edges: [plan_trivy, plan_opa, plan_cost], when: fail}
+  - {title: "Summary on the PR", text: "Every unit's plan and every gate's result land in one summary for review.", edges: [trivy_sum, opa_sum, cost_sum], when: pass}
+  - {title: "Merge", text: "The PR is squash-merged once the plan looks right.", edges: [sum_merge], when: pass}
+  - {title: "Plan again on main", text: "main plans again with the same gates, because main may have moved since the PR's plan.", edges: [merge_plan2], when: pass}
+  - {title: "Anything to do?", text: "A plan with no changes stops here, so a docs-only merge doesn't run an apply.", edges: [plan2_check], when: pass}
+  - {title: "Apply", text: "Units apply in dependency order with the stack's own service principal; independent units run in parallel.", edges: [check_apply], when: pass}
+  - {title: "Azure changes", text: "Each unit calls Azure Resource Manager over HTTPS. The next daily drift scan plans the stack again to catch changes made outside Terraform.", edges: [apply_azure], when: pass}

@@ -87,7 +87,7 @@ metadata. Liquid tags and includes are stripped before upload.
 ## ADR-0003: Azure resources through infra-azure; index objects as code in this repo
 {: #adr-0003 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `terragrunt_shared_module`</span>
 
 #### Context
 
@@ -315,7 +315,7 @@ comparing them.
 ## ADR-0011: Infrastructure in each cloud's IaC repo through the shared module
 {: #adr-0011 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `rag-on-cloud`, `infra-azure`, `infra-aws`, `infra-gcp`, `platform-as-code`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `rag-on-cloud`, `infra-azure`, `infra-aws`, `infra-gcp`, `terragrunt_shared_module`</span>
 
 #### Context
 
@@ -341,6 +341,69 @@ modules for them.
 #### Consequences
 
 - Two module-building steps before AWS and GCP can start; the modules are reusable by the platform afterwards.
+
+## ADR-0012: The Azure stack runs in a sandbox subscription in a separate Entra tenant
+{: #adr-0012 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
+
+#### Context
+
+The plan put the lab in the platform's dev subscription, next to its other development stacks. When the stack was
+applied (2026-11-22), the owner pointed it at a sandbox subscription in a different Entra tenant instead. That tenant
+has its own Azure Policy, its own required tags, its own users and its own service principal for CI.
+
+#### Decision
+
+The `development/rag-on-cloud` stack in infra-azure deploys to the sandbox subscription (`default_subscription` in the
+stack's `common_vars.yaml`). It declares no other subscriptions, so the platform's `connect` and `management`
+subscriptions aren't used (platform-as-code gives unused aliases a placeholder).
+
+#### Considered options
+
+- The platform's dev subscription: the original plan; shares the dev VNet, private-endpoint subnet and the private DNS
+  zones in the connect subscription.
+- The sandbox subscription: chosen by the owner.
+
+#### Consequences
+
+- The tenant's Azure Policy applies at apply time and the plan doesn't see it. It denies AI model deployments on the
+  `GlobalStandard` SKU, so deployments use `Standard` or `DataZoneStandard`. A mandatory OPA policy in
+  platform-as-code repeats the rule for that tenant, so a plan fails first.
+- Users in role assignments are looked up in that tenant, with the stack's own credentials.
+- Trivy findings the lab accepts are listed once for the GitHub organisation, not per stack.
+- Phase 5 (private networking) can't reuse the dev subscription's VNet or the connect subscription's DNS zones,
+  which are in the other tenant. It needs its own VNet, subnet and private DNS zones in the sandbox subscription.
+- The lab's bill and its budget sit in the sandbox subscription.
+
+## ADR-0013: Chat model on Azure: gpt-5-mini, DataZoneStandard
+{: #adr-0013 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-23 · `rag-on-cloud`, `infra-azure`</span>
+
+#### Context
+
+ADR 0006 left the chat model open (open question 2). The lab is a proof of concept over a few hundred blog posts:
+answers are short and grounded in retrieved chunks, so a small model should do. The platform's terraform-drift agent
+already prices its work against gpt-5-mini. The tenant the stack runs in denies `GlobalStandard` deployments
+(ADR 0012), and in `eastus` gpt-5-mini is offered as `DataZoneStandard` but not as regional `Standard`.
+
+#### Decision
+
+Deploy `gpt-5-mini` (version `2025-08-07`) as `DataZoneStandard` with 50 thousand tokens per minute, beside the
+`text-embedding-3-small` embedding deployment (`Standard`).
+
+#### Considered options
+
+- A larger chat model: better on hard multi-post questions, more cost per answer; revisit if the golden set shows
+  generation, not retrieval, is the weak part.
+- `GlobalStandard`: denied by the tenant's policy.
+
+#### Consequences
+
+- Pay per token, no idle cost; data stays in the US data zone.
+- The cross-cloud model question (open question 3: same family everywhere or each cloud's own) is still open; the
+  judge model for scoring stays fixed either way.
 
 {% endraw %}
 <!-- adr:end -->

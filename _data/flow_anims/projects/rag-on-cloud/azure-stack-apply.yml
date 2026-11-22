@@ -1,0 +1,46 @@
+# RAG on Cloud: how the Azure stack applies, unit by unit (infra-azure development/rag-on-cloud).
+# Belongs to the Infrastructure and Environments post of the "RAG on Cloud" project playbook
+# (_posts/projects/rag-on-cloud/2026-11-18-11-infrastructure-and-environments.md). Made with the cloudutsuk-flow-anim skill.
+# Each box is one Terragrunt unit (one resource type); arrows are the units' dependency blocks. Mode "first" replays
+# the first apply on 2026-11-22, which stopped on two units (lessons L002 and L003).
+title: RAG on Cloud Azure stack, applied unit by unit
+accent: "#F472B6"
+accent2: "#FACC15"
+viewbox: [1000, 470]
+lanes:
+  - {label: "Sandbox subscription, eastus: one resource group, one Terragrunt unit per resource type", x: 8, y: 8, w: 984, h: 454}
+modes:
+  - {id: ok, label: "Apply as it runs now"}
+  - {id: first, label: "Replay the first apply (two units failed)"}
+nodes:
+  - {id: rg, label: "Resource group", sub: "dv-rg-rag-01", x: 500, y: 80, w: 170, h: 56, color: sky, icon: "cloud/azure/services/resource-manager.svg", icon_pos: corner}
+  - {id: uai, label: "Search identity", sub: "user-assigned", x: 110, y: 210, w: 150, h: 56, color: rose, icon: key, icon_pos: corner}
+  - {id: sa, label: "Storage", sub: "shared key off", x: 300, y: 210, w: 140, h: 56, color: amber, icon: "cloud/azure/services/storage-accounts.svg", icon_pos: corner}
+  - {id: law, label: "Log Analytics", sub: "30 days", x: 490, y: 210, w: 150, h: 56, color: green, icon: "cloud/azure/services/log-analytics.svg", icon_pos: corner}
+  - {id: ca, label: "Foundry account", sub: "local auth off", x: 690, y: 210, w: 160, h: 56, color: violet, icon: "cloud/azure/services/ai-services.svg", icon_pos: corner}
+  - {id: budget, label: "Budget", sub: "100 a month", x: 895, y: 210, w: 140, h: 56, color: orange, icon: "cloud/azure/services/cost-management.svg", icon_pos: corner}
+  - {id: ra, label: "RBAC roles", sub: "group scope", x: 85, y: 380, w: 140, h: 56, color: rose, icon: "cloud/azure/services/rbac.svg", icon_pos: corner}
+  - {id: ss, label: "AI Search", sub: "Basic, keyless", x: 255, y: 380, w: 140, h: 56, color: amber, icon: "cloud/azure/services/ai-search.svg", icon_pos: corner}
+  - {id: sc, label: "Container", sub: "posts", x: 425, y: 380, w: 130, h: 56, color: amber, icon: bucket, icon_pos: corner}
+  - {id: ai, label: "App Insights", sub: "1 GB a day cap", x: 595, y: 380, w: 140, h: 56, color: green, icon: "cloud/azure/services/application-insights.svg", icon_pos: corner}
+  - {id: cap, label: "Foundry project", sub: "RAG on Cloud", x: 765, y: 380, w: 140, h: 56, color: violet, icon: "cloud/azure/services/machine-learning.svg", icon_pos: corner}
+  - {id: cd, label: "Model deploys", sub: "embed + chat", x: 925, y: 380, w: 130, h: 56, color: violet, icon: "cloud/azure/services/openai.svg", icon_pos: corner}
+edges:
+  - {id: rg_uai, from: rg, to: uai, exit: left, enter: top}
+  - {id: rg_sa, from: rg, to: sa, exit: bottom, enter: top}
+  - {id: rg_law, from: rg, to: law, exit: bottom, enter: top}
+  - {id: rg_ca, from: rg, to: ca, exit: bottom, enter: top}
+  - {id: rg_budget, from: rg, to: budget, exit: right, enter: top}
+  - {id: uai_ra, from: uai, to: ra, exit: bottom, enter: top}
+  - {id: uai_ss, from: uai, to: ss, exit: bottom, enter: top}
+  - {id: sa_sc, from: sa, to: sc, exit: bottom, enter: top}
+  - {id: law_ai, from: law, to: ai, exit: bottom, enter: top}
+  - {id: ca_cap, from: ca, to: cap, exit: bottom, enter: top}
+  - {id: ca_cd, from: ca, to: cd, exit: bottom, enter: top}
+steps:
+  - {title: "Resource group first", text: "Every other unit names dv-rg-rag-01, so it is created first. Units that don't depend on each other then run in parallel.", lights: [rg]}
+  - {title: "Independent units", text: "The Search identity, storage, Log Analytics, the Foundry account and the budget only need the group.", edges: [rg_uai, rg_sa, rg_law, rg_ca, rg_budget]}
+  - {title: "Identity before Search", text: "Roles and Search wait for the user-assigned identity, so the roles survive removing Search between sessions. Search takes about ten minutes, the slowest unit.", edges: [uai_ra, uai_ss]}
+  - {title: "Data and telemetry", text: "The posts container waits for storage, and Application Insights for its Log Analytics workspace.", edges: [sa_sc, law_ai]}
+  - {title: "Project and models", text: "The Foundry project and the model deployments wait for the account: the embedding on Standard, gpt-5-mini on DataZoneStandard.", edges: [ca_cap, ca_cd], when: ok}
+  - {title: "Two units fail", text: "First apply: the tenant's policy denied the GlobalStandard embedding (403), and the role Azure AI User was gone, renamed Foundry User. 14 of 16 resources were created.", edges: [ca_cap, ca_cd], when: first}

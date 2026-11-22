@@ -8,7 +8,7 @@ accent2: "#FACC15"
 viewbox: [1000, 640]
 lanes:
   - {label: "Sources and people", x: 8, y: 8, w: 984, h: 122}
-  - {label: "Azure dev subscription (rag-on-cloud stack, one region)", x: 8, y: 160, w: 984, h: 310}
+  - {label: "Azure sandbox subscription (rag-on-cloud stack, eastus)", x: 8, y: 160, w: 984, h: 310}
   - {label: "Evaluation and comparison", x: 8, y: 500, w: 984, h: 130}
 modes:
   - {id: standard, label: "Standard RAG"}
@@ -21,8 +21,8 @@ nodes:
   - {id: api, label: "rag-api", sub: "Container Apps", x: 110, y: 230, w: 140, h: 56, color: violet, icon: "cloud/azure/services/container-apps.svg", icon_pos: corner}
   - {id: agent, label: "Foundry agent", sub: "Agent Service", x: 340, y: 230, w: 150, h: 56, color: violet, icon: server, icon_pos: corner}
   - {id: kb, label: "Knowledge base", sub: "Foundry IQ", x: 580, y: 230, w: 150, h: 56, color: indigo}
-  - {id: blob, label: "Blob corpus", sub: "container", x: 860, y: 230, w: 130, h: 66, shape: cylinder, color: amber, icon: bucket, icon_pos: corner}
-  - {id: chat, label: "Chat model", sub: "Foundry", x: 110, y: 400, w: 130, h: 56, color: violet, icon: message, icon_pos: corner}
+  - {id: blob, label: "Blob posts", sub: "container", x: 860, y: 230, w: 130, h: 66, shape: cylinder, color: amber, icon: bucket, icon_pos: corner}
+  - {id: chat, label: "Chat model", sub: "gpt-5-mini", x: 110, y: 400, w: 130, h: 56, color: violet, icon: message, icon_pos: corner}
   - {id: embed, label: "Embeddings", sub: "Foundry", x: 340, y: 400, w: 140, h: 56, color: violet}
   - {id: index, label: "Search index", sub: "hybrid+semantic", x: 580, y: 400, w: 150, h: 66, shape: cylinder, color: amber, icon: search, icon_pos: corner}
   - {id: appi, label: "App Insights", sub: "traces, metrics", x: 860, y: 400, w: 150, h: 56, color: green, icon: chart, icon_pos: corner}
@@ -46,8 +46,8 @@ edges:
 steps:
   - {title: "A post is published", text: "The corpus is the blog's own public posts, so every answer can be checked and nothing private is indexed.", lights: [blog, user, eval]}
   - {title: "Sync starts", text: "A push to the blog's main branch starts the corpus sync workflow.", edges: [blog_gha]}
-  - {title: "Upload the corpus", text: "Changed posts land in the corpus container, with title, URL, date and tags as blob metadata.", edges: [gha_blob]}
-  - {title: "Indexer picks it up", text: "The Search indexer reads new blobs with the service's managed identity: no storage key exists.", edges: [blob_idx]}
+  - {title: "Upload the corpus", text: "Changed posts land in the posts container, with title, URL, date and tags as blob metadata.", edges: [gha_blob]}
+  - {title: "Indexer picks it up", text: "The Search indexer reads new blobs with its user-assigned identity: no storage key exists.", edges: [blob_idx]}
   - {title: "Chunk and embed", text: "The skillset splits each post into chunks and the embedding model turns each chunk into a vector.", edges: [idx_emb]}
   - {title: "Sign in and ask", text: "You get an Entra ID token and ask rag-api on Container Apps, which scales to zero between sessions.", edges: [user_entra, user_api]}
   - {title: "Hybrid retrieval", text: "Standard RAG: one hybrid query (keywords plus vectors), reranked by the semantic ranker, returns the top chunks.", edges: [api_idx], when: standard}

@@ -7,7 +7,7 @@ tag: RAG on Cloud
 summary: A lab that builds retrieval-augmented generation end to end on Azure, then AWS and GCP from the same
   code, standard and agentic side by side over the blog's own posts, scored on one golden question set and
   compared with the homelab RAG.
-status: Planning
+status: In progress
 created: '2026-11-18'
 category: ai-automation
 clouds: [azure, aws, gcp]
@@ -20,6 +20,8 @@ facts:
   value: Python, FastAPI, Microsoft Agent Framework, Terraform
 - label: Corpus
   value: This blog's public posts
+- label: Models
+  value: gpt-5-mini (chat), text-embedding-3-small (embeddings)
 - label: Access
   value: Keyless, Entra ID and RBAC; public endpoints first
 - label: Architecture
@@ -27,6 +29,8 @@ facts:
   url: /posts/projects/rag-on-cloud/05-technical-architecture/#system-context-and-component-architecture
 diagrams:
 - {type: system-context, title: "System architecture (standard and agentic RAG on Azure)", url: /posts/projects/rag-on-cloud/05-technical-architecture/#system-context-and-component-architecture, diagram: projects/rag-on-cloud/system-architecture, format: animated}
+- {type: deployment, title: "Azure stack, applied unit by unit", url: /posts/projects/rag-on-cloud/11-infrastructure-and-environments/#infrastructure-as-code, diagram: projects/rag-on-cloud/azure-stack-apply, format: animated}
+- {type: cicd, title: "Infrastructure pipeline, plan on PR and apply on main", url: /posts/projects/rag-on-cloud/12-cicd-and-release-management/#build-automation, diagram: projects/rag-on-cloud/iac-pipeline, format: animated}
 - {type: data-model, title: "Posts, chunks and golden questions", url: /posts/projects/rag-on-cloud/05-technical-architecture/#data-architecture-and-data-models, format: mermaid}
 brief: >-
   From the blog tracker (B-010, 2026-11-18), in the author's words: To deploy a Retrieval-Augmented
@@ -59,3 +63,10 @@ brief: >-
   blog's own public posts.
   Author (2026-11-19): implement a similar RAG system on AWS and GCP using the same repo, multiple folders if
   required or the same code if it is independent of the cloud provider; start with Azure.
+  Author (2026-11-23): set a decent budget cap considering this as POC and then use a basic chat model which
+  would suffice for example terraform-drift agent chat agent. Asked the same day how the playbook should describe
+  where the stack runs (a sandbox subscription in a separate tenant since 2026-11-22), the author chose a generic
+  description with no names.
+  Author (2026-11-23), on the playbook's open questions: select the recommended and sensible choices for these
+  questions (pace and M1 date, public demo, Phase 5 access, the sandbox subscription, quota, Infracost, a required
+  reviewer, p95 targets).

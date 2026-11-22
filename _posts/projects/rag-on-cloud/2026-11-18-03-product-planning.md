@@ -44,10 +44,10 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Lab repo, plan, first ADRs; playbook areas 1, 2, 3, 5, 6, 7 and 11 | lab repo, this blog | Plan merged; playbook passes its checks | In progress (2026-11-18: plan merged; 2026-11-19: widened to three clouds) |
+| 1 | Lab repo, plan, first ADRs; playbook areas 1, 2, 3, 5, 6, 7 and 11 | lab repo, this blog | Plan merged; playbook passes its checks | Done (2026-11-21: playbook published) |
 | 2 | Azure AI Search module for the shared Terraform (identity, local auth off, semantic ranker plan, optional private endpoint) | shared module | Merged with an example | Done (2026-11-19) |
-| 3 | The Azure stack: resource group, Foundry account and project, embedding and chat deployments, Search (Basic), storage and container, Log Analytics, Application Insights, identity, role assignments | infra-azure | Applied from `main`; local auth reported off; region supports every feature used | In progress (2026-11-19: stack written and planned, not applied) |
-| 4 | Idle-cost switch for the Search service, and a budget alert | infra-azure, lab repo | Search removed and restored through PRs; the index rebuilt from the corpus | Not started |
+| 3 | The Azure stack: resource group, Foundry account and project, embedding and chat deployments, Search (Basic), storage and container, Log Analytics, Application Insights, identity, role assignments | infra-azure | Applied from `main`; local auth reported off; region supports every feature used | In progress (2026-11-22: applied, 16 resources, in a sandbox subscription in a separate tenant; 2026-11-23: chat model gpt-5-mini applied, 18 resources; local auth confirmed off. Left: the region check for agentic retrieval) |
+| 4 | Idle-cost switch for the Search service, and a budget alert | infra-azure, lab repo, shared module | Search removed and restored through PRs; the index rebuilt from the corpus | In progress (2026-11-23: budget of 100 a month applied, with a new budget module in the shared Terraform. Left: the remove and restore cycle, which needs `make index`) |
 | 5 | Repo skeleton for three clouds: a shared core with three small interfaces (retriever, generator, agent mode), corpus prep, eval, the Azure adapter and a fake adapter for tests | lab repo | Tests pass against the fake adapter | Not started |
 
 ### Phase 1 steps
@@ -94,9 +94,9 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Private DNS zones for Search and Blob next to the existing AI zones | infra-azure | Zones linked to the dev network | Not started |
+| 1 | A VNet, a private-endpoint subnet and the private DNS zones in the lab's own subscription (the platform's network and zones are in another tenant, ADR 0012) | infra-azure | Zones linked to the lab's VNet | Not started |
 | 2 | Private endpoints for Foundry, Search and Storage; shared private links for the indexer; public access off | infra-azure | Indexer runs with public access off everywhere | Not started |
-| 3 | Container Apps environment inside the dev network | infra-azure | The API answers over the private path | Not started |
+| 3 | Container Apps environment inside the lab's VNet | infra-azure | The API answers over the private path | Not started |
 | 4 | Parity check on the golden set | lab repo | Scores within noise of the public setup | Not started |
 
 ### Phase 6 steps
@@ -169,8 +169,9 @@ Insights views, and private networking.
 | M7 GCP | GCP results file exists for every GCP mode |
 | M8 Cross-cloud | The comparison table covers three clouds and the homelab |
 
-> **TODO:** No dates yet. How many hours a week go to this lab, and is there a target month for M1?
-{: .prompt-warning }
+**Pace and dates** (set 2026-11-23): about five hours a week, in sessions, which is what the
+idle-cost switch is designed around. M0 by the end of November 2026, M1 by the end of December 2026. Later
+milestones get dates when M1 lands, from how long Phases 0 and 1 actually took rather than from a guess now.
 
 ## Backlog structure
 {: #backlog-structure }
@@ -203,9 +204,15 @@ The cost shape, from the services' billing models:
 | Storage, Log Analytics, Application Insights | Per GB stored and ingested | Small |
 | Container Apps (consumption) | Per use, scales to zero | Near zero |
 
-> **TODO:** What is the monthly budget cap for the lab? It sets the budget alert in Phase 0 step 4 and decides
-> whether Search can stay up during a week of experiments.
-{: .prompt-warning }
+The cap is **100 a month** for the lab's resource group, set for a proof of concept (2026-11-23). The arithmetic
+behind it: Search Basic is about $0.10 an hour, roughly $74 if it's never removed, which leaves about a quarter of the
+budget for tokens, storage and logs. Models are small and pay per token (`gpt-5-mini` for chat, ADR 0013), so a
+few hundred eval questions cost cents, not dollars. The budget emails at 50% and 80% of actual spend, and when the
+month's forecast passes 100%. That last one matters most: it fires while Search is still running, before the money
+is spent. The remove-and-restore switch is what keeps the real bill well under the cap; the budget is the backstop.
+
+A budget notifies, it doesn't stop anything. If it fires, the response is the same PR that ends a session: remove
+the Search service.
 
 ## Risk and dependency management
 {: #risk-and-dependency-management }
@@ -233,7 +240,7 @@ between phases or adding a phase needs an ADR, because the reason is what future
 
 - [ ] Every phase has numbered steps with a checkable done-when
 - [ ] The golden set lands before any agentic step
-- [ ] Budget cap set and budget alert planned
+- [x] Budget cap set and budget alert planned (100 a month)
 - [ ] Region feature check scheduled before the stack is applied
 - [ ] Phase 4's dependency on the homelab tracked as Blocked
 - [ ] Hours per week and an M1 target month agreed

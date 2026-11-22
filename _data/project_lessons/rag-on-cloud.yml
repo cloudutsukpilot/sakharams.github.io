@@ -1,0 +1,50 @@
+# Lessons learned while building RAG on Cloud: one entry per problem that cost real time or would bite again.
+# Written as each problem is solved; rendered by _includes/project-lessons-log.html on the Lessons Learned post.
+# Public: no IDs, tokens, emails or private repo links
+# (check with .claude/skills/cloudutsuk-project/scripts/lessons.py rag-on-cloud).
+#
+# Fields: id (L + 3 digits, never reused), date, step (where in the build), title (the lesson as one
+# sentence), tags, symptom (what was seen), cause (why), fix (what changed), lesson (what to do next
+# time), adrs (optional, related ADR ids).
+lessons:
+  - id: L001
+    date: 2026-11-22
+    step: "Phase 0, step 3: the Azure stack"
+    title: "A Terraform provider alias that a module mentions must exist in every stack, even one that never uses it"
+    tags: [terraform, terragrunt, azure]
+    symptom: "The first plan of the stack failed in every unit with `Provider configuration not present` for `azurerm.connect`, although nothing in the stack used the connect subscription."
+    cause: "Some of the platform's shared modules look things up in the connect or management subscription through provider aliases. Terraform needs every alias a module references to be declared, used or not, and the generated provider file only declared aliases for the subscriptions a stack listed. This stack lists none."
+    fix: "The shared module now declares every alias its modules use. An alias the stack doesn't configure points at the stack's own subscription as a placeholder, and the stack generator refuses a resource that actually selects an alias the stack hasn't configured, with a message that says which one."
+    lesson: "Provider aliases are part of a module's interface: declare them all from one list, and fail on the ones a resource really uses rather than on the ones it merely mentions."
+    adrs: ["0012"]
+
+  - id: L002
+    date: 2026-11-22
+    step: "Phase 0, step 3: the Azure stack"
+    title: "A tenant's Azure Policy only speaks at apply time, so repeat its deny rules as plan-time checks"
+    tags: [azure, azure-policy, opa, foundry]
+    symptom: "The plan and every gate passed. The apply then created 14 of the 16 resources and stopped on the embedding model deployment with `403 RequestDisallowedByPolicy`: AI deployments should not use the GlobalStandard SKU."
+    cause: "The lab's subscription sits in a tenant with its own Azure Policy, which denies the GlobalStandard deployment type for models. Terraform's plan doesn't evaluate Azure Policy, so nothing saw it before the apply."
+    fix: "The embedding deployment moved to Standard and the chat model uses DataZoneStandard. The platform added a mandatory OPA policy that repeats the rule for that tenant only, reading the tenant from the plan's provider configuration, so the same mistake now fails the plan."
+    lesson: "Before the first apply in a tenant you don't run, list its deny policies and mirror the ones your stacks can hit as plan-time checks. Also check which deployment types each model offers in the region: gpt-5-mini has no regional Standard in eastus."
+    adrs: ["0012", "0013"]
+
+  - id: L003
+    date: 2026-11-22
+    step: "Phase 0, step 3: the Azure stack"
+    title: "Built-in Azure role names can change; the role ID doesn't"
+    tags: [azure, rbac, foundry]
+    symptom: "The same apply failed one role assignment with `could not find role 'Azure AI User'`, a role the plan had accepted."
+    cause: "Microsoft renamed the built-in role Azure AI User to Foundry User. The role's ID is unchanged, but the stack assigned roles by name, and the lookup by the old name found nothing."
+    fix: "The assignment uses Foundry User, with the role ID in a comment next to it. A second apply created it."
+    lesson: "When a role assignment by name fails, look the role up by its ID (`az role definition list --name <id>`) before anything else. For roles in fast-moving services such as Foundry, keep the ID next to the name."
+
+  - id: L004
+    date: 2026-11-22
+    step: "Phase 0, step 3: the Azure stack"
+    title: "Accept deliberate scanner findings once per organisation, with a reason, not once per stack"
+    tags: [trivy, security, terraform]
+    symptom: "After the plan succeeded, the Trivy gate blocked it on three storage-account findings: network rules not defaulting to deny, no storage analytics logging, and no infrastructure encryption. All three were deliberate choices for the lab."
+    cause: "Accepted findings could only be listed in each repository's own config, so every repository with the same lab-style storage account would repeat the same exceptions."
+    fix: "The shared module now holds one file of accepted findings per GitHub organisation, each with an ID, a reason and an optional expiry date. The gate finds the organisation from the repository's config and merges those findings before the repository's own."
+    lesson: "When a scanner flags a choice you made on purpose, record the exception with its reason where it applies (the organisation, the repository) rather than silencing the rule, and give it an expiry when the choice is temporary."
