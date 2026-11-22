@@ -4,7 +4,7 @@ source: rag-on-cloud/docs/adr
 adrs:
   - {id: "0001", title: "Record architecture decisions as MADR in rag-on-cloud", status: accepted, date: 2026-11-18, anchor: adr-0001, repos: [rag-on-cloud, sakharams.github.io]}
   - {id: "0002", title: "The corpus is the blog's public posts", status: accepted, date: 2026-11-18, anchor: adr-0002, repos: [rag-on-cloud, sakharams.github.io]}
-  - {id: "0003", title: "Azure resources through infra-azure; index objects as code in this repo", status: accepted, date: 2026-11-18, anchor: adr-0003, repos: [rag-on-cloud, infra-azure, terragrunt_shared_module]}
+  - {id: "0003", title: "Azure resources through infra-azure; index objects as code in this repo", status: accepted, date: 2026-11-18, anchor: adr-0003, repos: [rag-on-cloud, infra-azure, platform-as-code]}
   - {id: "0004", title: "Keyless access with Entra ID, managed identity and RBAC; Search on Basic", status: accepted, date: 2026-11-18, anchor: adr-0004, repos: [rag-on-cloud, infra-azure]}
   - {id: "0005", title: "Public endpoints first, private endpoints in a later phase", status: accepted, date: 2026-11-18, anchor: adr-0005, repos: [rag-on-cloud, infra-azure]}
   - {id: "0006", title: "Orchestrator: a shared FastAPI pipeline; Microsoft Agent Framework for the Azure agent mode", status: proposed, date: 2026-11-18, anchor: adr-0006, repos: [rag-on-cloud]}
@@ -15,3 +15,5 @@ adrs:
   - {id: "0011", title: "Infrastructure in each cloud's IaC repo through the shared module", status: accepted, date: 2026-11-19, anchor: adr-0011, repos: [rag-on-cloud, infra-azure, infra-aws, infra-gcp, terragrunt_shared_module]}
   - {id: "0012", title: "The Azure stack runs in a sandbox subscription in a separate Entra tenant", status: accepted, date: 2026-11-22, anchor: adr-0012, repos: [rag-on-cloud, infra-azure, platform-as-code]}
   - {id: "0013", title: "Chat model on Azure: gpt-5-mini, DataZoneStandard", status: accepted, date: 2026-11-23, anchor: adr-0013, repos: [rag-on-cloud, infra-azure]}
+  - {id: "0014", title: "One chat model family on every cloud: OpenAI's", status: accepted, date: 2026-11-23, anchor: adr-0014, repos: [rag-on-cloud, infra-aws, infra-gcp]}
+  - {id: "0015", title: "AWS in ap-south-1, GCP in the cloudutsuk project in asia-south1", status: accepted, date: 2026-11-23, anchor: adr-0015, repos: [rag-on-cloud, infra-aws, infra-gcp]}

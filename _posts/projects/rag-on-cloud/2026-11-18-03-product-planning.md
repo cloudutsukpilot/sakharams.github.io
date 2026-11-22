@@ -57,7 +57,7 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 |---|---|---|---|---|
 | 1 | Corpus sync from the blog to the corpus container, front matter as metadata | lab repo | Blob count equals published post count | Not started |
 | 2 | Index as code: data source, index, skillset, indexer, vectorizer, semantic configuration | lab repo | Indexer run with zero failures; a hybrid query returns chunks with their URL | Not started |
-| 3 | Golden question set v0, shared with the homelab RAG; retrieval scored for four modes | lab repo | hit@5 and MRR table for keyword, vector, hybrid, hybrid + semantic | Not started |
+| 3 | Golden question set v0, shared with the homelab RAG; retrieval scored for four modes | lab repo | hit@5 and MRR table for keyword, vector, hybrid, hybrid + semantic | In progress (2026-11-23: v0 written, 46 questions: 34 single-post, 7 multi-post, 5 out-of-corpus; scoring waits on the index) |
 | 4 | The API locally: FastAPI and Agent Framework, hybrid + semantic, citations, streaming | lab repo | Answers a golden question with citations and no key in config | Not started |
 | 5 | The API on Container Apps with its managed identity and Entra sign-in | lab repo, infra-azure | Signed-in calls answer; anonymous calls get 401 | Not started |
 
@@ -111,7 +111,7 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | AWS choices as ADRs: region, vector store, hosting, caller auth | lab repo | ADRs accepted | Not started |
+| 1 | AWS choices as ADRs: region, vector store, hosting, caller auth | lab repo | ADRs accepted | In progress (2026-11-23: `ap-south-1` and gpt-oss-120b, [ADR-0014](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0014) and [ADR-0015](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0015)) |
 | 2 | Terraform modules AWS needs (roles, Knowledge Base, vector store, registry, host, OIDC) | shared module | Merged | In progress (2026-11-19: all but the host and a budget merged) |
 | 3 | AWS dev stack with no long-lived access keys and a budget alert | infra-aws | Applied from `main` | In progress (2026-11-19: stack written, planned only) |
 | 4 | Ingestion through a Knowledge Base sync from the corpus bucket | lab repo | Every post ingested | Not started |
@@ -126,7 +126,7 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | GCP choices as ADRs: project and region, retrieval backend, hosting, caller auth | lab repo | ADRs accepted | Not started |
+| 1 | GCP choices as ADRs: project and region, retrieval backend, hosting, caller auth | lab repo | ADRs accepted | In progress (2026-11-23: `asia-south1` and gpt-oss-120b, [ADR-0014](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0014) and [ADR-0015](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0015)) |
 | 2 | Terraform modules GCP needs (service accounts, bucket, registry, Cloud Run, workload identity) | shared module | Merged | In progress (2026-11-19: all but a budget merged) |
 | 3 | GCP dev stack with no service account keys and a budget alert | infra-gcp | Applied from `main` | In progress (2026-11-19: stack written, planned only) |
 | 4 | Ingestion into a RAG Engine corpus from the corpus bucket | lab repo | Every post imported | Not started |

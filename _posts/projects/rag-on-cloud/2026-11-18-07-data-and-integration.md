@@ -137,6 +137,6 @@ A mismatch fails the workflow. The only "migration" is moving between index vers
 - [ ] Index JSON versioned, with a v2 path for breaking changes
 - [ ] Chunk size and overlap chosen and recorded
 - [ ] Reconciliation counts checked after every run
-- [ ] Golden set stored as JSONL readable by both harnesses
+- [x] Golden set stored as JSONL readable by both harnesses
 
 {% include project-nav.html %}

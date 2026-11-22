@@ -87,7 +87,7 @@ metadata. Liquid tags and includes are stripped before upload.
 ## ADR-0003: Azure resources through infra-azure; index objects as code in this repo
 {: #adr-0003 }
 
-<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `terragrunt_shared_module`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-18 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
 
 #### Context
 
@@ -404,6 +404,91 @@ Deploy `gpt-5-mini` (version `2025-08-07`) as `DataZoneStandard` with 50 thousan
 - Pay per token, no idle cost; data stays in the US data zone.
 - The cross-cloud model question (open question 3: same family everywhere or each cloud's own) is still open; the
   judge model for scoring stays fixed either way.
+
+## ADR-0014: One chat model family on every cloud: OpenAI's
+{: #adr-0014 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-23 · `rag-on-cloud`, `infra-aws`, `infra-gcp`</span>
+
+#### Context
+
+Phase 9 compares Azure, AWS, GCP and the homelab on one golden set (`eval/golden/`). Open question 3 asked whether
+each cloud should use the same model family, which makes the comparison about retrieval and the platform, or each
+cloud's own flagship, which is closer to what a team on that cloud would pick. The owner chose the same family where
+possible (2026-11-23). The judge model that scores the answers is fixed either way.
+
+What each cloud offers (checked 2026-11-23):
+
+| Cloud | OpenAI model offered | Where |
+|---|---|---|
+| Azure | `gpt-5-mini` (ADR 0013); `gpt-oss-120b` only as `GlobalStandard`, which the tenant denies (ADR 0012) | `eastus`, `DataZoneStandard` |
+| AWS Bedrock | `openai.gpt-oss-120b-1:0`, in-region (no cross-region inference profile) | `ap-south-1` and 15 other commercial regions |
+| GCP Vertex AI | `gpt-oss-120b-maas` (Model as a Service, GA) | The `global` endpoint (and `us-central1`), not `asia-south1` |
+
+GPT-5 models are not offered on Bedrock or Vertex AI.
+
+#### Decision
+
+Use OpenAI's family everywhere: `gpt-5-mini` on Azure (unchanged, ADR 0013), `gpt-oss-120b` on AWS through the
+Bedrock Converse API in `ap-south-1`, and `gpt-oss-120b` on GCP through the Vertex AI `global` endpoint. Each cloud's
+generator adapter takes the model from config, so the comparison can be re-run with another model without code
+changes.
+
+#### Considered options
+
+- Each cloud's flagship (gpt-5-mini, Claude or Nova on Bedrock, Gemini on Vertex AI): realistic for a team on one
+  cloud, but a score difference would mix the model with the retrieval and the platform.
+- `gpt-oss-120b` on Azure too, for an identical model: blocked by the tenant's `GlobalStandard` deny.
+
+#### Consequences
+
+- AWS and GCP run the same model, so their results compare directly; Azure differs in model (gpt-5-mini, a closed
+  model) and every comparison table says so in a note.
+- On Bedrock, gpt-oss-120b isn't supported as a Knowledge Base's generation model. The plan already separates the
+  two (Knowledge Base `Retrieve` for retrieval, `Converse` for the answer), so nothing changes.
+- On GCP the model runs on the `global` endpoint while retrieval stays in `asia-south1` (ADR 0015). Questions and
+  retrieved chunks are public blog text (ADR 0002), so where they are processed doesn't matter here.
+- A model family's availability changes; each cloud's Phase 7/8 step 1 re-checks it before the first run.
+
+## ADR-0015: AWS in ap-south-1, GCP in the cloudutsuk project in asia-south1
+{: #adr-0015 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-23 · `rag-on-cloud`, `infra-aws`, `infra-gcp`</span>
+
+#### Context
+
+Open question 6 asked for the AWS region and the GCP project and region (Phase 7 and 8, step 1). The owner chose
+`ap-south-1` for AWS, and for GCP the `cloudutsuk` project in an India region, or whichever is cheaper
+(2026-11-23). The draft stacks (infra-aws #18, infra-gcp #14) already assume the dev AWS account in `ap-south-1`
+and the `cloudutsuk` project in `asia-south1`.
+
+What the regions offer (checked 2026-11-23):
+
+| Need | `ap-south-1` (Mumbai) | `asia-south1` (Mumbai) | `asia-south2` (Delhi) |
+|---|---|---|---|
+| Chat model (ADR 0014) | `gpt-oss-120b` in-region | Through the `global` endpoint | Through the `global` endpoint |
+| Embeddings | Titan Text Embeddings V2 in-region | Vertex AI embedding model: confirm in step 1 | Not checked |
+| Managed RAG | Bedrock Knowledge Bases: Mumbai is listed for structured data stores; vector stores to confirm in step 1 | Vertex AI RAG Engine, Preview | Not offered |
+
+#### Decision
+
+- AWS: the existing dev account in `ap-south-1`.
+- GCP: project `cloudutsuk`, region `asia-south1`. It is the only India region with Vertex AI RAG Engine, so
+  `asia-south2` can't host the lab whatever it costs; the "cheaper" comparison doesn't arise.
+
+#### Considered options
+
+- `asia-south2` for GCP: no RAG Engine.
+- A US region on either cloud (`us-east-1`, `us-central1`): more services and often lower prices, but the owner
+  asked for India, and the lab's costs are small enough that region pricing won't decide anything.
+
+#### Consequences
+
+- RAG Engine in `asia-south1` is Preview: an API change or a missing feature there is recorded as a lesson, and
+  falling back to Vertex AI Search (the other option in Phase 8 step 1) stays open.
+- Phase 7 step 1 still confirms that a Bedrock Knowledge Base with a vector store (S3 Vectors, OpenSearch
+  Serverless) can be created in `ap-south-1`, before the vector-store ADR.
+- No resources are created yet: the owner starts AWS and GCP after the Azure testing is finished.
 
 {% endraw %}
 <!-- adr:end -->
