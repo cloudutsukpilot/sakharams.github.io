@@ -72,7 +72,8 @@ pull requests to `main` (build and test only):
    `SonarSource/sonarqube-scan-action@v8` using `SONAR_TOKEN` — config in
    [sonar-project.properties](sonar-project.properties).
 
-Pull request runs have their own concurrency group, so they never cancel a deploy of `main`.
+Runs that cannot deploy (pull requests, manual runs on other branches) have their own concurrency group per
+ref, so they never cancel a deploy of `main`.
 Any htmlproofer failure fails the PR check and the deploy. Triage locally with the
 [htmlproofer-triage skill](.github/skills/htmlproofer-triage/SKILL.md) — it maps
 `_site/**/*.html` failures back to the offending source file.

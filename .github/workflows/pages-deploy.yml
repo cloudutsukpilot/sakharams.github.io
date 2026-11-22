@@ -27,10 +27,11 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment. Pull request runs get their own group per
-# branch, so they never cancel a deploy of main.
+# Allow one concurrent deployment. Runs that cannot deploy (pull requests,
+# manual runs on other branches) get their own group per ref, so they never
+# cancel a deploy of main and a deploy never cancels them.
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.head_ref) || 'pages' }}
+  group: ${{ (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') && 'pages' || format('pages-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
