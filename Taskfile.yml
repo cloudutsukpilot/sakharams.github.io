@@ -21,9 +21,9 @@ tasks:
       # - git push gitlab
 
   test-site:
-    desc: test website
+    desc: "test website: htmlproofer on _site in one process per CPU, same as CI (HTMLPROOFER_JOBS=N to change)"
     cmds:
-      - bundle exec htmlproofer _site --disable-external --ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
+      - bundle exec ruby tools/htmlproofer-parallel.rb _site
 
   test-custom:
     desc: Test theme customizations (AdSense, Mermaid, config, theme sync) against the built _site

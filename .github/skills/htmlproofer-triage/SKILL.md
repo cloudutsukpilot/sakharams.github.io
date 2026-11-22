@@ -37,7 +37,9 @@ each failure back to the authoring file the user actually edits.
    task test-site
    ```
 
-   Equivalent raw command:
+   `task test-site` runs [tools/htmlproofer-parallel.rb](../../../tools/htmlproofer-parallel.rb), which
+   splits the files over one process per CPU and prints each shard's output in turn. Equivalent
+   single-process command (slower, same checks):
 
    ```bash
    bundle exec htmlproofer _site \

@@ -98,7 +98,7 @@ pushing:
 ```bash
 rm -rf _site .jekyll-cache
 JEKYLL_ENV=production bundle exec jekyll build -d _site
-task test-site                 # htmlproofer, same flags as CI
+task test-site                 # htmlproofer, one process per CPU, same as CI
 ```
 
 To trace a failure in `_site/**/*.html` back to the source post, use the
@@ -108,8 +108,8 @@ To trace a failure in `_site/**/*.html` back to the source post, use the
 ### Publishing
 
 Pushing to `main` deploys the site through
-[.github/workflows/pages-deploy.yml](.github/workflows/pages-deploy.yml) (build → htmlproofer → SonarQube
-→ GitHub Pages).
+[.github/workflows/pages-deploy.yml](.github/workflows/pages-deploy.yml) (build → htmlproofer → GitHub
+Pages, with SonarQube alongside). Pull requests to `main` run the build and htmlproofer without deploying.
 
 ```bash
 task test-site

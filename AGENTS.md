@@ -12,7 +12,7 @@ Site: <https://cloudutsuk.com>.
 | `task setup-local` | One-shot local setup: installs Ruby/Bundler + gems to `$HOME/.local/share/gem`. Never `bundle install` with `sudo`. |
 | `task start-local` [`PORT=4001`] | Background `jekyll serve` on `:4000`, logs at `/tmp/jekyll-server.log`. |
 | `task stop-local` | Kills the background server. |
-| `task test-site` | `bundle exec htmlproofer _site --disable-external …` — same flags as CI. |
+| `task test-site` | htmlproofer on `_site` (`--disable-external`, localhost ignored) split over one process per CPU by [tools/htmlproofer-parallel.rb](tools/htmlproofer-parallel.rb) — same as CI. |
 | `task update` | Runs `test-site` then `git add/commit/push origin main`. Never runs on its own — user-invoked. |
 
 Fallbacks when tasks fail:
@@ -56,16 +56,22 @@ Fallbacks when tasks fail:
 
 ## CI/CD
 
-[.github/workflows/pages-deploy.yml](.github/workflows/pages-deploy.yml) on push to `main`/`master`:
+[.github/workflows/pages-deploy.yml](.github/workflows/pages-deploy.yml) on push to `main` (deploys), and on
+pull requests to `main` (build and test only):
 
-1. `actions/checkout@v5` → `ruby/setup-ruby@v1` (Ruby 3.3, `bundler-cache: true`).
+1. `build` job: `actions/checkout@v5` → `ruby/setup-ruby@v1` (Ruby 3.3, `bundler-cache: true`).
 2. Build: `bundle exec jekyll b -d "_site${{ base_path }}"` with `JEKYLL_ENV=production`.
-3. Test: `bundle exec htmlproofer _site --disable-external --ignore-urls "…localhost…"`.
-4. `SonarSource/sonarqube-scan-action@v8` using `SONAR_TOKEN` — config in
+3. Test: `bundle exec ruby tools/htmlproofer-parallel.rb _site` — htmlproofer with `--disable-external` and
+   localhost ignored, split into one shard per CPU (html-proofer itself uses one core; this cut the step from
+   about 3 minutes to about 1). Every shard sees the whole `_site`, so cross-page links and anchors are still
+   checked. `HTMLPROOFER_JOBS=N` sets the number of shards.
+4. `actions/upload-pages-artifact@v5` → `deploy` job `actions/deploy-pages@v5`, only on `main`.
+5. `sonarqube` job, in parallel with `build` and not on pull requests:
+   `SonarSource/sonarqube-scan-action@v8` using `SONAR_TOKEN` — config in
    [sonar-project.properties](sonar-project.properties).
-5. `actions/upload-pages-artifact@v5` → `actions/deploy-pages@v5`.
 
-Any htmlproofer failure fails the deploy. Triage locally with the
+Pull request runs have their own concurrency group, so they never cancel a deploy of `main`.
+Any htmlproofer failure fails the PR check and the deploy. Triage locally with the
 [htmlproofer-triage skill](.github/skills/htmlproofer-triage/SKILL.md) — it maps
 `_site/**/*.html` failures back to the offending source file.
 

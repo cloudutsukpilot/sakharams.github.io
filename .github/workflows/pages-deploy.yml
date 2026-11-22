@@ -9,6 +9,16 @@ on:
       - README.md
       - LICENSE
 
+  # Build and test (no deploy, no SonarQube) on pull requests, so a broken
+  # link fails the PR instead of the deploy.
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - .gitignore
+      - README.md
+      - LICENSE
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -17,9 +27,10 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
+# Allow one concurrent deployment. Pull request runs get their own group per
+# branch, so they never cancel a deploy of main.
 concurrency:
-  group: "pages"
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.head_ref) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
@@ -72,15 +83,15 @@ jobs:
         id: test_custom
         run: bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require File.expand_path(f) }'
 
+      # Same checks as `htmlproofer _site --disable-external --ignore-urls ...`,
+      # split into one shard per CPU (html-proofer itself uses one core).
       - name: Test site
         id: test_site
-        run: |
-          bundle exec htmlproofer _site \
-            \-\-disable-external \
-            \-\-ignore-urls "/^http:\/\/127.0.0.1/,/^http:\/\/0.0.0.0/,/^http:\/\/localhost/"
+        run: bundle exec ruby tools/htmlproofer-parallel.rb _site
 
       - name: Upload site artifact
         id: upload
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5
         with:
           path: "_site${{ steps.pages.outputs.base_path }}"
@@ -119,6 +130,7 @@ jobs:
 
   # Runs alongside build so the scan never delays a deploy.
   sonarqube:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       quality_gate: ${{ steps.summary.outputs.quality_gate }}
@@ -195,6 +207,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    # Only main deploys; pull requests and manual runs on other branches stop after the tests.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
