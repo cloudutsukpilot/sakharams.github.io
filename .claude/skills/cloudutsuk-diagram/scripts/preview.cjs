@@ -340,8 +340,8 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         });
         check(pos.top < 80 && !pos.dots && !pos.cap, `hovering the tab drops the controls down at the top (${Math.round(pos.top)}px), with a step count (${pos.n}) and no step dots or caption`);
         await fig.screenshot({ path: path.join(args.out, 'player-open.png') });
-        const intro = await page.$eval(`${sel} .dgm-banner`, (b) => b.classList.contains('is-on') && b.classList.contains('is-intro') && b.textContent.length > 20);
-        check(intro, 'before the first step the card introduces the use case');
+        const idle = await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on'));
+        check(idle, 'no step card before a use case is played');
         const lvls = await page.$$(`${sel} .dgm-lvl`);
         await lvls[lvls.length - 1].click();
         await page.waitForFunction((s) => !document.querySelector(`${s}.is-stepping`), sel, { timeout: 20000 }).catch(() => {});
@@ -424,10 +424,10 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       if (info.tour) {
         const scn = await page.$$(`${sel} .dgm-scn`);
         if (scn.length > 1) {
-          const t0 = await page.$eval(`${sel} .dgm-banner-title`, (x) => x.textContent);
+          const t0 = await page.$eval(sel, (f) => f._dgm.scn.title);
           await scn[1].click();
           await page.waitForTimeout(1200);
-          check((await page.$eval(`${sel} .dgm-banner-title`, (x) => x.textContent)) !== t0, `use-case picker switches scenario (${scn.length} use cases)`);
+          check((await page.$eval(sel, (f) => f._dgm.scn.title)) !== t0, `use-case picker switches scenario (${scn.length} use cases)`);
         }
         await ctl('next');
         const stepped = await page
@@ -500,6 +500,15 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         check(won, 'the last step shows its outcome (banner + celebration)');
         await page.waitForTimeout(250);
         await fig.screenshot({ path: path.join(args.out, 'outcome.png') });
+        // The card spans the canvas (no side panel open here) and goes 5 s after the last step.
+        const span = await page.$eval(sel, (f) => {
+          const st = f.querySelector('.dgm-stage').getBoundingClientRect();
+          const b = f.querySelector('.dgm-banner').getBoundingClientRect();
+          return { stage: Math.round(st.width), card: Math.round(b.width), panel: f.classList.contains('has-panel') };
+        });
+        check(span.panel || span.card >= span.stage - 40, `the step card spans the canvas (${span.card} of ${span.stage}px)`);
+        await page.waitForTimeout(6500);
+        check(await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on')), 'the step card goes about 5 s after the last step');
         await page.waitForTimeout(2500);
         await ctl('prev');
         await page.waitForTimeout(300);
@@ -511,6 +520,16 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 40000, polling: 100 })
           .then(() => true, () => false);
         check(moved, 'tour plays (a pointer travels an arrow)');
+        // Play runs only the selected use case: after its last step it stops on the same use case.
+        if (!(await page.$eval(sel, (f) => f._dgm.data.loop === true))) {
+          const before = await page.$eval(sel, (f) => f._dgm.scn.id || f._dgm.scn.title);
+          await page.$eval(sel, (f) => { const d = f._dgm; d.stop(); d.k = Math.max(-1, d.steps.length - 2); d.play(); });
+          const ended = await page
+            .waitForFunction((s) => !document.querySelector(s)._dgm.playing, sel, { timeout: 60000, polling: 250 })
+            .then(() => true, () => false);
+          const after = await page.$eval(sel, (f) => f._dgm.scn.id || f._dgm.scn.title);
+          check(ended && after === before, `Play stops after the selected use case's last step (stayed on "${after}")`);
+        }
         await page.mouse.move(5, 5);
         await page.waitForTimeout(700);
         check(!(await page.$eval(`${sel} .dgm-player`, (x) => x.classList.contains('is-open'))), 'the player folds away while the use case plays');
