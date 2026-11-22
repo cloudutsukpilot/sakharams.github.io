@@ -23,6 +23,7 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SPEEDS = [0.5, 1, 2];
   const DWELL_MS = 1600;
+  const END_CARD_MS = 5000; // the step card stays this long after a use case's last step
   // Reading time for a step's `detail` while Details is on: about 250 words a minute, at most 25 s.
   const READ_MS_PER_WORD = 240;
   const READ_MAX_MS = 25000;
@@ -2753,17 +2754,11 @@
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
       };
-      // Before the first step: the use case's name and summary, and how to start it.
+      // No use case running (before the first step, after the end): no card.
       this.setIntro = () => {
         this.stepRunning = null;
-        if (!banner) return;
-        part('n').textContent = list.length > 1 ? 'Use case' : 'Tour';
-        part('title').textContent = this.scn.title || 'Guided tour';
-        part('scn').textContent = '';
-        part('line').textContent = '';
-        part('text').innerHTML = markdown(`${this.scn.summary ? this.scn.summary + ' ' : ''}Open the player at the top of the canvas to play, or step through.`);
-        banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done', 'is-detailed');
-        banner.classList.add('is-on', 'is-intro');
+        clearTimeout(this.endTimer);
+        if (banner) banner.classList.remove('is-on', 'is-run', 'is-success', 'is-fail', 'is-done', 'is-detailed');
       };
       this.setBanner = (text, state = 'run') => {
         if (!banner) return;
@@ -2771,7 +2766,6 @@
           if (this.stepRunning == null) this.setIntro();
           return;
         }
-        banner.classList.remove('is-intro');
         const icon = { success: '✓ ', fail: '✗ ', done: '● ' }[state] || '';
         part('line').textContent = icon + text;
         banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done');
@@ -3020,6 +3014,7 @@
       // then its targets light up and, for a step with `result`, the outcome is celebrated.
       this.showStep = async (i, animate) => {
         const token = ++this.run;
+        clearTimeout(this.endTimer);
         if (i < 0 || !this.steps.length) {
           await this.restoreBefore();
           if (token !== this.run) return 'stopped';
@@ -3068,6 +3063,12 @@
             this.celebrate(at, x.result);
           }
         }
+        // The card stays up through the use case and goes END_CARD_MS after its last step completes.
+        if (i === this.steps.length - 1) {
+          this.endTimer = setTimeout(() => {
+            if (token === this.run) this.setIntro();
+          }, END_CARD_MS);
+        }
         return 'done';
       };
       this.stop = () => {
@@ -3087,37 +3088,30 @@
           const r = await this.showStep(this.k + 1, true);
           if (r === 'stopped' || !this.playing) break;
           const token = this.run;
-          await sleep(this.dwell(this.steps[this.k]));
+          const last = this.k >= this.steps.length - 1;
+          await sleep(last ? END_CARD_MS : this.dwell(this.steps[this.k]));
           if (token !== this.run || !this.playing) break;
           if (this.k >= this.steps.length - 1) {
-            // End of this use case: auto-play moves on to the next one. After the last one the diagram
-            // goes back to how the reader left it (loop: true starts again from the first instead).
-            const cur = list.indexOf(this.scn);
-            const next = (cur + 1) % list.length;
-            if (next === 0 && this.data.loop !== true) {
-              this.stop();
+            // End of the use case: Play runs only the one the reader picked. After its last step (and
+            // the outcome's dwell) the diagram goes back to how the reader left it; `loop: true` plays
+            // the same use case again instead.
+            if (this.data.loop === true) {
               this.k = -1;
-              this.setBanner(null);
-              await this.restoreBefore();
-              this.lit = empty();
-              this.applyLit();
-              this.setCaption(-1);
-              break;
+              continue;
             }
-            if (list.length > 1) {
-              this.selectScenario(next, true);
-              const ids = await this.ensureVisible(0);
-              if (token !== this.run || !this.playing) break;
-              this.focusStep(ids);
-              await sleep(DWELL_MS / this.speed);
-              if (token !== this.run || !this.playing) break;
-            }
+            this.stop();
             this.k = -1;
+            this.setBanner(null);
+            await this.restoreBefore();
+            this.lit = empty();
+            this.applyLit();
+            this.setCaption(-1);
+            break;
           }
         }
       };
       // Scenario picker.
-      // keepPlaying: called by auto-play moving to the next use case, so the player keeps running.
+      // keepPlaying: select without stopping the player.
       this.selectScenario = (i, keepPlaying = false) => {
         if (!keepPlaying) this.stop();
         this.scn = list[i];

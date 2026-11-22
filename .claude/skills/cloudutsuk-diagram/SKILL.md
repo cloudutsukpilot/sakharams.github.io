@@ -211,9 +211,8 @@ edges:
 
 Guided stories are **use cases**, chosen from what the post explains: signing in to the portal,
 seeing cost, deploying something, monitoring, a chat request, an ingest job, the SRE agent handling an
-alert, a release. The reader picks one from a row of buttons; Play runs it, and auto-play then moves
-on to the next use case. After the last use case the player stops (`loop: true` at the top level starts
-again from the first). While a use case runs, each step opens the groups its components sit in and
+alert, a release. The reader picks one from the Use cases menu; Play runs that one use case and stops
+after its last step (`loop: true` at the top level plays it again). While a use case runs, each step opens the groups its components sit in and
 closes the open groups that neither it nor a later step uses, so the packet is easy to follow; when
 the player finishes (or is rewound to the start) the diagram goes back to the level, open groups, view
 tab and zoom the reader had. Clicking a level, a component or a view tab mid-way keeps the reader's
@@ -261,10 +260,13 @@ new layout instead. Rules:
   words), `**Why it matters:**` (the risk it removes or the guarantee it gives: cost, safety, audit, a
   person in the loop) and `**How:**` (the mechanism and its numbers, or a short `- ` list). Explain
   each term the first time it appears, state known gaps plainly, and set `details: true`.
-- The step card at the bottom of the canvas is the one place for the description: `n/N`, the step's
-  title and, on the right, the use case's title, then the action line and `text`. Before the first step
-  it introduces the use case (title and summary). With Details on, the same card grows a little (wider,
-  taller up to about a third of the canvas) and a long `detail` scrolls inside it.
+- The step card across the bottom of the canvas (its whole width, left of the side panel when one is
+  open) is the one place for the description: `n/N`, the step's title and, on the right, the use case's
+  title, then the action line and `text`. It shows only while a use case runs: none before Play, every
+  step while it plays or is stepped through, and it goes 5 seconds after the last step. With Details on,
+  the same card grows a little taller and a long `detail` scrolls inside it.
+- Play runs only the selected use case and stops after its last step (then the reader's layout comes
+  back); `loop: true` plays the same use case again.
 - The player is a tab hanging from the top edge of the canvas (play state and `n/N`). Hovering it (a
   click on touch, or keyboard focus) drops the controls down: play, previous, next, restart, the step
   count, speed, the layout padlock, the alternative mode and Details. It folds back when the pointer
@@ -349,7 +351,7 @@ read. Never commit.
 | `views` | Tabs for cross-cutting connections: `[{id, label, icon?}]`; the main view (`Main flows`) is always first and `Show all` (id `*`, built in) last; don't define a view with id `*` |
 | `edges` | `{id, from, to, why, certs, view?, main?, oneway?, proto?, port?, kind?, tls?, stream?, both?, cards?, label?, detail?, dashed?, tone?, when?}`. `why` (required): when the path is used or why it exists; `certs`: which certificate secures it (step 2); `detail`: an extra technical note (auth, token lifetime) |
 | `certs` | Certificate catalog: `{id: {label, type, by, issuer, valid, trust, key?, stored?, note?}}`, referenced by edges (step 2). `issuer` may be left out for `type: key` |
-| `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, detail?, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `detail`: 3 to 10 lines shown with the Details box. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes auto-play start again after the last use case (default: stop and restore the reader's layout) |
+| `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, detail?, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `detail`: 3 to 10 lines shown with the Details box. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes Play repeat the selected use case (default: stop after its last step and restore the reader's layout) |
 | `lock` | Always set when there are use cases: `false` (default) lets each step open the groups it needs; `true` opens the diagram in lock mode, so use cases play on the reader's layout. The padlock in the player toggles it |
 | `details` | `true` opens with the Details box ticked, so the step card shows each step's `detail`; default `false`. The reader's own choice, once made, wins |
 | `map` | Geo backdrop `{name: world, lon: [w, e], lat: [n, s], width, height}`; nodes use `lat`/`lon` |
