@@ -69,7 +69,7 @@ def validate(data, path):
     for key in ("accent", "accent2"):
         if key in data and not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(data[key])):
             E(f"`{key}` must be #RRGGBB")
-    for key in ("loop", "lock", "details"):
+    for key in ("loop", "lock", "details", "zoom_lock"):
         if key in data and not isinstance(data[key], bool):
             E(f"`{key}` must be true or false")
     has_story = bool(data.get("scenarios") or (data.get("tour") or {}).get("steps"))

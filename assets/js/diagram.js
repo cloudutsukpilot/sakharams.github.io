@@ -445,6 +445,7 @@
   // overlapping parallel segments of different arrows are spread into lanes.
   // boxes: Map id -> {x, y, w, h}; routes: [{key, from, to, skip: Set of ids that don't block it}].
   const ROUTE_M = 10; // clearance around a box
+  const BAND_LABEL_W = 168; // the band header column on the left of a top level with labelled bands
   const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // east, south, west, north
   function routeOrtho(boxes, routes, flow = 'right') {
     const M = ROUTE_M;
@@ -727,7 +728,11 @@
       this.buildModel();
       this.buildChrome();
       this.clearUrlState();
-      this.relayout({ fit: true, animate: false }).then(() => root.classList.add('is-ready'));
+      this.relayout({ fit: true, animate: false }).then(() => {
+        root.classList.add('is-ready');
+        // `zoom_lock: true` locks the zoom the diagram opened at (after the first fit, not before it).
+        if (this.data.zoom_lock === true) this.setZoomLock(true);
+      });
     }
 
     // ---------------------------------------------------------------- model
@@ -808,6 +813,7 @@
       this.view = make('g', { class: 'dgm-view' }, this.svg);
       this.defs = make('defs', {}, this.svg);
       if (this.data.map) this.mapLayer = make('g', { class: 'dgm-map' }, this.view);
+      this.bandLayer = make('g', { class: 'dgm-bands' }, this.view);
       this.groupLayer = make('g', { class: 'dgm-groups' }, this.view);
       this.edgeLayer = make('g', { class: 'dgm-edges' }, this.view);
       this.nodeLayer = make('g', { class: 'dgm-nodes' }, this.view);
@@ -819,12 +825,11 @@
       make('feMergeNode', { in: 'b' }, merge);
       make('feMergeNode', { in: 'SourceGraphic' }, merge);
 
-      // Toolbar: one button per level (clicking steps there layer by layer), zoom, fit, fullscreen.
-      const bar = r.querySelector('.dgm-toolbar');
+      // Sidebar: Levels (one button per level; clicking steps there layer by layer), then Views and Use
+      // cases (buildViews, buildTour), each a collapsible menu; zoom, Fit and fullscreen at its foot.
+      const bar = r.querySelector('.dgm-side-foot');
       const names = this.data.levels || [];
-      const lv = html('div', 'dgm-levels', bar);
-      lv.setAttribute('role', 'group');
-      lv.setAttribute('aria-label', 'Detail level');
+      const lv = this.menu('levels', 'Levels', 'Detail level');
       this.levelBtns = [];
       for (let i = 0; i <= this.maxLevel; i++) {
         const b = html('button', 'dgm-lvl', lv);
@@ -844,16 +849,21 @@
         b.innerHTML = `<i class="fas fa-${icon}" aria-hidden="true"></i>`;
         return b;
       };
-      btn('zoom-in', 'plus', 'Zoom in');
-      btn('zoom-out', 'minus', 'Zoom out');
+      // Zoom lock: holds the current zoom. Buttons, Ctrl + scroll, pinch and +/- stop zooming, and the
+      // camera moves of levels, Fit and use cases only pan. Dragging still moves around.
+      this.zoomLockBtn = btn('zoom-lock', 'lock-open', 'Lock zoom');
+      this.zoomLockBtn.classList.add('dgm-btn-zoomlock');
+      this.zoomBtns = [btn('zoom-in', 'plus', 'Zoom in'), btn('zoom-out', 'minus', 'Zoom out')];
+      this.setZoomLock(false);
       btn('fit', 'expand', 'Fit to view');
       btn('full', 'up-right-and-down-left-from-center', 'Fullscreen');
       bar.addEventListener('click', (ev) => {
         const b = ev.target.closest('[data-act]');
         if (!b) return;
         const a = b.dataset.act;
-        if (a === 'zoom-in') this.zoomBy(1.25);
-        if (a === 'zoom-out') this.zoomBy(0.8);
+        if (a === 'zoom-lock') this.setZoomLock(!this.zoomLocked);
+        if (a === 'zoom-in') this.userZoom(1.25);
+        if (a === 'zoom-out') this.userZoom(0.8);
         if (a === 'fit') this.fit(true);
         if (a === 'full') this.toggleFull();
       });
@@ -879,6 +889,65 @@
       this.bindFullscreen();
       this.buildViews();
       this.buildTour();
+      this.bindSideToggle();
+    }
+
+    // The sidebar folds to a narrow strip that keeps only the zoom, Fit and fullscreen buttons; the
+    // canvas takes the room and keeps its centre, and the choice is remembered in this browser.
+    bindSideToggle() {
+      const b = this.root.querySelector('[data-act="side-collapse"]');
+      if (!b) return;
+      const storeKey = `dgm-side-collapsed:${this.root.id}`;
+      const set = (on, save) => {
+        const W = this.stage.clientWidth;
+        const H = this.stage.clientHeight;
+        this.root.classList.toggle('is-side-collapsed', on);
+        const label = on ? 'Show the sidebar' : 'Hide the sidebar';
+        b.setAttribute('aria-expanded', on ? 'false' : 'true');
+        b.setAttribute('aria-label', label);
+        b.title = label;
+        const dw = this.stage.clientWidth - W;
+        const dh = this.stage.clientHeight - H;
+        if (dw || dh) {
+          cancelAnimationFrame(this.camRaf);
+          this.cam = { ...this.cam, x: this.cam.x + dw / 2, y: this.cam.y + dh / 2 };
+          this.applyCam();
+        }
+        if (save) try { localStorage.setItem(storeKey, on ? '1' : '0'); } catch (e) { /* storage blocked: lasts for this page only */ }
+      };
+      let saved = null;
+      try {
+        saved = localStorage.getItem(storeKey);
+      } catch (e) { /* storage blocked */ }
+      set(saved === '1', false);
+      b.addEventListener('click', () => set(!this.root.classList.contains('is-side-collapsed'), true));
+    }
+
+    // A collapsible menu in the sidebar: its head toggles the items, and the reader's choice is
+    // remembered per diagram in this browser. Returns the element that holds the items.
+    menu(id, title, label) {
+      const menus = this.root.querySelector('.dgm-side-menus');
+      const sec = html('section', `dgm-menu dgm-menu-${id}`, menus);
+      const head = html('button', 'dgm-menu-head', sec);
+      head.type = 'button';
+      head.innerHTML = `<span>${esc(title)}</span><span class="dgm-menu-meta"></span><i class="fas fa-chevron-down" aria-hidden="true"></i>`;
+      const items = html('div', 'dgm-menu-items', sec);
+      items.setAttribute('aria-label', label || title);
+      items.id = `${this.root.id}-menu-${id}`;
+      head.setAttribute('aria-controls', items.id);
+      const key = `dgm-menu-${id}:${this.root.id}`;
+      const set = (open, save) => {
+        sec.classList.toggle('is-closed', !open);
+        head.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (save) try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) { /* storage blocked: lasts for this page only */ }
+      };
+      let saved = null;
+      try {
+        saved = localStorage.getItem(key);
+      } catch (e) { /* storage blocked */ }
+      set(saved !== '0', false);
+      head.addEventListener('click', () => set(sec.classList.contains('is-closed'), true));
+      return items;
     }
 
     updateLevelLabel() {
@@ -938,9 +1007,9 @@
     // ---------------------------------------------------------------- view tabs
     buildViews() {
       if (!this.views.length) return;
-      const bar = html('div', 'dgm-views', this.stage);
+      const bar = this.menu('views', 'Views');
+      bar.classList.add('dgm-views');
       bar.setAttribute('role', 'tablist');
-      bar.setAttribute('aria-label', 'Views');
       const count = (id) => (id === ALL_VIEWS ? this.edges.length : this.edges.filter((e) => (id ? e.viewList.includes(id) : e.mainFlow)).length);
       // Main flows first, the diagram's views, then Show all (every view's arrows and components).
       [{ id: null, label: 'Main flows', icon: 'api' }, ...this.views, { id: ALL_VIEWS, label: 'Show all', icon: 'cluster' }].forEach((v) => {
@@ -1051,6 +1120,64 @@
       return !this.data.map && this.data.layout !== 'auto';
     }
 
+    // `arrange: flow` (top level for every container, or on one group): children in rows, left to
+    // right then top to bottom, in the order they are written. Stable layout only.
+    // Which band each child of a flow container sits in. `bands:` lists the container's bands top to
+    // bottom ({id, label?, main?}); the main band (the one marked `main`, else the first) holds every
+    // child without a `band:`. With no `band:` on any child (and `hubs` not false), a child that
+    // receives arrows from 3 or more siblings and leads to at most one is a hub: it moves to an
+    // unlabelled band of its own below the main one. links: each child's siblings by arrow (any view).
+    bandPlan(cid, kids) {
+      const node = cid === '__root' ? null : this.nodes.get(cid);
+      const listed = ((node ? node.bands : this.data.bands) || []).map((b) => (typeof b === 'string' ? { id: b } : b));
+      const childIn = (id) => {
+        for (let n = this.nodes.get(id); n; n = n.parent) if ((n.parent ? n.parent.id : '__root') === cid) return n.id;
+        return null;
+      };
+      const links = new Map(kids.map((k) => [k.id, new Set()]));
+      const inFrom = new Map(kids.map((k) => [k.id, new Set()]));
+      const outTo = new Map(kids.map((k) => [k.id, new Set()]));
+      for (const e of this.edges) {
+        const a = childIn(e.from);
+        const b = childIn(e.to);
+        if (!a || !b || a === b || !links.has(a) || !links.has(b)) continue;
+        links.get(a).add(b);
+        links.get(b).add(a);
+        inFrom.get(b).add(a);
+        outTo.get(a).add(b);
+      }
+      let bands = listed.length ? listed.slice() : [{ id: 'main' }];
+      const main = Math.max(0, bands.findIndex((b) => b.main));
+      const idx = new Map(bands.map((b, i) => [b.id, i]));
+      const bandOf = kids.map((k) => (k.band != null && idx.has(k.band) ? idx.get(k.band) : main));
+      const hubs = (node && node.hubs != null ? node.hubs : this.data.hubs) !== false;
+      if (hubs && !kids.some((k) => k.band != null)) {
+        const isHub = kids.map((k) => inFrom.get(k.id).size >= 3 && outTo.get(k.id).size <= 1);
+        const count = isHub.filter(Boolean).length;
+        if (count && count < kids.length) {
+          bands = [...bands, { id: '__hubs' }];
+          isHub.forEach((h, i) => {
+            if (h) bandOf[i] = bands.length - 1;
+          });
+        }
+      }
+      const members = new Map();
+      bandOf.forEach((b, i) => {
+        if (!members.has(b)) members.set(b, []);
+        members.get(b).push(i);
+      });
+      const order = [main];
+      for (let b = main + 1; b < bands.length; b++) order.push(b);
+      for (let b = main - 1; b >= 0; b--) order.push(b);
+      return { bands, count: bands.length, main, bandOf, members, order, links, labelled: listed.some((b) => b.label) };
+    }
+
+    isFlow(cid) {
+      if (!this.stable) return false;
+      const n = cid === '__root' ? null : this.nodes.get(cid);
+      return ((n && n.arrange) || this.data.arrange) === 'flow';
+    }
+
     async relayout({ fit = false, focus = null, anchor = null, was = null, animate = true } = {}) {
       const token = (this.layoutToken = (this.layoutToken || 0) + 1);
       const vis = this.visibleEdges();
@@ -1149,6 +1276,8 @@
     // and closing one gives back the layout from before it was opened.
     async stableLayout(vis) {
       const base = await this.baseLayouts();
+      // The top level's labelled bands, as the last arrange step left them (drawn behind everything).
+      let rootBands = null;
       let pinned = new Set();
       // Each step's positions: container id → child id → center, relative to the container's center.
       let prev = new Map();
@@ -1180,14 +1309,100 @@
         // Wide enough for the header (icon, label, sub, info and collapse buttons), as in the ELK layout.
         const minW = Math.ceil(Math.max(String(n.label).length * 8, String(n.sub || '').length * 6.8) + 110);
         if (x1 - x0 < minW) {
-          const grow = (minW - (x1 - x0)) / 2;
-          x0 -= grow;
-          x1 += grow;
+          // A flow group grows right and down from its closed box; any other group around its center.
+          if (this.isFlow(n.id)) x1 = x0 + minW;
+          else {
+            const grow = (minW - (x1 - x0)) / 2;
+            x0 -= grow;
+            x1 += grow;
+          }
         }
         if (y1 - y0 < 80) y1 = y0 + 80;
         const w = Math.max(2 * Math.max(-x0, x1), s.w);
         const h = Math.max(2 * Math.max(-y0, y1), s.h);
         return { w, h, group: true, items, box: { x0, y0, x1, y1 } };
+      };
+      // Flow arrangement (`arrange: flow`): children in model order, left to right in rows of `cols`,
+      // rows top to bottom, each row top-aligned. Positions come from the current sizes, so an open
+      // component pushes the ones after it in its row to the right and the rows below it down, and
+      // closing it restores the layout exactly. A group's rows start at its closed box's top-left
+      // corner, so it opens right and down from where it was. Hidden components keep their base space.
+      const FLOW_GAP_X = 88;
+      const FLOW_GAP_Y = 64;
+      // Bands (`bands:` on the top level or a group, `band:` on a component) are horizontal swimlanes:
+      // the main band holds the main path in rows as above; every other band is one row, stacked in
+      // the order the bands are listed, with each component placed under (or over) the components it
+      // connects to (the mean of their centers), keeping order and spacing. Components that many
+      // siblings point at (hubs) go to their own band, so their arrows arrive from one side instead
+      // of converging in the middle of the main path.
+      const BAND_GAP = 104;
+      const flowArrange = (cid, rows) => {
+        const node = cid === '__root' ? null : this.nodes.get(cid);
+        const cols = Math.max(1, (node ? node.cols : this.data.cols) || (node ? Math.min(rows.length, 4) : rows.length));
+        let [ox, oy] = [0, 0];
+        if (node) {
+          const s = this.leafSize(node);
+          ox = -s.w / 2 + PAD_X;
+          oy = -s.h / 2 + TOP;
+        }
+        const boxOf = (r) => (r.f ? r.f.box : { x0: -r.bw / 2, y0: -r.bh / 2, x1: r.bw / 2, y1: r.bh / 2 });
+        const plan = this.bandPlan(cid, rows.map((r) => r.k));
+        const raw = new Array(rows.length);
+        const cx = new Map();
+        const heights = new Map();
+        for (const bi of plan.order) {
+          const idxs = plan.members.get(bi) || [];
+          if (!idxs.length) continue;
+          let bandH = 0;
+          if (bi === plan.main) {
+            // The main path: rows of `cols`, left to right, top to bottom, top-aligned.
+            let [x, y, rowH] = [0, 0, 0];
+            idxs.forEach((i, n) => {
+              if (n && n % cols === 0) {
+                x = 0;
+                y += rowH + FLOW_GAP_Y;
+                rowH = 0;
+              }
+              const box = boxOf(rows[i]);
+              raw[i] = { x: x - box.x0, y: y - box.y0 };
+              cx.set(rows[i].k.id, x + (box.x1 - box.x0) / 2);
+              x += box.x1 - box.x0 + FLOW_GAP_X;
+              rowH = Math.max(rowH, box.y1 - box.y0);
+            });
+            bandH = y + rowH;
+          } else {
+            // One row, in the order written; each component slides right to sit under (or over) the
+            // center of what it connects to in the bands already placed, never past the next one.
+            const want = idxs.map((i) => {
+              const xs = [...(plan.links.get(rows[i].k.id) || [])].map((id) => cx.get(id)).filter((v) => v != null);
+              return { i, at: xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null };
+            });
+            let cursor = 0;
+            for (const { i, at } of want) {
+              const box = boxOf(rows[i]);
+              const w = box.x1 - box.x0;
+              const left = at == null ? cursor : Math.max(at - w / 2, cursor);
+              raw[i] = { x: left - box.x0, y: -box.y0 };
+              cx.set(rows[i].k.id, left + w / 2);
+              cursor = left + w + FLOW_GAP_X;
+              bandH = Math.max(bandH, box.y1 - box.y0);
+            }
+          }
+          heights.set(bi, bandH);
+        }
+        // Stack the bands in their listed order.
+        const top = new Map();
+        let y = 0;
+        const out = [];
+        for (let bi = 0; bi < plan.count; bi++) {
+          if (!heights.has(bi)) continue;
+          top.set(bi, y);
+          out.push({ band: plan.bands[bi], y0: y, y1: y + heights.get(bi) });
+          y += heights.get(bi) + BAND_GAP;
+        }
+        const labelW = !node && plan.labelled ? BAND_LABEL_W : 0;
+        if (!node) rootBands = plan.labelled ? out.map((b) => ({ ...b, y0: b.y0 + oy, y1: b.y1 + oy })) : null;
+        return rows.map((r, i) => ({ x: ox + labelW + raw[i].x, y: oy + top.get(plan.bandOf[i]) + raw[i].y }));
       };
       const arrange = (cid, kids) => {
         const b = base.get(cid);
@@ -1198,6 +1413,12 @@
           const st = was && was.get(k.id);
           return { k, f, bx: bb.x, by: bb.y, bw: bb.w, bh: bb.h, sx: st && st.x, sy: st && st.y, w: f ? Math.max(f.w, bb.w) : bb.w, h: f ? Math.max(f.h, bb.h) : bb.h };
         });
+        if (this.isFlow(cid)) {
+          const pos = flowArrange(cid, rows);
+          const out = rows.map((r, i) => ({ k: r.k, f: r.f, x: pos[i].x, y: pos[i].y }));
+          cur.set(cid, new Map(out.filter((o) => o.f).map((o) => [o.k.id, { x: o.x, y: o.y }])));
+          return out;
+        }
         // Local push among the visible children; the guaranteed (roomier) push if it doesn't settle.
         const vis = rows.filter((r) => r.f);
         const local = pushLocal(vis.map((r) => ({ ...r, box: r.f.box, grown: r.f.group, pinned: r.f.group && pinned.has(r.k.id) })));
@@ -1238,6 +1459,19 @@
         this.expanded = open;
       }
       put(top, 0, 0);
+      if (rootBands && rootBands.length) {
+        let x1 = 0;
+        for (const p of placed.nodes.values()) x1 = Math.max(x1, p.x + p.w);
+        const n = rootBands.length;
+        placed.bands = rootBands.map((b, i) => ({
+          label: b.band.label || '',
+          id: b.band.id,
+          x0: 0,
+          x1: x1 + 40,
+          y0: i ? (rootBands[i - 1].y1 + b.y0) / 2 : b.y0 - 44,
+          y1: i < n - 1 ? (b.y1 + rootBands[i + 1].y0) / 2 : b.y1 + 44
+        }));
+      }
       // Arrows: an open group that holds either end doesn't block the arrow; every other box does.
       const routes = vis.map((v) => ({
         key: v.key,
@@ -1246,45 +1480,11 @@
         skip: new Set([...this.ancestorsOf(v.from), ...this.ancestorsOf(v.to)].map((a) => a.id))
       }));
       const paths = routeOrtho(placed.nodes, routes, this.data.direction || 'right');
-      // Pills: on the longest segment that has room, clear of components and of the pills placed
-      // before (an arrow's label sits just above its pill, so it counts too).
-      const leaves = [...placed.nodes.values()].filter((p) => !p.group);
-      const taken = [];
-      const area = (r, o) => Math.max(0, Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)) * Math.max(0, Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y));
-      // Overlap with components weighs more than with other pills.
-      const clash = (r) => taken.reduce((s, o) => s + area(r, o), 0) + 2 * leaves.reduce((s, o) => s + area(r, o), 0);
-      const TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9];
       for (const v of vis) {
         const pts = paths.get(v.key);
-        if (!pts) continue;
-        const text = this.pillText(v);
-        let label = null;
-        if (text) {
-          const w = text.length * 6.8 + 14;
-          const above = v.list.length === 1 && v.list[0].label ? 18 : 0;
-          const segs = [];
-          for (let k = 1; k < pts.length; k++) segs.push([pts[k - 1], pts[k], Math.abs(pts[k][0] - pts[k - 1][0]) + Math.abs(pts[k][1] - pts[k - 1][1])]);
-          segs.sort((p, q) => q[2] - p[2]);
-          // The middle of the longest segment if it is free, else the free spot nearest to it, else
-          // the spot with the least overlap.
-          let best = null;
-          for (const [p, q] of segs.slice(0, 3)) {
-            for (const t of TS) {
-              const at = { x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t };
-              const r = { x: at.x - w / 2 - 2, y: at.y - 12 - above, w: w + 4, h: 24 + above };
-              const score = clash(r);
-              if (!best || score < best.score) best = { at, r, score };
-              if (!score) break;
-            }
-            if (best && !best.score) break;
-          }
-          if (best) {
-            label = best.at;
-            taken.push(best.r);
-          }
-        }
-        placed.edges.set(v.key, { pts, label });
+        if (pts) placed.edges.set(v.key, { pts, label: null });
       }
+      this.placeLabels(placed, vis);
       return placed;
     }
 
@@ -1376,9 +1576,9 @@
           addPort(Y, pid, 'WEST');
           return [Y, pid];
         });
-        const pill = this.pillText(v);
+        const room = this.labelRoom(v);
         const labelled = ids.length;
-        seg(lca, from, ins.length ? ins[ins.length - 1][1] : v.to, pill ? [{ text: pill, width: pill.length * 6.8 + 16, height: 22 }] : null);
+        seg(lca, from, ins.length ? ins[ins.length - 1][1] : v.to, room ? [room] : null);
         for (let i = ins.length - 1; i >= 0; i--) seg(ins[i][0], ins[i][1], i ? ins[i - 1][1] : v.to);
         segments.set(v.key, [ids, labelled]);
       });
@@ -1418,7 +1618,58 @@
         });
         placed.edges.set(key, { pts, label });
       }
+      // ELK keeps room for each pill but not for the text label drawn above it, and labels of arrows in
+      // different containers never see each other: check every spot as the stable layout does.
+      this.placeLabels(placed, vis);
       return placed;
+    }
+
+    // Where each arrow's protocol pill and its text label (drawn just above the pill, or alone in the
+    // middle of the arrow when it has no pill) go: the spot the layout suggested if it is free, else the
+    // middle of the longest segment that is free, else the free spot nearest to it, else the spot with
+    // the least overlap. Free means clear of components and of the pills and labels placed before; the
+    // pill and the label are checked as two boxes, each as wide as its own text. Sets edges' `label`.
+    placeLabels(placed, vis) {
+      const leaves = [...placed.nodes.values()].filter((p) => !p.group);
+      const taken = [];
+      const area = (r, o) => Math.max(0, Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)) * Math.max(0, Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y));
+      // Overlap with components weighs more than with other pills and labels.
+      const clash = (rs) => rs.reduce((s, r) => s + taken.reduce((t, o) => t + area(r, o), 0) + 2 * leaves.reduce((t, o) => t + area(r, o), 0), 0);
+      const TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9];
+      for (const v of vis) {
+        const pe = placed.edges.get(v.key);
+        if (!pe || !pe.pts || pe.pts.length < 2) continue;
+        const text = this.pillText(v);
+        const caption = v.list.length === 1 ? v.list[0].label : null;
+        if (!text && !caption) continue;
+        const pw = text ? text.length * 6.8 + 14 : 0;
+        const lw = caption ? String(caption).length * 6.6 + 8 : 0;
+        // The boxes around a spot on the arrow (the label's text sits 18px above the pill's center,
+        // or 8px above the arrow without a pill; 11px bold, about 12px tall).
+        const boxes = (at) => [
+          ...(text ? [{ x: at.x - pw / 2 - 2, y: at.y - 12, w: pw + 4, h: 24 }] : []),
+          ...(caption ? [{ x: at.x - lw / 2, y: at.y - (text ? 18 : 8) - 11, w: lw, h: 14 }] : [])
+        ];
+        const pts = pe.pts;
+        const cands = [];
+        if (pe.label) {
+          const q = nearestOnPath(measure(pts), pe.label.x, pe.label.y);
+          cands.push({ x: q.x, y: q.y });
+        }
+        const segs = [];
+        for (let k = 1; k < pts.length; k++) segs.push([pts[k - 1], pts[k], Math.abs(pts[k][0] - pts[k - 1][0]) + Math.abs(pts[k][1] - pts[k - 1][1])]);
+        segs.sort((p, q) => q[2] - p[2]);
+        for (const [p, q] of segs.slice(0, 3)) for (const t of TS) cands.push({ x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t });
+        let best = null;
+        for (const at of cands) {
+          const rs = boxes(at);
+          const score = clash(rs);
+          if (!best || score < best.score) best = { at, rs, score };
+          if (!score) break;
+        }
+        pe.label = best.at;
+        taken.push(...best.rs);
+      }
     }
 
     geoLayout() {
@@ -1452,6 +1703,17 @@
         placed.edges.set(v.key, { pts, label: null });
       }
       return placed;
+    }
+
+    // The room ELK keeps on an arrow (inline labels: centered on the line, where the pill is drawn) for
+    // its pill and, when it has one, the text label 18px above the pill: the box is centered on the
+    // line, so the label's height is kept on both sides.
+    labelRoom(v) {
+      const text = this.pillText(v);
+      const caption = v.list.length === 1 ? v.list[0].label : null;
+      if (!text && !caption) return null;
+      const w = Math.max(text ? text.length * 6.8 + 16 : 0, caption ? String(caption).length * 6.6 + 8 : 0);
+      return { text: text || String(caption), width: w, height: text ? (caption ? 58 : 22) : 38, layoutOptions: { 'elk.edgeLabels.inline': 'true' } };
     }
 
     // ---------------------------------------------------------------- render
@@ -1529,7 +1791,23 @@
       this.pillLayer.textContent = '';
       this.pointerLayer.textContent = '';
       this.edgeEls = new Map();
+      this.bandsBox = placed.bands ? { x0: placed.bands[0].x0, y0: placed.bands[0].y0, x1: placed.bands[0].x1, y1: placed.bands[placed.bands.length - 1].y1 } : null;
+      const drawBands = () => {
+        this.bandLayer.textContent = '';
+        (placed.bands || []).forEach((b, i) => {
+          const g = make('g', { class: 'dgm-band' + (i % 2 ? ' is-alt' : ''), 'data-band': b.id }, this.bandLayer);
+          make('rect', { class: 'dgm-band-bg', x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 }, g);
+          make('rect', { class: 'dgm-band-head', x: b.x0, y: b.y0, width: BAND_LABEL_W - 28, height: b.y1 - b.y0 }, g);
+          const lines = wrap(b.label, 16);
+          const t = make('text', { class: 'dgm-band-label', x: b.x0 + (BAND_LABEL_W - 28) / 2, y: (b.y0 + b.y1) / 2 - ((lines.length - 1) * 17) / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
+          lines.forEach((l, k) => {
+            const sp = make('tspan', { x: b.x0 + (BAND_LABEL_W - 28) / 2, dy: k ? 17 : 0 }, t);
+            sp.textContent = l;
+          });
+        });
+      };
       const drawEdges = () => {
+        drawBands();
         for (const v of vis) {
           const pe = placed.edges.get(v.key);
           if (pe && pe.pts.length > 1) this.drawEdge(v, pe);
@@ -1701,7 +1979,7 @@
       }
       if (e0.label && v.list.length === 1) {
         // Just above the pill, so the two read together; else the middle of the arrow.
-        const at = pillAt || pointAt(m, m.total * 0.5);
+        const at = pillAt || (pe.label ? nearestOnPath(m, pe.label.x, pe.label.y) : pointAt(m, m.total * 0.5));
         const lab = make('text', { class: 'dgm-link-label', x: at.x, y: at.y - (pill ? 18 : 8), 'text-anchor': 'middle' }, this.pillLayer);
         lab.textContent = e0.label;
       }
@@ -2055,8 +2333,45 @@
       this.view.setAttribute('transform', `translate(${this.cam.x},${this.cam.y}) scale(${this.cam.k})`);
       this.root.style.setProperty('--dgm-zoom', this.cam.k);
     }
+    // With the zoom locked, a camera move keeps the current zoom and centres on the point the move
+    // aimed at, so it only pans.
+    lockCam(to) {
+      if (!this.zoomLocked || Math.abs(to.k - this.cam.k) < 1e-6) return to;
+      const W = this.stage.clientWidth;
+      const H = this.stage.clientHeight;
+      const { k } = this.cam;
+      const wx = (W / 2 - to.x) / to.k;
+      const wy = (H / 2 - to.y) / to.k;
+      return { k, x: W / 2 - k * wx, y: H / 2 - k * wy };
+    }
+    setZoomLock(on) {
+      this.zoomLocked = on;
+      const b = this.zoomLockBtn;
+      if (b) {
+        b.innerHTML = `<i class="fas fa-${on ? 'lock' : 'lock-open'}" aria-hidden="true"></i>`;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        const label = on ? 'Zoom locked: click to zoom in and out again' : 'Lock zoom at this level';
+        b.setAttribute('aria-label', label);
+        b.title = label;
+      }
+      for (const z of this.zoomBtns || []) z.disabled = on;
+      this.root.classList.toggle('is-zoom-locked', on);
+    }
+    // A zoom the reader asked for (buttons, wheel, pinch, keys): refused while the zoom is locked.
+    userZoom(f, cx, cy) {
+      if (this.zoomLocked) return this.flashHint('Zoom is locked: unlock it at the foot of the sidebar to zoom');
+      this.zoomBy(f, cx, cy);
+    }
+    flashHint(text) {
+      const hint = this.root.querySelector('.dgm-hint');
+      if (hint && text) hint.textContent = text;
+      this.root.classList.add('show-hint');
+      clearTimeout(this.hintTimer);
+      this.hintTimer = setTimeout(() => this.root.classList.remove('show-hint'), 1400);
+    }
     animateCam(to, animate = true) {
       cancelAnimationFrame(this.camRaf);
+      to = this.lockCam(to);
       if (!animate || reduceMotion) {
         this.cam = to;
         this.applyCam();
@@ -2092,15 +2407,22 @@
       const W = this.stage.clientWidth;
       const H = this.stage.clientHeight;
       const pad = 28;
-      // Keep clear of the view tabs at the top (and the banner at the bottom).
-      const top = this.viewBar ? this.viewBar.offsetHeight + 16 : 0;
+      // Keep clear of the player's tab at the top of the canvas.
+      const top = this.root.classList.contains('has-player') ? 22 : 0;
       const k = Math.min(maxK, (W - 2 * pad) / Math.max(1, b.x1 - b.x0), (H - 2 * pad - top) / Math.max(1, b.y1 - b.y0));
       return { k, x: (W - k * (b.x1 + b.x0)) / 2, y: top + (H - top - k * (b.y1 + b.y0)) / 2 };
     }
     // Open on the whole diagram when it fits at a readable size, else at a readable zoom on its start
     // (left, top), like a map: drag to explore, Fit shows everything.
-    overview(animate = true) {
+    // Everything on the canvas: the components and the band strips behind them.
+    allBox() {
       const b = this.box([...this.pos.keys()]);
+      const s = this.bandsBox;
+      if (!b || !s) return b;
+      return { x0: Math.min(b.x0, s.x0), y0: Math.min(b.y0, s.y0), x1: Math.max(b.x1, s.x1), y1: Math.max(b.y1, s.y1) };
+    }
+    overview(animate = true) {
+      const b = this.allBox();
       if (!b) return;
       const c = this.camFor(b, 1.25);
       const minK = this.data.min_zoom || 0.62;
@@ -2111,7 +2433,7 @@
       this.animateCam({ k, x: 24 - k * b.x0, y: fitsTall ? (H - k * (b.y1 + b.y0)) / 2 : 24 - k * b.y0 }, animate);
     }
     fit(animate = true) {
-      const b = this.box([...this.pos.keys()]);
+      const b = this.allBox();
       if (b) this.animateCam(this.camFor(b, 1.25), animate);
     }
     focusOn(ids, animate = true) {
@@ -2135,7 +2457,8 @@
       const W = this.stage.clientWidth;
       const H = this.stage.clientHeight;
       const pad = 28;
-      const top = this.viewBar ? this.viewBar.offsetHeight + 16 : 0;
+      // Keep clear of the player's tab at the top of the canvas.
+      const top = this.root.classList.contains('has-player') ? 22 : 0;
       const { k } = this.cam;
       const [cx, cy] = p.c || [p.x + p.w / 2, p.y + p.h / 2];
       const [ox, oy] = was || [cx, cy];
@@ -2151,7 +2474,7 @@
         (sy - top - pad) / Math.max(1, cy - p.y),
         (H - pad - sy) / Math.max(1, p.y + p.h - cy)
       );
-      const nk = fitK >= k - 1e-3 ? k : Math.max(0.2, fitK);
+      const nk = this.zoomLocked || fitK >= k - 1e-3 ? k : Math.max(0.2, fitK);
       const to = { k: nk, x: sx - nk * cx, y: sy - nk * cy };
       if (Math.abs(to.k - k) < 1e-3 && Math.abs(to.x - this.cam.x) < 0.5 && Math.abs(to.y - this.cam.y) < 0.5) return;
       this.animateCam(to, animate);
@@ -2204,7 +2527,7 @@
           const [a, b] = [...pts.values()];
           const box = st.getBoundingClientRect();
           const d = Math.hypot(a.x - b.x, a.y - b.y);
-          this.zoomBy((pinch.k * d) / pinch.d / this.cam.k, (a.x + b.x) / 2 - box.left, (a.y + b.y) / 2 - box.top);
+          if (!this.zoomLocked) this.zoomBy((pinch.k * d) / pinch.d / this.cam.k, (a.x + b.x) / 2 - box.left, (a.y + b.y) / 2 - box.top);
           this.dragged = true;
           return;
         }
@@ -2229,15 +2552,12 @@
       st.addEventListener(
         'wheel',
         (ev) => {
-          if (!(ev.ctrlKey || ev.metaKey || this.root.classList.contains('is-full'))) {
-            this.root.classList.add('show-hint');
-            clearTimeout(this.hintTimer);
-            this.hintTimer = setTimeout(() => this.root.classList.remove('show-hint'), 1200);
-            return;
-          }
+          const wantsZoom = ev.ctrlKey || ev.metaKey || this.root.classList.contains('is-full');
+          // Locked: a plain scroll still scrolls the page; a zoom gesture says the zoom is locked.
+          if (!wantsZoom) return this.flashHint(this.zoomLocked ? 'Zoom is locked' : 'Ctrl + scroll (or pinch) to zoom');
           ev.preventDefault();
           const box = st.getBoundingClientRect();
-          this.zoomBy(Math.exp(-ev.deltaY * 0.0022), ev.clientX - box.left, ev.clientY - box.top);
+          this.userZoom(Math.exp(-ev.deltaY * 0.0022), ev.clientX - box.left, ev.clientY - box.top);
         },
         { passive: false }
       );
@@ -2252,8 +2572,8 @@
           ev.preventDefault();
           this.cam = { ...this.cam, x: this.cam.x + moves[ev.key][0], y: this.cam.y + moves[ev.key][1] };
           this.applyCam();
-        } else if (ev.key === '+' || ev.key === '=') this.zoomBy(1.2);
-        else if (ev.key === '-') this.zoomBy(1 / 1.2);
+        } else if (ev.key === '+' || ev.key === '=') this.userZoom(1.2);
+        else if (ev.key === '-') this.userZoom(1 / 1.2);
         else if (ev.key === '0') this.fit(true);
       });
       window.addEventListener('resize', () => {
@@ -2324,9 +2644,12 @@
       this.playing = false;
       this.run = 0;
       this.locked = this.data.lock === true;
-      const dots = ctl.querySelector('.dgm-dots');
+      const player = this.root.querySelector('.dgm-player');
+      const handle = player && player.querySelector('.dgm-player-handle');
+      const stepN = ctl.querySelector('.dgm-step-n');
       const playBtn = ctl.querySelector('[data-act="play"]');
-      const picker = this.root.querySelector('.dgm-scenarios');
+      const picker = list.length > 1 ? this.menu('scn', 'Use cases') : null;
+      if (picker) picker.setAttribute('role', 'tablist');
       const modeLabel = ctl.querySelector('.dgm-toggle-mode');
       const modeBox = modeLabel && modeLabel.querySelector('input');
       const lockBtn = ctl.querySelector('[data-act="lock"]');
@@ -2357,7 +2680,34 @@
       const setPlayIcon = () => {
         playBtn.innerHTML = `<i class="fas fa-${this.playing ? 'pause' : 'play'}" aria-hidden="true"></i>`;
         playBtn.setAttribute('aria-label', this.playing ? 'Pause' : 'Play');
+        const st = handle && handle.querySelector('.dgm-player-state');
+        if (st) st.className = `fas fa-${this.playing ? 'pause' : 'play'} dgm-player-state`;
       };
+      // The player drawer: closed by default, opens while the pointer is on its tab or its controls (or
+      // on a click, for touch, or keyboard focus), closes shortly after the pointer leaves and whenever a
+      // use case starts playing.
+      this.openPlayer = (on) => {
+        if (!player) return;
+        clearTimeout(this.playerTimer);
+        player.classList.toggle('is-open', on);
+        handle.setAttribute('aria-expanded', on ? 'true' : 'false');
+        handle.setAttribute('aria-label', on ? 'Hide the player' : 'Show the player');
+      };
+      if (player) {
+        player.addEventListener('pointerenter', (ev) => ev.pointerType === 'mouse' && this.openPlayer(true));
+        player.addEventListener('pointerleave', (ev) => {
+          if (ev.pointerType !== 'mouse' || player.querySelector(':focus-visible')) return;
+          clearTimeout(this.playerTimer);
+          this.playerTimer = setTimeout(() => this.openPlayer(false), 450);
+        });
+        player.addEventListener('focusin', () => player.querySelector(':focus-visible') && this.openPlayer(true));
+        player.addEventListener('focusout', (ev) => {
+          if (!player.contains(ev.relatedTarget) && !player.matches(':hover')) this.openPlayer(false);
+        });
+        handle.addEventListener('click', () => this.openPlayer(!player.classList.contains('is-open')));
+        // Clicks and drags on the player are not pans or clicks on the canvas.
+        for (const t of ['pointerdown', 'click', 'wheel', 'dblclick']) player.addEventListener(t, (ev) => ev.stopPropagation());
+      }
       // A step moves packets in "groups": its `edges` all at once (fan-out / fan-in), then each hop of
       // its `path` one after another. `~id` in a path travels that arrow backwards (a response).
       const leg = (ref) => {
@@ -2375,37 +2725,21 @@
       };
       const buildSteps = () => {
         this.steps = this.scn.steps.filter((x) => !x.when || x.when === this.mode).map((x) => ({ ...x, edges: x.edges || [], groups: groupsOf(x) }));
-        dots.textContent = '';
-        this.steps.forEach((x, i) => {
-          const b = html('button', 'dgm-dot', dots);
-          b.type = 'button';
-          b.setAttribute('aria-label', `Step ${i + 1}: ${x.title}`);
-          b.addEventListener('click', () => {
-            this.stop();
-            this.showStep(i, true);
-          });
-        });
       };
+      // Step n/N in the player and on its tab; before the first step, the card introduces the use case.
       this.setCaption = (i) => {
-        if (i < 0) {
-          capEl.querySelector('.dgm-counter').textContent = list.length > 1 ? 'Use case' : 'Tour';
-          capEl.querySelector('.dgm-step-title').textContent = this.scn.title || 'Guided tour';
-          capEl.querySelector('.dgm-step-text').textContent = `${this.scn.summary ? this.scn.summary + ' ' : ''}Press play, or step through with the arrows.`;
-        } else {
-          capEl.querySelector('.dgm-counter').textContent = `${i + 1}/${this.steps.length}`;
-          capEl.querySelector('.dgm-step-title').textContent = this.scn.title || 'Guided tour';
-          capEl.querySelector('.dgm-step-text').textContent = this.scn.summary || '';
-          this.setCard(i);
-        }
-        [...dots.children].forEach((d, j) => {
-          d.classList.toggle('is-done', j < i);
-          d.classList.toggle('is-current', j === i);
-        });
+        const n = i < 0 ? '' : `${i + 1}/${this.steps.length}`;
+        if (stepN) stepN.textContent = n || `${this.steps.length} steps`;
+        const hn = handle && handle.querySelector('.dgm-player-n');
+        if (hn) hn.textContent = n || 'Play';
+        if (i < 0) this.setIntro();
+        else this.setCard(i);
       };
-      // Step card at the bottom of the canvas: the step's number and title, the banner line (what the
-      // step is doing, then its outcome) and its description: `text`, or `detail` while Details is on.
+      // Step card at the bottom of the canvas, the one place for the description: the step's number and
+      // title with the use case's name, the banner line (what the step is doing, then its outcome) and its
+      // description: `text`, or `detail` while Details is on (the card grows a little for it).
       const banner = this.root.querySelector('.dgm-banner');
-      if (banner) banner.innerHTML = '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-title"></span></div><div class="dgm-banner-line"></div><div class="dgm-banner-text"></div>';
+      if (banner) banner.innerHTML = '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-title"></span><span class="dgm-banner-scn"></span></div><div class="dgm-banner-line"></div><div class="dgm-banner-text"></div>';
       const part = (c) => banner && banner.querySelector(`.dgm-banner-${c}`);
       this.setCard = (i) => {
         const x = this.steps[i];
@@ -2413,28 +2747,31 @@
         const long = this.details && x.detail;
         part('n').textContent = `${i + 1}/${this.steps.length}`;
         part('title').textContent = x.title || '';
+        part('scn').textContent = list.length > 1 ? this.scn.title || '' : '';
         // A blank line in `detail` starts a new paragraph; `- ` lines are a list.
         part('text').innerHTML = String(long ? x.detail : x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
       };
-      // With Details on, the card leaves the canvas and sits under it at the figure's full width, so a long
-      // description is easy to read and covers no component; with Details off it floats at the canvas bottom.
-      const body = this.root.querySelector('.dgm-body');
-      const placeCard = () => {
-        if (!banner || !body) return;
-        const below = !!this.details;
-        if (below && banner.previousElementSibling !== body) body.after(banner);
-        if (!below && banner.parentNode !== this.stage) this.stage.appendChild(banner);
-        banner.classList.toggle('is-below', below);
+      // Before the first step: the use case's name and summary, and how to start it.
+      this.setIntro = () => {
+        this.stepRunning = null;
+        if (!banner) return;
+        part('n').textContent = list.length > 1 ? 'Use case' : 'Tour';
+        part('title').textContent = this.scn.title || 'Guided tour';
+        part('scn').textContent = '';
+        part('line').textContent = '';
+        part('text').innerHTML = markdown(`${this.scn.summary ? this.scn.summary + ' ' : ''}Open the player at the top of the canvas to play, or step through.`);
+        banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done', 'is-detailed');
+        banner.classList.add('is-on', 'is-intro');
       };
-      placeCard();
       this.setBanner = (text, state = 'run') => {
         if (!banner) return;
         if (!text) {
-          banner.classList.remove('is-on');
+          if (this.stepRunning == null) this.setIntro();
           return;
         }
+        banner.classList.remove('is-intro');
         const icon = { success: '✓ ', fail: '✗ ', done: '● ' }[state] || '';
         part('line').textContent = icon + text;
         banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done');
@@ -2743,6 +3080,8 @@
         if (this.playing) return;
         this.playing = true;
         setPlayIcon();
+        // Fold the drawer away (the pointer may still be on it: it opens again when it moves back).
+        this.openPlayer(false);
         if (this.k >= this.steps.length - 1) this.k = -1;
         while (this.playing) {
           const r = await this.showStep(this.k + 1, true);
@@ -2863,8 +3202,7 @@
         try {
           localStorage.setItem(detailKey, this.details ? '1' : '0');
         } catch (e) { /* storage blocked: the choice lasts for this page only */ }
-        placeCard();
-        if (banner && banner.classList.contains('is-on') && this.stepRunning != null) this.setCard(this.stepRunning);
+        if (banner && banner.classList.contains('is-on') && !banner.classList.contains('is-intro') && this.stepRunning != null) this.setCard(this.stepRunning);
       });
       modeBox?.addEventListener('change', () => {
         this.stop();
@@ -2873,8 +3211,9 @@
         this.relayout({}).then(() => this.showStep(-1));
       });
       this.selectScenario(0);
-      capEl.hidden = false;
-      ctl.hidden = false;
+      capEl.hidden = true;
+      if (player) player.hidden = false;
+      this.root.classList.add('has-player');
     }
   }
 

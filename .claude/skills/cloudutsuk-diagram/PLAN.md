@@ -46,7 +46,7 @@ Replace the step-through `flow-anim` diagrams with **explorable diagrams**:
 | File | Role |
 |---|---|
 | `assets/js/diagram.js` | Engine: model, levels, ELK layout, SVG rendering, pan/zoom, panel, cards, tour, geo |
-| `_includes/diagram.html` | Markup: stage, toolbar, legend, caption, tour controls, panel, card, no-JS fallback (nested list) |
+| `_includes/diagram.html` | Markup: sidebar (Levels, Views and Use cases menus, zoom buttons at its foot), stage with the player tab and step card, legend, panel, card, no-JS fallback (nested list) |
 | `_sass/diagram.scss` | Theme-aware styles (light and dark), prefix `dgm-` (never a short generic class: `.fa` broke flow-anim once) |
 | `_data/diagrams/<post folders>/<name>.yml` | One file per diagram, folders mirror the post, like `assets/img/` |
 | `.claude/skills/cloudutsuk-diagram/` | SKILL.md, `scripts/validate.py`, `scripts/preview.cjs`, references, this plan |

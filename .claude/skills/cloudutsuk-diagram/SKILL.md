@@ -165,8 +165,8 @@ collapsed, the engine redraws the arrow to the group and merges parallel arrows 
 
 Logs to a collector, audit trails, metrics scrapes, secret fetches, DNS lookups and image pulls connect
 almost everything to everything; drawn all the time they bury the main flows. Put them in **views**:
-tabs at the top centre of the canvas (`Main flows`, one tab per view, then a built-in `Show all`). The
-main view shows only the main request flows; a view tab reveals its hidden arrows, highlights them with
+the **Views** menu in the sidebar (`Main flows`, one entry per view, then a built-in `Show all`). The
+main view shows only the main request flows; a view reveals its hidden arrows, highlights them with
 the components they touch, and dims the rest. `Show all` draws every view's arrows and components with
 nothing dimmed (combine it with the deepest level button to see literally everything).
 
@@ -261,9 +261,14 @@ new layout instead. Rules:
   words), `**Why it matters:**` (the risk it removes or the guarantee it gives: cost, safety, audit, a
   person in the loop) and `**How:**` (the mechanism and its numbers, or a short `- ` list). Explain
   each term the first time it appears, state known gaps plainly, and set `details: true`.
-- With Details off the step card floats at the bottom of the canvas; with Details on it sits under the
-  canvas at the figure's full width, with the whole description and nothing on the canvas covered.
-- The caption under the canvas shows the use case's title and summary; the step itself is on the card.
+- The step card at the bottom of the canvas is the one place for the description: `n/N`, the step's
+  title and, on the right, the use case's title, then the action line and `text`. Before the first step
+  it introduces the use case (title and summary). With Details on, the same card grows a little (wider,
+  taller up to about a third of the canvas) and a long `detail` scrolls inside it.
+- The player is a tab hanging from the top edge of the canvas (play state and `n/N`). Hovering it (a
+  click on touch, or keyboard focus) drops the controls down: play, previous, next, restart, the step
+  count, speed, the layout padlock, the alternative mode and Details. It folds back when the pointer
+  leaves and whenever a use case starts playing. There are no per-step dots.
 
 ```yaml
 scenarios:
@@ -322,8 +327,8 @@ hover, the detail panel (status badge, chips, lead sentence, how it works, link 
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `step-details.png` (the card with Details ticked: under the canvas at full width,
-the whole description readable) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player dropped down from its tab), `step-details.png` (the same card with Details
+ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -367,7 +372,12 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
 - **Layout (`layout: auto`):** ELK lays out the whole visible diagram again after every change; each
   open group is laid out on its own, and arrows that cross groups leave through ports on the group
   borders. Compact, but components can move anywhere when one opens.
-- **Level buttons:** the toolbar has one button per level (`Level 0`, `Level 1`, … with the level's name). Clicking one walks there a layer at a time, each layer opening or closing with its own animation; a new click cancels a walk in progress.
+- **Sidebar:** Levels, Views and Use cases are collapsible menus in a sidebar on the left (each head
+  folds its items, remembered per diagram); the zoom lock, zoom in, zoom out, Fit and fullscreen buttons
+  sit at its foot and stay in view. `«` folds the whole sidebar to a strip that keeps those buttons.
+  The zoom lock holds the current zoom: buttons, Ctrl + scroll, pinch and `+`/`-` stop zooming and the
+  camera moves of levels, Fit and use cases only pan; `zoom_lock: true` opens locked.
+- **Level buttons:** the Levels menu has one button per level (`Level 0`, `Level 1`, … with the level's name). Clicking one walks there a layer at a time, each layer opening or closing with its own animation; a new click cancels a walk in progress.
 - **Opening view:** the whole diagram if it fits at a readable size, else a readable zoom on its start
   (drag to explore; ⤢ fits everything).
 - **Interaction:** wheel zoom needs Ctrl/⌘ (or a trackpad pinch) so the page still scrolls; in

@@ -29,20 +29,6 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 }
 
-.dgm-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-}
-
-.dgm-levels {
-  display: flex;
-  flex: 1 1 18rem;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
 
 // One button per level; the current one is filled, the levels it already includes are tinted.
 .dgm-lvl {
@@ -112,6 +98,22 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   &:focus-visible {
     border-color: var(--dgm-accent);
   }
+}
+
+.dgm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+
+  &:hover {
+    border-color: var(--dgm-border);
+  }
+}
+
+// Zoom lock at the sidebar's foot: filled while the zoom is held.
+.dgm-btn-zoomlock[aria-pressed='true'] {
+  border-color: var(--dgm-accent);
+  background: color-mix(in srgb, var(--dgm-accent) 16%, var(--main-bg));
+  color: var(--dgm-ink);
 }
 
 .dgm-btn-primary {
@@ -282,6 +284,29 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 // ---- open groups
+// Bands: horizontal swimlanes behind a top level with `bands:` (header column on the left).
+.dgm-band-bg {
+  fill: var(--main-bg);
+  stroke: var(--dgm-border);
+  stroke-width: 1;
+}
+
+.dgm-band.is-alt .dgm-band-bg {
+  fill: var(--dgm-soft);
+}
+
+.dgm-band-head {
+  fill: color-mix(in srgb, var(--dgm-ink) 7%, var(--main-bg));
+  stroke: var(--dgm-border);
+  stroke-width: 1;
+}
+
+.dgm-band-label {
+  fill: var(--dgm-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .dgm-group {
   --dgm-c: var(--dgm-accent);
 }
@@ -1036,7 +1061,7 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 }
 
-// Body: the use-case sidebar on the left, the canvas on the right (stacked on phones).
+// Body: the sidebar on the left, the canvas on the right (stacked on phones).
 .dgm-body {
   display: flex;
   gap: 0.6rem;
@@ -1048,26 +1073,117 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   min-width: 0;
 }
 
-.dgm-scenarios {
+// The sidebar: collapsible menus (Levels, Views, Use cases) that scroll, and a foot with the zoom lock,
+// zoom, Fit and fullscreen buttons that always stays in view.
+.dgm-side {
   display: flex;
-  flex: 0 0 11.5rem;
+  flex: 0 0 12.5rem;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
   max-height: clamp(420px, 64vh, 700px);
-  overflow: auto;
+}
+
+.dgm-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0 0.1rem 0 0.2rem;
+  color: var(--dgm-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dgm-side-menus {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.1rem;
+}
+
+.dgm-side-foot {
+  display: flex;
+  flex: none;
+  gap: 0.3rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--dgm-border);
+
+  // One row: the five buttons share the sidebar's width.
+  .dgm-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+  }
+}
+
+.dgm-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dgm-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  color: var(--dgm-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+
+  .dgm-menu-meta {
+    margin-left: auto;
+    color: var(--dgm-muted);
+    font-weight: 400;
+  }
+
+  i {
+    color: var(--dgm-muted);
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--dgm-soft);
+  }
+}
+
+.dgm-menu.is-closed {
+  .dgm-menu-items {
+    display: none;
+  }
+
+  .dgm-menu-head i {
+    transform: rotate(-90deg);
+  }
+}
+
+.dgm-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 
   &[hidden] {
     display: none;
   }
 }
 
-.dgm-scenarios-head {
-  padding: 0.1rem 0.2rem 0.2rem;
-  color: var(--dgm-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.dgm-menu-levels .dgm-lvl {
+  width: 100%;
 }
 
 .dgm-scn {
@@ -1094,6 +1210,64 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 }
 
+// Fold toggle in the sidebar's head.
+.dgm-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.4rem;
+  background: var(--main-bg);
+  color: var(--dgm-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--dgm-accent);
+    color: var(--dgm-ink);
+  }
+}
+
+// Folded: a narrow strip with the toggle and the foot's buttons, one under the other.
+.dgm.is-side-collapsed {
+  .dgm-side {
+    flex-basis: 2.2rem;
+  }
+
+  .dgm-side-head {
+    justify-content: center;
+    padding: 0;
+
+    span {
+      display: none;
+    }
+  }
+
+  .dgm-side-menus {
+    display: none;
+  }
+
+  .dgm-side-foot {
+    flex-direction: column;
+    margin-top: auto;
+  }
+
+  .dgm-side-foot .dgm-btn {
+    flex: none;
+    width: 2.2rem;
+    height: 2rem;
+    padding: 0;
+  }
+
+  .dgm-collapse[data-act='side-collapse'] i {
+    transform: rotate(180deg);
+  }
+}
+
 .dgm-scn-title {
   font-size: 0.84rem;
   font-weight: 600;
@@ -1109,58 +1283,64 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
     flex-direction: column;
   }
 
-  .dgm-scenarios {
+  // Stacked on phones: the sidebar sits above the canvas, its items in rows.
+  .dgm-side {
     flex: none;
-    flex-direction: row;
     max-height: none;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
   }
 
-  .dgm-scenarios-head {
-    display: none;
+  .dgm-side-menus {
+    overflow: visible;
   }
 
-  .dgm-scn {
-    flex: 0 0 auto;
+  .dgm-menu-items {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .dgm-menu-levels .dgm-lvl {
+    width: auto;
+  }
+
+  .dgm-collapse[data-act='side-collapse'] i {
+    transform: rotate(90deg);
+  }
+
+  .dgm.is-side-collapsed {
+    .dgm-side {
+      flex-basis: auto;
+    }
+
+    .dgm-side-head {
+      justify-content: space-between;
+    }
+
+    .dgm-side-foot {
+      flex-direction: row;
+    }
+
+    .dgm-side-foot .dgm-btn {
+      flex: 1 1 0;
+      width: auto;
+    }
+
+    .dgm-collapse[data-act='side-collapse'] i {
+      transform: rotate(-90deg);
+    }
   }
 }
 
-// View tabs at the top centre of the canvas: reveal and highlight cross-cutting connections.
-.dgm-views {
-  position: absolute;
-  top: 0.6rem;
-  left: 50%;
-  z-index: 4;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.15rem;
-  width: max-content;
-  max-width: calc(100% - 1rem);
-  padding: 0.18rem;
-  border: 1px solid var(--dgm-border);
-  border-radius: 0.7rem;
-  background: color-mix(in srgb, var(--main-bg) 92%, transparent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-  transform: translateX(-50%);
-  // Only the buttons take clicks; the space around them lets the map through.
-  pointer-events: none;
-
-  .dgm-vtab {
-    pointer-events: auto;
-  }
-}
-
+// Views (in the sidebar): reveal and highlight cross-cutting connections.
 .dgm-vtab {
-  display: inline-flex;
+  display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.5rem;
-  border: 0;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--dgm-border);
   border-radius: 0.5rem;
-  background: none;
+  background: var(--main-bg);
+  text-align: left;
   color: var(--dgm-text);
   font-size: 0.76rem;
   font-weight: 600;
@@ -1190,6 +1370,7 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 .dgm-vtab-n {
+  margin-left: auto;
   min-width: 1.2rem;
   padding: 0 0.3rem;
   border-radius: 0.6rem;
@@ -1278,6 +1459,19 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
     color: var(--dgm-ink);
   }
 
+  // The use case the step belongs to, on the right of the card's head.
+  .dgm-banner-scn {
+    overflow: hidden;
+    margin-left: auto;
+    max-width: 50%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &:empty {
+      display: none;
+    }
+  }
+
   .dgm-banner-line {
     margin-top: 0.1rem;
     color: var(--dgm-ink);
@@ -1313,8 +1507,17 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
     }
   }
 
-  &.is-detailed .dgm-banner-text {
-    max-height: min(15em, 38vh);
+  // Details: the same card, a little wider and taller; a long description scrolls inside it.
+  &.is-detailed {
+    width: min(48rem, calc(100% - 2rem));
+
+    .dgm-banner-text {
+      max-height: min(13em, 34vh);
+    }
+  }
+
+  &.is-intro {
+    border-left-color: var(--dgm-accent);
   }
 
   &.is-success {
@@ -1342,151 +1545,114 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   left: calc((100% - min(360px, 92%)) / 2);
 }
 
-// With Details on, the script moves the card under the canvas: the figure's full width, the whole description
-// without a scroll box, and nothing on the canvas covered. `.dgm` in front outranks the phone rules further down.
-.dgm .dgm-banner.is-below {
-  position: static;
-  width: auto;
-  margin-top: 0.5rem;
-  box-shadow: none;
-  font-size: 0.9rem;
-  transform: none;
-  transition: border-color 0.25s ease;
 
-  &:not(.is-on) {
-    display: none;
-  }
-
-  .dgm-banner-head {
-    font-size: 0.8rem;
-  }
-
-  .dgm-banner-text {
-    max-height: none;
-    overflow: visible;
-
-    p {
-      margin-bottom: 0.45rem;
-    }
-  }
-}
-
-// Response packets (path hops marked ~) are green and travel backwards.
-.dgm-pointer.is-back {
-  .dgm-halo {
-    fill: #22c55e;
-  }
-
-  .dgm-head {
-    fill: #22c55e;
-  }
-}
-
-// Celebration when a request succeeds (or fails).
-.dgm-burst-ring {
-  fill: none;
-  stroke-width: 3;
-}
-
-.dgm-burst-mark {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.dgm-node.is-winning .dgm-disc {
-  animation: dgm-win 0.7s ease-out 2;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.dgm-node.is-failing {
-  animation: dgm-shake 0.45s ease-in-out 2;
-}
-
-// Lock mode: a hop hidden inside a closed component (or on an arrow the view tab hides) pulses it.
-.dgm-node.is-pulsing .dgm-disc,
-.dgm-group.is-pulsing .dgm-frame {
-  animation: dgm-pulse 0.9s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-@keyframes dgm-pulse {
-  50% {
-    stroke: var(--dgm-accent2);
-    stroke-width: 4;
-    filter: drop-shadow(0 0 6px var(--dgm-accent2));
-  }
-}
-
-.dgm-btn-lock[aria-pressed="true"] {
-  border-color: var(--dgm-accent);
-  background: color-mix(in srgb, var(--dgm-accent) 16%, var(--main-bg));
-  color: var(--dgm-accent);
-}
-
-@keyframes dgm-win {
-  50% {
-    transform: scale(1.18);
-    stroke-width: 4;
-  }
-}
-
-@keyframes dgm-shake {
-  20%,
-  60% {
-    translate: -4px 0;
-  }
-
-  40%,
-  80% {
-    translate: 4px 0;
-  }
-}
-
-.dgm-toggle-mode[hidden],
-.dgm-toggle-details[hidden] {
-  display: none;
-}
-
-.dgm-controls {
+// The player: a tab hanging from the top edge of the canvas (play state, step n/N, a chevron). Hovering
+// it (or a click, or keyboard focus) drops the controls down under it; they fold back up when the pointer
+// leaves and when a use case starts playing.
+.dgm-player {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 6;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  // Only the tab and the open controls take the pointer: the folded drawer must not cover the view tabs.
+  pointer-events: none;
+  transform: translateX(-50%);
 
   &[hidden] {
     display: none;
   }
 }
 
-.dgm-dots {
-  display: flex;
-  flex: 1 1 8rem;
-  gap: 0.25rem;
+.dgm-player-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 8.5rem;
+  height: 1.45rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--dgm-border);
+  border-top: 0;
+  border-radius: 0 0 0.6rem 0.6rem;
+  background: color-mix(in srgb, var(--main-bg) 92%, transparent);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 10%);
+  color: var(--dgm-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+
+  .dgm-player-state {
+    color: var(--dgm-accent);
+  }
+
+  .dgm-player-n {
+    color: var(--dgm-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dgm-player-chev {
+    transition: transform 0.2s ease;
+  }
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--dgm-accent);
+  }
 }
 
-.dgm-dot {
-  flex: 1;
-  height: 1rem;
-  padding: 0.3rem 0;
-  border: 0;
+.dgm-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: min(44rem, calc(100vw - 2rem));
+  margin-top: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--main-bg) 96%, transparent);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.5rem);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  visibility: hidden;
+}
+
+.dgm-player.is-open {
+  .dgm-controls {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    visibility: visible;
+  }
+
+  .dgm-player-chev {
+    transform: rotate(180deg);
+  }
+}
+
+.dgm-step-n {
+  min-width: 4.2rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 1rem;
-  background: var(--dgm-border);
-  background-clip: content-box;
-  cursor: pointer;
+  background: color-mix(in srgb, var(--dgm-accent) 16%, var(--main-bg));
+  color: var(--dgm-ink);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
 
-  &.is-done {
-    background-color: color-mix(in srgb, var(--dgm-accent) 55%, transparent);
-  }
 
-  &.is-current {
-    background-color: var(--dgm-accent);
-  }
+.dgm-toggle-mode[hidden],
+.dgm-toggle-details[hidden] {
+  display: none;
 }
 
 .dgm-toggle-mode,
@@ -1526,21 +1692,13 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
     min-height: 0;
   }
 
-  .dgm-scenarios {
+  .dgm-side {
     max-height: none;
   }
 
   .dgm-legend,
-  .dgm-caption,
-  .dgm-controls,
-  .dgm-banner.is-below {
+  .dgm-caption {
     flex: none;
-  }
-
-  // Full screen keeps most of the height for the canvas: a long description scrolls inside the card.
-  .dgm-banner.is-below .dgm-banner-text {
-    max-height: 24vh;
-    overflow-y: auto;
   }
 }
 
