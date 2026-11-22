@@ -9,8 +9,10 @@
  * script errors, full width, no foreign styling, no raw Markdown leaking from the post, and at every
  * level no two components overlap (pills on top of components are reported too). On light desktop it
  * also clicks through: expand a component, hover an arrow (protocol card), open a detail panel, zoom,
- * the start level, and (if the diagram has one) the tour. Screenshots: <view>-level<N>.png, card.png,
- * panel.png, edge-panel.png, expanded.png, tour.png. Exit code 1 if any check fails.
+ * the start level, the sidebar (menus, buttons at its foot, folding), the zoom lock and (if the diagram
+ * has one) the player and the tour. Screenshots: <view>-level<N>.png, card.png, panel.png, edge-panel.png,
+ * expanded.png, sidebar.png, zoom-locked.png, player-open.png, tour.png, collapsed.png. Exit code 1 if
+ * any check fails.
  */
 const path = require('path');
 const fs = require('fs');
@@ -139,7 +141,8 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       await page.waitForFunction((s) => !document.querySelector(s).classList.contains('is-stepping'), sel, { timeout: 30000 });
       await page.waitForTimeout(900);
       const stage = await (await page.$(`${sel} .dgm-stage`)).boundingBox();
-      const tabsBox = await page.$(`${sel} .dgm-views`).then((t) => (t ? t.boundingBox() : null));
+      // The player's tab hangs from the top of the canvas: only what is below it counts as in view.
+      const tabsBox = await page.$(`${sel} .dgm-player-handle`).then((t) => (t ? t.boundingBox() : null));
       const topClear = tabsBox ? tabsBox.y + tabsBox.height - stage.y + 8 : 10;
       const visible = async (css) => {
         for (const el of await page.$$(`${sel} ${css}`)) {
@@ -263,22 +266,82 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await page.click(`${sel} .dgm-vtab[data-view=""]`);
         await page.waitForTimeout(1500);
       }
+      // Sidebar: Levels, Views (if any) and Use cases (if more than one) are collapsible menus; the zoom,
+      // Fit and fullscreen buttons sit at its foot and stay in view.
+      const side = await page.$eval(sel, (f) => ({
+        menus: [...f.querySelectorAll('.dgm-menu')].map((m) => m.className.match(/dgm-menu-(\w+)/)[1]),
+        foot: [...f.querySelectorAll('.dgm-side-foot [data-act]')].map((b) => b.dataset.act),
+        tabsOnCanvas: !!f.querySelector('.dgm-stage .dgm-vtab, .dgm-toolbar')
+      }));
+      check(side.menus[0] === 'levels' && !side.tabsOnCanvas && ['zoom-in', 'zoom-out', 'fit', 'full'].every((a) => side.foot.includes(a)),
+        `sidebar menus ${side.menus.join(', ')}; ${side.foot.join(', ')} at its foot; nothing on top of the canvas`);
+      const head = await page.$(`${sel} .dgm-menu-levels .dgm-menu-head`);
+      await head.click();
+      const shut = await page.$eval(`${sel} .dgm-menu-levels .dgm-menu-items`, (x) => !x.offsetParent);
+      await head.click();
+      const back = await page.$eval(`${sel} .dgm-menu-levels .dgm-menu-items`, (x) => !!x.offsetParent);
+      check(shut && back, 'a menu head folds and unfolds its items');
+      await fig.screenshot({ path: path.join(args.out, 'sidebar.png') });
       // Zoom.
       const t0 = await page.$eval(`${sel} .dgm-view`, (g) => g.getAttribute('transform'));
       await page.click(`${sel} [data-act="zoom-in"]`);
       await page.waitForTimeout(300);
       check((await page.$eval(`${sel} .dgm-view`, (g) => g.getAttribute('transform'))) !== t0, 'zoom button changes the view');
+      // Zoom lock: the zoom buttons, Ctrl + scroll and Fit keep the scale; unlocking zooms again.
+      const scale = () => page.$eval(`${sel} .dgm-view`, (g) => +/scale\(([^)]+)\)/.exec(g.getAttribute('transform'))[1]);
+      await page.click(`${sel} [data-act="zoom-lock"]`);
+      const k0 = await scale();
+      const btnOff = await page.$eval(`${sel} [data-act="zoom-in"]`, (b) => b.disabled);
+      const st = await page.$(`${sel} .dgm-stage`);
+      const sb = await st.boundingBox();
+      await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+      await page.keyboard.down('Control');
+      await page.mouse.wheel(0, -400);
+      await page.keyboard.up('Control');
+      await page.click(`${sel} [data-act="fit"]`);
+      await page.waitForTimeout(700);
+      check(btnOff && Math.abs((await scale()) - k0) < 1e-3, 'zoom lock holds the scale (buttons off, Ctrl + scroll and Fit only pan)');
+      await (await page.$(`${sel} .dgm-side-foot`)).screenshot({ path: path.join(args.out, 'zoom-locked.png') });
+      await page.click(`${sel} [data-act="zoom-lock"]`);
+      await page.click(`${sel} [data-act="zoom-in"]`);
+      await page.waitForTimeout(300);
+      check(Math.abs((await scale()) - k0) > 1e-3, 'unlocking the zoom lets the buttons zoom again');
+      // The player is a drawer at the top of the canvas: hover its tab to open it, then press a control.
+      const openPlayer = async () => {
+        await page.hover(`${sel} .dgm-player-handle`);
+        await page.waitForSelector(`${sel} .dgm-player.is-open .dgm-controls`, { state: 'visible', timeout: 3000 });
+      };
+      const ctl = async (a) => {
+        await openPlayer();
+        await page.click(`${sel} .dgm-controls [data-act="${a}"]`);
+      };
+      const goStep = (k) => page.$eval(sel, (f, i) => { f._dgm.stop(); f._dgm.showStep(i, true); }, k);
+      const stepCount = () => page.$eval(sel, (f) => f._dgm.steps.length);
       // A diagram with `lock: true` opens locked: note it, and unlock for the unlocked checks below
       // (the lock-mode check turns it on again, and it is put back at the end).
       const startLocked = info.tour && (await page.$eval(`${sel}`, (f) => !!f.querySelector('[data-act="lock"][aria-pressed="true"]')));
       if (startLocked) {
         note('opens in lock mode (`lock: true`); unlocking for the unlocked use-case checks');
-        await page.click(`${sel} [data-act="lock"]`);
+        await ctl('lock');
         await page.waitForTimeout(600);
         check(await page.$eval(`${sel} [data-act="lock"]`, (b) => b.getAttribute('aria-pressed') === 'false'), 'the padlock turns lock mode off');
       }
       // Use cases close the open groups they don't use, and put the reader's layout back afterwards.
       if (info.tour) {
+        // Closed by default (and again once the pointer leaves); hovering the tab opens it; playing folds it away.
+        await page.mouse.move(2, 2);
+        await page.waitForTimeout(700);
+        check(!(await page.$eval(`${sel} .dgm-player`, (x) => x.classList.contains('is-open'))), 'the player is folded into its tab at the top of the canvas');
+        await openPlayer();
+        const pos = await page.$eval(sel, (f) => {
+          const st = f.querySelector('.dgm-stage').getBoundingClientRect();
+          const c = f.querySelector('.dgm-controls').getBoundingClientRect();
+          return { top: c.top - st.top, dots: !!f.querySelector('.dgm-dot'), cap: !!f.querySelector('.dgm-caption:not([hidden])'), n: f.querySelector('.dgm-step-n').textContent };
+        });
+        check(pos.top < 80 && !pos.dots && !pos.cap, `hovering the tab drops the controls down at the top (${Math.round(pos.top)}px), with a step count (${pos.n}) and no step dots or caption`);
+        await fig.screenshot({ path: path.join(args.out, 'player-open.png') });
+        const intro = await page.$eval(`${sel} .dgm-banner`, (b) => b.classList.contains('is-on') && b.classList.contains('is-intro') && b.textContent.length > 20);
+        check(intro, 'before the first step the card introduces the use case');
         const lvls = await page.$$(`${sel} .dgm-lvl`);
         await lvls[lvls.length - 1].click();
         await page.waitForFunction((s) => !document.querySelector(`${s}.is-stepping`), sel, { timeout: 20000 }).catch(() => {});
@@ -286,13 +349,13 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         const openGroups = () => page.$$eval(`${sel} [data-kind="group"]`, (x) => x.length);
         const before = await openGroups();
         await page.click(`${sel} .dgm-scn`).catch(() => {});
-        await page.click(`${sel} [data-act="next"]`);
+        await ctl('next');
         await page.waitForTimeout(1500);
         const during = await openGroups();
         const hidden = await page.$$eval(`${sel} .is-faded`, (x) => x.length);
         const tabOn = await page.$eval(`${sel} .dgm-vtab.is-on`, (b) => b.dataset.view).catch(() => null);
         check(hidden === 0 && (tabOn === '*' || !tabs.length), `while a use case runs Show all is on and nothing is faded (${hidden} faded, tab ${tabOn})`);
-        await page.click(`${sel} [data-act="prev"]`);
+        await ctl('prev');
         await page.waitForTimeout(1500);
         const after = await openGroups();
         if (during < before) check(true, `a use case closes groups it doesn't use (${before} → ${during} open)`);
@@ -325,16 +388,16 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
             pos: [...f.querySelectorAll('.dgm-node')].map((n) => `${n.dataset.id}@${n.style.transform}`).sort().join('|'),
           }));
         const before = await layout();
-        await page.click(`${sel} [data-act="lock"]`);
+        await ctl('lock');
         await page.waitForTimeout(300);
         check(await page.$eval(`${sel} [data-act="lock"]`, (b) => b.getAttribute('aria-pressed') === 'true'), 'the padlock turns lock mode on');
         await page.click(`${sel} .dgm-scn`).catch(() => {});
         await page.waitForTimeout(600);
-        const steps = Math.min(4, (await page.$$(`${sel} .dgm-dot`)).length);
+        const steps = Math.min(4, await stepCount());
         let same = true;
         let moved = false;
         for (let i = 0; i < steps; i++) {
-          await page.click(`${sel} [data-act="next"]`);
+          await ctl('next');
           const ran = await page
             .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer, ${s} .is-pulsing`), sel, { timeout: 6000, polling: 50 })
             .then(() => true, () => false);
@@ -347,13 +410,13 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         check(same, `lock mode keeps the layout through ${steps} step(s) (open groups: ${before.open || 'none'})`);
         check(moved, 'lock mode still moves a packet (or pulses a closed component)');
         for (let i = 0; i <= steps; i++) {
-          await page.click(`${sel} [data-act="prev"]`);
+          await ctl('prev');
           await page.waitForTimeout(150);
         }
         await page.waitForTimeout(1200);
         check((await layout()).open === before.open, 'rewinding a locked use case leaves the layout as it was');
         if (!startLocked) {
-          await page.click(`${sel} [data-act="lock"]`);
+          await ctl('lock');
           await page.waitForTimeout(600);
         }
       }
@@ -361,12 +424,12 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       if (info.tour) {
         const scn = await page.$$(`${sel} .dgm-scn`);
         if (scn.length > 1) {
-          const t0 = await page.$eval(`${sel} .dgm-step-title`, (x) => x.textContent);
+          const t0 = await page.$eval(`${sel} .dgm-banner-title`, (x) => x.textContent);
           await scn[1].click();
           await page.waitForTimeout(1200);
-          check((await page.$eval(`${sel} .dgm-step-title`, (x) => x.textContent)) !== t0, `use-case picker switches scenario (${scn.length} use cases)`);
+          check((await page.$eval(`${sel} .dgm-banner-title`, (x) => x.textContent)) !== t0, `use-case picker switches scenario (${scn.length} use cases)`);
         }
-        await page.click(`${sel} [data-act="next"]`);
+        await ctl('next');
         const stepped = await page
           .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 8000, polling: 50 })
           .then(() => true, () => false);
@@ -396,29 +459,41 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
             await pickers[found.i].click();
             await page.waitForTimeout(1200);
           }
-          const dots = await page.$$(`${sel} .dgm-dot`);
           const withDetail = found ? found.k : -1;
-          if (withDetail >= 0 && dots[withDetail]) {
+          if (withDetail >= 0) {
             const wasOn = await box.isChecked();
-            if (!wasOn) await box.click();
-            await dots[withDetail].click();
+            const width = () => page.$eval(`${sel} .dgm-banner`, (b) => b.getBoundingClientRect().width);
+            await goStep(withDetail);
             await page.waitForTimeout(2500);
-            const card = await page.$eval(`${sel} .dgm-banner`, (b) => ({ on: b.classList.contains('is-detailed'), len: b.querySelector('.dgm-banner-text').textContent.length,
-              below: !b.closest('.dgm-stage') && b.classList.contains('is-below'), full: b.getBoundingClientRect().width >= b.closest('.dgm').getBoundingClientRect().width - 40 }));
+            const w0 = await width();
+            if (!wasOn) {
+              await openPlayer();
+              await box.click();
+            }
+            await page.waitForTimeout(400);
+            const card = await page.$eval(`${sel} .dgm-banner`, (b) => {
+              const st = b.closest('.dgm-stage').getBoundingClientRect();
+              const r = b.getBoundingClientRect();
+              return { on: b.classList.contains('is-detailed'), len: b.querySelector('.dgm-banner-text').textContent.length, inside: r.bottom <= st.bottom && r.height < st.height * 0.6, h: r.height, scn: b.querySelector('.dgm-banner-scn').textContent };
+            });
             check(card.on && card.len > 60, `Details shows the step's longer description (${card.len} chars)`);
-            check(card.below && card.full, 'with Details on, the card sits under the canvas at the figure\'s full width');
+            check(card.inside && (await width()) >= w0, `with Details on, the same card on the canvas grows a little (${Math.round(card.h)}px high)`);
             await fig.screenshot({ path: path.join(args.out, 'step-details.png') });
+            await openPlayer();
             await box.click();
             await page.waitForTimeout(300);
             const off = await page.$eval(`${sel} .dgm-banner`, (b) => ({ long: b.classList.contains('is-detailed'), inside: !!b.closest('.dgm-stage') }));
             check(!off.long && off.inside, 'unticking Details goes back to the short text, on the canvas');
-            if (wasOn) await box.click();
+            if (wasOn) {
+              await openPlayer();
+              await box.click();
+            }
           } else note('Details box shown, but no use case has a step with `detail` in its first mode');
         } else note('no step has `detail`, so there is no Details box');
         // The last step of the first use case: its outcome is celebrated.
         await page.click(`${sel} .dgm-scn`).catch(() => {});
         await page.waitForTimeout(600);
-        await page.click(`${sel} .dgm-dot:last-child`);
+        await goStep((await stepCount()) - 1);
         const won = await page
           .waitForFunction((s) => document.querySelector(`${s} .dgm-burst`) && /is-(success|done|fail)/.test(document.querySelector(`${s} .dgm-banner`).className), sel, { timeout: 20000, polling: 100 })
           .then(() => true, () => false);
@@ -426,19 +501,37 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await page.waitForTimeout(250);
         await fig.screenshot({ path: path.join(args.out, 'outcome.png') });
         await page.waitForTimeout(2500);
-        await page.click(`${sel} [data-act="prev"]`);
+        await ctl('prev');
         await page.waitForTimeout(300);
         await page.click(`${sel} .dgm-scn`).catch(() => {});
         await page.waitForTimeout(800);
-        await page.click(`${sel} [data-act="play"]`);
+        await ctl('play');
         const moved = await page
           // a first step with no packet stays up to 25 s while Details is on (reading time), so wait past that
           .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 40000, polling: 100 })
           .then(() => true, () => false);
         check(moved, 'tour plays (a pointer travels an arrow)');
+        await page.mouse.move(5, 5);
+        await page.waitForTimeout(700);
+        check(!(await page.$eval(`${sel} .dgm-player`, (x) => x.classList.contains('is-open'))), 'the player folds away while the use case plays');
         await page.waitForTimeout(600);
         await fig.screenshot({ path: path.join(args.out, 'tour.png') });
-        await page.click(`${sel} [data-act="play"]`);
+        await ctl('play');
+        // Collapsing the use-case sidebar and the player gives their room to the canvas; both come back.
+        const stageW = () => page.$eval(`${sel} .dgm-stage`, (x) => x.clientWidth);
+        const hasNav = await page.$(`${sel} [data-act="side-collapse"]`).then((x) => x && x.isVisible());
+        if (hasNav) {
+          const w0 = await stageW();
+          await page.click(`${sel} [data-act="side-collapse"]`);
+          await page.waitForTimeout(200);
+          const w1 = await stageW();
+          const scnHidden = await page.$$eval(`${sel} .dgm-scn`, (xs) => xs.every((x) => !x.offsetParent));
+          check(w1 > w0 + 50 && scnHidden, `folding the sidebar widens the canvas (${w0} → ${w1}px)`);
+        }
+        const foot = await page.$$eval(`${sel} .dgm-side-foot .dgm-btn`, (xs) => xs.filter((x) => x.offsetParent).length);
+        check(foot >= 4, `the folded sidebar keeps the zoom, Fit and fullscreen buttons (${foot})`);
+        await fig.screenshot({ path: path.join(args.out, 'collapsed.png') });
+        if (hasNav) await page.click(`${sel} [data-act="side-collapse"]`);
       }
     }
     if (v.interact) {
@@ -447,9 +540,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       await page.waitForTimeout(900);
       const vh = page.viewportSize().height;
       const sh = await page.$eval(`${sel} .dgm-stage`, (x) => x.getBoundingClientRect().height);
-      // With Details on, the step card sits under the canvas and takes its share of the height.
-      const ch = await page.$eval(`${sel}`, (f) => f.querySelector(':scope > .dgm-banner.is-below.is-on')?.getBoundingClientRect().height || 0);
-      check(sh + ch > vh * 0.6, `fullscreen gives the canvas the window's height (${Math.round(sh)}${ch ? ` + card ${Math.round(ch)}` : ''} of ${vh}px)`);
+      check(sh > vh * 0.6, `fullscreen gives the canvas the window's height (${Math.round(sh)} of ${vh}px)`);
       await fig.screenshot({ path: path.join(args.out, 'fullscreen.png') });
       await page.keyboard.press('Escape');
       await page.waitForTimeout(600);
