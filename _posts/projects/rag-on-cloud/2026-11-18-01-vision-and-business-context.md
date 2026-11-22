@@ -79,10 +79,11 @@ Two personas, and neither is a "customer":
 - **The reader with a question.** Wants to ask "how did you set up split DNS for the homelab?" and get an answer
   with a link to the post that explains it. This is the user the chat endpoint is built for.
 
-> **TODO:** Is the hosted API only for me, or should readers of the blog be able to try it? A public demo needs
-> rate limits, abuse protection and a cost cap, and it changes the sign-in design in
-> [Identity and access](/posts/projects/rag-on-cloud/05-technical-architecture/#identity-and-access-architecture).
-{: .prompt-warning }
+**The API stays owner-only** (decided 2026-11-23). Readers get the published results, the comparison
+tables and the ADRs, not a live endpoint. An open endpoint in front of pay-per-token models needs rate limits, abuse
+handling and a hard cost cap, and building those isn't what this lab is about. If that changes, the design is sign-in
+for readers through Container Apps authentication with Entra External ID, a per-user daily question quota in the API,
+and the budget scaling the app to zero when it's hit.
 
 ## Success metrics and business KPIs
 {: #success-metrics-and-business-kpis }
@@ -129,7 +130,7 @@ a folder per cloud. The last phase compares all three and the homelab on one que
 {: #checklist }
 
 - [ ] The comparison table, not the chat endpoint, is agreed as the main deliverable
-- [ ] Personas confirmed: owner-only API or a public demo
+- [x] Personas confirmed: owner-only API (2026-11-23)
 - [ ] Success metrics have targets after the first baseline run
 - [ ] Corpus fixed as the blog's public posts (ADR 0002)
 - [ ] The homelab dependency (platform Phase 5) is tracked in the roadmap

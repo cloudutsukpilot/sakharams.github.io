@@ -31,7 +31,7 @@ Press play to follow a post from publication to an answer; tick the box for the 
 | Component | Role | Built from |
 |---|---|---|
 | Corpus sync | Uploads changed posts with their metadata | GitHub Actions workflow in the lab repo |
-| Blob container `corpus` | Raw Markdown, one blob per post | Storage account, shared key off |
+| Blob container `posts` | Raw Markdown, one blob per post | Storage account, shared key off |
 | Search indexer and skillset | Reads blobs, splits text, calls the embedding model, writes chunks | Azure AI Search (Foundry IQ), Basic |
 | Index | Chunk text, vector, title, URL, date, tags; vectorizer; semantic configuration | JSON in the lab repo |
 | Knowledge base | Agentic retrieval over the same index | Foundry IQ, REST `2026-10-01` |
@@ -47,8 +47,8 @@ Press play to follow a post from publication to an answer; tick the box for the 
 | Need | Choice | Why, and what I passed over |
 |---|---|---|
 | Retrieval | Azure AI Search | Hybrid search, semantic ranker, integrated vectorization and knowledge bases in one service. A vector-only store (Cosmos DB, Postgres with pgvector) would need the ranker and agentic layer built by hand |
-| Embedding model | `text-embedding-3-small` (proposed) | Cheap, well supported by the embedding skill and vectorizer |
-| Chat model | Open | See the TODO below |
+| Embedding model | `text-embedding-3-small`, `Standard` deployment | Cheap, well supported by the embedding skill and vectorizer |
+| Chat model | `gpt-5-mini`, `DataZoneStandard` deployment (ADR 0013) | Small and cheap, and answers here are short and grounded in retrieved chunks. The platform's terraform-drift agent is priced against the same model. A bigger model only if the golden set shows generation, not retrieval, is the weak part |
 | Orchestrator | A plain FastAPI pipeline in the shared core; Microsoft Agent Framework for the Azure agent mode (ADR 0006, proposed) | A fixed search-then-generate sequence needs no framework and must run on every cloud; Microsoft's agentic RAG guidance uses Agent Framework, and Semantic Kernel's agent features moved into it |
 | Hosting | Container Apps, consumption | Scales to zero, managed identity, built-in Entra sign-in. App Service would bill idle |
 | IaC | Terraform through the platform's shared module (ADR 0003) | Same scanners, state and review as every other Azure stack; azd would be faster but bypasses that |
@@ -70,9 +70,8 @@ class AgentMode(Protocol):
     def answer(self, question: str) -> Answer: ...
 ```
 
-> **TODO:** Which chat model should the lab deploy? It has to be available in the chosen region, support tool
-> calling for the agent modes, and be priced for a few hundred eval questions per run.
-{: .prompt-warning }
+Neither model uses the `GlobalStandard` deployment type. The tenant the lab runs in denies it with an Azure Policy
+(ADR 0012), and in `eastus` gpt-5-mini is offered as `DataZoneStandard` (US data zone) but not as regional `Standard`.
 
 ## API and integration architecture
 {: #api-and-integration-architecture }
@@ -145,13 +144,19 @@ Keyless, end to end (ADR 0004):
 | Caller | Target | Identity | Role |
 |---|---|---|---|
 | Me (CLI, `make index`, eval) | Search | Entra user | Search Service Contributor, Search Index Data Contributor |
-| Me | Foundry project | Entra user | Azure AI User (to verify the current role name) |
-| Search indexer | Storage | Search system-assigned identity | Storage Blob Data Reader |
-| Search skillset and vectorizer | Foundry embedding deployment | Search system-assigned identity | Cognitive Services OpenAI User |
+| Me | Foundry project | Entra user | Foundry User (the built-in role formerly called Azure AI User) |
+| Search indexer | Storage | Search's user-assigned identity `dv-id-rag-search-01` | Storage Blob Data Reader |
+| Search skillset and vectorizer | Foundry embedding deployment | Search's user-assigned identity | Cognitive Services OpenAI User |
 | rag-api | Search | User-assigned identity | Search Index Data Reader |
-| rag-api | Foundry models and agent | User-assigned identity | Cognitive Services OpenAI User, Azure AI User |
+| rag-api | Foundry models and agent | User-assigned identity | Cognitive Services OpenAI User, Foundry User |
 | Knowledge base MCP connection | Search | Foundry project managed identity | Search Index Data Reader |
 | GitHub Actions | Storage, registry | Federated credential (OIDC) | Storage Blob Data Contributor, AcrPush |
+
+Search uses a user-assigned identity rather than a system-assigned one so that its role assignments can exist
+before the service does: the Search service is removed and recreated between sessions (ADR 0008), and a
+system-assigned identity would come back with a new principal and no roles. The first six rows are applied
+(2026-11-22), at resource-group scope for now because the role-assignment module has no Search or Foundry scope yet;
+the group holds only this lab. The rest arrive with the API in Phase 1.
 
 Callers of the API sign in with Entra ID through Container Apps' built-in authentication. More in
 [Security and Privacy](/posts/projects/rag-on-cloud/06-security-and-privacy/#authentication-and-authorization).
@@ -159,8 +164,10 @@ Callers of the API sign in with Entra ID through Container Apps' built-in authen
 ## Hosting and deployment model
 {: #hosting-and-deployment-model }
 
-Everything sits in one new resource group in the dev subscription, in a single region, defined in an
-`infra-azure` stack beside the existing Foundry stack. Application code ships as a container image to a
+Everything sits in one resource group, `dv-rg-rag-01`, in a sandbox subscription in a separate Entra tenant
+(ADR 0012), in a single region, defined in an `infra-azure` stack beside the platform's other Azure stacks. The
+stack has been applied since 2026-11-22; what it holds is in
+[Infrastructure and Environments](/posts/projects/rag-on-cloud/11-infrastructure-and-environments/#compute-storage-and-databases). Application code ships as a container image to a
 registry, pulled by Container Apps with its managed identity. Index objects deploy separately through
 `make index`, because they're data-plane objects the Terraform provider doesn't manage.
 
@@ -198,7 +205,7 @@ The decisions live as MADR files in the lab's own repo and are published here.
 {: #checklist }
 
 - [ ] One index serves every answer mode
-- [ ] Chat model chosen and recorded in an ADR
+- [x] Chat model chosen and recorded in an ADR (0013)
 - [ ] Region feature check done
 - [ ] Every role assignment in the identity table is in Terraform
 - [ ] Container Apps sign-in rejects anonymous calls

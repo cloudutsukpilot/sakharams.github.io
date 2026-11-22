@@ -40,26 +40,30 @@ later.
 ## Authentication and authorization
 {: #authentication-and-authorization }
 
-All authentication is Entra ID; all authorization is Azure RBAC on the narrowest scope that works (the service,
-not the resource group). The full table of callers, identities and roles is in
+All authentication is Entra ID; all authorization is Azure RBAC. The target is the narrowest scope that works (the
+service, not the resource group). Today the roles sit on the lab's resource group, because the platform's
+role-assignment module can't scope to a Search service or a Foundry account yet; the group holds nothing but this
+lab, so the difference is small, and it's on the list for the module. The full table of callers, identities and roles is in
 [Technical Architecture](/posts/projects/rag-on-cloud/05-technical-architecture/#identity-and-access-architecture).
 
 For the API itself, Container Apps' built-in authentication validates the Entra token before the request reaches
 the code, and the app checks one app role (`RagLab.Ask`) so that a signed-in account from the tenant isn't
 enough on its own.
 
-> **TODO:** If the API becomes a public demo (an open question in
-> [Vision](/posts/projects/rag-on-cloud/01-vision-and-business-context/#target-users-and-personas)), this section
-> needs a different model: anonymous access with rate limits and a cost cap, or sign-in for readers.
-{: .prompt-warning }
+**The API stays owner-only** (decided 2026-11-23). Readers of the blog get the published results, the comparison
+tables and the ADRs, not a live endpoint. An open endpoint in front of pay-per-token models needs rate limits, abuse
+handling and a hard cost cap, and building those isn't what this lab is about. If that changes, the design is sign-in
+for readers through Container Apps authentication with Entra External ID, a per-user daily question quota in the API,
+and the budget scaling the app to zero when it's hit.
 
 ## Secrets and key management
 {: #secrets-and-key-management }
 
 There are no application secrets to manage, which is the point of ADR 0004:
 
-- Foundry and Search: `local_auth_enabled = false` / local authentication disabled.
-- Storage: shared-key access off, so no connection strings.
+- Foundry, Search and Application Insights: local authentication disabled (`local_auth_enabled = false`,
+  `local_authentication_enabled = false`), so there are no API keys to leak or rotate.
+- Storage: shared-key access off and OAuth the default, so no connection strings or SAS tokens.
 - GitHub Actions: federated credentials (OIDC) for Azure; no client secret.
 - Container registry: admin user off; pulls by managed identity.
 
@@ -81,12 +85,20 @@ Two stages (ADR 0005):
 
 | Phases | Posture |
 |---|---|
-| 0–4 | Public endpoints, every call authenticated with Entra ID. Search's IP firewall limited to my egress address where it doesn't block the managed-identity paths |
-| 5 | Private endpoints for Foundry, Search and Storage; shared private links for the indexer; Container Apps inside the dev network; public access off; private DNS zones beside the existing AI zones |
+| 0–4 | Public endpoints, every call authenticated with Entra ID. No IP firewall: my home address changes, and a default-deny rule would block local runs |
+| 5 | Private endpoints for Foundry, Search and Storage; shared private links for the indexer; Container Apps inside a VNet; public access off; private DNS zones. All of it new in the lab's own subscription: the platform's network and DNS zones are in another tenant (ADR 0012) |
 
-> **TODO:** In Phase 5, how will I reach the private API for testing: a jump host, a point-to-site VPN, or a
-> route from the homelab?
-{: .prompt-warning }
+The public endpoints aren't an oversight, and the scanners know it. Trivy flags the storage account's network rules
+(AZU-0012), and the platform accepts that finding for its whole GitHub organisation, with the reason, in one file in
+the shared module rather than per stack. More in
+[Vulnerability and dependency management](#vulnerability-and-dependency-management).
+
+**Testing the private API in Phase 5** (decided 2026-11-23): a Container Apps job in the same VNet runs the
+smoke test and the eval against the private endpoints, started from my machine with `az containerapp job start`. It
+costs nothing between runs, unlike a point-to-site VPN gateway or Bastion, which bill every hour. A route from the
+homelab is out: the stack lives in a separate tenant, and a site-to-site VPN to it would be more infrastructure than
+the lab it serves. For the rare interactive session, a small VM in the subnet goes in and out through a PR, the same
+way the Search service does.
 
 ## Input validation and secure coding
 {: #input-validation-and-secure-coding }
@@ -103,7 +115,22 @@ Two stages (ADR 0005):
 
 Dependencies are pinned with `uv` lock files; Dependabot raises updates; the container image is scanned in CI
 before it's pushed. Agent Framework and the Azure AI SDKs move fast and include preview packages, so upgrades get
-an eval run before merge, not just tests. Terraform goes through the platform's existing scanners on every plan.
+an eval run before merge, not just tests.
+
+Terraform goes through the platform's gates on every plan, locally and in CI: Trivy for misconfigurations and OPA for
+policy (tags, regions, SKUs). For this stack, three Trivy findings on the storage account are accepted rather than
+fixed, each with a reason, in the platform's per-organisation exceptions file:
+
+| Finding | What Trivy wants | Why it's accepted |
+|---|---|---|
+| AZU-0012 | Network rules default to deny | Public endpoint with Entra ID only, until Phase 5 (ADR 0005) |
+| AZU-0057 | Storage analytics logging | Diagnostics off by the organisation's cost preference; turned on per resource when debugging |
+| AZU-0061 | Infrastructure (double) encryption | Platform-managed encryption at rest is on; a second layer isn't needed for public posts |
+
+One OPA policy exists because of this lab. The tenant it runs in denies `GlobalStandard` model deployments with an
+Azure Policy, and that rule only fires at apply, after the rest of the stack has been created. The platform now
+repeats the rule as a mandatory OPA policy for that tenant, so a plan fails before anything is created
+([lesson L002](/posts/projects/rag-on-cloud/lessons-learned/#lesson-l002)).
 
 ## Privacy and data-protection requirements
 {: #privacy-and-data-protection-requirements }
@@ -120,12 +147,13 @@ The corpus is public posts (ADR 0002). Two privacy edges remain:
 | Source | What it records | Retention |
 |---|---|---|
 | Activity log | Control-plane changes (who created or deleted Search) | Azure default |
-| Search resource logs | Queries and indexing operations | Log Analytics |
-| Storage logs | Blob reads and writes | Log Analytics |
-| Application Insights | Each request, its mode and the caller's object ID | Log Analytics |
+| Search resource logs | Queries and indexing operations | Log Analytics, once a diagnostic setting is added |
+| Storage logs | Blob reads and writes | Log Analytics, once a diagnostic setting is added |
+| Application Insights | Each request, its mode and the caller's object ID | Log Analytics `dv-log-rag-01` |
 
-> **TODO:** Log Analytics retention for the lab: the default, or longer to keep months of eval traces?
-{: .prompt-warning }
+Retention is 30 days in both the workspace and Application Insights, with a 1 GB daily cap on ingestion. Eval results
+are what I want to keep for months, and they live in the lab repo, not in logs. The resource logs aren't flowing yet:
+diagnostics stay off until there's something to debug, because ingestion is the part of Log Analytics that costs.
 
 ## Security testing and incident response
 {: #security-testing-and-incident-response }
@@ -147,7 +175,7 @@ remove the Search service and scale the app to zero through a PR, then look at t
 - [ ] API rejects anonymous and wrong-role calls
 - [ ] Agent iteration and time limits configured
 - [ ] Prompt-injection questions in the golden set
-- [ ] Budget alert live before the first agentic run
+- [x] Budget alert live before the first agentic run (100 a month, applied 2026-11-23)
 - [ ] Phase 5 test access path decided
 
 {% include project-nav.html %}
