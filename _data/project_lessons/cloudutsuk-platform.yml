@@ -1035,3 +1035,14 @@ lessons:
     cause: "The working set Kubernetes reports is usage minus inactive file cache, so it includes the active file cache: the Chromium binary and the browser profile, read during the search and charged to the container. That cache isn't freed when the browser exits; it stays on the active list until the kernel ages it to the inactive list, and only then does the working set drop. The process memory (RSS) was back to 100-140 MiB within 5 minutes every time."
     fix: "None needed: the cache is reclaimable, and the container never came near an OOM kill. The check now looks at RSS next to the working set."
     lesson: "Before chasing a leak in a container's working set, split it into RSS and active file cache (container_memory_rss, container_memory_total_active_file_bytes). If the extra is all active file cache, it's the kernel keeping pages it may reuse, not your process holding memory."
+
+  - id: L096
+    date: 2026-11-22
+    step: "Phase 2, step 2e"
+    title: "A Helm chart's rules setting rendered nothing in the mode we run, and said nothing"
+    tags: [loki, helm, logs, alerting]
+    symptom: "Counting log lines per workload needs Loki's ruler, and the Loki chart has a values key for rule files. Set in our single-process install, it would have mounted a ConfigMap that the chart never creates, so the pod couldn't have started."
+    cause: "The chart's template for the rules ConfigMap is wrapped in a distributed-mode check, while the pod template mounts it in every mode. Nothing in the values documentation says so."
+    fix: "The rules ConfigMap comes from the chart's extra objects and is mounted with the single binary's extra volumes. The rendered chart was checked with helm template, and its config with Loki's -verify-config. A local Loki loaded and evaluated the rules before the change went to review. Extra objects pass through Helm's tpl, so the LogQL avoids double braces."
+    lesson: "Before relying on a chart value, render the chart in the mode you run and look for every object the value should create. A value that is valid in the schema can still render nothing."
+    adrs: ["0120"]
