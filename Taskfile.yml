@@ -21,7 +21,7 @@ tasks:
       # - git push gitlab
 
   test-site:
-    desc: "test website: htmlproofer on _site in one process per CPU, same as CI (HTMLPROOFER_JOBS=N to change)"
+    desc: "test website: htmlproofer on _site (fast anchor lookup, one process per CPU), same as CI (HTMLPROOFER_JOBS=N to change)"
     cmds:
       - bundle exec ruby tools/htmlproofer-parallel.rb _site
 

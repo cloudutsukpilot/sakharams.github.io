@@ -62,8 +62,10 @@ pull requests to `main` (build and test only):
 1. `build` job: `actions/checkout@v5` → `ruby/setup-ruby@v1` (Ruby 3.3, `bundler-cache: true`).
 2. Build: `bundle exec jekyll b -d "_site${{ base_path }}"` with `JEKYLL_ENV=production`.
 3. Test: `bundle exec ruby tools/htmlproofer-parallel.rb _site` — htmlproofer with `--disable-external` and
-   localhost ignored, split into one shard per CPU (html-proofer itself uses one core; this cut the step from
-   about 3 minutes to about 1). Every shard sees the whole `_site`, so cross-page links and anchors are still
+   localhost ignored, with the same checks as the plain CLI but faster: `#anchor` checks look the fragment up
+   in a set of the target page's `id`/`name` values (html-proofer 5 runs a whole-document XPath with a Ruby
+   callback per fragment, about 90% of its time here), and the files are split into one shard per CPU
+   (html-proofer uses one core). Every shard sees the whole `_site`, so cross-page links and anchors are still
    checked. `HTMLPROOFER_JOBS=N` sets the number of shards.
 4. `actions/upload-pages-artifact@v5` → `deploy` job `actions/deploy-pages@v5`, only on `main`.
 5. `sonarqube` job, in parallel with `build` and not on pull requests:

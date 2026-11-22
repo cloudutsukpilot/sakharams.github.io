@@ -38,7 +38,7 @@ each failure back to the authoring file the user actually edits.
    ```
 
    `task test-site` runs [tools/htmlproofer-parallel.rb](../../../tools/htmlproofer-parallel.rb), which
-   splits the files over one process per CPU and prints each shard's output in turn. Equivalent
+   looks anchors up faster and splits the files over one process per CPU, printing each shard's output in turn. Equivalent
    single-process command (slower, same checks):
 
    ```bash

@@ -84,7 +84,7 @@ jobs:
         run: bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require File.expand_path(f) }'
 
       # Same checks as `htmlproofer _site --disable-external --ignore-urls ...`,
-      # split into one shard per CPU (html-proofer itself uses one core).
+      # with a fast #anchor lookup and one shard per CPU (see the script).
       - name: Test site
         id: test_site
         run: bundle exec ruby tools/htmlproofer-parallel.rb _site

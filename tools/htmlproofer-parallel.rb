@@ -1,11 +1,15 @@
 # frozen_string_literal: true
 
-# Runs html-proofer over a built site in several processes at once.
+# Runs html-proofer over a built site, faster, with the same checks.
 #
-# html-proofer checks one file at a time on one CPU core, so on this site
-# (about 2,000 pages) it was the slowest step of the deploy. This script
-# splits the HTML files into shards, gives each shard to its own forked
-# html-proofer runner and fails if any shard fails.
+# On this site (about 2,000 pages) html-proofer was the slowest step of the
+# deploy (about 3 minutes). Two changes, neither of which drops a check:
+#
+# 1. Anchor lookups use a set of the page's id/name values instead of a
+#    whole-document XPath per #fragment (see FastFragmentLookup below).
+# 2. The HTML files are split into shards, one forked html-proofer runner per
+#    CPU (html-proofer itself uses one core), and the run fails if any shard
+#    fails. Each shard prints its output in turn.
 #
 # The checks are the same as `htmlproofer <site> --disable-external
 # --ignore-urls ...`: every runner sees the whole site on disk, so a link in
@@ -19,6 +23,34 @@
 require "etc"
 require "tempfile"
 require "html-proofer"
+
+require "set"
+
+# Anchor (#hash) checks: html-proofer 5 looks each fragment up with
+# `//*[case_sensitive_equals(@id, 'x')] | //*[case_sensitive_equals(@name, 'x')]`,
+# a whole-document XPath scan that calls back into Ruby for every element.
+# With thousands of TOC anchors that was ~90% of the run. This gives the same
+# answer (some element has an id or name attribute exactly equal to the
+# fragment) from a set of the document's id and name values, built once per
+# target document.
+module FastFragmentLookup
+  private
+
+  def find_fragments(fragment_ids, html)
+    unless @fragment_doc.equal?(html)
+      @fragment_doc = html
+      @fragment_set = html.xpath("//@id | //@name").to_set(&:value)
+    end
+    fragment_ids.any? { |id| @fragment_set.include?(id) } ? [true] : []
+  end
+end
+# Written against html-proofer 5.x; on any other version keep its own lookup.
+if HTMLProofer::VERSION.start_with?("5.") &&
+   HTMLProofer::UrlValidator::Internal.private_method_defined?(:find_fragments)
+  HTMLProofer::UrlValidator::Internal.prepend(FastFragmentLookup)
+else
+  warn "html-proofer #{HTMLProofer::VERSION}: fast anchor lookup not applied"
+end
 
 site = ARGV.fetch(0, "_site")
 abort "#{site} is not a directory; build the site first" unless File.directory?(site)

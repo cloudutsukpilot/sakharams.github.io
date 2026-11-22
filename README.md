@@ -98,7 +98,7 @@ pushing:
 ```bash
 rm -rf _site .jekyll-cache
 JEKYLL_ENV=production bundle exec jekyll build -d _site
-task test-site                 # htmlproofer, one process per CPU, same as CI
+task test-site                 # htmlproofer (tools/htmlproofer-parallel.rb), same as CI
 ```
 
 To trace a failure in `_site/**/*.html` back to the source post, use the
