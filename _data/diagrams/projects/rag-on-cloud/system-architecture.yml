@@ -1,0 +1,1014 @@
+# RAG on Cloud: system architecture on Azure, from the first slice (Phases 1 to 3) to the enterprise target
+# (Phase 10, enterprise ingestion, and Phase 11, retrieval speed). Belongs to the Technical Architecture post of the
+# "RAG on Cloud" playbook (_posts/projects/rag-on-cloud/2026-11-18-05-technical-architecture.md); replaces the
+# flow-anim of the same id. Facts from the lab's plan and ADRs 0001 to 0017 (2026-11-23) and the applied stack.
+# Status: `built` = applied in Azure (Phase 0); everything else is `planned` with its phase.
+# Certificates checked with openssl on 2026-11-24 (Blob, Search, Entra, GitHub, the blog); Container Apps, Redis,
+# Cosmos DB and PostgreSQL are Microsoft-managed endpoints not created yet. No resource names, IDs or private links:
+# the blog is public.
+title: RAG on Cloud on Azure
+description: "Standard and agentic RAG over the blog's posts on Azure: how documents get into Azure AI Search today and in the enterprise target (a pipeline per source, a lake, permissions on every chunk), how a question is answered, and how each change is scored."
+level: 1
+lock: false
+levels: [Context, Layers, Services, Lake zones]
+accent: "#F472B6"
+accent2: "#FACC15"
+
+views:
+  - {id: security, label: Identity & secrets, icon: lock}
+  - {id: observability, label: Observability & cost, icon: chart}
+  - {id: cicd, label: CI/CD, icon: rocket}
+  - {id: bench, label: Benchmark, icon: database}
+
+certs:
+  ms-azure:
+    label: "*.blob.core.windows.net, *.dfs.core.windows.net, *.search.windows.net"
+    type: public
+    by: "The Azure service's own front end (TLS ends at Microsoft)"
+    issuer: "Microsoft TLS G2 RSA CA OCSP 02/04 → Microsoft TLS RSA Root G2"
+    key: "RSA · TLS 1.2 or 1.3"
+    valid: "About a year; issued and rotated by Microsoft"
+    trust: "Public chain: Microsoft's root is in the OS and Python CA bundles"
+  ms-ai:
+    label: "*.cognitiveservices.azure.com, *.services.ai.azure.com"
+    type: public
+    by: "The Foundry account's endpoint (TLS ends at Microsoft)"
+    issuer: "Microsoft Corporation (MSFT RS256 CA-1 on the regional endpoint)"
+    valid: "About a year; rotated by Microsoft"
+    trust: "Public chain in the OS and Python CA bundles"
+  ms-apps:
+    label: "<app>.<environment>.eastus.azurecontainerapps.io"
+    type: public
+    by: "The Container Apps environment's ingress (TLS ends there)"
+    issuer: "Microsoft-managed certificate for the default domain"
+    valid: "Managed by Microsoft"
+    trust: "Public chain; a custom domain would bring its own managed certificate"
+  ms-managed:
+    label: "Managed data endpoints (Redis, Cosmos DB, PostgreSQL)"
+    type: public
+    by: "The managed service (TLS ends at Microsoft)"
+    issuer: "Microsoft or DigiCert public CAs, per service"
+    valid: "Managed by Microsoft"
+    trust: "Public chain; clients verify the host name"
+  entra:
+    label: login.microsoftonline.com
+    type: public
+    by: "Microsoft Entra ID"
+    issuer: "DigiCert Global G2 TLS RSA SHA256 2020 CA1 → DigiCert Global Root G2"
+    valid: "About a year; rotated by Microsoft"
+    trust: "Public chain in every OS and browser"
+  github:
+    label: "github.com, api.github.com"
+    type: public
+    by: "GitHub's edge"
+    issuer: "Sectigo Public Server Authentication CA DV E36"
+    valid: "About a year; rotated by GitHub"
+    trust: "Public chain in the runner's CA bundle"
+
+nodes:
+  - id: owner
+    label: You
+    sub: the lab's only user
+    icon: user
+    status: external
+    facts:
+      summary: "The owner: asks questions, reviews every change, and reads the scores. Readers get the published results, not the API."
+      how: "Signs in with Entra ID in a browser or the CLI, then calls the API with that token."
+      api: "None of its own: a browser, `curl` and `make eval`"
+
+  - id: sources
+    label: Sources
+    sub: public content only
+    icon: globe
+    status: built
+    facts:
+      summary: "What the assistant knows about. Phase 1 has one source, the blog; Phase 10 adds more, each with an owner, a classification and a permission model."
+      how: "Each source is a file in the lab repo's source registry (`sources/<id>.yaml`): connector, schedule, owner, classification, extractor, permissions, retention."
+      api: "None of its own: each source below has its own address"
+    children:
+      - id: blog
+        label: Blog posts
+        sub: Markdown in Git
+        icon: devops/cicd/github-18.svg
+        status: built
+        facts:
+          summary: "This blog's published posts: the corpus, chosen so every answer can be checked and nothing private is indexed."
+          how: "Jekyll Markdown with front matter; drafts, private folders and stubs without content are left out."
+          url: {Blog: "https://cloudutsuk.com"}
+      - id: repodocs
+        label: Repo docs
+        sub: READMEs and ADRs
+        icon: file
+        status: planned
+        phase: 10
+        facts:
+          summary: "Planned: a second source pulled through a REST connector, to prove a pipeline per source (the owner picks it, open question 7)."
+          how: "Public repositories' README and ADR files over the GitHub REST API."
+          api: "`https://api.github.com/repos/<owner>/<repo>/contents/...`"
+      - id: pdfs
+        label: PDFs and Office
+        sub: another format
+        icon: file
+        status: planned
+        phase: 10
+        facts:
+          summary: "Planned: a third source in formats Markdown cleaning can't read, to prove the extractor interface."
+          how: "Public files fetched over HTTPS; Document Intelligence turns their layout into Markdown."
+          api: "`https://<host>/<file>.pdf`"
+      - id: remote
+        label: Remote sources
+        sub: web, MCP, SharePoint
+        icon: cloud
+        status: planned
+        phase: 10
+        facts:
+          summary: "Planned: systems that keep their own search and permissions, queried in place by the knowledge base instead of being copied."
+          how: "Foundry IQ remote knowledge sources: the knowledge base calls them at question time."
+          url: {Docs: "https://learn.microsoft.com/azure/search/agentic-knowledge-source-overview"}
+
+  - id: github
+    label: GitHub Actions
+    sub: sync, CI, deploy
+    icon: devops/cicd/githubactions-18.svg
+    status: planned
+    phase: 1
+    facts:
+      summary: "The lab repo's workflows: the first slice's corpus sync, the checks on every PR, and later the API deploy and evals."
+      how: "Hosted runners sign in to Azure with OIDC as the lab's CI identity: no stored secret."
+      api: "None of its own: `workflow_dispatch`, schedules and PR events"
+    children:
+      - id: sync
+        label: Corpus sync
+        sub: daily + on publish
+        icon: rocket
+        status: planned
+        phase: 1
+        facts:
+          summary: "The first slice's ingestion: cleans the blog's posts and uploads one JSON document per post. Written and tested; the first run waits for its identity."
+          how: "`ragcorpus` strips Liquid and includes, keeps front matter as fields, compares MD5s and uploads only changes; a removed post is soft-deleted."
+          when: "daily 02:30 UTC, and on a blog-published dispatch"
+          api: "`uv run python -m ragcorpus sync --target azure`"
+      - id: deploy
+        label: CI and deploy
+        sub: checks, image, release
+        icon: code
+        status: planned
+        phase: 1
+        facts:
+          summary: "Runs ruff and pytest on every PR today; from Phase 1 step 5 it also builds the API image and deploys it, and from Phase 3 it fails a PR whose eval score drops."
+          how: "Build with Docker, push to the registry and update the Container App, all with the OIDC identity."
+          when: "every PR; deploy on merge"
+          api: "None of its own: PR and push events"
+
+  - id: entra
+    label: Entra ID
+    sub: tokens for everyone
+    icon: cloud/azure/services/entra-id.svg
+    status: external
+    facts:
+      summary: "Every caller gets a token here: no key exists anywhere in the lab (local auth is off on Foundry, Search and Application Insights, shared key off on storage)."
+      how: "The owner signs in interactively; GitHub exchanges its OIDC token through a federated credential; Azure services use managed identities."
+      api: "`https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token`"
+
+  - id: azure
+    label: Azure sandbox
+    sub: one subscription, eastus
+    icon: cloud
+    status: built
+    facts:
+      summary: "Everything the lab runs in Azure, in one resource group with a budget of 100 a month."
+      how: "Terraform through the platform's shared module (ADR 0003): plan on PR, apply on merge. Public endpoints with Entra ID first, private endpoints in Phase 5."
+      where: "a sandbox subscription · eastus"
+      api: "None of its own: each service's endpoint"
+    children:
+      - id: ingest
+        label: Ingestion platform
+        sub: one pipeline per source
+        icon: cloud/azure/services/data-factory.svg
+        status: planned
+        phase: 10
+        facts:
+          summary: "Planned (ADR 0016): how an enterprise ingests for RAG. Every source gets a pipeline from one template, lands raw, is cleaned into one schema, and fails into quarantine."
+          how: "Data Factory copies, Functions process, Event Grid wakes them, Key Vault holds the few connector secrets. All consumption-billed: no idle cost."
+          api: "None of its own: the services below"
+        children:
+          - id: adf
+            label: Data Factory
+            sub: pipeline per source
+            icon: cloud/azure/services/data-factory.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "Copies each source into the lake's raw zone and starts processing, with run history, retries and backfill windows a single job doesn't have."
+              how: "One parameterised pipeline generated per registry entry and deployed by CI; schedule, tumbling-window or storage-event triggers; its own managed identity."
+              when: "per source schedule"
+              url: {Docs: "https://learn.microsoft.com/azure/data-factory/introduction"}
+          - id: evgrid
+            label: Event Grid
+            sub: blob created
+            icon: cloud/azure/services/event-grid.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "Wakes the processing function when a file lands in raw, for sources that push instead of being pulled."
+              how: "A system topic on the lake's storage account, `BlobCreated` filtered to `raw/`, delivered to the Function's Event Grid trigger."
+              api: "None of its own: a subscription on the storage account"
+          - id: func
+            label: Processing
+            sub: Functions, Flex Consumption
+            icon: cloud/azure/services/functions.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "Turns a raw item into one canonical JSON document, or quarantines it with a reason. The blog's cleaning code becomes its Markdown extractor."
+              how: "Python on Flex Consumption with its own identity: pick an extractor, normalise, run quality gates (empty, language, size, duplicate), check PII for non-public items, write lineage."
+              api: "`POST https://<function app>.azurewebsites.net/api/process`"
+          - id: docintel
+            label: Document Intelligence
+            sub: PDF and Office
+            icon: cloud/azure/services/ai-services.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "Reads PDF and Office layout (headings, tables, reading order) as Markdown, so chunks keep their structure."
+              how: "The `prebuilt-layout` model, called by the Function with its managed identity; created when the first such source arrives."
+              url: {Docs: "https://learn.microsoft.com/azure/ai-services/document-intelligence/overview"}
+          - id: language
+            label: AI Language
+            sub: PII detection
+            icon: cloud/azure/services/ai-services.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "Keeps personal data out of prompts and logs: items classified non-public are checked before they reach the curated zone."
+              how: "PII entity recognition called by the Function; a hit quarantines the item or redacts it, per the source's registry entry."
+              url: {Docs: "https://learn.microsoft.com/azure/ai-services/language-service/personally-identifiable-information/overview"}
+          - id: kv
+            label: Key Vault
+            sub: connector secrets
+            icon: cloud/azure/services/key-vault.svg
+            status: planned
+            phase: 10
+            views: [security]
+            facts:
+              summary: "Holds the few secrets a SaaS connector needs; Azure sources use managed identities and need none."
+              how: "RBAC mode; Data Factory's identity reads secrets through Key Vault linked services."
+              api: "`https://<vault>.vault.azure.net`"
+
+      - id: storage
+        label: Storage
+        sub: corpus and lake
+        icon: cloud/azure/services/storage-accounts.svg
+        status: built
+        facts:
+          summary: "Where documents wait for the indexer: the first slice's Blob container today, the lake's zones in Phase 10."
+          how: "Shared-key access off; the indexer and the uploaders read and write with Entra ID roles."
+          api: "None of its own: the containers below"
+        children:
+          - id: blob
+            label: Blob container posts
+            sub: one JSON per post
+            icon: cloud/azure/services/blob-storage.svg
+            status: built
+            facts:
+              summary: "The first slice's corpus: one cleaned JSON document per post, with title, URL, date, categories and tags as fields."
+              how: "Written by the corpus sync, read by the Search indexer; a removed post is soft-deleted with `is_deleted=true` metadata so the index drops it."
+              api: "`https://<account>.blob.core.windows.net/posts`"
+          - id: lake
+            label: ADLS Gen2 lake
+            sub: medallion zones
+            icon: cloud/azure/services/data-lake-storage.svg
+            status: planned
+            phase: 10
+            facts:
+              summary: "One storage account with a hierarchical namespace and a container per zone, so raw copies can be replayed and directory ACLs travel into the index."
+              how: "Zones as containers, a folder per source; lifecycle rules move raw to cool, then delete it after the source's retention."
+              api: "`https://<account>.dfs.core.windows.net/<zone>/<source>/`"
+            children:
+              - id: raw
+                label: raw
+                sub: bronze, immutable
+                icon: bucket
+                status: planned
+                phase: 10
+                facts:
+                  summary: "The source's bytes as fetched, kept for replay and audit: a cleaning bug is fixed by re-processing, not re-pulling."
+                  how: "`raw/<source>/<yyyy>/<mm>/<dd>/<run id>/`; written only by Data Factory."
+                  api: "`raw/<source>/...`"
+              - id: curated
+                label: curated
+                sub: silver, canonical JSON
+                icon: bucket
+                status: planned
+                phase: 10
+                facts:
+                  summary: "One canonical document per source item: the contract between processing and indexing, whatever the source."
+                  how: "`source_id`, `source_uri`, title, content, classification, ACL, `content_hash`, `ingest_run_id`, extractor; directory ACLs per source."
+                  api: "`curated/<source>/...`"
+              - id: quarantine
+                label: quarantine
+                sub: failed items
+                icon: bucket
+                status: planned
+                phase: 10
+                facts:
+                  summary: "Items that failed extraction or a quality gate, with the reason; any new item raises an alert."
+                  how: "Same layout as curated plus a reason file; replayed from raw once the cause is fixed."
+                  api: "`quarantine/<source>/...`"
+              - id: gold
+                label: gold
+                sub: benchmark export
+                icon: bucket
+                status: planned
+                phase: 11
+                views: [bench]
+                facts:
+                  summary: "Chunks and vectors exported once from the index, so other vector stores are compared on exactly the same data."
+                  how: "Written and read by the benchmark script in the eval harness (ADR 0017)."
+                  api: "`gold/chunks-<index version>.jsonl`"
+
+      - id: search
+        label: Azure AI Search
+        sub: Basic, semantic free
+        icon: cloud/azure/services/ai-search.svg
+        status: built
+        facts:
+          summary: "The retrieval layer and the vector store: hybrid search, the semantic ranker, integrated vectorization, permission filters and Foundry IQ knowledge bases in one service."
+          how: "Basic tier, the lowest that lets indexers use a managed identity (ADR 0004); local auth off. The only resource with a real idle cost, removed between sessions (ADR 0008)."
+          api: "`https://<service>.search.windows.net`"
+        children:
+          - id: indexer
+            label: Indexer + skillset
+            sub: split, embed, project
+            icon: gear
+            status: planned
+            phase: 1
+            facts:
+              summary: "Pulls documents, splits them into chunks, embeds each chunk and writes them to the index: managed ingestion, no chunking code of our own (ADR 0010)."
+              how: "Data source with the Search identity; skillset Text Split + Azure OpenAI embedding with index projections. Phase 10: one indexer per source over `curated/<source>/`, ACLs ingested."
+              when: "on a schedule and on `make index`"
+              api: "`PUT /indexers/<name>?api-version=2026-10-01`"
+          - id: index
+            label: Index blog-chunks
+            sub: hybrid + semantic
+            icon: search
+            status: planned
+            phase: 1
+            facts:
+              summary: "Chunk text and vector, title, URL, date and tags; one index for every answer mode, so modes are compared on what they retrieve, not where from."
+              how: "Defined as JSON in the lab repo (index as code); a vectorizer embeds the question at query time; semantic configuration for the reranker. Phase 10 adds `source_id` and permission fields; Phase 11 tunes quantization."
+              api: "`POST /indexes/blog-chunks/docs/search?api-version=2026-10-01`"
+          - id: kb
+            label: Knowledge base
+            sub: Foundry IQ, agentic
+            icon: search
+            status: planned
+            phase: 2
+            facts:
+              summary: "Agentic retrieval: plans subqueries for a multi-part question, runs them over the index (and remote sources) and returns chunks with references."
+              how: "A knowledge source over the index plus a knowledge base (REST `2026-10-01`), extractive output; exposed to agents as an MCP endpoint."
+              api: "`POST /knowledgebases/<name>/retrieve?api-version=2026-10-01`"
+
+      - id: foundry
+        label: Microsoft Foundry
+        sub: account + project
+        icon: cloud/azure/services/openai.svg
+        status: built
+        facts:
+          summary: "The models and the agent service. Pay per token, no idle cost."
+          how: "Local auth off; callers need the Foundry User or Cognitive Services OpenAI User role. The tenant denies `GlobalStandard` deployments (ADR 0012)."
+          api: "`https://<account>.services.ai.azure.com`"
+        children:
+          - id: embed
+            label: text-embedding-3-small
+            sub: Standard
+            icon: cpu
+            status: built
+            facts:
+              summary: "Turns chunks (at indexing) and questions (at query time) into vectors; the same model on both sides."
+              how: "Called by the skillset and the vectorizer with the Search identity. Phase 11 tries MRL truncation of its vectors."
+              api: "`POST /openai/deployments/text-embedding-3-small/embeddings`"
+          - id: chat
+            label: gpt-5-mini
+            sub: DataZoneStandard
+            icon: message
+            status: built
+            facts:
+              summary: "Writes the grounded answer from the retrieved chunks; also the knowledge base's query planner and the eval judge (ADR 0013)."
+              how: "US data zone deployment, 50K tokens a minute; a bigger model only if the golden set shows generation is the weak part."
+              api: "`POST /openai/v1/chat/completions`"
+          - id: agent
+            label: Foundry agent
+            sub: Agent Service
+            icon: server
+            status: planned
+            phase: 2
+            facts:
+              summary: "A managed agent that decides whether to search and how often, with the knowledge base as its tool."
+              how: "Agent Service in the Foundry project; the knowledge base through a project connection to its MCP endpoint, with the project's managed identity."
+              url: {Docs: "https://learn.microsoft.com/azure/ai-foundry/agents/overview"}
+
+      - id: serving
+        label: Serving
+        sub: API, image, cache
+        icon: cloud/azure/services/container-apps.svg
+        status: planned
+        phase: 1
+        facts:
+          summary: "The one API every answer mode goes through, so the eval harness can loop over modes with one call shape."
+          how: "Container Apps on the consumption plan (scales to zero), built-in Entra sign-in, its own user-assigned identity."
+          api: "None of its own: the API below"
+        children:
+          - id: api
+            label: rag-api
+            sub: FastAPI, Container Apps
+            icon: cloud/azure/services/container-apps.svg
+            status: planned
+            phase: 1
+            facts:
+              summary: "One `/chat` endpoint with a `mode`: standard RAG in the shared core, and the agent modes. The same code runs on every cloud with a different provider."
+              how: "FastAPI; `DefaultAzureCredential` for Search and Foundry; citations one per post; says \"not covered\" when nothing relevant is retrieved. Phase 10 forwards the caller's token for permission trimming."
+              api: "`POST https://<app>.azurecontainerapps.io/chat`"
+          - id: acr
+            label: Container registry
+            sub: API image
+            icon: cloud/azure/services/container-registry.svg
+            status: planned
+            phase: 1
+            views: [cicd]
+            facts:
+              summary: "Holds the API image; the Container App pulls it with its managed identity, so no registry password exists."
+              how: "Pushed by the deploy workflow with OIDC; `AcrPull` for the app's identity."
+              api: "`<registry>.azurecr.io/rag-api:<sha>`"
+          - id: cache
+            label: Semantic cache
+            sub: Azure Managed Redis
+            icon: cloud/azure/services/cache-redis.svg
+            status: planned
+            phase: 11
+            facts:
+              summary: "Answers a repeated question without retrieval or generation, the largest saving available (ADR 0017). Created per session like Search, unless the owner raises the budget."
+              how: "RediSearch vector lookup of the question's embedding; the key includes index version, prompt version and permission scope, with a TTL, so a cached answer never crosses permissions or survives a reindex."
+              api: "`<cache>.eastus.redis.azure.net:10000`"
+
+      - id: ops
+        label: Monitoring and cost
+        sub: traces, logs, budget
+        icon: cloud/azure/services/monitor.svg
+        status: built
+        facts:
+          summary: "Where every request's spans, tokens and latency land, and the budget that warns before the lab costs too much."
+          how: "Workspace-based Application Insights; diagnostics from Data Factory and Functions; a resource-group budget."
+          api: "None of its own: the services below"
+        children:
+          - id: appi
+            label: Application Insights
+            sub: spans per stage
+            icon: cloud/azure/services/application-insights.svg
+            status: built
+            views: [observability]
+            facts:
+              summary: "One span per stage (embed, retrieve, rerank, generate, first token), tagged with the mode, so p50 and p95 show where the time goes (Phase 11 step 1)."
+              how: "Azure Monitor OpenTelemetry exporter in the API and Functions; Foundry agent tracing; local auth off, so exporters sign in with Entra ID."
+              api: "`https://eastus-<n>.in.applicationinsights.azure.com`"
+          - id: law
+            label: Log Analytics
+            sub: workspace
+            icon: cloud/azure/services/log-analytics.svg
+            status: built
+            views: [observability]
+            facts:
+              summary: "Stores the traces and the pipelines' run history, so alerts and the per-source dashboard query one place."
+              how: "Application Insights writes to it; Data Factory and Function diagnostics are sent to it."
+              api: "KQL in the portal or `az monitor log-analytics query`"
+          - id: budget
+            label: Budget
+            sub: 100 a month
+            icon: cloud/azure/services/cost-management.svg
+            status: built
+            views: [observability]
+            facts:
+              summary: "Warns before a forgotten Search service or cache eats the proof of concept's budget."
+              how: "Resource-group budget with notifications at 50% and 80% of actual spend and a forecast over 100%."
+              when: "evaluated daily by Cost Management"
+              api: "None of its own: an email to the owner"
+
+      - id: bench
+        label: Benchmark stores
+        sub: Phase 11 only
+        icon: database
+        status: planned
+        phase: 11
+        views: [bench]
+        facts:
+          summary: "Evidence for \"would a vector database be faster?\": the same chunks and queries on two other stores (ADR 0017). Switch only if one wins without losing relevance or permission trimming."
+          how: "Created for the benchmark session, stopped or removed after."
+          api: "None of its own: the stores below"
+        children:
+          - id: cosmos
+            label: Cosmos DB for NoSQL
+            sub: DiskANN, serverless
+            icon: cloud/azure/services/cosmos-db.svg
+            status: planned
+            phase: 11
+            views: [bench]
+            facts:
+              summary: "A candidate when an app's operational data already lives there: vectors beside the data, hybrid search with RRF."
+              how: "Serverless account, DiskANN vector index, full-text and hybrid queries; Entra ID data-plane roles."
+              api: "`https://<account>.documents.azure.com`"
+          - id: pg
+            label: PostgreSQL pgvector
+            sub: DiskANN
+            icon: cloud/azure/services/postgresql.svg
+            status: planned
+            phase: 11
+            views: [bench]
+            facts:
+              summary: "A candidate when the data is relational with a few vector columns."
+              how: "Flexible server with pgvector and the DiskANN extension, stopped between sessions; Entra ID authentication."
+              api: "`<server>.postgres.database.azure.com:5432`"
+
+  - id: eval
+    label: Eval harness
+    sub: make eval
+    icon: chart
+    status: planned
+    phase: 3
+    facts:
+      summary: "Scores every mode on one golden question set: hit@5 and MRR for retrieval, a judged groundedness and relevance, latency and cost. Every change has to move a measured number."
+      how: "Python in the lab repo; runs on the owner's machine and, for PRs that touch prompts, chunking or the index, in CI with a regression threshold. Results are dated files in `results/`."
+      api: "`make eval PROVIDER=azure`"
+
+  - id: homelab
+    label: Homelab RAG
+    sub: Qdrant, local models
+    icon: databases/qdrant-18.svg
+    status: planned
+    phase: 4
+    facts:
+      summary: "The comparison target: the same golden set through the homelab's own RAG, to weigh the Azure bill against running it at home."
+      how: "rag-api on the homelab's `ai` cluster with Qdrant and local embedding and chat models through LiteLLM. Waits on the platform's own RAG phase."
+      api: "None public: reached from the owner's machine on the home network"
+
+edges:
+  # Phase 1 ingestion
+  - {id: sync_entra, from: sync, to: entra, proto: OIDC, port: 443, view: security, main: true, why: "Every sync run starts here: GitHub's OIDC token is exchanged for an Azure token through a federated credential, so no secret is stored.", certs: entra}
+  - {id: sync_blog, from: sync, to: blog, proto: HTTPS, port: 443, label: checkout, why: "Every sync run: checks out the blog's repository to read its posts.", certs: github}
+  - {id: sync_blob, from: sync, to: blob, proto: HTTPS, port: 443, label: upload, why: "Every sync run: uploads new and changed posts and soft-deletes removed ones; unchanged posts are skipped by MD5.", certs: ms-azure, detail: "Bearer token for the CI identity, role Storage Blob Data Contributor on the account."}
+  - {id: idx_blob, from: indexer, to: blob, proto: HTTPS, port: 443, why: "Phase 1: on each indexer run, reads new and changed documents with the Search service's identity; no storage key exists.", certs: ms-azure, detail: "Role Storage Blob Data Reader for the Search identity."}
+  - {id: idx_embed, from: indexer, to: embed, proto: HTTPS, port: 443, label: skillset, why: "On each indexer run: the embedding skill turns every new chunk into a vector.", certs: ms-ai, detail: "Role Cognitive Services OpenAI User for the Search identity."}
+  - {id: idx_index, from: indexer, to: index, kind: data, label: chunks, oneway: true, why: "On each indexer run: index projections write one search document per chunk, with the post's title, URL and tags.", certs: {none: "Inside the Search service: no network hop."}}
+  # Asking
+  - {id: owner_entra, from: owner, to: entra, proto: OIDC, port: 443, view: security, main: true, why: "Before every session: the owner signs in and gets a token for the API.", certs: entra}
+  - {id: owner_api, from: owner, to: api, proto: HTTPS, port: 443, why: "Every question: one POST to /chat with the mode; an anonymous call gets 401 from the built-in sign-in.", certs: ms-apps}
+  - {id: api_cache, from: api, to: cache, proto: Redis, port: 10000, tls: true, why: "Phase 11: before retrieval, looks up the question's embedding among recent questions in the same permission scope.", certs: ms-managed}
+  - {id: api_index, from: api, to: index, proto: HTTPS, port: 443, label: hybrid query, why: "Standard RAG: one hybrid query (keywords and vectors), reranked by the semantic ranker, returns the top chunks.", certs: ms-azure, detail: "Role Search Index Data Reader for the API's identity. Phase 10 adds the caller's token in `x-ms-query-source-authorization` for permission trimming."}
+  - {id: index_embed, from: index, to: embed, proto: HTTPS, port: 443, label: vectorizer, why: "Every vector or hybrid query: the vectorizer embeds the question with the same model that embedded the chunks.", certs: ms-ai}
+  - {id: api_chat, from: api, to: chat, proto: HTTPS, port: 443, why: "Standard RAG: the question and the numbered chunks go to the chat model, which answers with citations.", certs: ms-ai}
+  - {id: api_agent, from: api, to: agent, proto: HTTPS, port: 443, why: "Agentic mode: the API hands the question to the Foundry agent, which decides how to search.", certs: ms-ai}
+  - {id: agent_kb, from: agent, to: kb, proto: MCP, port: 443, tls: true, kind: request, why: "Agentic mode: the agent calls the knowledge base's retrieve tool through its MCP endpoint.", certs: ms-azure, detail: "Project connection with the project's managed identity."}
+  - {id: kb_chat, from: kb, to: chat, proto: HTTPS, port: 443, label: plan, why: "Agentic retrieval: the knowledge base asks the chat model to split the question into subqueries.", certs: ms-ai}
+  - {id: kb_index, from: kb, to: index, kind: data, label: subqueries, why: "Agentic retrieval: each subquery runs against the same index, merged and reranked.", certs: {none: "Inside the Search service: no network hop."}}
+  - {id: kb_remote, from: kb, to: remote, proto: HTTPS, port: 443, why: "Phase 10: a remote knowledge source is queried in place at question time instead of being copied.", certs: {planned: "Each remote source's own public certificate."}}
+  # Phase 10 enterprise ingestion
+  - {id: adf_blog, from: adf, to: blog, proto: HTTPS, port: 443, why: "Phase 10 step 4: the blog's own pipeline replaces the Actions sync and fetches the posts on schedule.", certs: github}
+  - {id: adf_repodocs, from: adf, to: repodocs, proto: HTTPS, port: 443, why: "Phase 10: a REST connector pulls the second source on its schedule.", certs: github}
+  - {id: adf_pdfs, from: adf, to: pdfs, proto: HTTPS, port: 443, why: "Phase 10: an HTTP connector fetches the third source's files.", certs: {planned: "The file host's public certificate."}}
+  - {id: adf_raw, from: adf, to: raw, proto: HTTPS, port: 443, label: copy, why: "Every pipeline run: writes the source's bytes, unchanged, under the run's own folder.", certs: ms-azure}
+  - {id: adf_func, from: adf, to: func, proto: HTTPS, port: 443, label: process, why: "After each copy: the pipeline's Azure Function activity processes the run's items and returns counts.", certs: ms-azure}
+  - {id: raw_evgrid, from: raw, to: evgrid, kind: event, oneway: true, label: BlobCreated, why: "Push sources: a new raw file raises an event instead of waiting for a schedule.", certs: {none: "Raised inside Azure Storage: no client connection."}}
+  - {id: evgrid_func, from: evgrid, to: func, proto: Webhook, port: 443, oneway: true, why: "Push sources: Event Grid delivers the event to the Function's trigger.", certs: ms-azure}
+  - {id: func_raw, from: func, to: raw, proto: HTTPS, port: 443, why: "Each processing run: reads the run's raw items.", certs: ms-azure}
+  - {id: func_docintel, from: func, to: docintel, proto: HTTPS, port: 443, why: "PDF and Office items: layout analysis returns Markdown with headings and tables.", certs: ms-ai}
+  - {id: func_language, from: func, to: language, proto: HTTPS, port: 443, why: "Non-public items only: PII detection before the item is curated.", certs: ms-ai}
+  - {id: func_curated, from: func, to: curated, proto: HTTPS, port: 443, oneway: true, why: "An item that passes every gate: written as one canonical JSON document with lineage.", certs: ms-azure}
+  - {id: func_quar, from: func, to: quarantine, proto: HTTPS, port: 443, oneway: true, why: "An item that fails extraction or a gate: written with its reason, and an alert fires.", certs: ms-azure}
+  - {id: idx_curated, from: indexer, to: curated, proto: HTTPS, port: 443, why: "Phase 10: one indexer per source reads its curated folder and ingests the folder's ACLs as permission fields.", certs: ms-azure}
+  - {id: adf_kv, from: adf, to: kv, proto: HTTPS, port: 443, view: security, why: "Only for SaaS connectors: the linked service reads the connector's secret at run time.", certs: ms-azure}
+  # Scoring
+  - {id: eval_api, from: eval, to: api, proto: HTTPS, port: 443, label: golden set, why: "Every eval run: each golden question through every mode, timing each stage.", certs: ms-apps}
+  - {id: eval_chat, from: eval, to: chat, proto: HTTPS, port: 443, label: judge, why: "Every eval run: one fixed judge model scores groundedness and relevance.", certs: ms-ai}
+  - {id: eval_home, from: eval, to: homelab, proto: HTTPS, port: 443, why: "Phase 4: the same golden set through the homelab RAG, same scorer.", certs: {planned: "The homelab's Let's Encrypt certificate on its ingress."}}
+  # Views: identity, observability, CI/CD, benchmark
+  - {id: deploy_entra, from: deploy, to: entra, proto: OIDC, port: 443, view: [security, cicd], why: "Every deploy: the workflow's OIDC token is exchanged for an Azure token.", certs: entra}
+  - {id: deploy_acr, from: deploy, to: acr, proto: HTTPS, port: 443, view: cicd, label: push, why: "On merge: pushes the API image tagged with the commit.", certs: ms-azure}
+  - {id: deploy_api, from: deploy, to: api, proto: HTTPS, port: 443, view: cicd, label: new revision, why: "On merge: updates the Container App to the new image, which starts a new revision.", certs: ms-azure, detail: "Through Azure Resource Manager (`management.azure.com`)."}
+  - {id: api_acr, from: api, to: acr, proto: HTTPS, port: 443, view: cicd, label: pull, why: "When a revision starts: pulls the image with the app's managed identity.", certs: ms-azure}
+  - {id: api_appi, from: api, to: appi, proto: HTTPS, port: 443, kind: telemetry, view: observability, why: "Always on: a span per stage, tokens and the mode for every request.", certs: ms-azure}
+  - {id: agent_appi, from: agent, to: appi, proto: HTTPS, port: 443, kind: telemetry, view: observability, why: "Agentic mode: Foundry agent tracing shows each tool call and its result.", certs: ms-azure}
+  - {id: func_appi, from: func, to: appi, proto: HTTPS, port: 443, kind: telemetry, view: observability, why: "Every processing run: counts fetched, curated and quarantined per source.", certs: ms-azure}
+  - {id: adf_law, from: adf, to: law, kind: telemetry, view: observability, why: "Every pipeline run: run history and failures for the per-source dashboard and alerts.", certs: {none: "Diagnostic settings inside Azure Monitor: no client connection."}}
+  - {id: appi_law, from: appi, to: law, kind: telemetry, view: observability, why: "Always on: Application Insights stores its data in the workspace.", certs: {none: "Inside Azure Monitor."}}
+  - {id: budget_owner, from: budget, to: owner, proto: SMTP, kind: event, oneway: true, view: observability, why: "At 50% and 80% of the month's budget, and when the forecast goes over 100%.", certs: {none: "An email from Azure Cost Management."}}
+  - {id: eval_index, from: eval, to: index, proto: HTTPS, port: 443, view: bench, label: export, why: "Phase 11, once: reads every chunk and vector out of the index.", certs: ms-azure}
+  - {id: eval_gold, from: eval, to: gold, proto: HTTPS, port: 443, view: bench, why: "Phase 11: writes the export to gold, and reads it back to load each store.", certs: ms-azure}
+  - {id: eval_cosmos, from: eval, to: cosmos, proto: HTTPS, port: 443, view: bench, why: "Phase 11: loads the export, then runs the golden set's retrieval and times it.", certs: ms-managed}
+  - {id: eval_pg, from: eval, to: pg, proto: PostgreSQL, port: 5432, tls: true, view: bench, why: "Phase 11: loads the export into pgvector, then runs the same queries.", certs: ms-managed}
+
+scenarios:
+  - id: sync
+    title: Sync the blog (Phase 1)
+    summary: "The first slice's ingestion: a GitHub Actions job uploads the posts, and Search chunks and embeds them."
+    steps:
+      - title: A post is published
+        action: "Blog → Corpus sync: daily schedule or a blog-published dispatch"
+        text: "The workflow runs every day and when the blog publishes, so a new post is searchable the same day."
+        lights: [blog, sync]
+        detail: |
+          - Triggers: a cron at 02:30 UTC, a `repository_dispatch` of type `blog-published`, or a manual run with a dry-run option.
+          - One run at a time (`concurrency: corpus-sync`), so two runs never race on the same blobs.
+      - title: Get an Azure token
+        action: "Corpus sync ↔ Entra ID: OIDC token for an Azure token"
+        text: "GitHub's OIDC token is exchanged for an Azure token through a federated credential on the lab's CI identity."
+        path: [sync_entra, ~sync_entra]
+        detail: |
+          - The workflow asks for `id-token: write`; `azure/login` sends GitHub's token to Entra ID.
+          - Entra ID checks the token's issuer and subject against the federated credential, then issues an access token.
+          - No client secret exists, so there is nothing to leak or rotate.
+      - title: Read the posts
+        action: "Corpus sync ↔ GitHub: check out the blog repository"
+        text: "The job checks out the blog and finds every published, dated post."
+        path: [sync_blog, ~sync_blog]
+        detail: |
+          - `find_posts` skips drafts (`published: false`), private folders and files without a date in the name.
+          - Each post's URL is computed the way Jekyll builds it; all of them match the live sitemap.
+      - title: Upload the changes
+        action: "Corpus sync → Blob posts: PUT changed documents (443)"
+        text: "Each post becomes one cleaned JSON document; only new and changed ones are uploaded, removed ones are soft-deleted."
+        path: [sync_blob, ~sync_blob]
+        detail: |
+          - `clean()` strips Liquid tags, includes, kramdown attributes and HTML wrappers, and keeps code blocks.
+          - Stubs with no real content are left out.
+          - The MD5 of each document is compared with the blob's; unchanged posts aren't sent.
+          - A post gone from the blog gets `is_deleted=true` metadata, which the indexer's deletion policy reads.
+        packets:
+          sync_blob:
+            summary: "One post as a JSON document"
+            line: "PUT /posts/cloud%20native/2025-01-02-auto-scaling.json HTTP/1.1"
+            headers:
+              Authorization: "Bearer <token>"
+              Content-Type: "application/json; charset=utf-8"
+              x-ms-meta-is_deleted: "false"
+            body: |
+              {"categories": ["Cloud Native"], "content": "Some real content about KEDA…",
+               "date": "2025-01-02", "description": "…", "id": "<sha1 of the source path>",
+               "source_path": "cloud native/2025-01-02-auto-scaling.md", "tags": ["K8s"],
+               "title": "Auto Scaling", "url": "https://cloudutsuk.com/posts/cloud%20native/auto-scaling/"}
+            source: "corpus/src/ragcorpus/sync.py (to_doc) and providers/azure/src/ragazure/blob.py"
+      - title: Indexer reads
+        action: "Indexer ↔ Blob posts: read new and changed documents"
+        text: "The Search indexer finds what changed since its last run, reading with its own identity."
+        path: [idx_blob, ~idx_blob]
+        detail: |
+          - Change detection uses the blob's last-modified time; soft-deleted blobs remove their chunks.
+          - The data source has no connection string with a key: it names the managed identity.
+      - title: Chunk and embed
+        action: "Indexer ↔ text-embedding-3-small: one vector per chunk"
+        text: "The skillset splits each post into chunks and the embedding model turns each one into a vector."
+        path: [idx_embed, ~idx_embed]
+        detail: |
+          - Text Split cuts by pages of tokens with an overlap, so a sentence isn't lost at a boundary.
+          - The embedding skill calls the Foundry deployment; the same model embeds questions later.
+      - title: Write the chunks
+        action: "Indexer → Index: one search document per chunk"
+        text: "Index projections write each chunk with its post's title, URL, date and tags, ready to cite."
+        path: [idx_index]
+        result: success
+        outcome: "The post is searchable"
+        detail: |
+          - Each chunk keeps a parent key, so a citation points to the post, not the chunk.
+          - Done when the indexer run reports zero failed documents and the blob count equals the published post count.
+
+  - id: ask
+    title: Ask a question (standard RAG)
+    summary: "One hybrid query, then one grounded answer with citations; with the Phase 11 cache, a repeated question skips both."
+    modes:
+      - {id: miss, label: "New question"}
+      - {id: hit, label: "Repeated question (cache hit, Phase 11)"}
+    steps:
+      - title: Sign in
+        action: "You ↔ Entra ID: sign in, get a token for the API"
+        text: "The owner signs in once per session; the token proves who is asking."
+        path: [owner_entra, ~owner_entra]
+        detail: |
+          - Container Apps' built-in sign-in checks the token before the request reaches the code.
+          - Only the owner is allowed; readers see the published results instead.
+      - title: Ask
+        action: "You → rag-api: POST /chat (443)"
+        text: "One endpoint for every mode; the mode is a field, so the eval harness loops over modes with one call shape."
+        path: [owner_api]
+        detail: |
+          - The request is validated: a question of 1 to 2,000 characters, `top_k` from 1 to 20.
+          - An unknown mode is a 400; an empty question a 422.
+        packets:
+          owner_api:
+            summary: "A question in standard mode"
+            line: "POST /chat HTTP/1.1"
+            headers:
+              Authorization: "Bearer <token>"
+              Content-Type: "application/json"
+            body: '{"question": "How does KEDA scale a queue consumer to zero?", "mode": "standard", "top_k": 5}'
+            source: "core/src/ragcore/app.py (ChatRequest)"
+      - title: Check the cache
+        action: "rag-api ↔ Semantic cache: a close enough earlier question?"
+        text: "Phase 11: the question's embedding is looked up among recent questions in the same index version, prompt version and permission scope."
+        path: [api_cache, ~api_cache]
+        detail: |
+          - Above a similarity threshold the cached answer and citations come back, and nothing else runs.
+          - A reindex or a prompt change changes the key, so an old answer is never reused.
+          - Until Phase 11 this step doesn't exist and every question goes to retrieval.
+      - title: Cached answer
+        action: "rag-api → You: the cached answer and citations"
+        text: "A repeated question is answered without retrieval or generation, which the plan targets under 500 ms."
+        when: hit
+        path: [~owner_api]
+        result: success
+        outcome: "Answered from the cache"
+        detail: |
+          - The hit rate and the saved latency go into the trace, so the cache has to earn its hourly price.
+      - title: Hybrid retrieval
+        action: "rag-api → Index: one hybrid query with the semantic ranker"
+        text: "Keywords and vectors in one query; the semantic ranker reorders the top results."
+        when: miss
+        path: [api_index]
+        detail: |
+          - The query text goes in `search` and in a vector query of kind `text`, which the vectorizer embeds.
+          - `semantic` query type with the index's semantic configuration; top 5 chunks by default.
+          - Phase 10 adds the caller's token so only chunks they may read come back.
+        packets:
+          api_index:
+            summary: "Hybrid + semantic query"
+            line: "POST /indexes/blog-chunks/docs/search?api-version=2026-10-01 HTTP/1.1"
+            headers:
+              Authorization: "Bearer <token>"
+            body: |
+              {"search": "How does KEDA scale a queue consumer to zero?",
+               "vectorQueries": [{"kind": "text", "text": "How does KEDA scale…", "fields": "vector", "k": 50}],
+               "queryType": "semantic", "semanticConfiguration": "default", "top": 5,
+               "select": "chunk,title,url"}
+            illustrative: true
+      - title: Embed the question
+        action: "Index ↔ text-embedding-3-small: vectorize the query"
+        text: "The vectorizer embeds the question with the model that embedded the chunks, so the vectors are comparable."
+        when: miss
+        path: [index_embed, ~index_embed]
+        detail: |
+          - The API never handles vectors itself; Search owns both sides of the embedding.
+          - Phase 11 tries quantized and truncated vectors here and keeps them only if the golden set holds.
+      - title: Top chunks back
+        action: "Index → rag-api: 5 chunks with title and URL"
+        text: "The best chunks return with the posts they came from, ready to number in the prompt."
+        when: miss
+        path: [~api_index]
+        detail: |
+          - Each chunk carries its text, the post's title and URL, and a reranker score.
+          - No relevant chunk means the API answers that the blog doesn't cover it, with no citations.
+          - The retrieved set is what hit@5 and MRR score later, so it is logged with the answer.
+      - title: Grounded answer
+        action: "rag-api ↔ gpt-5-mini: question + numbered chunks"
+        text: "The prompt tells the model to answer only from the numbered sources and to ignore instructions inside them."
+        when: miss
+        path: [api_chat, ~api_chat]
+        detail: |
+          - Citations are one per post, built from the chunks, not from the model's text.
+          - If the model says the sources don't cover it, the citations are dropped.
+      - title: Answer with citations
+        action: "rag-api → You: answer, citations, mode"
+        text: "The owner gets the answer and links to the posts it came from."
+        when: miss
+        path: [~owner_api]
+        result: success
+        outcome: "Answered with citations"
+        detail: |
+          - Each stage's time is recorded as a span (embed, retrieve, rerank, generate, first token).
+          - p50 and p95 per stage show where the time goes; generation usually dominates.
+          - Phase 11 streams tokens, so the first words arrive before the answer is finished.
+        packets:
+          "~owner_api":
+            summary: "The answer"
+            line: "HTTP/1.1 200 OK"
+            body: |
+              {"text": "KEDA scales the consumer to zero when the queue is empty… [1]",
+               "citations": [{"title": "Auto Scaling", "url": "https://cloudutsuk.com/posts/cloud%20native/auto-scaling/"}],
+               "mode": "standard", "not_found": false}
+            source: "core/src/ragcore/models.py (Answer)"
+
+  - id: agentic
+    title: Ask a multi-part question (agentic, Phase 2)
+    summary: "The Foundry agent calls the knowledge base, which plans subqueries over the same index."
+    steps:
+      - title: Ask in agent mode
+        action: "You → rag-api: POST /chat with mode=agent"
+        text: "Same endpoint, another mode: the API passes the question to the Foundry agent."
+        path: [owner_api]
+        detail: |
+          - `GET /modes` lists the modes the provider offers, so the harness knows what to loop over.
+          - Standard mode lives in the shared core; agent modes come from the cloud's provider.
+          - The request shape and the answer shape are the same in every mode.
+      - title: Hand to the agent
+        action: "rag-api → Foundry agent: run the question"
+        text: "The agent decides whether to search, and how often, within iteration and time limits."
+        path: [api_agent]
+        detail: |
+          - Agent Service keeps the thread and calls tools; the API waits for the run to finish.
+          - Iteration and time limits stop a loop that keeps searching.
+      - title: Call the knowledge base
+        action: "Foundry agent → Knowledge base: retrieve tool over MCP"
+        text: "The knowledge base is the agent's only tool, reached through its MCP endpoint."
+        path: [agent_kb]
+        detail: |
+          - A project connection holds the endpoint; the project's managed identity signs the call.
+          - The tool takes one or more search intents, which the knowledge base turns into subqueries.
+          - No key or connection string is stored in the agent's definition.
+        packets:
+          agent_kb:
+            summary: "An MCP tool call"
+            line: "POST /knowledgebases/<name>/mcp?api-version=2026-10-01 HTTP/1.1"
+            body: |
+              {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+               "params": {"name": "knowledge_base_retrieve",
+                          "arguments": {"intents": ["KEDA scale to zero", "Cloud Run scale to zero"]}}}
+            illustrative: true
+      - title: Plan subqueries
+        action: "Knowledge base ↔ gpt-5-mini: split the question"
+        text: "The chat model breaks a multi-part question into focused subqueries."
+        path: [kb_chat, ~kb_chat]
+        detail: |
+          - The planner also rewrites vague phrasing into search terms the index matches.
+          - Reasoning effort minimal and low are compared on the golden set (Phase 2 step 1).
+          - Planning costs tokens and latency, which the comparison table shows per request.
+      - title: Retrieve per subquery
+        action: "Knowledge base ↔ Index: each subquery, merged and reranked"
+        text: "Each subquery runs against the same index as standard mode, so the comparison is fair."
+        path: [kb_index, ~kb_index]
+        detail: |
+          - Extractive output: the knowledge base returns chunks with references, not its own answer.
+          - Phase 10 adds remote sources here, queried in place.
+      - title: Chunks to the agent
+        action: "Knowledge base → Foundry agent: chunks with references"
+        text: "The agent reads the references and may search again before it answers."
+        path: [~agent_kb]
+        detail: |
+          - Each tool call and its result show in the trace (Foundry agent tracing).
+          - The agent can call the tool again with new intents if the first chunks don't cover a part.
+          - Iteration limits keep a run from searching forever.
+      - title: Answer with citations
+        action: "Foundry agent → rag-api → You: the answer"
+        text: "The API maps the references to post URLs, so citations look the same in every mode."
+        path: [~api_agent, ~owner_api]
+        result: success
+        outcome: "Multi-part answer with references"
+        detail: |
+          - Citations are one per post, as in standard mode.
+          - Phase 2 step 4 compares this mode with standard RAG on quality, latency, tokens and cost per request.
+          - A Microsoft Agent Framework agent in the API is the third mode, with search as its own tool.
+
+  - id: ingest
+    title: Ingest a new source (Phase 10)
+    summary: "The enterprise path: a pipeline per source copies into the lake, a Function curates or quarantines each item, and the indexer reads the curated zone with its ACLs."
+    modes:
+      - {id: ok, label: "Item passes the gates"}
+      - {id: bad, label: "Item fails a gate"}
+    steps:
+      - title: Pipeline starts
+        action: "Data Factory: the source's trigger fires"
+        text: "Each registry entry has its own pipeline, generated from one template, so sources fail and change independently."
+        lights: [adf]
+        detail: |
+          - The trigger comes from `sources/<id>.yaml`: a schedule, a tumbling window or a storage event.
+          - CI rejects a registry entry without an owner, a classification or a permission model.
+      - title: Copy from the source
+        action: "Data Factory ↔ PDFs and Office: fetch the files (443)"
+        text: "The copy activity pulls the source with the connector its registry entry names."
+        path: [adf_pdfs, ~adf_pdfs]
+        detail: |
+          - The connector is HTTP here; others use REST, Git, SharePoint or SQL connectors.
+          - Retries and run history come with the service; a backfill is a new run over an older window.
+          - The pipeline writes only to its own source's raw folder.
+      - title: Land raw
+        action: "Data Factory → raw: the bytes as fetched"
+        text: "The raw copy is immutable and kept for the source's retention, so a cleaning bug is fixed by replay."
+        path: [adf_raw, ~adf_raw]
+        detail: |
+          - Path `raw/<source>/<yyyy>/<mm>/<dd>/<run id>/`; lifecycle rules move it to cool storage.
+          - Nothing rewrites raw: a new run gets a new folder.
+          - Replay of a whole source reads only from here.
+      - title: Start processing
+        action: "Data Factory → Processing: process this run"
+        text: "The pipeline calls the Function with the run's folder."
+        path: [adf_func]
+        detail: |
+          - Azure Function activity with the factory's managed identity.
+          - Push sources take the other route: Event Grid wakes the same Function on `BlobCreated`.
+          - The Function returns counts (fetched, curated, quarantined) that the pipeline reconciles.
+      - title: Read the item
+        action: "Processing ↔ raw: read the run's files"
+        text: "The Function picks the extractor for each file's format."
+        path: [func_raw, ~func_raw]
+        detail: |
+          - Markdown: `ragcorpus`; HTML: its own extractor; PDF and Office: Document Intelligence.
+          - The extractor and its version are recorded on the output, for lineage.
+          - Flex Consumption scales out per run and back to zero.
+      - title: Extract the layout
+        action: "Processing ↔ Document Intelligence: PDF to Markdown"
+        text: "Layout analysis keeps headings and tables, so chunks keep their structure."
+        path: [func_docintel, ~func_docintel]
+        detail: |
+          - Then the quality gates: not empty, the expected language, a sane size, not a duplicate by hash.
+          - Non-public items also go through PII detection.
+      - title: Curated
+        action: "Processing → curated: one canonical document"
+        text: "The item passes every gate and is written in the one schema every source shares."
+        when: ok
+        path: [func_curated]
+        detail: |
+          - Fields: `source_id`, `source_uri`, title, content, classification, ACL, `content_hash`, `ingest_run_id`, extractor.
+          - `source_uri` is what a citation links to, whatever the source.
+          - The write is idempotent: the same item and hash give the same document.
+        packets:
+          func_curated:
+            summary: "The canonical document"
+            line: "PUT /curated/pdfs/<item>.json HTTP/1.1"
+            body: |
+              {"id": "<sha1 of source_id + key>", "source_id": "pdfs", "source_uri": "https://<host>/<file>.pdf",
+               "title": "…", "content": "<clean Markdown>", "classification": "public",
+               "acl": {"groups": [], "users": []}, "content_hash": "<md5>",
+               "ingest_run_id": "<ADF run id>", "extractor": "layout@1", "language": "en"}
+            illustrative: true
+      - title: Quarantined
+        action: "Processing → quarantine: the item and its reason"
+        text: "The item failed extraction or a gate; it is kept with the reason and an alert fires."
+        when: bad
+        path: [func_quar]
+        detail: |
+          - Completeness check per run: curated + quarantined = fetched.
+          - Once the cause is fixed, the item is replayed from raw without contacting the source.
+
+      - title: Report counts
+        action: "Processing → Data Factory: fetched, curated, quarantined"
+        text: "The pipeline checks the counts add up before the run is marked successful."
+        when: ok
+        path: [~adf_func]
+        detail: |
+          - Completeness: curated + quarantined must equal fetched for every run.
+          - The counts and the run's duration go to the per-source dashboard.
+          - A mismatch fails the run, which alerts like any other failure.
+      - title: Counts and alert
+        action: "Processing → Data Factory: one item quarantined"
+        text: "The run reports the quarantined item; the alert on any new quarantine fires."
+        when: bad
+        path: [~adf_func]
+        at: quarantine
+        result: fail
+        outcome: "Quarantined, alert raised"
+        detail: |
+          - The run itself still succeeds: the other items are curated and searchable.
+          - The alert names the source, the item and the reason.
+          - Once the cause is fixed, the item is replayed from raw.
+      - title: Index with permissions
+        action: "Indexer ↔ curated: read the source's folder and its ACLs"
+        text: "The source's indexer chunks and embeds the item and stores its ACLs as permission fields."
+        when: ok
+        path: [idx_curated, ~idx_curated, idx_index]
+        result: success
+        outcome: "Searchable, permission-trimmed"
+        detail: |
+          - Every source shares one skillset and one index, with `source_id` as a filter.
+          - A user without access never retrieves the item, chunks included (Phase 10 step 6).
+  - id: score
+    title: Score a change (Phase 3)
+    summary: "The golden set through every mode and through the homelab RAG, with one scorer and one judge."
+    steps:
+      - title: Run the golden set
+        action: "Eval harness → rag-api: each golden question, each mode"
+        text: "Every question with expected post URLs goes through every mode; each stage's time is recorded."
+        path: [eval_api]
+        detail: |
+          - The golden set has single-post, multi-post and out-of-corpus questions.
+          - In CI it runs for PRs that change prompts, chunking or the index.
+      - title: Answers back
+        action: "rag-api → Eval harness: answers, citations, timings"
+        text: "Retrieval is scored from the citations: hit@5 and MRR against the expected URLs."
+        path: [~eval_api]
+        detail: |
+          - An out-of-corpus question passes only when the answer says it isn't covered.
+          - Stage timings and token counts come back with each answer.
+          - Cost per request is computed from the tokens and the deployment's price.
+      - title: Judge the answers
+        action: "Eval harness ↔ gpt-5-mini: groundedness and relevance"
+        text: "One fixed judge model scores every mode, so scores compare across modes and clouds."
+        path: [eval_chat, ~eval_chat]
+        detail: |
+          - The judge sees the question, the answer and the retrieved chunks.
+          - Groundedness: is every claim in the chunks? Relevance: does it answer the question?
+          - The judge stays fixed across runs so a score change means the system changed.
+      - title: Same set at home
+        action: "Eval harness ↔ Homelab RAG: the same questions"
+        text: "Phase 4: the homelab's own RAG answers the same set, scored the same way."
+        path: [eval_home, ~eval_home]
+        result: done
+        outcome: "Dated results file in results/"
+        detail: |
+          - Quality, latency, tokens and cost per request in one table.
+          - The Azure bill is set against the homelab's running cost.
+          - In CI, a regression beyond the threshold fails the PR.

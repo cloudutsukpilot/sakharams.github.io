@@ -4,7 +4,7 @@ title: "RAG on Cloud: Technical Architecture"
 date: 2026-11-18 00:05:00 +0530
 categories: [projects, rag-on-cloud]
 tags: [Projects, RAG on Cloud, Architecture]
-description: "One index, four answer modes: Foundry models, Azure AI Search, an Agent Framework API on Container Apps, and keyless access throughout."
+description: "One index, four answer modes, keyless throughout, and the enterprise target: a pipeline per source, a lake, permission-trimmed chunks and a semantic cache."
 project: rag-on-cloud
 project_step: 5
 mermaid: true
@@ -24,14 +24,23 @@ the comparison it's because of how it retrieves, not what it retrieves from.
 ## System context and component architecture
 {: #system-context-and-component-architecture }
 
-Press play to follow a post from publication to an answer; tick the box for the agentic path.
+The diagram covers both the first slice and the enterprise target. Components with a phase badge are planned;
+the rest are applied. Click a group to open it, or pick a use case in the sidebar to replay it hop by hop:
 
-{% include flow-anim.html id="projects/rag-on-cloud/system-architecture" %}
+- syncing the blog;
+- asking a question, with and without a cache hit;
+- the agentic path;
+- ingesting a new source through the enterprise pipeline, including an item that fails a gate;
+- scoring a change.
+
+The views show identities, telemetry, the deploy path and the vector store benchmark.
+
+{% include diagram.html id="projects/rag-on-cloud/system-architecture" %}
 
 | Component | Role | Built from |
 |---|---|---|
-| Corpus sync | Uploads changed posts with their metadata | GitHub Actions workflow in the lab repo |
-| Blob container `posts` | Raw Markdown, one blob per post | Storage account, shared key off |
+| Corpus sync | Cleans the posts and uploads changed ones, daily and when the blog publishes | GitHub Actions workflow in the lab repo |
+| Blob container `posts` | One JSON document per post: cleaned text with title, URL, date, categories and tags as fields | Storage account, shared key off |
 | Search indexer and skillset | Reads blobs, splits text, calls the embedding model, writes chunks | Azure AI Search (Foundry IQ), Basic |
 | Index | Chunk text, vector, title, URL, date, tags; vectorizer; semantic configuration | JSON in the lab repo |
 | Knowledge base | Agentic retrieval over the same index | Foundry IQ, REST `2026-10-01` |
@@ -40,6 +49,10 @@ Press play to follow a post from publication to an answer; tick the box for the 
 | Models | One embedding and one chat deployment | Foundry |
 | Application Insights | Traces, metrics, logs | Log Analytics workspace |
 | Eval harness | Golden set through every mode and the homelab RAG | Python, `make eval` |
+| Data Factory (Phase 10) | One pipeline per source, from one template, copying into the lake's raw zone | Data Factory, consumption-billed ([ADR 0016](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0016)) |
+| Data Lake (Phase 10) | Zones `raw` (as fetched, kept for replay), `curated` (one canonical schema), `quarantine` (failed items) | Data Lake Storage Gen2, folder permissions per source |
+| Processing (Phase 10) | Extractor per format, quality gates, PII check, lineage | Azure Functions (Flex Consumption), Document Intelligence, AI Language |
+| Semantic cache (Phase 11) | Answers repeated questions without retrieval or generation | Azure Managed Redis ([ADR 0017](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0017)) |
 
 ## Technology and framework selection
 {: #technology-and-framework-selection }
@@ -53,6 +66,8 @@ Press play to follow a post from publication to an answer; tick the box for the 
 | Hosting | Container Apps, consumption | Scales to zero, managed identity, built-in Entra sign-in. App Service would bill idle |
 | IaC | Terraform through the platform's shared module (ADR 0003) | Same scanners, state and review as every other Azure stack; azd would be faster but bypasses that |
 | Language | Python | Matches the homelab `rag-api`, so the scorer and prompts are shared |
+| Enterprise ingestion (Phase 10) | Data Factory, a Data Lake with medallion zones, Functions ([ADR 0016](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0016)) | Connectors, triggers, retries and run history with no idle cost. Fabric fits an organisation that already pays for a capacity; this lab's budget doesn't |
+| Speed (Phase 11) | Measure each stage first, then tune the index and add a semantic cache ([ADR 0017](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0017)) | Generation takes seconds and retrieval tens of milliseconds, so a faster vector store would speed up the smallest stage. Cosmos DB and pgvector are benchmarked on the same data instead of assumed |
 | Multi-cloud layout | A shared core plus one adapter folder per cloud (ADR 0009) | AWS and GCP come later from the same repo; a per-cloud repo would let prompts and scorer drift, a framework over every cloud would hide the native services |
 
 The shared core is what doesn't import a cloud SDK: the API, prompts, citations, "not found" handling and the scorer.
@@ -133,7 +148,15 @@ erDiagram
 ```
 
 The index uses index projections, so one post produces many chunk documents, each carrying its parent's title
-and URL for citation. Details of the fields, chunk size and re-indexing are in
+and URL for citation. From Phase 10, every source writes the same canonical document to the curated zone, so the
+index doesn't care where a document came from:
+
+```json
+{"id": "<sha1 of source_id + key>", "source_id": "blog", "source_uri": "https://cloudutsuk.com/posts/...",
+ "title": "...", "content": "<clean Markdown>", "classification": "public", "acl": {"groups": [], "users": []},
+ "content_hash": "<md5>", "ingest_run_id": "<run id>", "extractor": "markdown@1", "language": "en"}
+```
+ Details of the fields, chunk size and re-indexing are in
 [Data and Integration](/posts/projects/rag-on-cloud/07-data-and-integration/#database-schema-and-migrations).
 
 ## Identity and access architecture
@@ -151,6 +174,8 @@ Keyless, end to end (ADR 0004):
 | rag-api | Foundry models and agent | User-assigned identity | Cognitive Services OpenAI User, Foundry User |
 | Knowledge base MCP connection | Search | Foundry project managed identity | Search Index Data Reader |
 | GitHub Actions | Storage, registry | Federated credential (OIDC) | Storage Blob Data Contributor, AcrPush |
+| Data Factory (Phase 10) | Lake `raw`, Key Vault | Its own managed identity | Write to its source's raw folder; Key Vault Secrets User |
+| Processing Function (Phase 10) | Lake `raw`, `curated`, `quarantine`; Document Intelligence, Language | Its own managed identity | Read raw; write curated and quarantine; Cognitive Services User |
 
 Search uses a user-assigned identity rather than a system-assigned one so that its role assignments can exist
 before the service does: the Search service is removed and recreated between sessions (ADR 0008), and a
@@ -186,6 +211,17 @@ expect to matter:
 - **Cold starts**: Container Apps at zero replicas adds start-up time to the first call. For eval runs I'll warm
   it first so the latency numbers measure RAG, not the platform.
 
+Phase 11 turns these into measurements ([ADR 0017](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0017)). Each change has to move a measured number:
+
+1. **Measure each stage.** The API records a span per stage (embed, retrieve, rerank, generate, first token), and
+   the eval results report p50 and p95 for each.
+2. **Tune the index.** Try quantization with rescoring and shorter vectors on the golden set.
+3. **Cache repeated questions.** A semantic cache answers a repeated question without retrieval or generation. Its
+   key includes the index version, the prompt version and the caller's permission scope.
+4. **Stream the answer**, so the first words arrive before the whole answer is written.
+5. **Benchmark two other stores.** Cosmos DB and PostgreSQL with pgvector get the same chunks and queries. The lab
+   switches only if one is faster without losing relevance or permission trimming.
+
 ## Resilience and disaster recovery
 {: #resilience-and-disaster-recovery }
 
@@ -211,5 +247,7 @@ The decisions live as MADR files in the lab's own repo and are published here.
 - [ ] Container Apps sign-in rejects anonymous calls
 - [ ] Rebuild from an empty resource group timed
 - [ ] ADR 0006 (orchestrator) and 0008 (idle cost) accepted or replaced
+- [ ] ADR 0016 (enterprise ingestion) and 0017 (retrieval speed) accepted or changed
+- [ ] A restricted test item is invisible to a denied user, chunks included
 
 {% include project-nav.html %}

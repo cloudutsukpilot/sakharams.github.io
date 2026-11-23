@@ -490,6 +490,166 @@ What the regions offer (checked 2026-11-23):
   Serverless) can be created in `ap-south-1`, before the vector-store ADR.
 - No resources are created yet: the owner starts AWS and GCP after the Azure testing is finished.
 
+## ADR-0016: Enterprise ingestion: a pipeline per source in Data Factory, a medallion lake on ADLS Gen2, Search indexes the curated layer
+{: #adr-0016 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-23 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
+
+#### Context
+
+Phase 1 step 1 ingests one source, the blog, with a GitHub Actions job that cleans the posts and uploads them to
+Blob; Search's indexer and skillset then chunk, embed and index them (ADR 0010). That is the right first slice, and
+it is how a single team would start. It isn't how an enterprise runs RAG ingestion, and the owner asked for the
+enterprise shape (2026-11-23): Azure's data services, several data sources, a pipeline per source, landing in a
+storage account, and room to add sources without touching the others.
+
+What an enterprise ingestion platform has to give, and the single-job sync doesn't:
+
+| Need | Why it matters | The sync today |
+|---|---|---|
+| One pipeline per source, same contract | Sources fail, change and get owners independently | One job, one source |
+| Raw copy kept (replay, audit) | Re-process after a cleaning bug without re-pulling from the source; prove what was indexed | Overwrites the cleaned copy only |
+| A canonical document schema | Retrieval, citations and filters work the same whatever the source | Blog-shaped JSON |
+| Format extraction (PDF, Office, HTML) | Most enterprise content isn't Markdown | Markdown only |
+| Document-level permissions | Users must retrieve only what they may read | Everything is public |
+| Lineage, run history, alerting, quarantine | Operate it; answer "where did this answer come from" | Workflow logs |
+| Classification and PII checks | Keep sensitive data out of prompts and logs | Not needed for public posts |
+
+#### Decision
+
+Build the ingestion platform from Azure data services, in five layers:
+
+1. **Source registry** (`sources/<id>.yaml` in this repo): connector, schedule or event trigger, owner,
+   classification, extractor, permission model and retention per source. Adding a source is a registry entry plus,
+   when needed, an extractor; CI generates and deploys its pipeline.
+2. **Ingest (Azure Data Factory)**: one pipeline per source, generated from one parameterised template: copy from
+   the source with the matching connector (HTTP/Git, REST, SharePoint, SQL, Blob/S3) into the raw zone. Schedule,
+   tumbling-window or storage-event triggers. The factory itself is Terraform (infra-azure); pipelines, datasets and
+   linked services are JSON in this repo, deployed by CI like the index objects (ADR 0003). Managed identities for
+   Azure sources; Key Vault for the credentials a SaaS connector needs.
+3. **Lake (ADLS Gen2, hierarchical namespace)**, one storage account with zones as containers:
+   - `raw` (bronze): the source's bytes as fetched, `raw/<source>/<yyyy>/<mm>/<dd>/<run id>/…`, immutable, kept
+     for replay (lifecycle to cool, then delete after the retention in the registry).
+   - `curated` (silver): one canonical JSON document per source item (the `ragcorpus` schema plus `source_id`,
+     `source_uri`, `content_hash`, `ingest_run_id`, `classification`, permission fields), `curated/<source>/…`.
+     Directory ACLs per source.
+   - `quarantine`: items that failed extraction or a quality gate, with the reason; an alert fires on any.
+4. **Process (Azure Functions, Flex Consumption, Python)**: started by Data Factory after the copy (or by Event
+   Grid on a raw blob): pick the extractor (Markdown: `ragcorpus`; PDF and Office: Azure AI Document Intelligence
+   layout to Markdown; HTML), normalise to the canonical schema, run the quality gates (non-empty, language,
+   size, duplicate hash), detect PII for non-public classifications (Azure AI Language), write `curated` or
+   `quarantine`, emit lineage. The cleaning code already written for the blog becomes the Markdown extractor.
+5. **Index (Azure AI Search)**: one indexer per source over `curated/<source>/`, sharing one skillset (Text Split
+   and the embedding skill, integrated vectorization as in ADR 0010) and one index with `source_id` as a filterable
+   facet. The ADLS Gen2 indexer ingests directory ACLs into permission fields (GA in REST `2026-10-01`), so queries
+   are trimmed to what the caller may read. Each indexed source is also a Foundry IQ knowledge source of the
+   agentic knowledge base (Phase 2), and systems that keep their own search and permissions (SharePoint, the web,
+   an MCP server) are added as *remote* knowledge sources at query time instead of being copied.
+
+The GitHub Actions sync stays as the blog's path until Phase 10 step 4 replaces it with the blog's Data Factory
+pipeline; both write the same canonical document, so the index doesn't change.
+
+#### Considered options
+
+- **Microsoft Fabric (Data Factory pipelines, OneLake, notebooks)**: the strongest choice where an organisation
+  already has a Fabric capacity: OneLake is a first-class Foundry IQ knowledge source and Fabric brings governance
+  and sharing. Rejected for this lab because Fabric bills a capacity (an F SKU) by the hour, the lab's budget is 100
+  a month (ADR 0008 removes even Search between sessions), and Data Factory is billed per activity run with no idle
+  cost. The registry, zones and canonical schema carry over unchanged if the lab moves to Fabric later.
+- **Search knowledge sources only (blob, SharePoint, OneLake generate their own indexer pipelines)**: the least
+  code, but each source gets its own generated index with fixed object names, there is no raw zone, no canonical
+  schema and no custom extraction or quality gates. Kept for remote sources, not for owned content.
+- **Our own chunking and embedding in the Functions (push model)**: full control and portable vectors for other
+  stores; it drops the managed indexing ADR 0010 chose to compare across clouds. Used only to produce the
+  benchmark export in ADR 0017, not for the primary index.
+- **Event-driven only (Event Grid to Functions, no Data Factory)**: cheaper for push sources, but no connectors for
+  pull sources (SharePoint, SQL, REST), no run history, retries or backfill windows. Event Grid is still used inside
+  the processing layer.
+- **Databricks or Synapse Spark for processing**: built for large tabular transforms; document extraction at this
+  scale needs neither a cluster nor its idle cost.
+
+#### Consequences
+
+- New resources (infra-azure, Phase 10 step 1): an ADLS Gen2 account with `raw`, `curated` and `quarantine`, a Data
+  Factory, a Function app on Flex Consumption with its own identity, Event Grid on the lake, Key Vault, and a
+  Document Intelligence account when the first PDF or Office source arrives. Platform-as-code has storage (with
+  hierarchical namespace), Functions, Event Grid and Key Vault modules; **Data Factory needs a new module**.
+- Idle cost stays near zero: Data Factory and Functions are consumption-billed, the lake is a few GB. Search stays
+  the only hourly resource.
+- Each source's owner, classification and permission model are explicit before it is ingested; a non-public source
+  can't be added without a permission model, so the "public posts only" rule (ADR 0002) becomes a registry check
+  instead of a convention.
+- More moving parts to operate: Phase 10 includes run monitoring (Data Factory diagnostics to Log Analytics),
+  reconciliation counts per source and a replay runbook.
+- Search permission filtering needs callers' delegated Entra tokens; the API passes the signed-in user's token
+  (Phase 1 step 5 adds Entra sign-in) in `x-ms-query-source-authorization`.
+
+## ADR-0017: Retrieval speed: AI Search stays the vector store; measure per stage, cache semantically, compress vectors, benchmark alternatives
+{: #adr-0017 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-23 · `rag-on-cloud`, `infra-azure`, `platform-as-code`</span>
+
+#### Context
+
+The owner asked whether a vector database would speed up retrieval (2026-11-23). Azure AI Search already is one:
+its vector fields use an HNSW graph, and it adds what a bare vector store lacks for RAG: hybrid keyword plus
+vector search, the semantic reranker, integrated vectorization from indexers, document-level permission filters,
+and Foundry IQ knowledge bases for agentic retrieval. So the question is really which part of an answer is slow and
+which change makes it faster.
+
+A RAG answer has five stages: embed the question, retrieve (vector and keyword), rerank, generate, and stream. On
+an index of a few thousand chunks, retrieval is normally tens of milliseconds and reranking about a hundred or two;
+generating the answer takes seconds. Moving the vectors to another store would speed up the smallest stage. That has
+to be shown with measurements, not assumed, and the starting targets (p95 under 4 s standard, 15 s agentic) are
+end-to-end.
+
+#### Decision
+
+1. **Measure each stage first.** The API records a span per stage (embed, retrieve, rerank, generate, first
+   token) to Application Insights, and the eval harness reports p50 and p95 per stage and mode. Every change below
+   must move a measured number.
+2. **Keep Azure AI Search as the primary retrieval store**, and tune it before replacing it:
+   - binary or scalar quantization with rescoring, and MRL truncation of `text-embedding-3-small` vectors
+     (smaller index, faster vector queries, quality checked on the golden set);
+   - hybrid search with the semantic reranker only where the golden set shows it pays for its latency;
+   - filters on `source_id` and dates, a tuned `top_k`, and replicas when query volume needs them.
+3. **Semantic cache in Azure Managed Redis (RediSearch module)**: before retrieval, look up the question's
+   embedding among recent questions; above a similarity threshold, return the cached answer and citations.
+   Partitioned by index version, prompt version and the caller's permission scope, with a TTL, so a cached answer
+   never crosses permissions or survives a reindex. This removes retrieval and generation entirely for repeat
+   questions: the largest saving available. The same instance holds agent conversation memory later.
+4. **Stream tokens to the client** (time to first token is what a user feels).
+5. **Benchmark the alternatives on the same data, as evidence**: export the curated corpus's chunks and vectors
+   once (`gold/` zone, ADR 0016) and load them into Azure Cosmos DB for NoSQL (DiskANN vector index, BM25 and
+   hybrid with RRF, serverless) and Azure Database for PostgreSQL (pgvector with DiskANN). Run the golden set's
+   retrieval through each: hit@5, MRR, p50/p95 retrieval latency, cost per thousand queries, and idle cost. Record
+   the result as an ADR update; switch only if a store beats AI Search on the measured stage without losing
+   relevance or permission trimming.
+
+#### Considered options
+
+- **Move the vectors to a dedicated vector database now**: optimises the fastest stage, loses the semantic reranker,
+  indexers and permission filters (each would be rebuilt by hand), and adds a second copy to keep in sync.
+- **Cosmos DB for NoSQL as the primary store**: a good fit when the application's operational data already lives
+  there (vectors beside the data, serverless, DiskANN); here the data is documents, so it's a benchmark candidate.
+- **PostgreSQL with pgvector**: a good fit for relational data with a few vector columns; same reasoning.
+- **Azure Managed Redis as the primary store**: very fast, but memory-priced and weak on relevance features; used for
+  the cache, where its speed matters most.
+- **Bigger Search tier now**: S1 adds partitions and memory; not needed at this corpus size. Revisit when the index
+  or query rate grows.
+
+#### Consequences
+
+- New resources, created only for the sessions that need them (like Search, ADR 0008): an Azure Managed Redis
+  instance with RediSearch (it can't be added after creation), and for the benchmark only, a Cosmos DB serverless
+  account and a PostgreSQL flexible server that is stopped between sessions. Platform-as-code has PostgreSQL;
+  Cosmos DB and Managed Redis need new modules.
+- Redis has a fixed hourly price; with Search Basic the lab's budget (100 a month) holds only if both are removed
+  between sessions. If the owner wants the cache always on, the budget needs to rise; that is an open question.
+- The cache must be invalidated on every reindex and prompt change; the cache key includes both versions.
+- The vector-store comparison becomes part of the public write-up, which is the useful part for readers: most
+  "do I need a vector database" questions are answered by the per-stage latency table.
+
 {% endraw %}
 <!-- adr:end -->
 
