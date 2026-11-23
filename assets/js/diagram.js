@@ -1186,6 +1186,7 @@
       const placed = this.data.map ? this.geoLayout() : this.stable ? await this.stableLayout(vis) : await this.elkLayout(vis);
       if (token !== this.layoutToken) return; // a newer layout started meanwhile
       this.render(placed, vis, animate && MOVE_MS > 0);
+      this.regroup?.(); // lock mode groups steps by the closed components
       if (fit) this.overview(animate);
       else if (anchor && this.pos.has(anchor)) this.zoomToFit(anchor, was, animate);
       else if (focus && this.pos.has(focus)) this.focusOn([focus], animate);
@@ -2722,8 +2723,97 @@
         (x.path || []).map(leg).filter(Boolean).forEach((l) => g.push([l]));
         return g;
       };
+      // The use case's steps as written (for the current mode). Each group of hops remembers its step's
+      // action (the banner line while it runs) and each hop its step's packet, so both survive grouping.
+      const rawOf = (scn, mode) =>
+        scn.steps.filter((x) => !x.when || x.when === mode).map((x, i) => {
+          const s = { ...x, edges: x.edges || [], groups: groupsOf(x), rawIdx: [i] };
+          s.groups.forEach((g) => {
+            g.action = s.action || s.title;
+            g.forEach((l) => (l.pk = (s.packets && s.packets[l.rev ? `~${l.id}` : l.id]) || null));
+          });
+          return s;
+        });
+      // Lock mode plays on the reader's layout, so a step whose every hop starts and ends inside one closed
+      // component only pulses it. Consecutive steps inside the same closed component become one step: one
+      // card listing each of them, and fewer steps in the count. Opening the component (or unlocking) shows
+      // them one by one again.
+      const insideOf = (x) => {
+        const legs = x.groups.flat();
+        let c = null;
+        for (const l of legs) {
+          const a = this.repOf(l.from);
+          if (!a || a !== this.repOf(l.to)) return null;
+          if (c && c !== a) return null;
+          c = a;
+        }
+        if (!legs.length) {
+          const reps = (x.lights || []).map((id) => this.repOf(id));
+          if (!reps.length || reps.some((r, k) => !r || r !== reps[0] || r.id === x.lights[k])) return null;
+          c = reps[0];
+        }
+        return c;
+      };
+      const groupSteps = (raw) => {
+        if (!this.locked) return raw;
+        const out = [];
+        for (let i = 0; i < raw.length; ) {
+          const c = insideOf(raw[i]);
+          let j = i + 1;
+          if (c) while (j < raw.length && !raw[j].clear && insideOf(raw[j]) === c) j++;
+          if (j - i < 2) {
+            out.push(raw[i++]);
+            continue;
+          }
+          const m = raw.slice(i, j);
+          const last = m[m.length - 1];
+          const lights = [...new Set(m.flatMap((y) => y.lights || []))];
+          out.push({
+            title: `Inside ${c.label}`,
+            action: `${c.label}: ${m.length} steps inside it`,
+            text: '',
+            merged: m,
+            inside: c.id,
+            rawIdx: m.flatMap((y) => y.rawIdx),
+            edges: [],
+            groups: m.flatMap((y) => y.groups),
+            lights: lights.length ? lights : undefined,
+            clear: m[0].clear,
+            result: last.result,
+            outcome: last.outcome,
+            at: last.at || (last.groups.length ? undefined : (last.lights || [])[0])
+          });
+          i = j;
+        }
+        return out;
+      };
       const buildSteps = () => {
-        this.steps = this.scn.steps.filter((x) => !x.when || x.when === this.mode).map((x) => ({ ...x, edges: x.edges || [], groups: groupsOf(x) }));
+        this.rawSteps = rawOf(this.scn, this.mode);
+        this.steps = groupSteps(this.rawSteps);
+      };
+      // The step count on each use case in the menu: what Play will show at the current layout.
+      const updateCounts = () => {
+        picker?.querySelectorAll('.dgm-scn').forEach((b, j) => {
+          const scn = list[j];
+          const n = scn === this.scn ? this.steps.length : groupSteps(rawOf(scn, (scn.modes || [{ id: 'default' }])[0].id)).length;
+          const meta = b.querySelector('.dgm-scn-meta');
+          if (meta) meta.textContent = `${n} step${n === 1 ? '' : 's'}`;
+        });
+      };
+      // After a layout change or a lock toggle: group again, keep the place (the step holding the same
+      // written step), refresh the card and the counts.
+      this.regroup = () => {
+        if (!this.rawSteps) return;
+        const rawAt = (i) => (i != null && i >= 0 && this.steps[i] ? this.steps[i].rawIdx[this.steps[i].rawIdx.length - 1] : null);
+        const k = rawAt(this.k);
+        const run = rawAt(this.stepRunning);
+        const before = this.steps.map((x) => x.rawIdx.join(',')).join('|');
+        this.steps = groupSteps(this.rawSteps);
+        const at = (r) => (r == null ? null : this.steps.findIndex((x) => x.rawIdx.includes(r)));
+        if (k != null) this.k = at(k);
+        if (run != null) this.stepRunning = at(run);
+        updateCounts();
+        if (before !== this.steps.map((x) => x.rawIdx.join(',')).join('|') && this.stepRunning != null) this.setCard(this.stepRunning);
       };
       // The box shows the current step; before the first step, the use case and its summary.
       this.setCaption = (i) => {
@@ -2776,6 +2866,14 @@
         }
         return rows.join('\n');
       };
+      // A grouped step's description: each step it holds, numbered, with its text (its detail with Details on).
+      const mergedMd = (x) =>
+        x.merged
+          .map((m, k) => {
+            const d = this.details && this.detailOf(m);
+            return d ? `**${k + 1} · ${m.title}**\n\n${d}` : `**${k + 1} · ${m.title}.** ${m.text || ''}`;
+          })
+          .join('\n\n');
       this.detailOf = (x) => {
         if (x.detail) return x.detail;
         const hops = hopsMd(x);
@@ -2784,10 +2882,7 @@
       // ---- Packet inspector: what one hop of a step carries, layer by layer, in the side panel.
       // A hop's content: the step's `packets: {<edge id or ~id>: …}`, else the arrow's own `packet`
       // (the request) or `reply` (the response). Without one, the layers still say what the arrow knows.
-      const packetOf = (x, l) => {
-        const own = x.packets && x.packets[l.rev ? `~${l.id}` : l.id];
-        return own || (l.rev ? l.e.reply : l.e.packet) || null;
-      };
+      const packetOf = (x, l) => l.pk || (x && x.packets && x.packets[l.rev ? `~${l.id}` : l.id]) || (l.rev ? l.e.reply : l.e.packet) || null;
       this.packetOf = packetOf;
       const inspectBtn = ctl.querySelector('[data-act="inspect"]');
       const UDP = ['WIREGUARD', 'DNS', 'QUIC', 'UDP', 'NTP', 'STATSD', 'SYSLOG', 'SNMP'];
@@ -2925,9 +3020,9 @@
         const x = this.steps[i];
         if (!banner || !x) return;
         if (inspectBtn) inspectBtn.disabled = !x.groups.flat().length;
-        const long = this.details && this.detailOf(x);
+        const long = x.merged ? mergedMd(x) : this.details && this.detailOf(x);
         part('n').textContent = `${i + 1}/${this.steps.length}`;
-        part('title').textContent = x.title || '';
+        part('title').textContent = x.merged ? `${x.title} · ${x.merged.length} steps` : x.title || '';
         part('scn').textContent = this.scn.title || 'Guided tour';
         // A blank line in `detail` starts a new paragraph; `- ` lines are a list.
         part('text').innerHTML = String(long || x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
@@ -2962,7 +3057,7 @@
       // on, long enough to read the detail (time already spent on the step counts).
       this.dwell = (x) => {
         const base = DWELL_MS / this.speed;
-        const d = this.details && x && this.detailOf(x);
+        const d = x && (x.merged ? mergedMd(x) : this.details && this.detailOf(x));
         if (!d) return base;
         const words = String(d).split(/\s+/).filter(Boolean).length;
         const read = Math.min(READ_MAX_MS, words * READ_MS_PER_WORD) / this.speed;
@@ -3079,7 +3174,7 @@
             else hidden.push(hiddenLeg(l));
           }
           const x = this.steps[this.stepRunning];
-          const line = x ? x.action || x.title : '';
+          const line = legs.action || (x ? x.action || x.title : '');
           this.setBanner(hidden.length && line ? `${line} · ${[...new Set(hidden.map((h) => h.note))].join(', ')}` : line || null);
           const pulsed = [...new Set(hidden.map((h) => h.rep && this.nodeEls.get(h.rep.id)).filter(Boolean))];
           pulsed.forEach((el) => {
@@ -3338,6 +3433,7 @@
           b.setAttribute('aria-selected', j === i ? 'true' : 'false');
         });
         buildSteps();
+        updateCounts();
         this.k = -1;
         this.lit = empty();
         this.applyLit();
@@ -3402,6 +3498,7 @@
         this.locked = on;
         setLockIcon();
         if (on) await this.restoreLayout();
+        this.regroup();
         if (wasPlaying) {
           // Play again from the current step.
           this.k = Math.max(-1, this.k - 1);
@@ -3420,6 +3517,7 @@
         this.stop();
         this.mode = modeBox.checked && this.modes[1] ? this.modes[1].id : this.modes[0].id;
         buildSteps();
+        updateCounts();
         this.relayout({}).then(() => this.showStep(-1));
       });
       this.selectScenario(0);
