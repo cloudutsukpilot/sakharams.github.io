@@ -246,14 +246,15 @@ new layout instead. Rules:
 - Every step has a `title` (2 to 5 words) and `text` (1 or 2 sentences, under about 230 characters)
   naming the protocol and port where it matters. `text` says what the step does and why, not only
   where the packet goes, so the step card makes sense on its own.
-- **`detail` for the steps that need explaining:** 3 to 10 short lines (under about 160 words) of
+- **`detail` on every step:** 3 to 10 short lines (under about 160 words) of
   Markdown: sentences, `- ` lines for a list, a blank line between paragraphs, `code` for names. It
   replaces `text` on the step card when the reader ticks **Details** in the player (`details: true` at
   the top level starts ticked; the reader's choice is remembered in their browser). Say what happens
   inside the step that the arrow can't show: which function or check runs, what it decides, what
   happens when it refuses, what the next step depends on. Facts from the post or the repo only; don't
   repeat `text` or the arrow's `why`. With Details on, auto-play stays long enough to read it (about
-  250 words a minute, at most 25 s). Give every use case at least one; the validator warns otherwise.
+  250 words a minute, at most 25 s). A step without `detail` still changes with Details: the card shows
+  its `text` and then each hop (from → to, protocol:port, the arrow's `why`), so the box never does nothing.
 - **`detail` for a semi-technical reader** (leadership, product, a new team member), when the post
   is for them: give every step one, as three short paragraphs with bold leads, each one or two plain
   sentences: `**What happens:**` (the function or check in `code`, and what it does in everyday

@@ -489,6 +489,29 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
               await box.click();
             }
           } else note('Details box shown, but no use case has a step with `detail` in its first mode');
+          // Every step of every use case (each mode): Details must change the card (its `detail`, or its hops).
+          const same = await page.$eval(sel, (f) => {
+            const d = f._dgm;
+            const keep = { scn: d.scn, mode: d.mode, steps: d.steps, details: d.details };
+            const out = [];
+            for (const sc of d.data.scenarios || [d.data.tour]) {
+              for (const m of sc.modes || [{ id: 'default' }]) {
+                const steps = sc.steps.filter((x) => !x.when || x.when === m.id);
+                steps.forEach((x, i) => {
+                  const g = { ...x, groups: [] };
+                  for (const ref of [...(x.edges || []), ...(x.path || [])]) {
+                    const r = String(ref); const rev = r.startsWith('~'); const id = rev ? r.slice(1) : r; const e = d.edgeById.get(id);
+                    if (e) g.groups.push([{ id, rev, e, from: rev ? e.to : e.from, to: rev ? e.from : e.to }]);
+                  }
+                  const long = d.detailOf(g);
+                  if (!long || long.trim() === String(x.text || '').trim()) out.push(`${sc.id || sc.title} #${i + 1}`);
+                });
+              }
+            }
+            Object.assign(d, keep);
+            return out;
+          });
+          check(same.length === 0, same.length ? `Details changes nothing on ${same.join(', ')}` : 'Details changes the card on every step');
         } else note('no step has `detail`, so there is no Details box');
         // The last step of the first use case: its outcome is celebrated.
         await page.click(`${sel} .dgm-scn`).catch(() => {});
