@@ -1046,3 +1046,14 @@ lessons:
     fix: "The rules ConfigMap comes from the chart's extra objects and is mounted with the single binary's extra volumes. The rendered chart was checked with helm template, and its config with Loki's -verify-config. A local Loki loaded and evaluated the rules before the change went to review. Extra objects pass through Helm's tpl, so the LogQL avoids double braces."
     lesson: "Before relying on a chart value, render the chart in the mode you run and look for every object the value should create. A value that is valid in the schema can still render nothing."
     adrs: ["0120"]
+
+  - id: L097
+    date: 2026-11-23
+    step: "Phase 6, step 41"
+    title: "A ConfigMap that updated on disk changed nothing, because the process had read it once at start"
+    tags: [kubernetes, configmap, argo-cd, wardens]
+    symptom: "A host was added to the chat links allow-list and Argo CD synced the ConfigMap, yet the next approval card in Slack still lost its console button: the egress filter dropped the link as if the change had never happened."
+    cause: "Kubelet had updated the mounted file, but the chat egress worker builds its filter from that file when it starts, and its pod had started five hours earlier. The ConfigMap and the Deployment come from different sources of the same Argo CD app, so no checksum on the pod template could roll it."
+    fix: "Stakater Reloader on the wardens cluster rolls every Deployment that mounts the deploy config when that ConfigMap changes; the charts annotate exactly those Deployments. Its annotation strategy doesn't show as drift in Argo CD."
+    lesson: "A mounted ConfigMap updates the file, not the process. For each process that reads config, decide how a change reaches it (re-read, or a roll) when you add the config, and check it once by changing the config, not only by deploying it fresh."
+    adrs: ["0124"]
