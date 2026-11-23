@@ -339,8 +339,9 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       }
       // Use cases close the open groups they don't use, and put the reader's layout back afterwards.
       if (info.tour) {
-        // No box before a use case is played; a click on a use case opens it in the bottom-right corner,
-        // narrow, with the controls at its foot, and plays; its close button stops and hides it.
+        // No box before a use case is played; a click on a use case opens it across the bottom of the
+        // canvas, the description on the left and the controls in a 2 x 4 grid on the right (on a phone,
+        // in a row under the description), and plays; its close button stops and hides it.
         const idle = await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on'));
         check(idle, 'no player box before a use case is played');
         const layout0 = await page.$$eval(`${sel} [data-kind="group"]`, (x) => x.length);
@@ -354,15 +355,22 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
             on: f.querySelector('.dgm-banner').classList.contains('is-on'),
             playing: f._dgm.playing,
             right: Math.round(st.right - b.right),
+            left: Math.round(b.left - st.left),
             bottom: Math.round(st.bottom - b.bottom),
             w: Math.round(b.width),
             sw: Math.round(st.width),
             ctl: !!c && c.getBoundingClientRect().bottom <= b.bottom + 1,
+            beside: !!c && c.getBoundingClientRect().left > f.querySelector('.dgm-banner-main').getBoundingClientRect().right - 1,
+            rows: c ? new Set([...c.querySelectorAll('.dgm-btn')].map((x) => Math.round(x.getBoundingClientRect().top))).size : 0,
             old: !!f.querySelector('.dgm-player, .dgm-dot'),
           };
         });
         check(pos.on && pos.playing, 'a click on a use case opens the player box and plays it');
-        check(pos.right < 24 && pos.bottom < 24 && (pos.w <= 400 || pos.w >= pos.sw - 30) && pos.ctl && !pos.old, `the box sits in the bottom-right corner, ${pos.w}px wide, with the controls at its foot`);
+        const phone = pos.sw < 560;
+        check(
+          pos.right < 24 && pos.left < 24 && pos.bottom < 24 && pos.ctl && !pos.old && (phone ? pos.rows <= 2 : pos.beside && pos.rows === 2),
+          `the box spans the bottom of the canvas (${pos.w} of ${pos.sw}px), the controls ${phone ? 'under the description' : 'beside it in 2 rows'}`,
+        );
         await fig.screenshot({ path: path.join(args.out, 'player-open.png') });
         await page.click(`${sel} .dgm-banner-close`);
         await page.waitForTimeout(2500);
@@ -469,6 +477,28 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           await page.$eval(sel, (f) => f._dgm.closeBox());
           await page.waitForTimeout(1200);
         } else note('lock mode groups no steps at this layout (no two consecutive steps inside one closed component)');
+        // At every level, grouping never folds a use case of two or more steps into a single step.
+        const short = await page.$eval(sel, async (f) => {
+          const d = f._dgm;
+          const cur = d.scenarios.indexOf(d.scn);
+          const lvl = d.level;
+          const open = new Set(d.expanded);
+          const bad = [];
+          for (let lv = 0; lv <= d.maxLevel; lv++) {
+            await d.stepToLevel(lv);
+            for (let i = 0; i < d.scenarios.length; i++) {
+              d.selectScenario(i);
+              if (d.rawSteps.length >= 2 && d.steps.length < 2) bad.push(`${d.scn.id}@${lv}`);
+            }
+          }
+          await d.stepToLevel(lvl);
+          d.expanded = open;
+          await d.relayout({});
+          d.selectScenario(cur);
+          return bad;
+        });
+        check(!short.length, `in lock mode every use case keeps at least two steps at every level${short.length ? ` (one step: ${short.join(', ')})` : ''}`);
+
         if (!startLocked) {
           await ctl('lock');
           await page.waitForTimeout(600);
@@ -540,6 +570,48 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           const st = await page.$eval(sel, (f) => ({ playing: f._dgm.playing, insp: f._dgm.inspecting && !f.querySelector('.dgm-panel').hidden, layers: f.querySelectorAll('.dgm-pk-layer').length }));
           check(!st.playing && st.insp && st.layers >= 3, `pressing a moving packet pauses and opens the inspector (${st.layers} layers)`);
         }
+        // An arriving packet rests on its target (about 2 s at 1x), so it can be pressed.
+        const rest = await page.$eval(sel, async (f) => {
+          const d = f._dgm;
+          d.closePanel?.();
+          d.stop();
+          d.speed = 1;
+          d.showStep(Math.max(0, d.steps.findIndex((x) => x.groups.length)), true);
+          const t0 = performance.now();
+          let a = null;
+          while (performance.now() - t0 < 12000) {
+            const n = f.querySelectorAll('.dgm-packet.is-arrived').length;
+            if (n && a == null) a = performance.now();
+            if (a != null && !n) return Math.round(performance.now() - a);
+            await new Promise((r) => setTimeout(r, 40));
+          }
+          return a == null ? -1 : 12000;
+        });
+        check(rest >= 1500 && rest < 4000, `an arriving packet rests on its target for ${rest} ms before the next hop`);
+        // Drag lock: dragging and the arrow keys keep the view; Play does not move the camera either.
+        await page.$eval(sel, (f) => f._dgm.closeBox());
+        await page.waitForTimeout(1500);
+        await page.$eval(sel, (f) => f.querySelector('[data-act="drag-lock"]').click());
+        const cam = () => page.$eval(sel, (f) => JSON.stringify(f._dgm.cam));
+        const c0 = await cam();
+        const sb = await page.$eval(`${sel} .dgm-stage`, (s) => { const r = s.getBoundingClientRect(); return { x: r.left + r.width * 0.3, y: r.top + r.height * 0.2 }; });
+        await page.mouse.move(sb.x, sb.y);
+        await page.mouse.down();
+        await page.mouse.move(sb.x + 90, sb.y + 60, { steps: 6 });
+        await page.mouse.up();
+        await page.focus(`${sel} .dgm-stage`);
+        await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(300);
+        const c1 = await cam();
+        await page.$eval(sel, (f) => { f._dgm.showBox(true); f._dgm.showStep(Math.min(1, f._dgm.steps.length - 1), true); });
+        await page.waitForTimeout(2500);
+        const c2 = await cam();
+        check(c0 === c1 && c1 === c2, 'drag lock: dragging, the arrow keys and Play leave the view where it was');
+        await page.$eval(sel, (f) => f._dgm.closeBox());
+        await page.waitForTimeout(1200);
+        await page.$eval(sel, (f) => f.querySelector('[data-act="drag-lock"]').click());
+        await page.$eval(sel, (f) => { f._dgm.showBox(true); f._dgm.showStep(Math.min(1, f._dgm.steps.length - 1), true); });
+        await page.waitForTimeout(400);
         await openPlayer();
         await ctl('inspect');
         await page.waitForTimeout(500);
@@ -677,7 +749,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await page.waitForTimeout(600);
         await goStep((await stepCount()) - 1);
         const won = await page
-          .waitForFunction((s) => document.querySelector(`${s} .dgm-burst`) && /is-(success|done|fail)/.test(document.querySelector(`${s} .dgm-banner`).className), sel, { timeout: 20000, polling: 100 })
+          .waitForFunction((s) => document.querySelector(`${s} .dgm-burst`) && /is-(success|done|fail)/.test(document.querySelector(`${s} .dgm-banner`).className), sel, { timeout: 70000, polling: 100 }) // each hop rests 2 s on its target
           .then(() => true, () => false);
         check(won, 'the last step shows its outcome (banner + celebration)');
         await page.waitForTimeout(250);
