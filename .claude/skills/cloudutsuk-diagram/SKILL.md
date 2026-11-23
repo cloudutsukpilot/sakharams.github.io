@@ -265,11 +265,24 @@ new layout instead. Rules:
   one is open, full width on a phone) is the one place for the description and the controls. Its head
   has `n/N`, the use case's title and a close button; then the step's title, the action line and `text`
   (or `detail` with Details on, the box growing taller); at its foot the controls: play/pause, previous,
-  next, restart, speed, the layout padlock, the alternative mode and Details. It shows only while a use
+  next, restart, speed, the layout padlock, the packet inspector, the alternative mode and Details. It shows only while a use
   case runs: a click on a use case opens it and plays, it stays while the use case runs (also paused),
   and it goes 5 seconds after the last step, or at once with the close button (which stops and puts the
   reader's layout back). While it is up, the camera frames each step in the room left of it. There are
   no per-step dots.
+- Each hop is drawn as a packet: a small frame with a header strip and the arrow's protocol on it, a
+  chevron for its direction; requests in `accent2`, replies green.
+- The packet inspector: a press on a moving packet, or the magnifier in the controls, pauses the use
+  case and opens the side panel on that step's hops (a tab per hop), layer by layer like a packet
+  capture: Network (source and destination components), Transport (TCP or UDP and the ports), Security
+  (TLS or mTLS with the certificates from `certs`, or why there is none), Application (the protocol's
+  message, then the packet's own `line` and `headers`) and Payload (`body`, its size, Copy). The step
+  counts as reached, so Next and Play go on from the next one, and the inspector follows the steps
+  until another panel opens. Record what 1 to 3 hops per use case carry (`packets` on the step), the
+  ones that teach the most. **This blog is public:** copy the shape from public docs or the code, use
+  placeholders for every id, token, key, hostname and email (`<token>`, `example.com`), never a private
+  repo link, and set `illustrative: true` when the values are examples. `validate.py` rejects anything
+  that looks like a live token or key.
 - Play runs only the selected use case and stops after its last step (then the reader's layout comes
   back); `loop: true` plays the same use case again.
 
@@ -331,7 +344,7 @@ arrow's panel with its exchange (bracket rail, looping) first and the collapsed 
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
 deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box in the bottom-right corner, controls at its foot), `step-details.png` (the same card with Details
-ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
+ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -354,6 +367,7 @@ read. Never commit.
 | `certs` | Certificate catalog: `{id: {label, type, by, issuer, valid, trust, key?, stored?, note?}}`, referenced by edges (step 2). `issuer` may be left out for `type: key` |
 | `scenarios` | Use cases: `[{id, title, summary?, modes?, steps: [{title, action, text, detail?, edges?, path?, lights?, when?, clear?, result?, outcome?, at?}]}]`. `detail`: 3 to 10 lines shown with the Details box. `edges` run together, `path` hops one after another (`~id` = response travelling back). `loop: true` at the top level makes Play repeat the selected use case (default: stop after its last step and restore the reader's layout) |
 | `lock` | Always set when there are use cases: `false` (default) lets each step open the groups it needs; `true` opens the diagram in lock mode, so use cases play on the reader's layout. The padlock in the player toggles it |
+| `packets` (on a step) | What the step's hops carry, for the packet inspector: `{<edge id> or ~<edge id>: {summary?, line?, headers?, body?, lang?, note?, source?, illustrative?}}`; each key must be a hop of the step. `line` is the first line on the wire (`POST /g/collect HTTP/2`), `headers` a mapping, `body` a mapping (shown as JSON) or a string with `lang`; `source` says where it was copied from, `illustrative: true` that the values are examples. An edge can carry `packet` / `reply` instead, used wherever a use case sends it |
 | `details` | `true` opens with the Details box ticked, so the step card shows each step's `detail`; default `false`. The reader's own choice, once made, wins |
 | `map` | Geo backdrop `{name: world, lon: [w, e], lat: [n, s], width, height}`; nodes use `lat`/`lon` |
 

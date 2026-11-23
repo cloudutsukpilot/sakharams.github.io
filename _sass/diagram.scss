@@ -462,18 +462,48 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   pointer-events: none;
 }
 
-.dgm-pointer {
-  pointer-events: none;
+// A use case's packet: a frame with a header strip and its protocol, a chevron in front. Requests in
+// accent2, replies green; a press on it opens the packet inspector.
+.dgm-packet {
+  --dgm-pk: var(--dgm-accent2);
 
-  .dgm-halo {
-    fill: var(--dgm-accent2);
-    opacity: 0.3;
+  cursor: pointer;
+
+  &.is-back {
+    --dgm-pk: #16a34a;
   }
 
-  .dgm-head {
-    fill: var(--dgm-accent2);
-    stroke: var(--main-bg);
+  .dgm-packet-glow {
+    fill: var(--dgm-pk);
+    opacity: 0.22;
+  }
+
+  .dgm-packet-body {
+    fill: color-mix(in srgb, var(--dgm-pk) 14%, var(--main-bg));
+    stroke: var(--dgm-pk);
     stroke-width: 1.5;
+  }
+
+  .dgm-packet-hdr {
+    fill: var(--dgm-pk);
+  }
+
+  .dgm-packet-dir {
+    fill: var(--dgm-pk);
+    stroke: var(--main-bg);
+    stroke-width: 1;
+  }
+
+  .dgm-packet-tag {
+    fill: var(--dgm-ink);
+    font-family: $dgm-mono;
+    font-size: 9.5px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+
+  &:hover .dgm-packet-glow {
+    opacity: 0.4;
   }
 }
 
@@ -1605,6 +1635,16 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   right: calc(min(var(--dgm-panel-w, 360px), 94%) + 0.6rem);
 }
 
+// No room for both beside each other (a narrow canvas, a phone): the box sits over the panel's foot, and
+// the panel's content gets the box's height of room at its bottom (fitBox in diagram.js).
+.dgm.has-panel.is-box-over-panel .dgm-banner {
+  right: 0.6rem;
+}
+
+.dgm.is-box-over-panel .dgm-panel {
+  padding-bottom: var(--dgm-box-h, 14rem);
+}
+
 
 .dgm-toggle-mode[hidden],
 .dgm-toggle-details[hidden] {
@@ -1896,4 +1936,170 @@ body.dgm-full-open {
 .dgm-cert-tbd {
   --dgm-s: #d97706;
   border-style: dashed;
+}
+
+// ---- packet inspector (the side panel while it shows a hop's packet)
+.dgm-pk-kind {
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--dgm-accent2) 16%, var(--main-bg));
+  color: var(--dgm-ink);
+  font-size: 0.72rem;
+  font-weight: 600;
+
+  &.is-back {
+    background: color-mix(in srgb, #16a34a 16%, var(--main-bg));
+  }
+}
+
+.dgm-pk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.4rem 0;
+}
+
+.dgm-pk-tab {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--dgm-border);
+  border-left: 3px solid var(--dgm-accent2);
+  border-radius: 0.35rem;
+  background: var(--main-bg);
+  color: var(--dgm-ink);
+  font-size: 0.74rem;
+  cursor: pointer;
+
+  &.is-back {
+    border-left-color: #16a34a;
+  }
+
+  &.is-on {
+    background: var(--dgm-soft);
+    font-weight: 600;
+  }
+}
+
+.dgm-pk-route {
+  margin: 0.35rem 0;
+  font-size: 0.88rem;
+
+  code {
+    font-size: 0.78rem;
+  }
+}
+
+.dgm-pk-layer {
+  margin: 0.3rem 0;
+  border: 1px solid var(--dgm-border);
+  border-radius: 0.45rem;
+
+  > summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: '▸';
+      color: var(--dgm-muted);
+      font-size: 0.75rem;
+    }
+  }
+
+  &[open] > summary::before {
+    content: '▾';
+  }
+}
+
+.dgm-pk-tag {
+  flex: none;
+  min-width: 2.6rem;
+  padding: 0 0.3rem;
+  border-radius: 0.3rem;
+  background: var(--dgm-soft);
+  font-family: $dgm-mono;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dgm-pk-name {
+  flex: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.dgm-pk-sum {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--dgm-muted);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  code {
+    font-size: 0.72rem;
+  }
+}
+
+.dgm-pk-body {
+  padding: 0 0.55rem 0.45rem;
+
+  .dgm-config {
+    margin: 0.35rem 0 0;
+  }
+}
+
+.dgm-pk-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.6rem;
+  margin: 0;
+  font-size: 0.8rem;
+
+  dt {
+    color: var(--dgm-muted);
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.dgm-pk-muted {
+  color: var(--dgm-muted);
+  font-size: 0.92em;
+}
+
+.dgm-pk-none,
+.dgm-pk-src,
+.dgm-pk-note {
+  margin: 0.45rem 0 0;
+  color: var(--dgm-muted);
+  font-size: 0.8rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+.dgm-pk-ill {
+  padding: 0 0.35rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, #f59e0b 22%, var(--main-bg));
+  color: var(--dgm-ink);
+  font-weight: 600;
+}
+
+.dgm-banner .dgm-controls [data-act='inspect']:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

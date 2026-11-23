@@ -425,7 +425,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         for (let i = 0; i < steps; i++) {
           await ctl('next');
           const ran = await page
-            .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer, ${s} .is-pulsing`), sel, { timeout: 6000, polling: 50 })
+            .waitForFunction((s) => document.querySelector(`${s} .dgm-packet, ${s} .is-pulsing`), sel, { timeout: 6000, polling: 50 })
             .then(() => true, () => false);
           moved ||= ran;
           if (i === 0) await fig.screenshot({ path: path.join(args.out, 'step-locked.png') });
@@ -457,7 +457,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         }
         await ctl('next');
         const stepped = await page
-          .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 8000, polling: 50 })
+          .waitForFunction((s) => document.querySelector(`${s} .dgm-packet`), sel, { timeout: 8000, polling: 50 })
           .then(() => true, () => false);
         check(stepped, 'Next animates the step (a packet travels its arrow)');
         await fig.screenshot({ path: path.join(args.out, 'step-next.png') });
@@ -466,6 +466,96 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           await page.$eval(`${sel} .dgm-banner`, (b) => b.querySelector('.dgm-banner-title').textContent.length > 1 && b.querySelector('.dgm-banner-text').textContent.length > 10),
           'the step card shows the step title and its description',
         );
+        // The packet: a frame with a header strip and its protocol; Inspect (and a press on a moving
+        // packet) pauses and opens the packet inspector, layer by layer; it follows the steps.
+        await ctl('next');
+        const shape = await page
+          .waitForFunction((s) => {
+            const g = document.querySelector(`${s} .dgm-packet`);
+            return g && { body: !!g.querySelector('.dgm-packet-body'), hdr: !!g.querySelector('.dgm-packet-hdr'), tag: g.querySelector('.dgm-packet-tag')?.textContent || '', dot: !!g.querySelector('circle') };
+          }, sel, { timeout: 8000, polling: 50 })
+          .then((h) => h.jsonValue(), () => null);
+        check(shape && shape.body && shape.hdr && shape.tag && !shape.dot, `the moving packet is a framed packet with its protocol on it (${shape ? shape.tag : 'none seen'})`);
+        // Press the packet where nothing covers it (on a narrow canvas it can travel under the player box).
+        let pressed = null;
+        for (let t = 0; t < 60 && !pressed; t++) {
+          pressed = await page.$eval(sel, (f) => {
+            for (const g of f.querySelectorAll('.dgm-packet')) {
+              const r = g.querySelector('.dgm-packet-body').getBoundingClientRect();
+              const x = r.left + r.width / 2;
+              const y = r.top + r.height / 2;
+              if (document.elementFromPoint(x, y)?.closest('.dgm-packet') === g) return { x, y };
+            }
+            return null;
+          });
+          if (!pressed) await page.waitForTimeout(100);
+        }
+        if (!pressed) note('no moving packet was uncovered long enough to press (it travelled under the player box)');
+        if (pressed) {
+          await page.mouse.click(pressed.x, pressed.y);
+          await page.waitForTimeout(500);
+          const st = await page.$eval(sel, (f) => ({ playing: f._dgm.playing, insp: f._dgm.inspecting && !f.querySelector('.dgm-panel').hidden, layers: f.querySelectorAll('.dgm-pk-layer').length }));
+          check(!st.playing && st.insp && st.layers >= 3, `pressing a moving packet pauses and opens the inspector (${st.layers} layers)`);
+        }
+        await openPlayer();
+        await ctl('inspect');
+        await page.waitForTimeout(500);
+        const insp = await page.$eval(sel, (f) => ({
+          on: f._dgm.inspecting && !f.querySelector('.dgm-panel').hidden,
+          names: [...f.querySelectorAll('.dgm-pk-layer .dgm-pk-name')].map((x) => x.textContent),
+          at: f._dgm.inspectAt && f._dgm.inspectAt.i,
+        }));
+        check(insp.on && insp.names.includes('Network') && insp.names.includes('Application'), `Inspect opens the packet inspector on the current step (${insp.names.join(', ')})`);
+        await fig.screenshot({ path: path.join(args.out, 'inspector.png') });
+        // The first hop in the diagram with recorded content (a step's `packets`, an arrow's packet / reply).
+        const withPk = await page.$eval(sel, (f) => {
+          const d = f._dgm;
+          for (let i = 0; i < d.scenarios.length; i++) {
+            const scn = d.scenarios[i];
+            const mode = (scn.modes || [{ id: 'default' }])[0].id;
+            const steps = scn.steps.filter((x) => !x.when || x.when === mode);
+            for (let k = 0; k < steps.length; k++) {
+              const refs = [...(steps[k].edges || []), ...(steps[k].path || [])].map(String);
+              for (let j = 0; j < refs.length; j++) {
+                const rev = refs[j].startsWith('~');
+                const e = d.edgeById.get(rev ? refs[j].slice(1) : refs[j]);
+                if ((steps[k].packets && steps[k].packets[refs[j]]) || (e && (rev ? e.reply : e.packet))) return { i, k, j };
+              }
+            }
+          }
+          return null;
+        });
+        if (withPk) {
+          await page.$eval(sel, (f, w) => {
+            f._dgm.selectScenario(w.i);
+            f._dgm.showBox(true);
+          }, withPk);
+          await goStep(withPk.k);
+          await page.waitForTimeout(300);
+          await page.$eval(sel, (f, w) => {
+            f._dgm.stop();
+            f._dgm.inspect(w.k, w.j, true);
+          }, withPk);
+          await page.waitForTimeout(400);
+          const c = await page.$eval(sel, (f) => ({
+            raw: (f.querySelector('.dgm-pk-raw code, .dgm-pk-payload code') || {}).textContent || '',
+            src: !!f.querySelector('.dgm-pk-src'),
+          }));
+          check(c.raw.length > 5 && c.src, `a hop with a recorded packet shows its content and where it comes from (${c.raw.split('\n')[0].slice(0, 50)})`);
+          const box = await page.$eval(sel, (f, k) => f.querySelector('.dgm-banner-n').textContent === `${k + 1}/${f._dgm.steps.length}`, withPk.k);
+          check(box, 'the player box shows the step being inspected');
+          await fig.screenshot({ path: path.join(args.out, 'inspector-content.png') });
+          // The inspector follows the steps while it is open.
+          if (withPk.k + 1 < (await stepCount())) {
+            await ctl('next');
+            await page.waitForTimeout(800);
+            check((await page.$eval(sel, (f) => f._dgm.inspectAt && f._dgm.inspectAt.i)) === withPk.k + 1, 'the inspector follows the next step');
+          }
+        } else note('no hop has a recorded packet (`packets` on a step, or `packet` / `reply` on an arrow)');
+        await page.$eval(sel, (f) => f._dgm.closePanel());
+        await page.$eval(sel, (f) => f._dgm.stop());
+        await pick();
+        await openPlayer();
         // Details: the box swaps the card's short text for the step's `detail` (3 to 10 lines).
         const box = await page.$(`${sel} .dgm-toggle-details:not([hidden]) input`);
         if (box) {
@@ -560,7 +650,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await ctl('play');
         const moved = await page
           // a first step with no packet stays up to 25 s while Details is on (reading time), so wait past that
-          .waitForFunction((s) => document.querySelector(`${s} .dgm-pointer`), sel, { timeout: 40000, polling: 100 })
+          .waitForFunction((s) => document.querySelector(`${s} .dgm-packet`), sel, { timeout: 40000, polling: 100 })
           .then(() => true, () => false);
         check(moved, 'tour plays (a pointer travels an arrow)');
         // Play runs only the selected use case: after its last step it stops on the same use case.
