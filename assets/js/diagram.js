@@ -2658,7 +2658,8 @@
       // `details: true` starts with it on; the reader's choice is remembered in this browser.
       const detailLabel = ctl.querySelector('.dgm-toggle-details');
       const detailBox = detailLabel && detailLabel.querySelector('input');
-      const hasDetail = list.some((x) => x.steps.some((y) => y.detail));
+      // Offered whenever a step has a `detail` or makes a hop (Details then lists its hops).
+      const hasDetail = list.some((x) => x.steps.some((y) => y.detail || (y.edges || []).length || (y.path || []).length));
       const detailKey = `dgm-details:${this.root.id}`;
       let stored = null;
       try {
@@ -2742,15 +2743,41 @@
       const banner = this.root.querySelector('.dgm-banner');
       if (banner) banner.innerHTML = '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-title"></span><span class="dgm-banner-scn"></span></div><div class="dgm-banner-line"></div><div class="dgm-banner-text"></div>';
       const part = (c) => banner && banner.querySelector(`.dgm-banner-${c}`);
+      // What Details adds to a step without a `detail`: each hop it makes, with the protocol and why.
+      const hopsMd = (x) => {
+        const seen = new Set();
+        const rows = [];
+        const legs = x.groups.flat();
+        for (const l of legs) {
+          // A reply whose request is in the same step adds nothing: the request's row covers both.
+          if (seen.has(l.id) || (l.rev && legs.some((m) => !m.rev && m.id === l.id))) continue;
+          seen.add(l.id);
+          const a = this.nodes.get(l.from)?.label || l.from;
+          const b = this.nodes.get(l.to)?.label || l.to;
+          const proto = [l.e.proto, l.e.port != null ? `:${l.e.port}` : ''].join('') || l.e.label || '';
+          const why = `${l.rev ? 'reply. ' : ''}${l.e.why || l.e.label || ''}`;
+          rows.push(`- **${a} → ${b}**${proto ? ` (${proto})` : ''}${why ? `: ${String(why).replace(/\s+/g, ' ').trim()}` : ''}`);
+        }
+        for (const id of x.lights || []) {
+          const n = this.nodes.get(id);
+          if (n && !x.groups.flat().some((l) => l.from === id || l.to === id)) rows.push(`- **${n.label}**${n.sub ? `: ${n.sub}` : ''}`);
+        }
+        return rows.join('\n');
+      };
+      this.detailOf = (x) => {
+        if (x.detail) return x.detail;
+        const hops = hopsMd(x);
+        return hops ? `${x.text || ''}\n\n${hops}` : '';
+      };
       this.setCard = (i) => {
         const x = this.steps[i];
         if (!banner || !x) return;
-        const long = this.details && x.detail;
+        const long = this.details && this.detailOf(x);
         part('n').textContent = `${i + 1}/${this.steps.length}`;
         part('title').textContent = x.title || '';
         part('scn').textContent = list.length > 1 ? this.scn.title || '' : '';
         // A blank line in `detail` starts a new paragraph; `- ` lines are a list.
-        part('text').innerHTML = String(long ? x.detail : x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
+        part('text').innerHTML = String(long || x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
       };
@@ -2775,8 +2802,9 @@
       // on, long enough to read the detail (time already spent on the step counts).
       this.dwell = (x) => {
         const base = DWELL_MS / this.speed;
-        if (!this.details || !x || !x.detail) return base;
-        const words = String(x.detail).split(/\s+/).filter(Boolean).length;
+        const d = this.details && x && this.detailOf(x);
+        if (!d) return base;
+        const words = String(d).split(/\s+/).filter(Boolean).length;
         const read = Math.min(READ_MAX_MS, words * READ_MS_PER_WORD) / this.speed;
         return Math.max(base, read - (performance.now() - (this.stepT0 || 0)));
       };
