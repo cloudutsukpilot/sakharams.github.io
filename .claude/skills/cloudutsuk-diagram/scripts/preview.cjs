@@ -441,10 +441,46 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         }
         await page.waitForTimeout(1200);
         check((await layout()).open === before.open, 'rewinding a locked use case leaves the layout as it was');
+        // Lock mode: consecutive steps inside one closed component are one step, with one card listing them,
+        // and the use case's count in the menu drops to match.
+        const grp = await page.$eval(sel, (f) => {
+          const d = f._dgm;
+          const cur = d.scenarios.indexOf(d.scn);
+          for (let i = 0; i < d.scenarios.length; i++) {
+            d.selectScenario(i);
+            const k = d.steps.findIndex((x) => x.merged);
+            if (k >= 0) return { i, k, raw: d.rawSteps.length, now: d.steps.length, n: d.steps[k].merged.length, meta: f.querySelectorAll('.dgm-scn-meta')[i].textContent };
+          }
+          d.selectScenario(cur);
+          return null;
+        });
+        if (grp) {
+          check(grp.now < grp.raw && grp.meta.startsWith(`${grp.now} step`), `lock mode groups ${grp.n} steps inside one closed component: ${grp.raw} → ${grp.now} steps, and the menu says ${grp.meta}`);
+          await page.$eval(sel, (f) => f._dgm.showBox(true));
+          await goStep(grp.k);
+          await page.waitForTimeout(3500);
+          const card = await page.$eval(sel, (f) => ({
+            n: f.querySelector('.dgm-banner-n').textContent,
+            title: f.querySelector('.dgm-banner-title').textContent,
+            items: f.querySelectorAll('.dgm-banner-text strong').length,
+          }));
+          check(card.n === `${grp.k + 1}/${grp.now}` && card.title.includes(`${grp.n} steps`) && card.items >= grp.n, `one card lists the grouped steps ("${card.title}", ${card.n})`);
+          await fig.screenshot({ path: path.join(args.out, 'step-grouped.png') });
+          await page.$eval(sel, (f) => f._dgm.closeBox());
+          await page.waitForTimeout(1200);
+        } else note('lock mode groups no steps at this layout (no two consecutive steps inside one closed component)');
         if (!startLocked) {
           await ctl('lock');
           await page.waitForTimeout(600);
-        }
+          if (grp) {
+            const back = await page.$eval(sel, (f, i) => {
+              f._dgm.selectScenario(i);
+              return f._dgm.steps.length === f._dgm.rawSteps.length;
+            }, grp.i);
+            check(back, 'unlocked, every step plays on its own again');
+            await page.$eval(sel, (f) => f._dgm.selectScenario(0));
+          }
+        } else if (grp) await page.$eval(sel, (f) => f._dgm.selectScenario(0));
       }
       // Use cases: the picker switches scenario, and Next animates a packet along the step.
       if (info.tour) {
@@ -477,6 +513,8 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           .then((h) => h.jsonValue(), () => null);
         check(shape && shape.body && shape.hdr && shape.tag && !shape.dot, `the moving packet is a framed packet with its protocol on it (${shape ? shape.tag : 'none seen'})`);
         // Press the packet where nothing covers it (on a narrow canvas it can travel under the player box).
+        // Hit-test and press in the same tick: the packet keeps moving, so a click sent a round trip later
+        // can land behind it. The pointer events go to whatever element is at that point, as a real press.
         let pressed = null;
         for (let t = 0; t < 60 && !pressed; t++) {
           pressed = await page.$eval(sel, (f) => {
@@ -484,7 +522,13 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
               const r = g.querySelector('.dgm-packet-body').getBoundingClientRect();
               const x = r.left + r.width / 2;
               const y = r.top + r.height / 2;
-              if (document.elementFromPoint(x, y)?.closest('.dgm-packet') === g) return { x, y };
+              const hit = document.elementFromPoint(x, y);
+              if (hit?.closest('.dgm-packet') !== g) continue;
+              const o = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+              hit.dispatchEvent(new PointerEvent('pointerdown', o));
+              hit.dispatchEvent(new PointerEvent('pointerup', o));
+              hit.dispatchEvent(new MouseEvent('click', o));
+              return { x, y };
             }
             return null;
           });
@@ -492,7 +536,6 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         }
         if (!pressed) note('no moving packet was uncovered long enough to press (it travelled under the player box)');
         if (pressed) {
-          await page.mouse.click(pressed.x, pressed.y);
           await page.waitForTimeout(500);
           const st = await page.$eval(sel, (f) => ({ playing: f._dgm.playing, insp: f._dgm.inspecting && !f.querySelector('.dgm-panel').hidden, layers: f.querySelectorAll('.dgm-pk-layer').length }));
           check(!st.playing && st.insp && st.layers >= 3, `pressing a moving packet pauses and opens the inspector (${st.layers} layers)`);

@@ -314,6 +314,15 @@ hides, pulses the component and the banner says so ("· inside Workers"). Set `l
 use cases read well at the start `level` and opening groups would distract. The reader can toggle the
 padlock either way; turning it on mid-way puts their layout back and keeps playing.
 
+Locked, consecutive steps whose every hop starts and ends inside the same closed component (or that only
+light components inside it) play as one step: one card titled "Inside Workers · 3 steps" lists each
+step's title and `text` (its `detail` with Details on), the `n/N` count and the use case's step count in
+the menu drop to match, the banner line names the step that is moving, and the packet inspector has a
+tab for every hop of the group. A step that also leaves the component, or has `clear`, starts a new
+step. Opening the component, a deeper level or unlocking shows every step again. So write each step for
+the deepest level and let the engine group them; a step's `title` and `text` must still read well in a
+list with its neighbours.
+
 ### 4. Write, validate, embed
 
 ```bash
@@ -344,7 +353,7 @@ arrow's panel with its exchange (bracket rail, looping) first and the collapsed 
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
 deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box in the bottom-right corner, controls at its foot), `step-details.png` (the same card with Details
-ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one). Then run htmlproofer on the same folder.
+ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one) and `step-grouped.png` (lock mode: consecutive steps inside one closed component on one card, when the layout has any). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
