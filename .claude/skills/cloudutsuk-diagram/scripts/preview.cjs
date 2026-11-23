@@ -142,7 +142,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       await page.waitForTimeout(900);
       const stage = await (await page.$(`${sel} .dgm-stage`)).boundingBox();
       // The player's tab hangs from the top of the canvas: only what is below it counts as in view.
-      const tabsBox = await page.$(`${sel} .dgm-player-handle`).then((t) => (t ? t.boundingBox() : null));
+      const tabsBox = null;
       const topClear = tabsBox ? tabsBox.y + tabsBox.height - stage.y + 8 : 10;
       const visible = async (css) => {
         for (const el of await page.$$(`${sel} ${css}`)) {
@@ -306,14 +306,22 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       await page.click(`${sel} [data-act="zoom-in"]`);
       await page.waitForTimeout(300);
       check(Math.abs((await scale()) - k0) > 1e-3, 'unlocking the zoom lets the buttons zoom again');
-      // The player is a drawer at the top of the canvas: hover its tab to open it, then press a control.
+      // The player's controls are in the step box (bottom right), which shows while a use case runs.
+      // A click on a use case opens it and plays; the checks below open it directly when it has gone.
       const openPlayer = async () => {
-        await page.hover(`${sel} .dgm-player-handle`);
-        await page.waitForSelector(`${sel} .dgm-player.is-open .dgm-controls`, { state: 'visible', timeout: 3000 });
+        await page.$eval(sel, (f) => { if (!f.querySelector('.dgm-banner.is-on')) f._dgm.showBox(true); });
+        await page.waitForSelector(`${sel} .dgm-banner.is-on .dgm-controls`, { state: 'visible', timeout: 3000 });
       };
       const ctl = async (a) => {
         await openPlayer();
-        await page.click(`${sel} .dgm-controls [data-act="${a}"]`);
+        await page.click(`${sel} .dgm-banner [data-act="${a}"]`);
+      };
+      // Pick a use case for a check that steps by hand: the click plays it, so pause it straight away.
+      const pick = async (i = 0) => {
+        const b = (await page.$$(`${sel} .dgm-scn`))[i];
+        if (!b) return;
+        await b.click();
+        await page.$eval(sel, (f) => { f._dgm.stop(); f._dgm.k = -1; });
       };
       const goStep = (k) => page.$eval(sel, (f, i) => { f._dgm.stop(); f._dgm.showStep(i, true); }, k);
       const stepCount = () => page.$eval(sel, (f) => f._dgm.steps.length);
@@ -325,30 +333,48 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await ctl('lock');
         await page.waitForTimeout(600);
         check(await page.$eval(`${sel} [data-act="lock"]`, (b) => b.getAttribute('aria-pressed') === 'false'), 'the padlock turns lock mode off');
+        // The padlock is in the player box, opened just for this: close it again.
+        await page.$eval(sel, (f) => f._dgm.showBox(false));
+        await page.waitForTimeout(400);
       }
       // Use cases close the open groups they don't use, and put the reader's layout back afterwards.
       if (info.tour) {
-        // Closed by default (and again once the pointer leaves); hovering the tab opens it; playing folds it away.
-        await page.mouse.move(2, 2);
-        await page.waitForTimeout(700);
-        check(!(await page.$eval(`${sel} .dgm-player`, (x) => x.classList.contains('is-open'))), 'the player is folded into its tab at the top of the canvas');
-        await openPlayer();
+        // No box before a use case is played; a click on a use case opens it in the bottom-right corner,
+        // narrow, with the controls at its foot, and plays; its close button stops and hides it.
+        const idle = await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on'));
+        check(idle, 'no player box before a use case is played');
+        const layout0 = await page.$$eval(`${sel} [data-kind="group"]`, (x) => x.length);
+        await page.click(`${sel} .dgm-scn`);
+        await page.waitForTimeout(2500);
         const pos = await page.$eval(sel, (f) => {
           const st = f.querySelector('.dgm-stage').getBoundingClientRect();
-          const c = f.querySelector('.dgm-controls').getBoundingClientRect();
-          return { top: c.top - st.top, dots: !!f.querySelector('.dgm-dot'), cap: !!f.querySelector('.dgm-caption:not([hidden])'), n: f.querySelector('.dgm-step-n').textContent };
+          const b = f.querySelector('.dgm-banner').getBoundingClientRect();
+          const c = f.querySelector('.dgm-banner .dgm-controls');
+          return {
+            on: f.querySelector('.dgm-banner').classList.contains('is-on'),
+            playing: f._dgm.playing,
+            right: Math.round(st.right - b.right),
+            bottom: Math.round(st.bottom - b.bottom),
+            w: Math.round(b.width),
+            sw: Math.round(st.width),
+            ctl: !!c && c.getBoundingClientRect().bottom <= b.bottom + 1,
+            old: !!f.querySelector('.dgm-player, .dgm-dot'),
+          };
         });
-        check(pos.top < 80 && !pos.dots && !pos.cap, `hovering the tab drops the controls down at the top (${Math.round(pos.top)}px), with a step count (${pos.n}) and no step dots or caption`);
+        check(pos.on && pos.playing, 'a click on a use case opens the player box and plays it');
+        check(pos.right < 24 && pos.bottom < 24 && (pos.w <= 400 || pos.w >= pos.sw - 30) && pos.ctl && !pos.old, `the box sits in the bottom-right corner, ${pos.w}px wide, with the controls at its foot`);
         await fig.screenshot({ path: path.join(args.out, 'player-open.png') });
-        const idle = await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on'));
-        check(idle, 'no step card before a use case is played');
+        await page.click(`${sel} .dgm-banner-close`);
+        await page.waitForTimeout(2500);
+        const closed = await page.$eval(sel, (f) => !f.querySelector('.dgm-banner').classList.contains('is-on') && !f._dgm.playing);
+        check(closed && (await page.$$eval(`${sel} [data-kind="group"]`, (x) => x.length)) === layout0, 'the close button stops the use case, hides the box and puts the layout back');
         const lvls = await page.$$(`${sel} .dgm-lvl`);
         await lvls[lvls.length - 1].click();
         await page.waitForFunction((s) => !document.querySelector(`${s}.is-stepping`), sel, { timeout: 20000 }).catch(() => {});
         await page.waitForTimeout(900);
         const openGroups = () => page.$$eval(`${sel} [data-kind="group"]`, (x) => x.length);
         const before = await openGroups();
-        await page.click(`${sel} .dgm-scn`).catch(() => {});
+        await pick();
         await ctl('next');
         await page.waitForTimeout(1500);
         const during = await openGroups();
@@ -391,7 +417,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         await ctl('lock');
         await page.waitForTimeout(300);
         check(await page.$eval(`${sel} [data-act="lock"]`, (b) => b.getAttribute('aria-pressed') === 'true'), 'the padlock turns lock mode on');
-        await page.click(`${sel} .dgm-scn`).catch(() => {});
+        await pick();
         await page.waitForTimeout(600);
         const steps = Math.min(4, await stepCount());
         let same = true;
@@ -514,7 +540,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           check(same.length === 0, same.length ? `Details changes nothing on ${same.join(', ')}` : 'Details changes the card on every step');
         } else note('no step has `detail`, so there is no Details box');
         // The last step of the first use case: its outcome is celebrated.
-        await page.click(`${sel} .dgm-scn`).catch(() => {});
+        await pick();
         await page.waitForTimeout(600);
         await goStep((await stepCount()) - 1);
         const won = await page
@@ -523,19 +549,13 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
         check(won, 'the last step shows its outcome (banner + celebration)');
         await page.waitForTimeout(250);
         await fig.screenshot({ path: path.join(args.out, 'outcome.png') });
-        // The card spans the canvas (no side panel open here) and goes 5 s after the last step.
-        const span = await page.$eval(sel, (f) => {
-          const st = f.querySelector('.dgm-stage').getBoundingClientRect();
-          const b = f.querySelector('.dgm-banner').getBoundingClientRect();
-          return { stage: Math.round(st.width), card: Math.round(b.width), panel: f.classList.contains('has-panel') };
-        });
-        check(span.panel || span.card >= span.stage - 40, `the step card spans the canvas (${span.card} of ${span.stage}px)`);
+        // The box goes 5 s after the last step.
         await page.waitForTimeout(6500);
-        check(await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on')), 'the step card goes about 5 s after the last step');
+        check(await page.$eval(`${sel} .dgm-banner`, (b) => !b.classList.contains('is-on')), 'the player box goes about 5 s after the last step');
         await page.waitForTimeout(2500);
         await ctl('prev');
         await page.waitForTimeout(300);
-        await page.click(`${sel} .dgm-scn`).catch(() => {});
+        await pick();
         await page.waitForTimeout(800);
         await ctl('play');
         const moved = await page
@@ -553,10 +573,10 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
           const after = await page.$eval(sel, (f) => f._dgm.scn.id || f._dgm.scn.title);
           check(ended && after === before, `Play stops after the selected use case's last step (stayed on "${after}")`);
         }
-        await page.mouse.move(5, 5);
-        await page.waitForTimeout(700);
-        check(!(await page.$eval(`${sel} .dgm-player`, (x) => x.classList.contains('is-open'))), 'the player folds away while the use case plays');
-        await page.waitForTimeout(600);
+        await pick();
+        await ctl('play');
+        await page.waitForTimeout(4000);
+        check(await page.$eval(sel, (f) => f._dgm.playing && f.querySelector('.dgm-banner').classList.contains('is-on')), 'the player box stays open while the use case plays');
         await fig.screenshot({ path: path.join(args.out, 'tour.png') });
         await ctl('play');
         // Collapsing the use-case sidebar and the player gives their room to the canvas; both come back.

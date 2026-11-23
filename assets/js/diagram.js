@@ -2408,10 +2408,13 @@
       const W = this.stage.clientWidth;
       const H = this.stage.clientHeight;
       const pad = 28;
-      // Keep clear of the player's tab at the top of the canvas.
-      const top = this.root.classList.contains('has-player') ? 22 : 0;
-      const k = Math.min(maxK, (W - 2 * pad) / Math.max(1, b.x1 - b.x0), (H - 2 * pad - top) / Math.max(1, b.y1 - b.y0));
-      return { k, x: (W - k * (b.x1 + b.x0)) / 2, y: top + (H - top - k * (b.y1 + b.y0)) / 2 };
+      // While the player box is up (bottom right), frame what a step shows in the room left of it, when
+      // the canvas is wide enough for that to help.
+      const box = this.root.classList.contains('is-playing-box') && this.root.querySelector('.dgm-banner');
+      const right = box && W > 720 ? box.offsetWidth + 16 : 0;
+      const Wv = W - right;
+      const k = Math.min(maxK, (Wv - 2 * pad) / Math.max(1, b.x1 - b.x0), (H - 2 * pad) / Math.max(1, b.y1 - b.y0));
+      return { k, x: (Wv - k * (b.x1 + b.x0)) / 2, y: (H - k * (b.y1 + b.y0)) / 2 };
     }
     // Open on the whole diagram when it fits at a readable size, else at a readable zoom on its start
     // (left, top), like a map: drag to explore, Fit shows everything.
@@ -2458,8 +2461,7 @@
       const W = this.stage.clientWidth;
       const H = this.stage.clientHeight;
       const pad = 28;
-      // Keep clear of the player's tab at the top of the canvas.
-      const top = this.root.classList.contains('has-player') ? 22 : 0;
+      const top = 0;
       const { k } = this.cam;
       const [cx, cy] = p.c || [p.x + p.w / 2, p.y + p.h / 2];
       const [ox, oy] = was || [cx, cy];
@@ -2645,11 +2647,9 @@
       this.playing = false;
       this.run = 0;
       this.locked = this.data.lock === true;
-      const player = this.root.querySelector('.dgm-player');
-      const handle = player && player.querySelector('.dgm-player-handle');
-      const stepN = ctl.querySelector('.dgm-step-n');
       const playBtn = ctl.querySelector('[data-act="play"]');
-      const picker = list.length > 1 ? this.menu('scn', 'Use cases') : null;
+      // The Use cases menu is how a use case starts (a click plays it), so it is there even for one.
+      const picker = this.menu('scn', list.length > 1 ? 'Use cases' : 'Use case');
       if (picker) picker.setAttribute('role', 'tablist');
       const modeLabel = ctl.querySelector('.dgm-toggle-mode');
       const modeBox = modeLabel && modeLabel.querySelector('input');
@@ -2682,34 +2682,7 @@
       const setPlayIcon = () => {
         playBtn.innerHTML = `<i class="fas fa-${this.playing ? 'pause' : 'play'}" aria-hidden="true"></i>`;
         playBtn.setAttribute('aria-label', this.playing ? 'Pause' : 'Play');
-        const st = handle && handle.querySelector('.dgm-player-state');
-        if (st) st.className = `fas fa-${this.playing ? 'pause' : 'play'} dgm-player-state`;
       };
-      // The player drawer: closed by default, opens while the pointer is on its tab or its controls (or
-      // on a click, for touch, or keyboard focus), closes shortly after the pointer leaves and whenever a
-      // use case starts playing.
-      this.openPlayer = (on) => {
-        if (!player) return;
-        clearTimeout(this.playerTimer);
-        player.classList.toggle('is-open', on);
-        handle.setAttribute('aria-expanded', on ? 'true' : 'false');
-        handle.setAttribute('aria-label', on ? 'Hide the player' : 'Show the player');
-      };
-      if (player) {
-        player.addEventListener('pointerenter', (ev) => ev.pointerType === 'mouse' && this.openPlayer(true));
-        player.addEventListener('pointerleave', (ev) => {
-          if (ev.pointerType !== 'mouse' || player.querySelector(':focus-visible')) return;
-          clearTimeout(this.playerTimer);
-          this.playerTimer = setTimeout(() => this.openPlayer(false), 450);
-        });
-        player.addEventListener('focusin', () => player.querySelector(':focus-visible') && this.openPlayer(true));
-        player.addEventListener('focusout', (ev) => {
-          if (!player.contains(ev.relatedTarget) && !player.matches(':hover')) this.openPlayer(false);
-        });
-        handle.addEventListener('click', () => this.openPlayer(!player.classList.contains('is-open')));
-        // Clicks and drags on the player are not pans or clicks on the canvas.
-        for (const t of ['pointerdown', 'click', 'wheel', 'dblclick']) player.addEventListener(t, (ev) => ev.stopPropagation());
-      }
       // A step moves packets in "groups": its `edges` all at once (fan-out / fan-in), then each hop of
       // its `path` one after another. `~id` in a path travels that arrow backwards (a response).
       const leg = (ref) => {
@@ -2728,21 +2701,35 @@
       const buildSteps = () => {
         this.steps = this.scn.steps.filter((x) => !x.when || x.when === this.mode).map((x) => ({ ...x, edges: x.edges || [], groups: groupsOf(x) }));
       };
-      // Step n/N in the player and on its tab; before the first step, the card introduces the use case.
+      // The box shows the current step; before the first step, the use case and its summary.
       this.setCaption = (i) => {
-        const n = i < 0 ? '' : `${i + 1}/${this.steps.length}`;
-        if (stepN) stepN.textContent = n || `${this.steps.length} steps`;
-        const hn = handle && handle.querySelector('.dgm-player-n');
-        if (hn) hn.textContent = n || 'Play';
         if (i < 0) this.setIntro();
         else this.setCard(i);
       };
-      // Step card at the bottom of the canvas, the one place for the description: the step's number and
-      // title with the use case's name, the banner line (what the step is doing, then its outcome) and its
-      // description: `text`, or `detail` while Details is on (the card grows a little for it).
+      // The player box in the canvas's bottom-right corner, the one place for the description and the
+      // controls: the step's number, the use case and a close button; the step's title, the banner line
+      // (what the step is doing, then its outcome) and its description: `text`, or `detail` while Details
+      // is on (the box grows taller for it); the controls at its foot. It shows only while a use case
+      // runs: a click on a use case opens it and plays, and it goes END_CARD_MS after the last step.
       const banner = this.root.querySelector('.dgm-banner');
-      if (banner) banner.innerHTML = '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-title"></span><span class="dgm-banner-scn"></span></div><div class="dgm-banner-line"></div><div class="dgm-banner-text"></div>';
+      if (banner) {
+        banner.insertAdjacentHTML('afterbegin', '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-scn"></span><button type="button" class="dgm-banner-close" aria-label="Close the player" title="Stop and close"><i class="fas fa-xmark" aria-hidden="true"></i></button></div><div class="dgm-banner-title"></div><div class="dgm-banner-line" aria-live="polite"></div><div class="dgm-banner-text"></div>');
+        // Clicks, drags and scrolls on the box are not pans or clicks on the canvas.
+        for (const t of ['pointerdown', 'click', 'wheel', 'dblclick']) banner.addEventListener(t, (ev) => ev.stopPropagation());
+      }
       const part = (c) => banner && banner.querySelector(`.dgm-banner-${c}`);
+      this.showBox = (on) => {
+        clearTimeout(this.endTimer);
+        if (banner) banner.classList.toggle('is-on', on);
+        this.root.classList.toggle('is-playing-box', on);
+      };
+      // Close: stop, put the reader's layout back and hide the box.
+      this.closeBox = () => {
+        this.stop();
+        this.showBox(false);
+        return this.showStep(-1);
+      };
+      part('close')?.addEventListener('click', () => this.closeBox());
       // What Details adds to a step without a `detail`: each hop it makes, with the protocol and why.
       const hopsMd = (x) => {
         const seen = new Set();
@@ -2775,17 +2762,22 @@
         const long = this.details && this.detailOf(x);
         part('n').textContent = `${i + 1}/${this.steps.length}`;
         part('title').textContent = x.title || '';
-        part('scn').textContent = list.length > 1 ? this.scn.title || '' : '';
+        part('scn').textContent = this.scn.title || 'Guided tour';
         // A blank line in `detail` starts a new paragraph; `- ` lines are a list.
         part('text').innerHTML = String(long || x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
       };
-      // No use case running (before the first step, after the end): no card.
+      // Before the first step: the use case and its summary (the box itself opens and closes on its own).
       this.setIntro = () => {
         this.stepRunning = null;
-        clearTimeout(this.endTimer);
-        if (banner) banner.classList.remove('is-on', 'is-run', 'is-success', 'is-fail', 'is-done', 'is-detailed');
+        if (!banner) return;
+        part('n').textContent = '';
+        part('scn').textContent = this.scn.title || 'Guided tour';
+        part('title').textContent = '';
+        part('line').textContent = '';
+        part('text').innerHTML = this.scn.summary ? markdown(this.scn.summary) : '';
+        banner.classList.remove('is-run', 'is-success', 'is-fail', 'is-done', 'is-detailed');
       };
       this.setBanner = (text, state = 'run') => {
         if (!banner) return;
@@ -3091,12 +3083,8 @@
             this.celebrate(at, x.result);
           }
         }
-        // The card stays up through the use case and goes END_CARD_MS after its last step completes.
-        if (i === this.steps.length - 1) {
-          this.endTimer = setTimeout(() => {
-            if (token === this.run) this.setIntro();
-          }, END_CARD_MS);
-        }
+        // The box stays up through the use case and goes END_CARD_MS after its last step completes.
+        if (i === this.steps.length - 1) this.endTimer = setTimeout(() => this.showBox(false), END_CARD_MS);
         return 'done';
       };
       this.stop = () => {
@@ -3109,8 +3097,7 @@
         if (this.playing) return;
         this.playing = true;
         setPlayIcon();
-        // Fold the drawer away (the pointer may still be on it: it opens again when it moves back).
-        this.openPlayer(false);
+        this.showBox(true);
         if (this.k >= this.steps.length - 1) this.k = -1;
         while (this.playing) {
           const r = await this.showStep(this.k + 1, true);
@@ -3161,17 +3148,18 @@
         this.setCaption(-1);
       };
       if (picker) {
-        if (list.length > 1) {
+        if (list.length) {
           list.forEach((x, i) => {
             const b = html('button', 'dgm-scn', picker);
             b.type = 'button';
-            b.innerHTML = `<span class="dgm-scn-title">${esc(x.title)}</span><span class="dgm-scn-meta">${x.steps.filter((y) => !y.when || y.when === (x.modes || [{}])[0].id).length} steps</span>`;
+            b.innerHTML = `<span class="dgm-scn-title">${esc(x.title || 'Guided tour')}</span><span class="dgm-scn-meta">${x.steps.filter((y) => !y.when || y.when === (x.modes || [{}])[0].id).length} steps</span>`;
             b.title = x.summary || x.title;
             b.setAttribute('role', 'tab');
-            b.addEventListener('click', async () => {
+            // A click plays the use case from its first step, in the player box.
+            b.addEventListener('click', () => {
               this.selectScenario(i);
-              const ids = await this.ensureVisible(0);
-              this.focusStep(ids);
+              this.showBox(true);
+              this.play();
             });
           });
           picker.hidden = false;
@@ -3234,8 +3222,6 @@
       });
       this.selectScenario(0);
       capEl.hidden = true;
-      if (player) player.hidden = false;
-      this.root.classList.add('has-player');
     }
   }
 

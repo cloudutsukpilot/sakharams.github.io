@@ -211,7 +211,7 @@ edges:
 
 Guided stories are **use cases**, chosen from what the post explains: signing in to the portal,
 seeing cost, deploying something, monitoring, a chat request, an ingest job, the SRE agent handling an
-alert, a release. The reader picks one from the Use cases menu; Play runs that one use case and stops
+alert, a release. A click on one in the Use cases menu plays it at once, in the player box, and it stops
 after its last step (`loop: true` at the top level plays it again). While a use case runs, each step opens the groups its components sit in and
 closes the open groups that neither it nor a later step uses, so the packet is easy to follow; when
 the player finishes (or is rewound to the start) the diagram goes back to the level, open groups, view
@@ -261,17 +261,17 @@ new layout instead. Rules:
   words), `**Why it matters:**` (the risk it removes or the guarantee it gives: cost, safety, audit, a
   person in the loop) and `**How:**` (the mechanism and its numbers, or a short `- ` list). Explain
   each term the first time it appears, state known gaps plainly, and set `details: true`.
-- The step card across the bottom of the canvas (its whole width, left of the side panel when one is
-  open) is the one place for the description: `n/N`, the step's title and, on the right, the use case's
-  title, then the action line and `text`. It shows only while a use case runs: none before Play, every
-  step while it plays or is stepped through, and it goes 5 seconds after the last step. With Details on,
-  the same card grows a little taller and a long `detail` scrolls inside it.
+- The player box in the canvas's bottom-right corner (about 22rem wide, left of the side panel when
+  one is open, full width on a phone) is the one place for the description and the controls. Its head
+  has `n/N`, the use case's title and a close button; then the step's title, the action line and `text`
+  (or `detail` with Details on, the box growing taller); at its foot the controls: play/pause, previous,
+  next, restart, speed, the layout padlock, the alternative mode and Details. It shows only while a use
+  case runs: a click on a use case opens it and plays, it stays while the use case runs (also paused),
+  and it goes 5 seconds after the last step, or at once with the close button (which stops and puts the
+  reader's layout back). While it is up, the camera frames each step in the room left of it. There are
+  no per-step dots.
 - Play runs only the selected use case and stops after its last step (then the reader's layout comes
   back); `loop: true` plays the same use case again.
-- The player is a tab hanging from the top edge of the canvas (play state and `n/N`). Hovering it (a
-  click on touch, or keyboard focus) drops the controls down: play, previous, next, restart, the step
-  count, speed, the layout padlock, the alternative mode and Details. It folds back when the pointer
-  leaves and whenever a use case starts playing. There are no per-step dots.
 
 ```yaml
 scenarios:
@@ -330,7 +330,7 @@ hover, the detail panel (status badge, chips, lead sentence, how it works, link 
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player dropped down from its tab), `step-details.png` (the same card with Details
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box in the bottom-right corner, controls at its foot), `step-details.png` (the same card with Details
 ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) and `step-locked.png` (the same packet on the reader's layout, nothing opened). Then run htmlproofer on the same folder.
 
 ### 6. Report
