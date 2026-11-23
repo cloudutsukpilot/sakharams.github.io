@@ -3349,7 +3349,7 @@ and models restarted mid-run, and the host was rebooted. A single short afterwar
 ## ADR-0056: A second local model for agents: Gemma 4 26B-A4B (FP8, Apache 2.0) in ai, scaled to zero, behind LiteLLM
 {: #adr-0056 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-24 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
 
 #### Context
 
@@ -3456,7 +3456,22 @@ stays free.
 - ADR 0051
 - ADR 0055
 
-#### Pending (to do later)
+#### Accepted (2026-11-22)
+
+The owner accepted this ADR on 2026-11-22. Gemma stays, in two roles:
+
+- **The judge's fallback.** Claude (through the subscription, ADR 0067) is the script judge. Gemma judges when Claude
+  can't answer: no token, a usage limit, an outage, a timeout, or a reply that fails the checks twice. In the 22 most
+  recent shorts on 2026-11-22, Claude judged 16 and Gemma 6.
+- **The learning agent**, as configured.
+
+The writer stays on the chat model (Qwen3.6-35B-A3B, ADR 0081). The golden-set comparison on Qwen3.6 (shorts-studio
+`docs/agent-workflow-plan.md`, "Golden-set comparison on Qwen3.6", shorts-studio PR 101) gave a mean of 5.0 with
+Qwen3.6 writing and Gemma judging, against 4.3 with Gemma writing. Qwen3.6 judging its own scripts was less
+consistent than Gemma (7 blockers against 2), so the local judge stays Gemma. No configuration passed any case;
+the judges' notes point at prompts and outlines, not the model.
+
+#### Pending (as written before acceptance)
 
 Gemma holds the judge and learning roles in Shorts Studio's config. The research judge calibrated 21 of 24 as
 expected (2026-10-25; the 2 misses were errors in the briefs). Its script blockers came from memory, without
@@ -3469,7 +3484,7 @@ To accept this ADR:
    `shorts eval script -c <case>` and `shorts eval script -c <case> --writer-model gemma-4-26b-a4b`.
 2. Compare score, blockers and time per case; give the writer role to the better model.
 3. Re-run `shorts eval judge` in the pod after PR 9 and 10 are live.
-4. Mark this ADR `accepted` with the measured roles, or remove Gemma if it wins none.
+4. Mark this ADR `accepted` with the measured roles, or remove Gemma if it wins none. Done 2026-11-22 (above).
 
 ## ADR-0057: Cloudflare metrics from our own collector, with a read-only token
 {: #adr-0057 }
@@ -4499,7 +4514,7 @@ LiteLLM's own encoding, and status and content are fetched by that id.
 ## ADR-0067: Claude judges, corrects and rewrites Shorts Studio's scripts before the board and video, through the Pro subscription, with the local models as the fallback
 {: #adr-0067 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-10-30 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-10-30 · `homelab-gitops`, `infra-local`, `shorts-studio`</span>
 
 #### Context
 
@@ -4728,7 +4743,16 @@ quotes the brief, and the facts the brief lacks went to `gaps`.
 - **A fact edit that only cuts or softens a claim quotes nothing.** Only a quote that isn't in the brief, or a
   new figure with no quote, fails the check.
 
-#### Pending
+#### Accepted (2026-11-22)
+
+The owner accepted this ADR on 2026-11-22: Claude, through the subscription (`claude -p` with a `claude setup-token`
+token), is Shorts Studio's script judge for every format, and Gemma (ADR 0056) is the fallback. That is how the app
+already runs: the `judge` section's `provider: claude` with no override on the Models page, and in the 22 most recent
+shorts Claude judged 16 and Gemma 6. Step 2 below (the golden set with `--claude`) was not run first. It is still
+worth doing, to measure Claude against the local judge's blind cross-check, and is a follow-up in shorts-studio
+`docs/agent-workflow-plan.md`.
+
+#### Pending (as written before acceptance)
 
 1. **Token:** run `claude setup-token` on your own machine, then `host/shorts-studio/configure.sh --claude` in
    infra-local.
@@ -8681,8 +8705,10 @@ Four things make that harder than a normal CI job:
    `status: ready`, non-empty What, Why and Done when, a known `component:`, the repo onboarded to the factory), then
    runs intake as a preflight (the `Mode: preflight` prompt that `factory.py check` prints, plugin 0.2.0): strict, it
    returns NEEDS-INFO for every decision an unattended run would have to guess. The fixed rules run in the job, so
-   this session gets no Bash: it reads the PR's own text, and only spawns intake and writes in the check folder. The `check` job posts the result as one PR comment (updated on every push)
-   and fails unless every feature is ready; as a required check it blocks the merge. After the merge, `plan` starts
+   this session gets no Bash: it reads the PR's own text, and only spawns intake and writes in the check folder. The
+   `check` job posts the result as one PR comment (updated on every push) and fails unless every feature is ready.
+   GitHub Free can't make it a required check on a private repo, so it doesn't block the merge button; the guard is
+   after the merge, where `plan` starts
    nothing unless the check passed for exactly the merged files (a hash in the comment, posted by
    `github-actions[bot]`), and refuses a repo without `.factory/` with the onboarding message.
 3. **The run after the merge.** `portfolio-task.yaml` runs once per feature (at most two at a time, one per feature
@@ -8736,6 +8762,8 @@ Four things make that harder than a normal CI job:
   involved, each ending in a reviewed pull request; questions arrive on the PR before the merge instead of stalling a
   run; the plugins, Claude Code version and CI rules are one reviewed file.
 - Good: no secret is in GitHub; each credential has its own OpenBao role bound to one workflow file on `main`.
+- Bad: on GitHub Free a failing `tasks / check` doesn't block the merge (private repos get no branch protection).
+  Merging anyway queues nothing: `plan` refuses features without a passing check for the merged files and says so.
 - Bad: a run uses the owner's Claude subscription and a runner (up to three hours per feature by default).
 - Bad: the factory's job state goes with the pod. Feedback on a factory PR (another round) is given by hand with
   `/factory feedback` on the Spark, or by a new feature file through the same label.
@@ -8825,7 +8853,7 @@ Owner, 2026-11-21:
 ## ADR-0120: Log levels and volume across the platform, a default of INFO with no access or health-check lines
 {: #adr-0120 }
 
-<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-22 · `homelab-gitops`, `homelab-services`, `platform-wardens`, `infra-local`</span>
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `homelab-gitops`, `homelab-services`, `platform-wardens`, `infra-local`</span>
 
 #### Context
 
@@ -8909,12 +8937,12 @@ What each noisy source gets, under these rules:
 | Grafana dashboard sidecar | `ignoreAlreadyProcessed: true` (each ConfigMap logged once per change, not once a minute) | PR |
 | ARC controller and listeners | `flags.logLevel: info` (rule 1) | PR |
 | Event Hubs emulator | Its known Debug-channel lines left out of the Event bus logs panel (rule 5); it has no level setting (`LoggingConfig` takes only `Console` or `File`) | PR |
-| ARC runner diagnostic trace | Owner decision, below | Proposed |
-| Argo CD repo-server, Temporal server, Loki | Owner decision, below | Proposed |
+| ARC runner diagnostic trace | `logMinLevel: {arc-runners: warn}` in the monitoring pack's agent collector (rule 5): the runner has no level setting, so the collector reads its level and drops INFO and VERB | Decided 2026-11-22, PR |
+| Argo CD repo-server, Temporal server, Loki | repo-server `warn` and application controller `info` (infra-local `argocd-values.yaml`); Temporal `server.config.logLevel: warn`; Loki `loki.server.log_level: warn` | Decided 2026-11-22, PRs |
 | Our uvicorn apps (job-hunter, shorts-studio, hello-world, portfolio-map), Phoenix, LiteLLM, the portal, Dependency-Track's frontend | Drop probe paths from the access log (rule 3): a `logging.Filter` on `uvicorn.access` in our apps; `--no-access-log` or the equivalent setting for the third-party ones, checked one by one | Planned, one change per service |
 | Kyverno | `--loggingFormat=json` for each controller (rule 5) | Planned |
 | Tempo's "no jobs found" pair | Left out of panels by name (rule 5); look for a scheduler setting first | Planned |
-| `core` | A collector (rule 6), option below | Owner decision |
+| `core` | A collector (rule 6), option (a) | Decided (2026-11-22) |
 
 #### Considered options
 
@@ -8952,6 +8980,14 @@ Owner decisions this ADR leaves open:
   the five small changes alone.
 - Good: a level filter means something: an `error` panel shows errors, not health checks.
 - Good: one written rule for the next service, checked by the same query.
+- Good: rule 7 is checked all the time, not only at a review (2026-11-22): the **Monitoring / Log volume** dashboard
+  shows lines and bytes per cluster, namespace, workload, container and level, and `alerts/monitoring/log-volume.yaml`
+  warns when a workload passes 5,000 lines an hour for 2 hours (five times the steady-state budget, above every other
+  workload's highest 3-hour run that week) or its written exception, when a cluster or workload logs 3 times last
+  week's volume, when retention stops and when Loki's disk would pass 24Gi. Loki's ruler counts lines per workload
+  and remote-writes them to Mimir, since Loki's own metrics count per tenant only; the exceptions (the ARC runner's
+  WARN and ERR lines, Argo CD's application controller at INFO, ARC's controller and listeners) carry their reasons
+  in that file.
 - Bad: health-check and access lines are gone, so "was the probe hitting it" is answered from the kubelet's events
   and metrics, not from Loki.
 - Bad: a panel that leaves known lines out by name can hide a new message that happens to match; the names stay
@@ -8962,6 +8998,246 @@ Owner decisions this ADR leaves open:
 
 - ADR 0026, ADR 0042 (the collectors), ADR 0025 (core boots first), ADR 0088 (the wardens ingress bus)
 - platform-wardens docs/framework/12-observability.md, section Logs (the same standard for the wardens processes)
+
+#### Owner decisions (2026-11-22)
+
+The owner asked first whether each source has a setting for its level (debug, info, warn, error), to add one where
+it doesn't, and to fall back on the recommendations only where one can't be added:
+
+| Source | Level setting | Decision |
+|---|---|---|
+| ARC runner trace | **None in the runner.** Its trace runs at Info, and `GITHUB_ACTIONS_RUNNER_TRACE` can only raise it to Verbose (actions/runner `TraceSetting.cs`). **Added in the collector:** `logMinLevel` in `apps/monitoring-pack/values.yaml`, a lowest level kept per namespace. The agent collector reads the runner's level (`actions-runner-trace` parser) and its `filter/levels` processor drops what is below it; a line with no level is kept | `arc-runners: warn`: option (b), its WARN and ERR lines stay in Loki |
+| Argo CD | `configs.params` `reposerver.log.level`, `controller.log.level` | repo-server `warn`, application controller `info` |
+| Temporal server | `server.config.logLevel` | `warn` |
+| Loki | `loki.server.log_level` | `warn` |
+| GitHub relay | `WARDENS_LOG_LEVEL` (every wardens service, platform-wardens `wardens.telemetry.logs`) | stays `info`: its line per delivery is an event log (rule 4) |
+| `core` | — | Option (a), 2026-11-22: infra-local's Terragrunt Helm stack `helm/core/otel-collector` installs an OpenTelemetry Collector DaemonSet (same image as the monitoring pack's agent, logs only) that sends core's pod logs to the gateway with core's own token (`kv/core/otlp`, `OTLP_TOKEN_CORE` on the gateway). core keeps booting without `platform`; the cost is one collector config outside the pack, which follows the pack's export settings by hand. The other clusters get the collector from the monitoring pack's ApplicationSets, which select clusters registered in Argo CD with the `homelab/addons` label; `core` isn't registered (it boots first, ADR 0025) |
+
+`logMinLevel` works for any namespace whose lines carry a level the collector reads (the wardens JSON lines, the
+runner trace), so a later noisy source gets a line there rather than a filter of its own.
+
+The runner's exception traces (one line per stack frame) are joined into one record per exception in the agent
+collector (`actions-runner-exception`, owner's decision 2026-11-23). The trace every ephemeral runner logs when it
+exits, 66 ERR lines from the broker retry treating its own cancellation as a failed request (actions/runner #4644,
+fix in #4645), is now one error a runner instead of up to about 12,000 lines an hour; it stays in Loki, not dropped.
+
+## ADR-0121: Wardens registry approvals are asked by agent-ci and committed by a wardens-deploy sync
+{: #adr-0121 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `homelab-gitops`, `platform-wardens`, `wardens-deploy`</span>
+
+#### Context
+
+A wardens agent's registry entry that raises risk waits in a wardens-deploy pull request for a reviewer's signed
+`approval.json` (platform-wardens decision 0040 rule 5). Making that record meant pasting the agent's two manifests
+into the console's Approvals page, approving, downloading the record and committing it by hand. On terraform-drift
+0.3.0 (2026-11-22) the owner asked that the reviewer's press be the only manual step.
+
+#### Decision
+
+platform-wardens decision 0048 has the design; this repository carries two parts of it.
+
+1. **agent-ci asks.** `.github/actions/wardens-registry-publish`, after it opens the pull request for a risk-raising
+   entry that is not on wardens-deploy `main`, sends the agent's current entry (the highest version on `main` below
+   the new one) and the new manifest to the console's `POST /api/registry-approvals`, with a GitHub OIDC token for
+   audience `wardens-console-approvals` (the registry job already has `id-token: write`). The runner calls the
+   internal name `console.wardens.home.cloudutsuk.com`, as the nightly evals do (ADR 0113). A failure is a warning,
+   not a failed build: the reviewer can still ask by hand.
+2. **The console checks the callers.** `apps/wardens-console/values.yaml` sets `WARDENS_APPROVAL_CI_*` (only
+   `agent-ci.yaml` at `main`, called from an agent's own `warden-<name>` repository at `main`),
+   `WARDENS_APPROVAL_SYNC_*` (only wardens-deploy's `approvals-sync.yaml` at `main`) and the organisation's id, and
+   lets the two paths through the sign-in proxy (`auth.skipAuthRoutes`, as ADR 0113 did for the eval route). The
+   console answers them before it reads the proxy's headers.
+
+wardens-deploy's `approvals-sync.yaml` (every five minutes) reads the approved records back, commits each beside its
+entry, runs the registry checks and merges the pull request.
+
+#### Considered options
+
+- **Keep asking by hand.** Refused by the owner: two manifests to paste and a file to commit per entry.
+- **The console commits the record itself.** It would need a GitHub token that writes wardens-deploy; the sync keeps
+  that write inside wardens-deploy's own workflow token, and the console holds only the signing key.
+
+#### Consequences
+
+- Two more machine paths skip the sign-in proxy; each takes one workflow's OIDC token only (rollback: drop the two
+  `skipAuthRoutes` lines and the `WARDENS_APPROVAL_*` variables; the console then answers 503 or needs a session).
+- An approved entry is merged within about five minutes of the press.
+
+## ADR-0122: platform-as-code modules are checked by mock-provider tests, not by planning consumer stacks
+{: #adr-0122 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `platform-as-code`</span>
+
+#### Context
+
+platform-as-code's compatibility workflow checks a module change by planning a real stack in a consumer repo
+(infra-azure, infra-aws, …) that uses the module. It has never passed: none of its last 100 runs, back to
+2026-08-01. Its plan jobs need each cloud's credentials as secrets of platform-as-code, which were never added;
+org secrets don't reach a private repository on the Free plan. Its module-to-stack map also pointed at stacks that
+exist only in plan-only PRs (rag-on-cloud). And a real plan shows the stack's drift along with the module change,
+while stacks are being deleted to save money, so fewer modules would have one to plan. On 2026-11-22 the owner
+asked for a way to check modules without drift in the plan and without creating resources.
+
+#### Decision
+
+1. Each module carries its own tests in `<module>/tests/*.tftest.hcl`, run by `terraform test` with
+   `mock_provider` blocks: example inputs, a plan (or pretend apply), and asserts on what the module would create
+   and output. No credentials, state or cloud resources.
+2. `tools/module_tests.py` gives each module the provider sources (`template/root.hcl`) and versions
+   (`config/providers.yaml`) that a stack gets, since modules don't declare providers themselves.
+3. platform-as-code's `Module Tests` workflow runs the tests of every changed module on the homelab runners. A
+   module without tests is a warning until the modules that change are covered, then an error.
+4. `Module Tests` then replaces the consumer-stack plans as the module check. A real plan of a live stack, comparing
+   `main`'s module with the PR's so that drift cancels out, may be added later as an optional extra, with
+   credentials from OpenBao.
+
+Plan and progress: platform-as-code `docs/plans/module-mock-tests.md`.
+
+#### Considered options
+
+1. **Mock-provider tests per module (chosen)**: fast, no credentials or resources, independent of which stacks
+   exist. They can't catch what only the cloud API knows (SKUs per region, names taken, quotas).
+2. **Fix the consumer-stack plans** (add the credentials to platform-as-code): proves the module against the real
+   API, but each run shows the stack's drift, needs cloud credentials in one more repository, and breaks whenever a
+   mapped stack is deleted.
+3. **Plan against an empty state with a local backend**: no drift, but providers still need credentials to plan,
+   and data sources call the real API.
+
+#### Consequences
+
+- Good: a module PR gets a real check again, in seconds, with nothing created and nothing to clean up.
+- Good: deleting stacks to save cost doesn't remove a module's check.
+- Bad: every module needs a test written; until most have one, untested modules are only warned about.
+- Bad: API-side errors surface only when a consumer plans the change.
+
+#### Related
+
+- ADR 0100 (the platform-as-code rename)
+- ADR 0119 (CI artifacts off GitHub; the step that found the compatibility matrix broken)
+
+## ADR-0123: Helm chart registries are declared in config.yaml and logged in outside Terraform; Zot charts need credentials
+{: #adr-0123 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `platform-as-code`, `infra-local`</span>
+
+#### Context
+
+platform-as-code's Helm units read `JFROG_USERNAME`/`JFROG_PASSWORD` from the environment and passed them to every
+release as `repository_username`/`repository_password`. No consumer set them (removed in platform-as-code #76), and
+a password passed that way is stored in clear text in the Terraform state and in every binary plan (ADR 0119 step
+16). Zot's `charts/` path (ADR 0034) allowed anonymous read. On 2026-11-22 the owner asked for chart registries,
+JFrog among them, to be declared in configuration in one place for the organisation, for Zot's charts to need
+credentials, and for credentials to be used only where a registry is configured.
+
+#### Decision
+
+1. `helm_registries` in platform-as-code's `config/config.yaml` is the organisation's list (name, URL, OpenBao path
+   of the credentials). A consuming repository's root `config.yaml` overrides an entry by name, or removes it with
+   `enabled: false`.
+2. A release picks a registry with `registry: <name>` in `resources.yaml`; a release without it keeps its own
+   `repository` and pulls anonymously.
+3. For runs that deploy to Kubernetes, the pac runner reads the credentials from OpenBao (CI: after `openbao-login`
+   with role `pr`) into a temporary, private Helm registry config (`HELM_REGISTRY_CONFIG`). The Helm provider
+   gets only the file's path (`registry_config_path`). Credentials are never a Terraform value, so they aren't in
+   the state, the plans or the logs. `helm_release.repository_password` stays refused by validation.
+4. Zot gets a read-only `charts-reader` account (password in `kv/core/zot`, copied to `kv/ci/zot-charts-read`), and
+   `charts/**` drops anonymous read. Cluster image pulls and Argo CD's chart pulls are unchanged: they use
+   `mirror/**` (anonymous) and `platform/**` (the `puller` account through `zot-pull` pull secrets).
+
+Plan and progress: platform-as-code `docs/plans/helm-chart-registries.md`.
+
+#### Considered options
+
+1. **Run-time registry login from a config list (chosen)**: no secret in state or plans; one place to declare
+   registries; needs an OpenBao sign-in in the IaC jobs.
+2. **`repository_username`/`repository_password` per release**: simplest, but the password lands in the state
+   (Azure storage) and every binary plan.
+3. **The provider's `registries` block**: also keeps state clean, but provider configuration values are stored in
+   the binary plan.
+4. **Per-environment `common_vars.yaml`**: considered first; the owner preferred one org-wide list, since an
+   organisation has one chart registry, with a per-repository override.
+
+#### Consequences
+
+- Good: credentials are used only for declared registries and never stored by Terraform.
+- Good: JFrog (or any OCI or HTTPS chart registry) is one config entry away.
+- Bad: the IaC jobs sign in to OpenBao, and a local run needs `BAO_ADDR` and a token.
+- Bad: turning off anonymous read on `charts/**` restarts Zot (a quiet window), and anything else pulling from
+  `charts/` would need the account (nothing does today).
+
+#### Related
+
+- ADR 0034 (Zot), ADR 0043 (CI sign-in to OpenBao), ADR 0119 (CI artifacts; step 16 found the plan secrets)
+
+## ADR-0124: Wardens pods roll when wardens-deploy's config changes, through Stakater Reloader
+{: #adr-0124 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-23 · `homelab-gitops`, `wardens-deploy`, `platform-wardens`</span>
+
+#### Context
+
+Every wardens process reads the deploy config, the ConfigMap `wardens-config` that wardens-deploy's chart renders from
+its `config/` (platform-wardens decision 0042), from `/etc/wardens/config`. Kubelet updates the mounted files when the
+ConfigMap changes, but the processes read them once: the framework caches routing, limits, redaction and run-record
+settings, and the services build their objects at start. The chat egress worker, for one, builds its link filter from
+`chat.yaml` when it starts.
+
+On 2026-11-23 wardens-deploy #22 added the console's public host to `links.allowHosts`. Argo CD synced the ConfigMap at
+19:20 UTC, but `wardens-chat-egress` had started at 14:52 and kept the old list: the next approval card (platform-wardens
+plan drift-merge-on-approval, step 6) lost its "Open in console" button until the Deployment was restarted by hand.
+
+The registry ConfigMaps don't have this problem: a sidecar re-copies them and the workers read the copy at each budget
+check (wardens-agent chart 0.1.8).
+
+A checksum annotation on the pod template, the usual Helm answer, doesn't work here: the ConfigMap and the Deployments
+are rendered by different sources of the same Argo CD app (wardens-deploy's chart and the app's chart in this
+repository), so the Deployment's chart can't hash the config.
+
+#### Decision
+
+1. **Stakater Reloader** runs on `wardens` (`clusters/wardens/reloader.yaml`, chart 2.2.19, Reloader v1.4.23, image
+   pinned by digest, the chart through Zot's ghcr.io mirror). It watches only ConfigMaps labelled
+   `app.kubernetes.io/name=wardens-config`, only in namespaces labelled `homelab/wardens-agent=true`, ignores Secrets,
+   and uses the `annotations` reload strategy.
+2. **Every Deployment that mounts the config says so**: `configmap.reloader.stakater.com/reload: <config.configMap>` on
+   the Deployment, from `charts/wardens-agent` (0.1.10), `charts/wardens-web` (0.14.0, helper
+   `wardens-web.deploy.annotations`, used by the console's entry points) and `apps/wardens-router`. When the ConfigMap
+   changes, Reloader sets a pod-template annotation and the Deployment rolls as it would for an image update (the
+   router keeps both pollers: `maxUnavailable: 0`). CronJobs read the config fresh on every run and need nothing.
+3. The processes keep reading the config once at start. A reload inside each process stays possible later, but it
+   would mean undoing caches across the framework and a wardens release for every agent, for the same result.
+
+#### Considered options
+
+1. **A config checksum on the pod template**: not possible without the Deployment's chart seeing the config (see
+   Context). A generated checksum file in wardens-deploy, passed in as a values file, would need every config change to
+   regenerate it: one more step to forget.
+2. **Each process re-reads the config when the file changes**: the cleanest for the processes, but every cache in the
+   framework and services has to learn it, and agents get it only with a wardens release and a bump in every agent
+   repository. Not chosen now.
+3. **A sidecar or liveness probe that restarts the main container**: restarts in place (both router replicas at once),
+   counts as container restarts, and needs a shared process namespace or a probe that fails on purpose. Not chosen.
+4. **An Argo CD PostSync hook that runs `kubectl rollout restart`**: runs on every sync, not only on config changes,
+   and needs a kubectl image and write RBAC in every namespace. Not chosen.
+5. **Stakater Reloader**: one small, widely used controller; the roll is a normal rolling update; no change to the
+   images. Chosen.
+
+#### Consequences
+
+- Good: a change to wardens-deploy `config/` reaches every process within about a minute of Argo CD's sync, with no
+  person restarting anything.
+- Good: the `annotations` strategy writes only a pod-template annotation, which Argo CD doesn't report as drift (a
+  `kubectl rollout restart` on `wardens-chat-egress` stayed Synced, 2026-11-23), so self-heal doesn't fight it.
+- Bad: one more controller on `wardens`, with a ClusterRole that can patch Deployments (it watches only the selected
+  namespaces and ConfigMaps). Its image and chart need the usual updates.
+- Bad: a config change and an image update in the same sync roll a Deployment twice.
+
+#### Related
+
+- ADR 0069 (the `wardens` cluster), ADR 0072 (the `wardens-agent` chart), ADR 0074 (the `wardens-web` chart)
+- ADR 0104 (the router as its own app), ADR 0034 (Zot's pull-through mirrors)
+- platform-wardens decision 0042 (wardens-deploy holds the registry and the deploy config)
 
 {% endraw %}
 <!-- adr:end -->
