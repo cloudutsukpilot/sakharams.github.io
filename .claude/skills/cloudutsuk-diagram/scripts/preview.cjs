@@ -78,6 +78,15 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
     const ready = await page.waitForSelector(`${sel}.is-ready`, { timeout: 40000 }).then(() => true, () => false);
     check(ready, 'diagram laid out (ELK loaded, is-ready)');
     await page.waitForTimeout(900);
+    // The sidebar opens folded on every page load; unfold it for the checks that use its menus.
+    const sideBtn = await page.$(`${sel} [data-act="side-collapse"]`);
+    const sideNav = !!sideBtn && (await sideBtn.isVisible());
+    const folded = () => page.$eval(sel, (f) => f.classList.contains('is-side-collapsed'));
+    if (sideNav) {
+      check(await folded(), 'the sidebar opens folded');
+      await sideBtn.click();
+      await page.waitForTimeout(200);
+    }
     const info = await page.evaluate((s) => {
       const f = document.querySelector(s);
       const cs = getComputedStyle(f);
@@ -802,9 +811,19 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       }
     }
     if (v.interact) {
-      // Fullscreen: the canvas takes the window's height, not a fixed one; Esc leaves.
+      // Fullscreen: the canvas takes the window's height, not a fixed one, and unfolds the sidebar; Esc
+      // leaves and folds it again.
+      if (sideNav && !(await folded())) await page.click(`${sel} [data-act="side-collapse"]`);
       await page.click(`${sel} [data-act="full"]`);
       await page.waitForTimeout(900);
+      if (sideNav) check(!(await folded()), 'fullscreen unfolds the sidebar');
+      const seen = await page.$eval(sel, (f) => {
+        const st = f.querySelector('.dgm-stage').getBoundingClientRect();
+        const ns = [...f.querySelectorAll('.dgm-node')].filter((n) => n.getBoundingClientRect().width > 0);
+        const inside = ns.filter((n) => { const r = n.getBoundingClientRect(); return r.right > st.left && r.left < st.right && r.bottom > st.top && r.top < st.bottom; });
+        return { k: f._dgm.cam.k, n: ns.length, inside: inside.length };
+      });
+      check(seen.k > 0 && seen.inside >= Math.min(2, seen.n), `fullscreen shows the diagram (${seen.inside} of ${seen.n} components in view, zoom ${seen.k.toFixed(2)})`);
       const vh = page.viewportSize().height;
       const sh = await page.$eval(`${sel} .dgm-stage`, (x) => x.getBoundingClientRect().height);
       check(sh > vh * 0.6, `fullscreen gives the canvas the window's height (${Math.round(sh)} of ${vh}px)`);
@@ -814,6 +833,7 @@ const BLOCK = /googlesyndication|googletagmanager|google-analytics|doubleclick|g
       if (await page.$eval(sel, (x) => x.classList.contains('is-full'))) await page.click(`${sel} [data-act="full"]`);
       await page.waitForTimeout(300);
       check(!(await page.$eval(sel, (x) => x.classList.contains('is-full'))), 'fullscreen closes again');
+      if (sideNav) check(await folded(), 'leaving fullscreen folds the sidebar again');
     }
     check(errors.length === 0, `no script errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
     console.log(`[${v.name}]\n  ` + checks.join('\n  '));

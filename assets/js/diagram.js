@@ -907,12 +907,12 @@
     }
 
     // The sidebar folds to a narrow strip that keeps only the zoom, Fit and fullscreen buttons; the
-    // canvas takes the room and keeps its centre, and the choice is remembered in this browser.
+    // canvas takes the room and keeps its centre. Every page load opens it folded; fullscreen unfolds
+    // it and leaving fullscreen puts it back as it was.
     bindSideToggle() {
       const b = this.root.querySelector('[data-act="side-collapse"]');
       if (!b) return;
-      const storeKey = `dgm-side-collapsed:${this.root.id}`;
-      const set = (on, save) => {
+      const set = (on) => {
         const W = this.stage.clientWidth;
         const H = this.stage.clientHeight;
         this.root.classList.toggle('is-side-collapsed', on);
@@ -927,14 +927,10 @@
           this.cam = { ...this.cam, x: this.cam.x + dw / 2, y: this.cam.y + dh / 2 };
           this.applyCam();
         }
-        if (save) try { localStorage.setItem(storeKey, on ? '1' : '0'); } catch (e) { /* storage blocked: lasts for this page only */ }
       };
-      let saved = null;
-      try {
-        saved = localStorage.getItem(storeKey);
-      } catch (e) { /* storage blocked */ }
-      set(saved === '1', false);
-      b.addEventListener('click', () => set(!this.root.classList.contains('is-side-collapsed'), true));
+      this.setSide = set;
+      set(true);
+      b.addEventListener('click', () => set(!this.root.classList.contains('is-side-collapsed')));
     }
 
     // A collapsible menu in the sidebar: its head toggles the items, and the reader's choice is
@@ -2454,13 +2450,13 @@
       const W = this.stage.clientWidth;
       const H = this.stage.clientHeight;
       const pad = 28;
-      // While the player box is up (bottom right), frame what a step shows in the room left of it, when
-      // the canvas is wide enough for that to help.
+      // While the player box is up (across the bottom), frame what a step shows in the room above it,
+      // when the canvas is tall enough for that to help.
       const box = this.root.classList.contains('is-playing-box') && this.root.querySelector('.dgm-banner');
-      const right = box && W > 720 ? box.offsetWidth + 16 : 0;
-      const Wv = W - right;
-      const k = Math.min(maxK, (Wv - 2 * pad) / Math.max(1, b.x1 - b.x0), (H - 2 * pad) / Math.max(1, b.y1 - b.y0));
-      return { k, x: (Wv - k * (b.x1 + b.x0)) / 2, y: (H - k * (b.y1 + b.y0)) / 2 };
+      const below = box && H - box.offsetHeight - 16 > 220 ? box.offsetHeight + 16 : 0;
+      const Hv = H - below;
+      const k = Math.max(0.05, Math.min(maxK, (W - 2 * pad) / Math.max(1, b.x1 - b.x0), (Hv - 2 * pad) / Math.max(1, b.y1 - b.y0)));
+      return { k, x: (W - k * (b.x1 + b.x0)) / 2, y: (Hv - k * (b.y1 + b.y0)) / 2 };
     }
     // Open on the whole diagram when it fits at a readable size, else at a readable zoom on its start
     // (left, top), like a map: drag to explore, Fit shows everything.
@@ -2645,7 +2641,15 @@
     toggleFull(force) {
       const on = force ?? !this.root.classList.contains('is-full');
       if (on === this.root.classList.contains('is-full')) return;
+      if (on) {
+        this.sideBeforeFull = this.root.classList.contains('is-side-collapsed');
+        this.setSide?.(false);
+      }
       this.root.classList.toggle('is-full', on);
+      if (!on && this.sideBeforeFull != null) {
+        this.setSide?.(this.sideBeforeFull);
+        this.sideBeforeFull = null;
+      }
       try {
         if (on && !document.fullscreenElement && this.root.requestFullscreen) this.root.requestFullscreen().catch(() => {});
         else if (!on && document.fullscreenElement === this.root) document.exitFullscreen().catch(() => {});
