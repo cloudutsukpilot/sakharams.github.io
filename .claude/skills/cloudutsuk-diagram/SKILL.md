@@ -357,7 +357,7 @@ arrow's panel with its exchange (bracket rail, looping) first and the collapsed 
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
 deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box across the bottom of the canvas, the controls in a 2 x 4 grid on its right), `step-details.png` (the same card with Details
-ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one) and `step-grouped.png` (lock mode: consecutive steps inside one closed component on one card, when the layout has any). Then run htmlproofer on the same folder.
+ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded; the check also confirms it opens folded and unfolds in fullscreen with the diagram in view) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one) and `step-grouped.png` (lock mode: consecutive steps inside one closed component on one card, when the layout has any). Then run htmlproofer on the same folder.
 
 ### 6. Report
 
@@ -404,7 +404,8 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
   borders. Compact, but components can move anywhere when one opens.
 - **Sidebar:** Levels, Views and Use cases are collapsible menus in a sidebar on the left (each head
   folds its items, remembered per diagram); the zoom lock, zoom in, zoom out, Fit and fullscreen buttons
-  sit at its foot and stay in view. `«` folds the whole sidebar to a strip that keeps those buttons.
+  sit at its foot and stay in view. `«` folds the whole sidebar to a strip that keeps those buttons. Every page load opens it folded
+  (`»` unfolds it); fullscreen unfolds it, and leaving fullscreen puts it back as it was.
   The zoom lock holds the current zoom: buttons, Ctrl + scroll, pinch and `+`/`-` stop zooming and the
   camera moves of levels, Fit and use cases only pan; `zoom_lock: true` opens locked. The drag lock (the
   hand beside it) keeps the view where the reader put it: dragging and the arrow keys don't pan, and use
