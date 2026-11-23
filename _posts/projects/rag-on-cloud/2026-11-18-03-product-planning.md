@@ -36,6 +36,8 @@ to beat.
 | 7 AWS | The same system on Bedrock Knowledge Bases, from the shared core | Phase 3 | Not started |
 | 8 GCP | The same system on Vertex AI RAG Engine, from the shared core | Phase 7 | Not started |
 | 9 Cross-cloud comparison | One eval run over Azure, AWS, GCP and the homelab, and the write-up | Phases 4, 7, 8 | Not started |
+| 10 Enterprise ingestion | A pipeline per source in Data Factory, a lake with raw, curated and quarantine zones, a processing Function, more sources, permissions on every chunk ([ADR-0016](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0016)) | Phase 1 | Planned |
+| 11 Retrieval speed | Timings per stage, index tuning, a semantic cache, streaming, a benchmark against two other vector stores ([ADR-0017](/posts/projects/rag-on-cloud/architecture-decision-records/#adr-0017)) | Phase 3 (runs alongside it) | Planned |
 
 Each phase's steps are below. Step numbers never change; a step split later becomes `3a`, `3b`.
 
@@ -48,14 +50,14 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 | 2 | Azure AI Search module for the shared Terraform (identity, local auth off, semantic ranker plan, optional private endpoint) | shared module | Merged with an example | Done (2026-11-19) |
 | 3 | The Azure stack: resource group, Foundry account and project, embedding and chat deployments, Search (Basic), storage and container, Log Analytics, Application Insights, identity, role assignments | infra-azure | Applied from `main`; local auth reported off; region supports every feature used | In progress (2026-11-22: applied, 16 resources, in a sandbox subscription in a separate tenant; 2026-11-23: chat model gpt-5-mini applied, 18 resources; local auth confirmed off. Left: the region check for agentic retrieval) |
 | 4 | Idle-cost switch for the Search service, and a budget alert | infra-azure, lab repo, shared module | Search removed and restored through PRs; the index rebuilt from the corpus | In progress (2026-11-23: budget of 100 a month applied, with a new budget module in the shared Terraform. Left: the remove and restore cycle, which needs `make index`) |
-| 5 | Repo skeleton for three clouds: a shared core with three small interfaces (retriever, generator, agent mode), corpus prep, eval, the Azure adapter and a fake adapter for tests | lab repo | Tests pass against the fake adapter | Not started |
+| 5 | Repo skeleton for three clouds: a shared core with three small interfaces (retriever, generator, agent mode), corpus prep, eval, the Azure adapter and a fake adapter for tests | lab repo | Tests pass against the fake adapter | In progress (2026-11-23: written, 18 tests pass, in review) |
 
 ### Phase 1 steps
 {: #phase-1-steps }
 
 | Step | Does | Repos | Done when | Status |
 |---|---|---|---|---|
-| 1 | Corpus sync from the blog to the corpus container, front matter as metadata | lab repo | Blob count equals published post count | Not started |
+| 1 | Corpus sync from the blog to the corpus container, one JSON document per post with its front matter as fields | lab repo | Blob count equals published post count | In progress (2026-11-23: written and in review; every computed URL matches the live sitemap. Left: the first run) |
 | 2 | Index as code: data source, index, skillset, indexer, vectorizer, semantic configuration | lab repo | Indexer run with zero failures; a hybrid query returns chunks with their URL | Not started |
 | 3 | Golden question set v0, shared with the homelab RAG; retrieval scored for four modes | lab repo | hit@5 and MRR table for keyword, vector, hybrid, hybrid + semantic | In progress (2026-11-23: v0 written, 46 questions: 34 single-post, 7 multi-post, 5 out-of-corpus; scoring waits on the index) |
 | 4 | The API locally: FastAPI and Agent Framework, hybrid + semantic, citations, streaming | lab repo | Answers a golden question with citations and no key in config | Not started |
@@ -144,6 +146,31 @@ Each phase's steps are below. Step numbers never change; a step split later beco
 | 1 | One eval run over every mode on all three clouds and the homelab | lab repo | One comparison table | Not started |
 | 2 | Cross-cloud write-up, remaining playbook areas, interview post | this blog | Published | Not started |
 
+### Phase 10 steps
+{: #phase-10-steps }
+
+| Step | Does | Repos | Done when | Status |
+|---|---|---|---|---|
+| 1 | Data platform resources: a Data Lake Storage account with its zones, Data Factory, a Function app, Event Grid, Key Vault, diagnostics; a new Data Factory module for the shared Terraform | shared module, infra-azure | Applied from `main`; idle cost unchanged | Not started |
+| 2 | Source registry and the canonical document schema, checked in CI | lab repo | CI rejects a source without an owner, a classification or a permission model | Not started |
+| 3 | Processing Function: an extractor per format, quality gates, PII check, quarantine with reasons, lineage | lab repo | A malformed file lands in quarantine and alerts | Not started |
+| 4 | The pipeline template, with the blog as source 1; the Actions sync retired | lab repo | Curated count equals the published post count; golden set unchanged within noise | Not started |
+| 5 | Sources 2 and 3: another format through Document Intelligence, and one through a connector | lab repo, infra-azure | Both searchable with source filters; new golden questions for them | Not started |
+| 6 | Document-level security: folder permissions ingested by the indexers, the user's token forwarded | lab repo, infra-azure | An allowed user retrieves a restricted item; a denied user doesn't | Not started |
+| 7 | Knowledge base over many sources, plus one remote source queried in place | lab repo | A multi-part answer cites two sources, one remote | Not started |
+| 8 | Operate: a dashboard per source, alerts on failure, staleness and quarantine, a replay runbook | lab repo, infra-azure | A forced failure alerts; a replay rebuilds a source without contacting it | Not started |
+
+### Phase 11 steps
+{: #phase-11-steps }
+
+| Step | Does | Repos | Done when | Status |
+|---|---|---|---|---|
+| 1 | A span per stage (embed, retrieve, rerank, generate, first token), p50 and p95 per stage in the results | lab repo | The results table shows where the time goes | Not started |
+| 2 | Index tuning: quantization with rescoring, shorter vectors, the semantic ranker on and off, `top_k` | lab repo | A quality and latency table per setting; the winner in the index definition | Not started |
+| 3 | Semantic cache in Azure Managed Redis, keyed by index version, prompt version and permission scope | infra-azure, lab repo, shared module | A repeated question is answered from the cache in under 500 ms; a reindex misses | Not started |
+| 4 | Streaming answers end to end | lab repo | Time to first token in the results | Not started |
+| 5 | Benchmark: the same chunks and queries on Cosmos DB and on PostgreSQL with pgvector | lab repo, infra-azure, shared module | One table per store: quality, latency, cost per 1,000 queries, idle cost | Not started |
+
 ## MVP definition
 {: #mvp-definition }
 
@@ -168,6 +195,8 @@ Insights views, and private networking.
 | M6 AWS | AWS results file exists for every AWS mode |
 | M7 GCP | GCP results file exists for every GCP mode |
 | M8 Cross-cloud | The comparison table covers three clouds and the homelab |
+| M9 Enterprise ingestion | Three sources through their own pipelines, one of them restricted and permission-trimmed |
+| M10 Fast | The stage table, the cache and the vector store benchmark are in the results |
 
 **Pace and dates** (set 2026-11-23): about five hours a week, in sessions, which is what the
 idle-cost switch is designed around. M0 by the end of November 2026, M1 by the end of December 2026. Later

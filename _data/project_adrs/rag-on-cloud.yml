@@ -17,3 +17,5 @@ adrs:
   - {id: "0013", title: "Chat model on Azure: gpt-5-mini, DataZoneStandard", status: accepted, date: 2026-11-23, anchor: adr-0013, repos: [rag-on-cloud, infra-azure]}
   - {id: "0014", title: "One chat model family on every cloud: OpenAI's", status: accepted, date: 2026-11-23, anchor: adr-0014, repos: [rag-on-cloud, infra-aws, infra-gcp]}
   - {id: "0015", title: "AWS in ap-south-1, GCP in the cloudutsuk project in asia-south1", status: accepted, date: 2026-11-23, anchor: adr-0015, repos: [rag-on-cloud, infra-aws, infra-gcp]}
+  - {id: "0016", title: "Enterprise ingestion: a pipeline per source in Data Factory, a medallion lake on ADLS Gen2, Search indexes the curated layer", status: proposed, date: 2026-11-23, anchor: adr-0016, repos: [rag-on-cloud, infra-azure, platform-as-code]}
+  - {id: "0017", title: "Retrieval speed: AI Search stays the vector store; measure per stage, cache semantically, compress vectors, benchmark alternatives", status: proposed, date: 2026-11-23, anchor: adr-0017, repos: [rag-on-cloud, infra-azure, platform-as-code]}
