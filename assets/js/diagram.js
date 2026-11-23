@@ -2199,6 +2199,7 @@
     }
 
     openPanel(n) {
+      this.endInspect();
       const body = this.panel.querySelector('.dgm-panel-body');
       const crumbs = this.ancestorsOf(n.id).reverse().map((a) => esc(a.label));
       const links = this.edges.filter((e) => e.from === n.id || e.to === n.id);
@@ -2229,6 +2230,7 @@
       });
       this.panel.hidden = false;
       this.root.classList.add('has-panel');
+      this.fitBox();
       this.focusOn([n.id], true);
     }
     factsHTML(f) {
@@ -2259,11 +2261,13 @@
       return h ? `<div class="dgm-facts">${h}</div>` : '';
     }
     openEdgePanel(v) {
+      this.endInspect();
       const body = this.panel.querySelector('.dgm-panel-body');
       body.innerHTML = this.cardHTML(v, true);
       this.playExchange(body);
       this.panel.hidden = false;
       this.root.classList.add('has-panel');
+      this.fitBox();
       this.hideCard();
     }
     // The side panel can be resized: drag its inner edge (left on desktop, top on a phone), use the arrow
@@ -2323,10 +2327,27 @@
       });
       for (const t of ['click', 'wheel']) grip.addEventListener(t, (ev) => ev.stopPropagation());
     }
+    // The player box sits left of an open side panel when the canvas has room for both; otherwise over the
+    // panel's foot, and the panel gets that much room at its bottom, so all of its content scrolls into view.
+    fitBox() {
+      const box = this.root.querySelector('.dgm-banner');
+      if (!box || !this.panel) return;
+      const on = box.classList.contains('is-on') && this.root.classList.contains('has-panel');
+      const tight = on && this.stage.clientWidth - this.panel.offsetWidth < box.offsetWidth + 24;
+      this.root.classList.toggle('is-box-over-panel', tight);
+      if (tight) this.root.style.setProperty('--dgm-box-h', `${box.offsetHeight + 12}px`);
+    }
+    // The side panel stops being the packet inspector (it no longer follows the steps).
+    endInspect() {
+      this.inspecting = false;
+      this.panel.classList.remove('is-inspector');
+    }
     closePanel() {
+      this.endInspect();
       clearTimeout(this.exTimer);
       this.panel.hidden = true;
       this.root.classList.remove('has-panel');
+      this.fitBox();
     }
 
     // ---------------------------------------------------------------- camera
@@ -2581,7 +2602,10 @@
       });
       window.addEventListener('resize', () => {
         clearTimeout(this.resizeTimer);
-        this.resizeTimer = setTimeout(() => this.fit(false), 150);
+        this.resizeTimer = setTimeout(() => {
+          this.fitBox();
+          this.fit(false);
+        }, 150);
       });
     }
 
@@ -2722,6 +2746,7 @@
         clearTimeout(this.endTimer);
         if (banner) banner.classList.toggle('is-on', on);
         this.root.classList.toggle('is-playing-box', on);
+        this.fitBox();
       };
       // Close: stop, put the reader's layout back and hide the box.
       this.closeBox = () => {
@@ -2756,9 +2781,150 @@
         const hops = hopsMd(x);
         return hops ? `${x.text || ''}\n\n${hops}` : '';
       };
+      // ---- Packet inspector: what one hop of a step carries, layer by layer, in the side panel.
+      // A hop's content: the step's `packets: {<edge id or ~id>: …}`, else the arrow's own `packet`
+      // (the request) or `reply` (the response). Without one, the layers still say what the arrow knows.
+      const packetOf = (x, l) => {
+        const own = x.packets && x.packets[l.rev ? `~${l.id}` : l.id];
+        return own || (l.rev ? l.e.reply : l.e.packet) || null;
+      };
+      this.packetOf = packetOf;
+      const inspectBtn = ctl.querySelector('[data-act="inspect"]');
+      const UDP = ['WIREGUARD', 'DNS', 'QUIC', 'UDP', 'NTP', 'STATSD', 'SYSLOG', 'SNMP'];
+      const FIELDS = { grpc: 'Metadata', kafka: 'Headers', amqp: 'Properties', mqtt: 'Properties', query: 'Parameters' };
+      this.pkOpen = new Set(['app', 'body']);
+      const inline = (t) => markdown(String(t)).replace(/^<p>|<\/p>$/g, '');
+      const dl = (rows) => `<dl class="dgm-pk-dl">${rows.filter(([, v]) => v != null && v !== '').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+      const layer = (key, tag, name, sum, inner) =>
+        `<details class="dgm-pk-layer" data-layer="${key}"${this.pkOpen.has(key) ? ' open' : ''}><summary><span class="dgm-pk-tag">${esc(tag)}</span><span class="dgm-pk-name">${esc(name)}</span><span class="dgm-pk-sum">${sum}</span></summary><div class="dgm-pk-body">${inner}</div></details>`;
+      const security = (e, cards) => {
+        const c = certsOf(e);
+        const cat = this.data.certs || {};
+        const name = (id) => `<code>${esc(cat[id]?.label || id)}</code>`;
+        const p = protoKey(e.proto);
+        if (cards.includes('tls') || cards.includes('mtls')) {
+          return {
+            tag: cards.includes('mtls') ? 'mTLS' : 'TLS',
+            sum: cards.includes('mtls') ? 'Mutual TLS: both ends show a certificate' : 'TLS: encrypted on the wire',
+            rows: [['Encrypted', 'Yes. The content below is what the receiver reads after decrypting it'], ['Server certificate', c?.server.map(name).join(', ')], ['Client certificate', c?.client.map(name).join(', ')], ['Note', c?.note ? inline(c.note) : null]],
+            enc: true
+          };
+        }
+        if (p === 'SSH') return { tag: 'SSH', sum: 'Encrypted with SSH session keys', rows: [['Encrypted', 'Yes, with keys both ends derived; no certificate']], enc: true };
+        if (p === 'WIREGUARD') return { tag: 'WG', sum: 'Encrypted inside the WireGuard tunnel', rows: [['Encrypted', 'Yes, with the tunnel\'s session keys']], enc: true };
+        if (c?.planned) return { tag: 'TLS?', sum: 'Not decided yet', rows: [['Plan', inline(c.planned)]] };
+        if (c?.none) return { tag: 'None', sum: 'No TLS on this hop', rows: [['Why', inline(c.none)]] };
+        return { tag: '?', sum: 'Not stated', rows: [['Encrypted', 'The diagram does not say this hop uses TLS']] };
+      };
+      const inspectHTML = (i, j) => {
+        const x = this.steps[i];
+        const legs = x.groups.flat();
+        const where = `<div class="dgm-crumbs">${esc(this.scn.title || 'Use case')} › step ${i + 1}/${this.steps.length}: ${esc(x.title || '')}</div>`;
+        if (!legs.length) return `${where}<div class="dgm-panel-head"><h4 style="--dgm-c:var(--dgm-accent2)">Packet inspector</h4></div><p class="dgm-pk-none">This step sends no packet: it ${esc((x.action || x.title || '').replace(/^./, (c) => c.toLowerCase()))}.</p>`;
+        const l = legs[j];
+        const e = l.e;
+        const a = this.nodes.get(l.from);
+        const b = this.nodes.get(l.to);
+        const pk = packetOf(x, l);
+        const cards = cardsFor(e);
+        const p = protoKey(e.proto);
+        const proto = [e.proto, e.port != null ? `:${e.port}` : ''].join('');
+        let h = `${where}<div class="dgm-panel-head"><h4 style="--dgm-c:var(--dgm-accent2)">Packet inspector</h4><span class="dgm-pk-kind${l.rev ? ' is-back' : ''}">${l.rev ? 'Reply' : 'Request'}</span></div>`;
+        if (legs.length > 1) {
+          h += `<div class="dgm-pk-tabs" role="tablist">${legs.map((m, k) => `<button type="button" class="dgm-pk-tab${k === j ? ' is-on' : ''}${m.rev ? ' is-back' : ''}" role="tab" aria-selected="${k === j}" data-j="${k}">${k + 1}. ${esc(this.nodes.get(m.from)?.label || m.from)} → ${esc(this.nodes.get(m.to)?.label || m.to)}</button>`).join('')}</div>`;
+        }
+        h += `<div class="dgm-pk-route"><b>${esc(a?.label || l.from)}</b> <span aria-hidden="true">→</span> <b>${esc(b?.label || l.to)}</b>${proto ? ` <code>${esc(proto)}</code>` : ''}</div>`;
+        const lead = pk?.summary || (l.rev ? `The reply. ${e.why || ''}` : e.why);
+        if (lead) h += `<div class="dgm-lead">${markdown(String(lead))}</div>`;
+        // Network: who talks to whom (component names; the diagram does not model addresses).
+        const end = (n, id) => `${esc(n?.label || id)}${n?.sub ? ` <span class="dgm-pk-muted">${esc(n.sub)}</span>` : ''}${n?.facts?.where ? ` <span class="dgm-pk-muted">· ${inline([].concat(n.facts.where).join(' · '))}</span>` : ''}`;
+        h += layer('net', 'IP', 'Network', `${esc(a?.label || l.from)} → ${esc(b?.label || l.to)}`, dl([['Source', end(a, l.from)], ['Destination', end(b, l.to)]]));
+        // Transport: TCP or UDP and the ports (the server's port; the client's is a random ephemeral one).
+        const tp = UDP.includes(p) ? 'UDP' : cards.length || p === 'TCP' || e.port != null ? 'TCP' : null;
+        if (tp) {
+          const srv = e.port != null ? String(e.port) : 'not stated';
+          const eph = 'ephemeral (the OS picks one)';
+          h += layer('tp', tp, 'Transport', e.port != null ? `${l.rev ? 'from' : 'to'} port ${e.port}` : tp, dl([['Protocol', tp], ['Source port', esc(l.rev ? srv : eph)], ['Destination port', esc(l.rev ? eph : srv)], ['Connection', tp === 'TCP' && cards.includes('tcp') ? 'Opened with the TCP handshake (or reused from a pool)' : null]]));
+        }
+        const sec = security(e, cards);
+        h += layer('sec', sec.tag, 'Security', esc(sec.sum), dl(sec.rows));
+        // Application: the protocol's message, then this packet's own content when the diagram has it.
+        const app = [...cards].reverse().find((k) => !['tcp', 'tls', 'mtls'].includes(k));
+        const msg = app && CARDS[app].msgs.find(([d]) => d === (l.rev ? '<' : '>')) || (app && CARDS[app].msgs.find(([d]) => d === '<>'));
+        const label = FIELDS[app] || 'Headers';
+        const fields = pk?.headers && typeof pk.headers === 'object' ? (Array.isArray(pk.headers) ? pk.headers.map((t) => String(t)) : Object.entries(pk.headers).map(([k, v]) => `${k}: ${v}`)) : [];
+        let ai = dl([['Protocol', app ? esc(CARDS[app].title) : esc(e.proto || e.label || 'not stated')], ['Message', msg ? `${esc(msg[1])}${msg[2] ? ` <span class="dgm-pk-muted">(${esc(msg[2])})</span>` : ''}` : null]]);
+        if (pk?.line || fields.length) {
+          ai += `<div class="dgm-config dgm-pk-raw"><div class="dgm-config-head"><span>${pk.line ? 'Message' : label}</span></div><pre><code>${esc([pk.line, ...fields].filter(Boolean).join('\n'))}</code></pre></div>`;
+        }
+        h += layer('app', (app && CARD_TAGS[app]) || e.proto || 'App', 'Application', pk?.line ? `<code>${esc(String(pk.line).slice(0, 60))}</code>` : msg ? esc(msg[1]) : esc(e.label || ''), ai);
+        const body = pk && pk.body != null ? (typeof pk.body === 'string' ? pk.body.replace(/\n+$/, '') : JSON.stringify(pk.body, null, 2)) : null;
+        if (body != null) {
+          const bytes = new TextEncoder().encode(body).length;
+          const lang = pk.lang || (typeof pk.body === 'string' ? (/^\s*[[{]/.test(body) ? 'json' : 'text') : 'json');
+          h += layer('body', 'Body', 'Payload', `${bytes} bytes · ${esc(lang)}`, `<div class="dgm-config dgm-pk-payload"><div class="dgm-config-head"><span>${esc(lang)} · ${bytes} bytes</span><button type="button" class="dgm-copy">Copy</button></div><pre><code>${esc(body)}</code></pre></div>`);
+        }
+        if (pk) {
+          // Where it comes from: copied from `source`; with `illustrative` too, the shape follows the source and
+          // the values are examples; `illustrative` alone, shortened or made up.
+          const from = pk.source ? `<code>${esc(pk.source)}</code>` : '';
+          const ill = '<span class="dgm-pk-ill">Illustrative</span>';
+          const origin = pk.illustrative ? (from ? `${ill} the shape follows ${from}; the values are examples` : `${ill} shortened or made up to show the shape, not copied from a real request`) : from ? `Copied from ${from}` : '';
+          const src = [pk.note ? `<div class="dgm-pk-note">${markdown(String(pk.note))}</div>` : '', origin ? `<div class="dgm-pk-src">${origin}</div>` : ''].join('');
+          h += src;
+          if (sec.enc && (body != null || pk.line)) h += '<div class="dgm-pk-src">On the wire this content is encrypted; the inspector shows it as the receiver reads it.</div>';
+        } else {
+          h += `<p class="dgm-pk-none">The diagram does not record what this ${l.rev ? 'reply' : 'request'} carries; the layers above show what its arrow says about it.</p>`;
+        }
+        return h;
+      };
+      // Open (or move) the inspector on step i's hop j. It follows the steps until another panel opens.
+      // settle: the reader paused on this step to inspect it, so it counts as reached (lit, and Next or
+      // Play go on from the step after it).
+      this.inspect = (i, j = 0, settle = false) => {
+        const x = this.steps[i];
+        if (!x) return;
+        if (settle) {
+          if (this.k < i) {
+            this.k = i;
+            this.computeLit(i);
+            this.applyLit();
+          }
+          // The box shows the same step (a pause before its card was drawn would leave the one before).
+          this.stepRunning = i;
+          this.showBox(true);
+          this.setCaption(i);
+          this.setBanner(x.action || x.title);
+        }
+        const legs = x.groups.flat();
+        j = Math.max(0, Math.min(j, legs.length - 1));
+        clearTimeout(this.endTimer);
+        clearTimeout(this.exTimer);
+        const body = this.panel.querySelector('.dgm-panel-body');
+        body.innerHTML = inspectHTML(i, j);
+        body.querySelectorAll('.dgm-pk-tab').forEach((t) => t.addEventListener('click', () => this.inspect(i, Number(t.dataset.j))));
+        body.querySelectorAll('.dgm-pk-layer').forEach((d) =>
+          d.addEventListener('toggle', () => {
+            if (d.open) this.pkOpen.add(d.dataset.layer);
+            else this.pkOpen.delete(d.dataset.layer);
+          })
+        );
+        body.querySelector('.dgm-copy')?.addEventListener('click', (ev) => {
+          const code = body.querySelector('.dgm-pk-payload code').textContent;
+          navigator.clipboard?.writeText(code).then(() => (ev.target.textContent = 'Copied'));
+        });
+        this.inspectAt = { i, j };
+        this.panel.hidden = false;
+        this.panel.classList.add('is-inspector');
+        this.root.classList.add('has-panel');
+        this.fitBox();
+        this.hideCard();
+        this.inspecting = true;
+      };
       this.setCard = (i) => {
         const x = this.steps[i];
         if (!banner || !x) return;
+        if (inspectBtn) inspectBtn.disabled = !x.groups.flat().length;
         const long = this.details && this.detailOf(x);
         part('n').textContent = `${i + 1}/${this.steps.length}`;
         part('title').textContent = x.title || '';
@@ -2767,10 +2933,12 @@
         part('text').innerHTML = String(long || x.text || '').split(/\n\s*\n/).map((t) => markdown(t)).join('');
         part('text').scrollTop = 0;
         banner.classList.toggle('is-detailed', !!long);
+        this.fitBox();
       };
       // Before the first step: the use case and its summary (the box itself opens and closes on its own).
       this.setIntro = () => {
         this.stepRunning = null;
+        if (inspectBtn) inspectBtn.disabled = true;
         if (!banner) return;
         part('n').textContent = '';
         part('scn').textContent = this.scn.title || 'Guided tour';
@@ -2907,7 +3075,7 @@
           const hidden = [];
           for (const l of legs) {
             const el = this.edgeEls.get(`${this.repOf(l.e.from)?.id}>${this.repOf(l.e.to)?.id}`);
-            if (el) runs.push({ ...el, rev: l.rev });
+            if (el) runs.push({ ...el, rev: l.rev, leg: l });
             else hidden.push(hiddenLeg(l));
           }
           const x = this.steps[this.stepRunning];
@@ -2942,10 +3110,31 @@
           }
           const maxLen = Math.max(...runs.map((r) => r.m.total));
           const D = (600 + maxLen * 1.4) / this.speed;
+          // Each hop is a packet: a small frame with a header strip and its protocol on it, a chevron in
+          // front showing which way it travels (requests in accent2, replies green). It stays upright so
+          // the protocol reads on any arrow; a press on it pauses the use case and opens the inspector.
+          const legsOf = x ? x.groups.flat() : [];
           const ptrs = runs.map((r) => {
-            const g = make('g', { class: 'dgm-pointer' + (r.rev ? ' is-back' : '') }, this.pointerLayer);
-            make('circle', { class: 'dgm-halo', r: 13 }, g);
-            make('path', { class: 'dgm-head', d: 'M-9,-8 L11,0 L-9,8 L-4,0 z' }, g);
+            const e = r.leg.e;
+            const raw = String(e.proto || e.label || 'data').trim();
+            const tag = raw.length > 10 ? raw.slice(0, 9) + '…' : raw;
+            const w = Math.round(Math.max(34, 14 + tag.length * 6.6));
+            const g = make('g', { class: 'dgm-packet' + (r.rev ? ' is-back' : '') + (x && packetOf(x, r.leg) ? ' has-content' : '') }, this.pointerLayer);
+            make('title', {}, g).textContent = `${r.rev ? 'Reply' : 'Request'} (${raw}): click to inspect it`;
+            make('rect', { class: 'dgm-packet-glow', x: -w / 2 - 5, y: -16, width: w + 10, height: 32, rx: 9 }, g);
+            g._dir = make('path', { class: 'dgm-packet-dir', d: 'M-1,-5.5 L7,0 L-1,5.5 z' }, g);
+            make('rect', { class: 'dgm-packet-body', x: -w / 2, y: -11, width: w, height: 22, rx: 3.5 }, g);
+            make('path', { class: 'dgm-packet-hdr', d: `M${-w / 2},-4.5 V-7.5 Q${-w / 2},-11 ${-w / 2 + 3.5},-11 H${w / 2 - 3.5} Q${w / 2},-11 ${w / 2},-7.5 V-4.5 Z` }, g);
+            make('text', { class: 'dgm-packet-tag', x: 0, y: 7, 'text-anchor': 'middle' }, g).textContent = tag;
+            g._w = w;
+            // pointerdown, not click: the packet moves away before a click would complete.
+            g.addEventListener('pointerdown', (ev) => {
+              ev.stopPropagation();
+              ev.preventDefault();
+              const i = this.stepRunning;
+              this.stop();
+              this.inspect(i, Math.max(0, legsOf.indexOf(r.leg)), true);
+            });
             return g;
           });
           const t0 = performance.now();
@@ -2960,7 +3149,12 @@
             runs.forEach((r, i) => {
               const d = Math.min(dist, r.m.total);
               const p = pointAt(r.m, r.rev ? r.m.total - d : d);
-              ptrs[i].setAttribute('transform', `translate(${p.x},${p.y}) rotate(${p.angle + (r.rev ? 180 : 0)})`);
+              ptrs[i].setAttribute('transform', `translate(${p.x},${p.y})`);
+              // The chevron sits just outside the frame, on the side it travels towards.
+              const ang = p.angle + (r.rev ? 180 : 0);
+              const rad = (ang * Math.PI) / 180;
+              const off = Math.abs(Math.cos(rad)) * (ptrs[i]._w / 2) + Math.abs(Math.sin(rad)) * 11 + 3;
+              ptrs[i]._dir.setAttribute('transform', `rotate(${ang}) translate(${off},0)`);
               ptrs[i].style.display = d >= r.m.total ? 'none' : '';
               if (!r.rev) r.trail.style.strokeDashoffset = r.m.total - d;
               else r.trail.style.strokeDashoffset = 0;
@@ -3036,6 +3230,7 @@
         const token = ++this.run;
         clearTimeout(this.endTimer);
         if (i < 0 || !this.steps.length) {
+          if (this.inspecting) this.closePanel();
           await this.restoreBefore();
           if (token !== this.run) return 'stopped';
           this.k = -1;
@@ -3053,6 +3248,7 @@
         if (token !== this.run) return 'stopped';
         this.pointerLayer.textContent = '';
         this.setCaption(i);
+        if (this.inspecting && !this.panel.hidden) this.inspect(i, 0);
         this.setBanner(x.action || x.title);
         this.focusStep(ids);
         this.computeLit(x.clear ? -1 : i - 1);
@@ -3191,6 +3387,12 @@
           b.textContent = `${this.speed}×`;
         }
         if (a === 'lock') this.setLocked(!this.locked);
+        if (a === 'inspect') {
+          // Pause where the use case is and open the inspector on the current step's first hop.
+          const i = this.stepRunning ?? this.k;
+          this.stop();
+          if (i != null && i >= 0) this.inspect(i, 0, true);
+        }
       });
       // Turning lock on puts back the layout the reader had before the use case opened groups; turning
       // it off lets the use case open what it needs. Either way the current step runs again.

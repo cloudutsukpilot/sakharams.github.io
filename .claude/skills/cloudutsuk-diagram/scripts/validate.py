@@ -52,6 +52,45 @@ CERT_TYPES = set(re.findall(r"(\w+): '", (re.search(r"const CERT_TYPES = (\{.*?\
     "public", "private", "cluster", "self", "key"}
 CERT_REQUIRED = ["label", "type", "by", "issuer", "valid", "trust"]
 TLS_PROTOS = {"HTTPS", "WSS", "AMQPS", "MQTTS", "LDAPS"}
+# A packet's content for the inspector: an edge's `packet` (request) / `reply` (response), or a step's
+# `packets: {<edge id or ~id>: …}`. Real content is copied from code (`source`) or marked `illustrative`.
+PACKET_KEYS = ["summary", "line", "headers", "body", "lang", "note", "source", "illustrative"]
+# What must never reach a published page: live tokens and keys. Placeholders (`<token>`, `…`, `xxx`) pass.
+SECRET_RES = [
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"), "a GitHub token"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), "a GitHub token"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"), "an API key"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "an AWS access key"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"), "a JWT"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "a private key"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"), "a Slack token"),
+    (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{24,}"), "a bearer token"),
+]
+
+
+def check_packet(pk, where, E, W):
+    """One packet: known keys, readable types, no secrets, and says where it came from."""
+    if not isinstance(pk, dict):
+        E(f"{where}: a packet must be a mapping of {', '.join(PACKET_KEYS)}")
+        return
+    for k in pk:
+        if k not in PACKET_KEYS:
+            E(f"{where}: unknown packet key `{k}` (use {', '.join(PACKET_KEYS)})")
+    if not any(pk.get(k) not in (None, "") for k in ("line", "headers", "body")):
+        E(f"{where}: a packet needs at least one of `line`, `headers` or `body`")
+    h = pk.get("headers")
+    if h is not None and not isinstance(h, (dict, list)):
+        E(f"{where}: `headers` must be a mapping (name: value) or a list of `Name: value` lines")
+    b = pk.get("body")
+    if isinstance(b, str) and len(b) > 4000 or b is not None and not isinstance(b, str) and len(str(b)) > 4000:
+        W(f"{where}: the body is long; keep the fields that explain the step and shorten the rest with `…`")
+    if not pk.get("source") and not pk.get("illustrative"):
+        W(f"{where}: say where the packet comes from: `source:` (the file or schema it was copied from) or `illustrative: true`")
+    text = yaml.safe_dump(pk, allow_unicode=True)
+    for rx, what in SECRET_RES:
+        if rx.search(text):
+            E(f"{where}: looks like {what}; use a placeholder such as `<token>` (diagrams get published)")
+
 
 
 def proto_kind(e):
@@ -251,6 +290,11 @@ def validate(data, path):
             W(f"edge `{eid}`: `why` is {len(why)} chars; keep it to 1-2 short sentences (under ~220)")
         if e.get("port") is not None and not (isinstance(e["port"], int) and 0 < e["port"] < 65536):
             E(f"edge `{eid}`: port must be 1..65535")
+        for k in ("packet", "reply"):
+            if e.get(k) is not None:
+                check_packet(e[k], f"edge `{eid}` {k}", E, W)
+        if e.get("reply") is not None and e.get("oneway"):
+            W(f"edge `{eid}`: has a `reply` but is `oneway`")
         for c in e.get("cards") or []:
             if c not in CARDS:
                 E(f"edge `{eid}`: unknown card {c!r} (cards: {sorted(CARDS)})")
@@ -391,6 +435,17 @@ def validate(data, path):
                         W(f"{tag}: detail is only {words} words; it should say more than `text`, or leave it out")
                     if " ".join(st["detail"].split()) == " ".join(str(st.get("text", "")).split()):
                         W(f"{tag}: detail repeats text; add what the step does and why, or leave it out")
+            # Packets for the inspector, keyed by a hop this step makes (`id`, or `~id` for the reply).
+            pks = st.get("packets")
+            if pks is not None:
+                hops = {str(r) for r in list(st.get("edges") or []) + list(st.get("path") or [])}
+                if not isinstance(pks, dict):
+                    E(f"{tag}: `packets` must map a hop of this step (`edge-id` or `~edge-id`) to its packet")
+                else:
+                    for ref, pk in pks.items():
+                        if str(ref) not in hops:
+                            E(f"{tag}: packets has `{ref}`, which is not a hop of this step ({', '.join(sorted(hops)) or 'none'})")
+                        check_packet(pk, f"{tag} packet `{ref}`", E, W)
             # The banner line: what this step does, short.
             if not st.get("action"):
                 E(f"{tag}: needs `action`, the short banner line saying what the step does (\"Keycloak ↔ core-db: read your account\")")
