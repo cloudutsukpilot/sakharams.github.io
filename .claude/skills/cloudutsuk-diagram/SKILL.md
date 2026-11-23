@@ -261,11 +261,14 @@ new layout instead. Rules:
   words), `**Why it matters:**` (the risk it removes or the guarantee it gives: cost, safety, audit, a
   person in the loop) and `**How:**` (the mechanism and its numbers, or a short `- ` list). Explain
   each term the first time it appears, state known gaps plainly, and set `details: true`.
-- The player box in the canvas's bottom-right corner (about 22rem wide, left of the side panel when
-  one is open, full width on a phone) is the one place for the description and the controls. Its head
-  has `n/N`, the use case's title and a close button; then the step's title, the action line and `text`
-  (or `detail` with Details on, the box growing taller); at its foot the controls: play/pause, previous,
-  next, restart, speed, the layout padlock, the packet inspector, the alternative mode and Details. It shows only while a use
+- The player box across the bottom of the canvas (left of the side panel when one is open and the
+  canvas has room, over the panel's foot when not) is the one place for the description and the
+  controls. On the left: `n/N`, the use case's title, the step's title, the action line and `text` (or
+  `detail` with Details on), as tall as it needs up to a cap, then it scrolls; on the right the controls
+  in a 2 x 4 grid (play/pause, previous, next, restart, speed, the layout padlock, the packet inspector)
+  with the alternative mode and Details under it; the close button in the corner. On a phone the
+  controls are a row under the description. Each packet rests 2 seconds on its target when its hop ends
+  (at 1x), so it can be pressed and inspected; Play waits for it. It shows only while a use
   case runs: a click on a use case opens it and plays, it stays while the use case runs (also paused),
   and it goes 5 seconds after the last step, or at once with the close button (which stops and puts the
   reader's layout back). While it is up, the camera frames each step in the room left of it. There are
@@ -319,7 +322,8 @@ light components inside it) play as one step: one card titled "Inside Workers ·
 step's title and `text` (its `detail` with Details on), the `n/N` count and the use case's step count in
 the menu drop to match, the banner line names the step that is moving, and the packet inspector has a
 tab for every hop of the group. A step that also leaves the component, or has `clear`, starts a new
-step. Opening the component, a deeper level or unlocking shows every step again. So write each step for
+step. A use case keeps at least two steps: if grouping would fold all of it into one card, every step
+plays on its own. Opening the component, a deeper level or unlocking shows every step again. So write each step for
 the deepest level and let the engine group them; a step's `title` and `text` must still read well in a
 list with its neighbours.
 
@@ -352,7 +356,7 @@ hover, the detail panel (status badge, chips, lead sentence, how it works, link 
 arrow's panel with its exchange (bracket rail, looping) first and the collapsed certificates under it
 (each opens to its details), zoom, the start level (ignoring an old URL parameter), the tour, lock mode (the padlock keeps the layout through the steps), no script errors, no foreign styling and no
 raw Markdown leaking, in light, dark and phone views. Read at least `light-desktop-level1.png`, the
-deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box in the bottom-right corner, controls at its foot), `step-details.png` (the same card with Details
+deepest level, `card.png`, `panel.png`, `edge-panel.png`, `tour.png`, `step-next.png`, `player-open.png` (the player box across the bottom of the canvas, the controls in a 2 x 4 grid on its right), `step-details.png` (the same card with Details
 ticked, a little larger, the description readable), `sidebar.png` and `collapsed.png` (the sidebar open and folded) `step-locked.png` (the same packet on the reader's layout, nothing opened), `inspector.png` (the packet inspector's layers) and `inspector-content.png` (a recorded packet, when the diagram has one) and `step-grouped.png` (lock mode: consecutive steps inside one closed component on one card, when the layout has any). Then run htmlproofer on the same folder.
 
 ### 6. Report
@@ -402,7 +406,10 @@ slate or `#RRGGBB`), else `tone`, else the icon's role, else one per top-level c
   folds its items, remembered per diagram); the zoom lock, zoom in, zoom out, Fit and fullscreen buttons
   sit at its foot and stay in view. `«` folds the whole sidebar to a strip that keeps those buttons.
   The zoom lock holds the current zoom: buttons, Ctrl + scroll, pinch and `+`/`-` stop zooming and the
-  camera moves of levels, Fit and use cases only pan; `zoom_lock: true` opens locked.
+  camera moves of levels, Fit and use cases only pan; `zoom_lock: true` opens locked. The drag lock (the
+  hand beside it) keeps the view where the reader put it: dragging and the arrow keys don't pan, and use
+  cases don't move the camera to each step, the outcome or back; zoom and Fit still work;
+  `drag_lock: true` opens with it on.
 - **Level buttons:** the Levels menu has one button per level (`Level 0`, `Level 1`, … with the level's name). Clicking one walks there a layer at a time, each layer opening or closing with its own animation; a new click cancels a walk in progress.
 - **Opening view:** the whole diagram if it fits at a readable size, else a readable zoom on its start
   (drag to explore; ⤢ fits everything).

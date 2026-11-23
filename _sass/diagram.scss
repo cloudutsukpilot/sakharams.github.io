@@ -1437,20 +1437,23 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   transition: opacity 0.3s ease;
 }
 
-// The player box, in the canvas's bottom-right corner (left of the side panel when one is open): the
-// step's number, the use case and a close button, the step's title, the banner line (`action`, then the
-// outcome), its description (`text`, or `detail` while the Details box is ticked) and, at its foot, the
-// player's controls. It shows only while a use case runs, and is narrow so it covers little of the map.
+// The player box across the bottom of the canvas (left of the side panel when one is open): on the left
+// the step's number and use case, the step's title, the banner line (`action`, then the outcome) and its
+// description (`text`, or `detail` while the Details box is ticked), as tall as it needs up to a cap; on
+// the right the player's controls in a 2 x 4 grid, and a close button in the corner. It shows only while
+// a use case runs.
 .dgm-banner {
   position: absolute;
   right: 0.6rem;
   bottom: 0.6rem;
+  left: 0.6rem;
   z-index: 6;
   display: flex;
-  flex-direction: column;
-  width: min(22rem, calc(100% - 1.2rem));
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.9rem;
   max-height: calc(100% - 1.2rem);
-  padding: 0.5rem 0.75rem 0.5rem;
+  padding: 0.5rem 2.2rem 0.5rem 0.75rem;
   border: 1px solid var(--dgm-border);
   border-left: 4px solid var(--dgm-accent2);
   border-radius: 0.6rem;
@@ -1474,6 +1477,16 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
     visibility: visible;
   }
 
+  // The description side: takes the width the controls leave.
+  .dgm-banner-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+  }
+
   .dgm-banner-head {
     display: flex;
     gap: 0.45rem;
@@ -1484,10 +1497,13 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 
   // Close: stops the use case and puts the reader's layout back.
   .dgm-banner-close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
     flex: none;
     width: 1.5rem;
     height: 1.5rem;
-    margin: -0.15rem -0.35rem 0 0;
+    margin: 0;
     padding: 0;
     border: 0;
     border-radius: 0.4rem;
@@ -1546,7 +1562,7 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   .dgm-banner-text {
     flex: 0 1 auto;
     min-height: 0;
-    max-height: 8.5em;
+    max-height: min(9em, 26vh);
     margin-top: 0.2rem;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1576,37 +1592,33 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 
   // Details: the same box, taller; a long description scrolls inside it.
   &.is-detailed .dgm-banner-text {
-    max-height: min(18em, 48vh);
+    max-height: min(16em, 40vh);
   }
 
-  // The player's controls, at the foot of the box.
+  // The player's controls on the right: the buttons in a 2 x 4 grid, the toggles under it.
   .dgm-controls {
-    display: flex;
+    display: grid;
     flex: none;
-    flex-wrap: wrap;
-    align-items: center;
+    grid-template-columns: repeat(4, 2rem);
     gap: 0.3rem;
-    margin-top: 0.45rem;
-    padding-top: 0.45rem;
-    border-top: 1px solid var(--dgm-border);
+    align-content: start;
+    padding-left: 0.9rem;
+    border-left: 1px solid var(--dgm-border);
 
     .dgm-btn {
       width: 2rem;
       height: 2rem;
+      padding: 0;
     }
 
     [data-act='speed'] {
-      width: auto;
-      min-width: 2.4rem;
+      font-size: 0.78rem;
     }
 
     .dgm-toggle-mode,
     .dgm-toggle-details {
+      grid-column: 1 / -1;
       font-size: 0.8rem;
-    }
-
-    .dgm-toggle-details {
-      margin-left: auto;
     }
   }
 
@@ -1633,6 +1645,27 @@ $dgm-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 
 .dgm.has-panel .dgm-banner {
   right: calc(min(var(--dgm-panel-w, 360px), 94%) + 0.6rem);
+}
+
+// A packet resting on its target after a hop: it breathes, so it reads as waiting to be pressed.
+.dgm-packet.is-arrived .dgm-packet-glow {
+  animation: dgm-packet-rest 1s ease-in-out infinite alternate;
+}
+
+.dgm-packet.is-arrived .dgm-packet-dir {
+  opacity: 0;
+}
+
+@keyframes dgm-packet-rest {
+  to {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dgm-packet.is-arrived .dgm-packet-glow {
+    animation: none;
+  }
 }
 
 // No room for both beside each other (a narrow canvas, a phone): the box sits over the panel's foot, and
@@ -1707,11 +1740,28 @@ body.dgm-full-open {
     height: 70vh;
   }
 
+  // A phone: the description on top, the controls in one row under it.
   .dgm-banner {
     right: 0.5rem;
     bottom: 0.5rem;
-    width: calc(100% - 1rem);
+    left: 0.5rem;
+    flex-direction: column;
+    gap: 0.4rem;
     font-size: 0.82rem;
+
+    .dgm-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-self: stretch;
+      padding: 0.4rem 0 0;
+      border-top: 1px solid var(--dgm-border);
+      border-left: 0;
+
+      .dgm-toggle-details {
+        margin-left: auto;
+      }
+    }
 
     &.is-detailed .dgm-banner-text {
       max-height: min(11em, 30vh);

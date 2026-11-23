@@ -24,6 +24,10 @@
   const SPEEDS = [0.5, 1, 2];
   const DWELL_MS = 1600;
   const END_CARD_MS = 5000; // the step card stays this long after a use case's last step
+  // How long a packet rests on its target once it arrives (at 1x), so it can be pressed and inspected.
+  const ARRIVE_MS = 2000;
+  // The narrowest the player box gets beside an open side panel; below it, it sits over the panel's foot.
+  const BOX_MIN_W = 460;
   // Reading time for a step's `detail` while Details is on: about 250 words a minute, at most 25 s.
   const READ_MS_PER_WORD = 240;
   const READ_MAX_MS = 25000;
@@ -733,6 +737,8 @@
         root.classList.add('is-ready');
         // `zoom_lock: true` locks the zoom the diagram opened at (after the first fit, not before it).
         if (this.data.zoom_lock === true) this.setZoomLock(true);
+        // `drag_lock: true` opens with dragging locked: the view stays where it opened, use cases included.
+        if (this.data.drag_lock === true) this.setDragLock(true);
       });
     }
 
@@ -854,6 +860,12 @@
       // camera moves of levels, Fit and use cases only pan. Dragging still moves around.
       this.zoomLockBtn = btn('zoom-lock', 'lock-open', 'Lock zoom');
       this.zoomLockBtn.classList.add('dgm-btn-zoomlock');
+      // Drag lock: the view stays where it is. Dragging and the arrow keys stop panning, and use cases
+      // stop moving the camera to each step (the packet travels across the view the reader framed).
+      // Zoom (buttons, Ctrl + scroll, pinch, +/-) and Fit still work.
+      this.dragLockBtn = btn('drag-lock', 'hand', 'Lock dragging');
+      this.dragLockBtn.classList.add('dgm-btn-zoomlock', 'dgm-btn-draglock');
+      this.setDragLock(false);
       this.zoomBtns = [btn('zoom-in', 'plus', 'Zoom in'), btn('zoom-out', 'minus', 'Zoom out')];
       this.setZoomLock(false);
       btn('fit', 'expand', 'Fit to view');
@@ -863,6 +875,7 @@
         if (!b) return;
         const a = b.dataset.act;
         if (a === 'zoom-lock') this.setZoomLock(!this.zoomLocked);
+        if (a === 'drag-lock') this.setDragLock(!this.dragLocked);
         if (a === 'zoom-in') this.userZoom(1.25);
         if (a === 'zoom-out') this.userZoom(0.8);
         if (a === 'fit') this.fit(true);
@@ -2334,7 +2347,7 @@
       const box = this.root.querySelector('.dgm-banner');
       if (!box || !this.panel) return;
       const on = box.classList.contains('is-on') && this.root.classList.contains('has-panel');
-      const tight = on && this.stage.clientWidth - this.panel.offsetWidth < box.offsetWidth + 24;
+      const tight = on && this.stage.clientWidth - this.panel.offsetWidth < BOX_MIN_W;
       this.root.classList.toggle('is-box-over-panel', tight);
       if (tight) this.root.style.setProperty('--dgm-box-h', `${box.offsetHeight + 12}px`);
     }
@@ -2379,6 +2392,17 @@
       }
       for (const z of this.zoomBtns || []) z.disabled = on;
       this.root.classList.toggle('is-zoom-locked', on);
+    }
+    setDragLock(on) {
+      this.dragLocked = on;
+      const b = this.dragLockBtn;
+      if (b) {
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        const label = on ? 'Dragging locked: the view stays put, use cases do not move it. Click to drag again' : 'Lock dragging: keep the view where it is';
+        b.setAttribute('aria-label', label);
+        b.title = label;
+      }
+      this.root.classList.toggle('is-drag-locked', on);
     }
     // A zoom the reader asked for (buttons, wheel, pinch, keys): refused while the zoom is locked.
     userZoom(f, cx, cy) {
@@ -2559,6 +2583,12 @@
         const dx = ev.clientX - last.x;
         const dy = ev.clientY - last.y;
         if (!this.dragged && Math.hypot(dx, dy) < 4) return;
+        if (this.dragLocked) {
+          // Not a click either: the pointer moved, so a release here must not open a panel.
+          if (!this.dragged) this.flashHint('Dragging is locked: unlock it at the foot of the sidebar');
+          this.dragged = true;
+          return;
+        }
         if (!this.dragged) st.setPointerCapture(ev.pointerId);
         this.dragged = true;
         last = { x: ev.clientX, y: ev.clientY };
@@ -2595,6 +2625,7 @@
         if (ev.target !== st) return;
         if (moves[ev.key]) {
           ev.preventDefault();
+          if (this.dragLocked) return this.flashHint('Dragging is locked: unlock it at the foot of the sidebar');
           this.cam = { ...this.cam, x: this.cam.x + moves[ev.key][0], y: this.cam.y + moves[ev.key][1] };
           this.applyCam();
         } else if (ev.key === '+' || ev.key === '=') this.userZoom(1.2);
@@ -2785,7 +2816,9 @@
           });
           i = j;
         }
-        return out;
+        // A use case keeps at least two steps: if grouping would fold all of it into one card (every hop
+        // inside one closed component, at level 0 say), it plays every step on its own instead.
+        return out.length < 2 && raw.length >= 2 ? raw : out;
       };
       const buildSteps = () => {
         this.rawSteps = rawOf(this.scn, this.mode);
@@ -2827,7 +2860,8 @@
       // runs: a click on a use case opens it and plays, and it goes END_CARD_MS after the last step.
       const banner = this.root.querySelector('.dgm-banner');
       if (banner) {
-        banner.insertAdjacentHTML('afterbegin', '<div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-scn"></span><button type="button" class="dgm-banner-close" aria-label="Close the player" title="Stop and close"><i class="fas fa-xmark" aria-hidden="true"></i></button></div><div class="dgm-banner-title"></div><div class="dgm-banner-line" aria-live="polite"></div><div class="dgm-banner-text"></div>');
+        banner.insertAdjacentHTML('afterbegin', '<div class="dgm-banner-main"><div class="dgm-banner-head"><span class="dgm-banner-n"></span><span class="dgm-banner-scn"></span></div><div class="dgm-banner-title"></div><div class="dgm-banner-line" aria-live="polite"></div><div class="dgm-banner-text"></div></div>');
+        banner.insertAdjacentHTML('beforeend', '<button type="button" class="dgm-banner-close" aria-label="Close the player" title="Stop and close"><i class="fas fa-xmark" aria-hidden="true"></i></button>');
         // Clicks, drags and scrolls on the box are not pans or clicks on the canvas.
         for (const t of ['pointerdown', 'click', 'wheel', 'dblclick']) banner.addEventListener(t, (ev) => ev.stopPropagation());
       }
@@ -3102,7 +3136,7 @@
           this.updateLevelLabel();
           await this.relayout({});
         }
-        this.animateCam(b.cam);
+        if (!this.dragLocked) this.animateCam(b.cam);
       };
       // Put back the reader's layout (open groups, level, view) but keep the snapshot, so the camera
       // still returns at the end: used when lock mode is turned on in the middle of a use case.
@@ -3250,16 +3284,26 @@
               const rad = (ang * Math.PI) / 180;
               const off = Math.abs(Math.cos(rad)) * (ptrs[i]._w / 2) + Math.abs(Math.sin(rad)) * 11 + 3;
               ptrs[i]._dir.setAttribute('transform', `rotate(${ang}) translate(${off},0)`);
-              ptrs[i].style.display = d >= r.m.total ? 'none' : '';
+              ptrs[i].classList.toggle('is-arrived', d >= r.m.total);
               if (!r.rev) r.trail.style.strokeDashoffset = r.m.total - d;
               else r.trail.style.strokeDashoffset = 0;
             });
-            if (t < 1) requestAnimationFrame(tick);
-            else {
+            if (t < 1) return requestAnimationFrame(tick);
+            // Arrived: the packets rest on their targets for ARRIVE_MS, so a reader can press one and
+            // inspect it; then the next hop starts.
+            const t1 = performance.now();
+            const rest = (n) => {
+              if (token !== this.run) {
+                ptrs.forEach((p) => p.remove());
+                unpulse();
+                return resolve('stopped');
+              }
+              if (n - t1 < ARRIVE_MS / this.speed) return requestAnimationFrame(rest);
               ptrs.forEach((p) => p.remove());
               unpulse();
               resolve();
-            }
+            };
+            requestAnimationFrame(rest);
           };
           requestAnimationFrame(tick);
         });
@@ -3345,7 +3389,7 @@
         this.setCaption(i);
         if (this.inspecting && !this.panel.hidden) this.inspect(i, 0);
         this.setBanner(x.action || x.title);
-        this.focusStep(ids);
+        if (!this.dragLocked) this.focusStep(ids);
         this.computeLit(x.clear ? -1 : i - 1);
         this.applyLit();
         if (animate && !reduceMotion) {
@@ -3361,8 +3405,9 @@
           const at = x.at || (last[last.length - 1] || {}).to || (x.lights || [])[0];
           this.setBanner(x.outcome || x.action || x.title, x.result);
           if (animate && at) {
-            // Glide to where the outcome lands, so the celebration is big enough to see.
-            const p = this.pos.get(this.repOf(at)?.id);
+            // Glide to where the outcome lands, so the celebration is big enough to see (not while
+            // dragging is locked: the view stays where the reader put it).
+            const p = !this.dragLocked && this.pos.get(this.repOf(at)?.id);
             if (p) {
               const W = this.stage.clientWidth;
               const H = this.stage.clientHeight;
