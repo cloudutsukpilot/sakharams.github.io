@@ -1,0 +1,11 @@
+# AI agents I've built, counted on the About tab (_tabs/about.md): the stat tile shows the list's size.
+# Add an agent here once it runs (not when it's only planned).
+- {name: Terraform Drift Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: Change Correlator Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: Stack Author Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: CI/CD Triage Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: Cluster Upgrade Readiness Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: Incident Triage Warden, project: Platform Wardens, url: /tags/platform-wardens/}
+- {name: SQL Blocking Agent, project: Agentic SQL incident responder (work)}
+- {name: Job Hunter Agent, project: Job Hunter Agent, url: /tags/job-hunter-agent/}
+- {name: SRE Agent, project: Cloudutsuk Platform, url: /tags/cloudutsuk-platform/}

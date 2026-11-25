@@ -36,8 +36,9 @@ order: 12
 
 <ul class="ap-stats" aria-label="At a glance">
   <li><strong>15+</strong><span>years in the field</span></li>
-  <li><strong>3</strong><span>clouds: Azure, AWS, GCP</span></li>
-  <li><strong>175</strong><span>Terraform modules on a shared IaC platform</span></li>
+  <li><strong>3</strong><span>clouds</span></li>
+  <li><strong>175</strong><span>Terraform modules</span></li>
+  <li><a href="#ai-agents-ive-built"><strong>{{ site.data.about_agents | size }}</strong><span>AI agents built</span></a></li>
   <li><strong>{{ site.data.about_certifications | size }}</strong><span>certifications</span></li>
 </ul>
 
@@ -125,6 +126,16 @@ order: 12
   </a>
   {%- endfor %}
 </div>
+
+## AI agents I've built
+
+<p class="ap-hint">Every one keeps a person in the loop: deterministic checks decide what an agent may do, and a human approves any change.</p>
+
+<ul class="ap-chips ap-agents">
+  {%- for a in site.data.about_agents %}
+  <li>{% if a.url %}<a href="{{ a.url | relative_url }}"><strong>{{ a.name }}</strong></a>{% else %}<strong>{{ a.name }}</strong>{% endif %} {{ a.project }}</li>
+  {%- endfor %}
+</ul>
 
 ## Career at a glance
 
