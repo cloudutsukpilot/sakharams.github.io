@@ -1,0 +1,27 @@
+# Certification badges shown on the About tab (_tabs/about.md). Images live in assets/img/certifications/.
+- name: Azure Administrator Associate
+  img: /assets/img/certifications/Azure_Administrator_Associate.png
+- name: Azure Security Engineer Associate
+  img: /assets/img/certifications/Azure-Security-Engineer-Associate.png
+- name: Terraform Associate
+  img: /assets/img/certifications/Terraform_Associate.png
+- name: GenAI-ML Advanced
+  img: /assets/img/certifications/GenAI-ML_Advanced.png
+- name: Artificial Intelligence Foundational
+  img: /assets/img/certifications/Artificial_Intelligence_Foundational.png
+- name: Artificial Intelligence General Awareness
+  img: /assets/img/certifications/Artificial_Intelligence_General_Awareness.png
+- name: Cybersecurity Advanced
+  img: /assets/img/certifications/Cybersecurity_Advanced.png
+- name: Cybersecurity Fundamentals
+  img: /assets/img/certifications/Cybersecurity_Fundamentals.png
+- name: Cloud FinOps
+  img: /assets/img/certifications/Cloud_FinOps.png
+- name: Azure Fundamentals
+  img: /assets/img/certifications/Azure_Fundamentals.png
+- name: Azure Data Fundamentals
+  img: /assets/img/certifications/Azure_Data_Fundamentals.png
+- name: Veritas NetBackup Advanced Administration
+  img: /assets/img/certifications/Veritas_NetBackup_Advanced_Administration.png
+- name: ITIL Foundation
+  img: /assets/img/certifications/ITIL_Foundation.png
