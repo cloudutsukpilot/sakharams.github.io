@@ -1,0 +1,83 @@
+# "Periodic table of my stack" on the About tab (_tabs/about.md).
+# Each group gets a colour; each item is one tile: sym (1-3 chars), name, note (where I use it).
+# Keep it in step with "Skills and Competencies" in _tabs/professional-journey.md.
+groups:
+- id: cloud
+  name: Cloud
+  color: "#2f80ed"
+  items:
+  - {sym: Az, name: Azure, note: "Main cloud at work: AKS, Azure OpenAI, AI Foundry, Key Vault, landing zones."}
+  - {sym: Aw, name: AWS, note: "EKS, CloudFormation and an application and database migration from Azure to AWS."}
+  - {sym: Gc, name: GCP, note: "Designed a GCP landing zone: resource hierarchy, network topology, IAM and org-policy guardrails."}
+- id: containers
+  name: Containers & GitOps
+  color: "#0f9d8a"
+  items:
+  - {sym: K8, name: Kubernetes, note: "AKS, EKS, GKE and k3d. Hosts most of the internal platforms I build."}
+  - {sym: Dk, name: Docker, note: "Building, shipping and running containerised apps and custom runner images."}
+  - {sym: Hm, name: Helm, note: "Packaging platform services for AKS."}
+  - {sym: Ar, name: Argo CD, note: "GitOps delivery for platform apps and the homelab."}
+- id: iac
+  name: Infrastructure as Code
+  color: "#7b61ff"
+  items:
+  - {sym: Tf, name: Terraform, note: "Shared IaC platform with 20 providers onboarded and 175 modules."}
+  - {sym: Tg, name: Terragrunt, note: "DRY environments and policy-gated plans with approved applies."}
+  - {sym: An, name: Ansible, note: "Server build automation and CIS benchmark hardening."}
+  - {sym: Pk, name: Packer, note: "Golden images for Linux and Windows servers."}
+  - {sym: Cf, name: CloudFormation, note: "AWS stacks during cloud migration work."}
+- id: cicd
+  name: CI/CD & DevEx
+  color: "#e8833a"
+  items:
+  - {sym: Gh, name: GitHub Enterprise, note: "Multi-org standards: rulesets, Entra ID/SCIM, reusable workflows, self-hosted runners."}
+  - {sym: Ga, name: GitHub Actions, note: "Reusable workflows that every infrastructure and app repo calls."}
+  - {sym: Ad, name: Azure DevOps, note: "Pipelines and TFS for legacy product lines."}
+  - {sym: Jk, name: Jenkins, note: "CI for older application stacks."}
+  - {sym: Bs, name: Backstage, note: "Internal developer portal with self-service Azure and GitHub workflows."}
+  - {sym: Cp, name: GitHub Copilot, note: "Drove enterprise-wide licensing and adoption."}
+- id: security
+  name: DevSecOps
+  color: "#e5484d"
+  items:
+  - {sym: Gs, name: GHAS, note: "Led the GitHub Advanced Security pilot, training content and rollout."}
+  - {sym: Wz, name: Wiz, note: "Part of the move from Mend to Wiz and GHAS."}
+  - {sym: Sq, name: SonarQube, note: "Reusable code-quality and SAST workflows."}
+  - {sym: Tv, name: Trivy, note: "Container image and IaC scanning."}
+  - {sym: Fc, name: Falco, note: "Runtime security for Kubernetes."}
+  - {sym: Md, name: Defender, note: "Microsoft Defender and Sentinel for cloud security posture."}
+- id: observability
+  name: Observability & SRE
+  color: "#d4a017"
+  items:
+  - {sym: Pr, name: Prometheus, note: "Metrics for AKS and platform services."}
+  - {sym: Gf, name: Grafana, note: "Dashboards for DORA metrics, labs and the homelab."}
+  - {sym: Ot, name: OpenTelemetry, note: "Traces, metrics and logs end to end. See the OpenTelemetry lab."}
+  - {sym: Dd, name: Datadog, note: "Application and infrastructure monitoring."}
+  - {sym: Lk, name: Loki, note: "Log aggregation alongside Tempo and Mimir."}
+  - {sym: Dl, name: DevLake, note: "DORA metrics across product teams."}
+- id: ai
+  name: AI
+  color: "#c2410c"
+  items:
+  - {sym: Ao, name: Azure OpenAI, note: "AI work summaries for people, teams, epics and PODs."}
+  - {sym: Af, name: AI Foundry, note: "Hosts models for the agentic SQL incident responder."}
+  - {sym: Pa, name: Pydantic AI, note: "Typed agents with deterministic safety gates."}
+  - {sym: Lg, name: LangGraph, note: "Multi-step agent workflows."}
+  - {sym: Mc, name: MCP, note: "Connecting agents to tools and platforms."}
+- id: code
+  name: Languages
+  color: "#4c8c2b"
+  items:
+  - {sym: Py, name: Python, note: "Scorecards, CLIs, FastAPI services and AI agents."}
+  - {sym: Go, name: Go, note: "Supporting microservices of an AI-driven authorization app."}
+  - {sym: Ts, name: TypeScript, note: "React front ends and Backstage plugins."}
+  - {sym: Ps, name: PowerShell, note: "Windows automation, CyberArk and SQL cluster patching."}
+  - {sym: Sh, name: Bash, note: "Glue for everything else."}
+- id: data
+  name: Data
+  color: "#6b7280"
+  items:
+  - {sym: Ms, name: SQL Server, note: "Where I started. A DBA and trainer for years, now automating it with agents."}
+  - {sym: Pg, name: PostgreSQL, note: "Backing store for portals and platform services."}
+  - {sym: Rd, name: Redis, note: "Caching for the DevOps health scorecard."}
