@@ -1,0 +1,570 @@
+// Modern look for Chirpy: the Astro prototype's palette, type and cards on top of
+// the theme's own layout (left sidebar, content, right panel). Only colours,
+// type, spacing and surfaces change; no Chirpy markup is replaced.
+
+@use 'abstracts/breakpoints' as bp;
+
+$font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+$font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+@mixin light-tokens {
+  --accent: #0d9488;
+  --accent-2: #6366f1;
+  --accent-soft: rgb(13 148 136 / 10%);
+  --surface: #ffffff;
+  --surface-2: #f1f4f8;
+  --ring: rgb(13 148 136 / 35%);
+
+  --main-bg: #f7f8fa;
+  --main-border-color: #e3e7ee;
+  --text-color: #1e293b;
+  --text-muted-color: #5b6474;
+  --heading-color: #0f172a;
+  --label-color: #5b6474;
+  --link-color: #0f766e;
+  --link-underline-color: rgb(13 148 136 / 30%);
+  --blockquote-border-color: #0d9488;
+  --blockquote-text-color: #475569;
+
+  --sidebar-bg: #ffffff;
+  --sidebar-border-color: #e3e7ee;
+  --sidebar-muted-color: #475569;
+  --sidebar-active-color: #0f172a;
+  --sidebar-hover-bg: #f1f4f8;
+  --site-title-color: #0f172a;
+  --site-subtitle-color: #5b6474;
+
+  --topbar-bg: rgb(247 248 250 / 80%);
+  --topbar-text-color: #334155;
+  --search-border-color: #e3e7ee;
+
+  --card-bg: #ffffff;
+  --card-hover-bg: #ffffff;
+  --card-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 0 0 1px #e3e7ee;
+  --toc-highlight: #0d9488;
+  --btn-border-color: #e3e7ee;
+  --tag-border: #e3e7ee;
+  --tag-hover: rgb(13 148 136 / 10%);
+  --highlight-bg-color: #f1f4f8;
+  --inline-code-bg: rgb(13 148 136 / 8%);
+  --highlighter-rouge-color: #0f766e;
+  --language-border-color: #e3e7ee;
+  --tb-odd-bg: #f8fafc;
+  --tb-border-color: #e3e7ee;
+  --timeline-color: #e3e7ee;
+  --timeline-node-bg: #94a3b8;
+  --card-header-bg: #ffffff;
+  --categories-border: #e3e7ee;
+}
+
+@mixin dark-tokens {
+  --accent: #2dd4bf;
+  --accent-2: #818cf8;
+  --accent-soft: rgb(45 212 191 / 12%);
+  --surface: #111827;
+  --surface-2: #1a2232;
+  --ring: rgb(45 212 191 / 40%);
+
+  --main-bg: #0a0f1a;
+  --main-border-color: #1f2a3c;
+  --text-color: #d5dbe6;
+  --text-muted-color: #9aa4b6;
+  --heading-color: #f1f5f9;
+  --label-color: #9aa4b6;
+  --link-color: #2dd4bf;
+  --link-underline-color: rgb(45 212 191 / 35%);
+  --blockquote-border-color: #2dd4bf;
+  --blockquote-text-color: #a8b3c5;
+
+  --sidebar-bg: #0d1320;
+  --sidebar-border-color: #1f2a3c;
+  --sidebar-muted-color: #9aa4b6;
+  --sidebar-active-color: #f1f5f9;
+  --sidebar-hover-bg: #162033;
+  --site-title-color: #f1f5f9;
+  --site-subtitle-color: #9aa4b6;
+
+  --topbar-bg: rgb(10 15 26 / 80%);
+  --topbar-text-color: #cbd5e1;
+  --search-border-color: #1f2a3c;
+
+  --card-bg: #111827;
+  --card-hover-bg: #111827;
+  --card-shadow: 0 0 0 1px #1f2a3c;
+  --toc-highlight: #2dd4bf;
+  --btn-border-color: #1f2a3c;
+  --tag-border: #1f2a3c;
+  --tag-hover: rgb(45 212 191 / 12%);
+  --highlight-bg-color: #0d1320;
+  --inline-code-bg: rgb(45 212 191 / 10%);
+  --highlighter-rouge-color: #7dd3c8;
+  --language-border-color: #1f2a3c;
+  --tb-odd-bg: #0f1626;
+  --tb-even-bg: #0a0f1a;
+  --card-header-bg: #111827;
+  --categories-border: #1f2a3c;
+  --categories-hover-bg: #162033;
+  --tb-border-color: #1f2a3c;
+  --timeline-color: #1f2a3c;
+  --timeline-node-bg: #475569;
+  --timeline-year-dot-color: #0a0f1a;
+}
+
+// Same selectors as Chirpy's base, emitted later so they win.
+:root[data-mode='light'] { @include light-tokens; }
+:root[data-mode='dark'] { @include dark-tokens; }
+@media (prefers-color-scheme: light) { :root:not([data-mode]) { @include light-tokens; } }
+@media (prefers-color-scheme: dark) { :root:not([data-mode]) { @include dark-tokens; } }
+
+// ---------- Type ----------
+body {
+  font-family: $font-sans;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  background: var(--main-bg);
+}
+
+h1, h2, h3, h4, h5, h6, .site-title, #post-list .card-title {
+  font-family: $font-sans;
+  letter-spacing: -0.02em;
+}
+
+code, kbd, pre, .highlight, .code-header {
+  font-family: $font-mono !important;
+}
+
+article .content {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+
+  // A readable measure (about 75 characters) inside the wide column.
+  > p, > ul, > ol, > blockquote { max-width: 76ch; }
+
+  h2 { font-size: 1.6rem; font-weight: 700; margin-top: 2.75rem; }
+  h3 { font-size: 1.25rem; font-weight: 650; margin-top: 2rem; }
+
+  // Links in running text only; cards, tiles and widgets style their own links.
+  :is(p, li, td, blockquote) > a:not(.img-link):not(.btn):not(#archives *) {
+    text-decoration: underline;
+    text-decoration-color: var(--link-underline-color);
+    text-underline-offset: 3px;
+    border-bottom: none;
+    transition: text-decoration-color 0.2s;
+
+    &:hover { text-decoration-color: currentColor; }
+  }
+
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 10px 10px 0;
+    padding: 0.75rem 1rem;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+// ---------- Left sidebar ----------
+#sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border-color);
+
+  .profile-wrapper { padding-top: 2.5rem; }
+
+  #avatar {
+    width: 4.5rem;
+    height: 4.5rem;
+    box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent);
+
+    img { transition: transform 0.25s; }
+    &:hover img { transform: scale(1.04); }
+  }
+
+  .site-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .site-subtitle { font-style: normal !important; font-size: 0.85rem; }
+
+  ul {
+    padding: 0 0.75rem !important;
+
+    li.nav-item {
+      opacity: 1;
+      height: auto;
+      margin: 1px 0;
+
+      a.nav-link {
+        border-radius: 10px;
+        padding: 0.55rem 0.85rem;
+        color: var(--sidebar-muted-color);
+        transition: background-color 0.15s, color 0.15s;
+
+        // Chirpy upper-cases the labels in its include; keep them as small caps.
+        span { font-size: 0.74rem; font-weight: 600; letter-spacing: 0.07em; }
+
+        i { color: var(--text-muted-color); width: 1.4rem; margin-right: 0.9rem; transition: color 0.15s; }
+        &:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-active-color); }
+      }
+
+      &.active a.nav-link {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+
+        i { color: var(--accent); }
+      }
+
+      &.active .nav-link,
+      .nav-link:hover { &::after { display: none; } }
+    }
+  }
+}
+
+// ---------- Top bar ----------
+#topbar-wrapper {
+  background: var(--topbar-bg);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--main-border-color);
+}
+
+#topbar #breadcrumb,
+#breadcrumb {
+  font-size: 0.85rem !important;
+  font-weight: 500;
+
+  a { color: var(--accent); }
+}
+
+search {
+  border-radius: 999px;
+  border: 1px solid var(--main-border-color);
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+}
+
+// ---------- Post header ----------
+header .post-desc,
+.post-desc {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text-muted-color);
+}
+
+article header h1,
+#main-wrapper h1[data-toc-skip] {
+  font-size: clamp(2rem, 1.2rem + 2.6vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.post-meta {
+  font-size: 0.85rem;
+
+  em, a { color: var(--text-color); font-style: normal; }
+}
+
+.preview-img img,
+.content img:not(.no-shadow) {
+  border-radius: 14px;
+}
+
+.preview-img img {
+  box-shadow: 0 20px 40px -20px rgb(15 23 42 / 35%);
+}
+
+// ---------- Right panel ----------
+#panel-wrapper {
+  .panel-heading {
+    font-family: $font-sans;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted-color);
+  }
+
+  section,
+  .access > section {
+    background: var(--surface);
+    border: 1px solid var(--main-border-color);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .post-tag {
+    border-radius: 999px;
+    border: 1px solid var(--main-border-color);
+    background: transparent;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.6rem;
+
+    &:hover { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  }
+}
+
+.toc-border-cover { display: none; }
+
+#toc-wrapper {
+  border-left: none;
+
+  // Chirpy's fade covers assume the panel has no background of its own.
+  &::before, &::after { display: none; }
+  > * { border-left: none !important; }
+
+  .toc-link {
+    font-size: 0.83rem;
+    border-radius: 6px;
+  }
+
+  .is-active-link {
+    color: var(--accent) !important;
+    font-weight: 600;
+
+    &::before { background-color: var(--accent) !important; }
+  }
+}
+
+// ---------- Home cards ----------
+#post-list {
+  .card-wrapper {
+    margin-bottom: 1.25rem;
+
+    .card {
+      border: 1px solid var(--main-border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: none;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+
+    // Astro prototype hover: lift, accent border, glow under the bottom edge, accent title.
+    &:hover .card {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--main-border-color));
+      box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+
+    &:hover .card-title { color: var(--accent); }
+
+    .preview-img img { transition: transform 0.4s ease; }
+    &:hover .preview-img img { transform: scale(1.04); }
+  }
+
+  .card-title { font-weight: 700; font-size: 1.2rem; }
+  .card-text { color: var(--text-muted-color); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-wrapper:hover .card,
+    .card-wrapper:hover .preview-img img { transform: none; }
+  }
+}
+
+// ---------- Code ----------
+div.highlighter-rouge,
+figure.highlight {
+  border-radius: 12px;
+  border: 1px solid var(--language-border-color);
+  overflow: hidden;
+}
+
+.code-header {
+  border-bottom: 1px solid var(--language-border-color);
+  font-size: 0.75rem;
+}
+
+// ---------- Prompts ----------
+.content [class^='prompt-'] {
+  border-radius: 12px;
+  border-left-width: 3px;
+}
+
+// ---------- Home hero (_includes/home-hero.html) ----------
+.home-hero {
+  position: relative;
+  padding: 2.5rem 0 2rem;
+  margin-bottom: 1.5rem;
+
+  // Soft accent glow behind the headline, as in the Astro prototype.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -2rem -2rem auto auto;
+    width: 32rem;
+    height: 20rem;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 16%, transparent), transparent);
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+.home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--main-border-color);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted-color);
+}
+
+.home-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+#main-wrapper .home-title {
+  margin: 1.4rem 0 1rem;
+  font-size: clamp(2.5rem, 1.2rem + 3.6vw, 4.4rem);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  color: var(--heading-color);
+}
+
+.home-grad {
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.home-lead {
+  max-width: 42rem;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text-muted-color);
+
+  a {
+    color: var(--heading-color);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 4px;
+    border-bottom: none;
+  }
+}
+
+.home-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.8rem;
+}
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.65rem 1.2rem;
+  border: 1px solid var(--main-border-color);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  color: var(--heading-color) !important;
+  font-weight: 600;
+  text-decoration: none !important;
+  border-bottom: 1px solid var(--main-border-color) !important;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent) !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover { transform: none; }
+  }
+}
+
+.home-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent) !important;
+  color: #fff !important;
+
+  :root[data-mode='dark'] & { color: #04201d !important; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode]) .home-btn-primary { color: #04201d !important; }
+}
+
+.home-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+  margin: 2.5rem 0 0;
+  padding: 1.5rem 0 0;
+  list-style: none;
+  border-top: 1px solid var(--main-border-color);
+
+  strong {
+    display: block;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--heading-color);
+  }
+
+  span {
+    color: var(--text-muted-color);
+    font-size: 0.9rem;
+  }
+}
+
+// ---------- List pages (archives, categories, tags) ----------
+// Post titles in lists read as titles, not as body links: heading colour, accent on hover.
+#archives,
+#categories,
+.categories,
+#tags,
+.card-categories,
+.list-group {
+  a {
+    color: var(--heading-color);
+    text-decoration: none !important;
+    border-bottom: none;
+    transition: color 0.15s;
+
+    &:hover { color: var(--accent); }
+  }
+}
+
+// Chirpy paints the odd archive rows with fixed greys; use the palette instead.
+#archives ul li:nth-child(odd),
+:root[data-mode] #archives ul li:nth-child(odd),
+:root:not([data-mode]) #archives ul li:nth-child(odd) {
+  background-color: transparent;
+  background-image: linear-gradient(to left, transparent, var(--accent-soft) 50%, transparent);
+}
+
+#archives .date { color: var(--text-muted-color); }
+
+.categories {
+  border-radius: 14px;
+  overflow: hidden;
+
+  .card-header { background: var(--card-header-bg); }
+  .card-header a { font-weight: 650; }
+}

@@ -1,0 +1,27 @@
+{%- comment -%}
+  Home page hero (page 1 only, from _layouts/home.html): eyebrow, headline, lead, buttons and site stats.
+  Counts come from the site's own data, so they stay current: posts, labs (_data/labs), playbooks
+  (_data/projects without `hidden`) and AI agents (_data/about_agents.yml, as on the About page).
+{%- endcomment -%}
+{%- assign hero_playbooks = 0 -%}
+{%- for e in site.data.projects %}{% unless e[1].hidden %}{% assign hero_playbooks = hero_playbooks | plus: 1 %}{% endunless %}{% endfor -%}
+{%- assign hero_posts = site.posts | size -%}
+<section class="home-hero px-xl-1">
+  <p class="home-eyebrow"><span class="home-dot" aria-hidden="true"></span> Cloud · DevOps · Security · AI</p>
+  <h1 class="home-title">Learn the cloud<br>by <span class="home-grad">building it for real.</span></h1>
+  <p class="home-lead">
+    Hands-on labs with real dashboards, project playbooks from vision to go-live, and field notes from
+    15+ years of running platforms. Written by <a href="{{ '/about/' | relative_url }}">Sakharam Shinde</a>.
+  </p>
+  <div class="home-cta">
+    <a class="home-btn home-btn-primary" href="{{ '/labs/' | relative_url }}"><i class="fas fa-flask" aria-hidden="true"></i> Explore the labs</a>
+    <a class="home-btn" href="{{ '/projects/' | relative_url }}"><i class="fas fa-project-diagram" aria-hidden="true"></i> Project playbooks</a>
+    <a class="home-btn" href="{{ '/tags/' | relative_url }}"><i class="fas fa-tags" aria-hidden="true"></i> Browse topics</a>
+  </div>
+  <ul class="home-stats">
+    <li><strong>{{ hero_posts | divided_by: 1000 }},{{ hero_posts | modulo: 1000 | prepend: '00' | slice: -3, 3 }}</strong><span>posts</span></li>
+    <li><strong>{{ site.data.labs | size }}</strong><span>hands-on labs</span></li>
+    <li><strong>{{ hero_playbooks }}</strong><span>project playbooks</span></li>
+    <li><strong>{{ site.data.about_agents | size }}</strong><span>AI agents built</span></li>
+  </ul>
+</section>

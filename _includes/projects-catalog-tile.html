@@ -1,14 +1,20 @@
 {%- comment -%}
   One project tile on the Projects tab (see projects-catalog.html).
   Params: name, url (or slug for a playbook → /tags/<slug>/), status, clouds, summary, kind,
-  and optionally areas, iq, stack, arch (playbooks), lab=true with areas (parts written) and
+  and optionally image (cover picture), areas, iq, stack, arch (playbooks), lab=true with areas (parts written) and
   experiments (labs), or links (other projects).
 {%- endcomment -%}
 {%- if include.slug -%}{%- capture tile_url -%}/tags/{{ include.slug }}/{%- endcapture -%}{%- else -%}{%- assign tile_url = include.url -%}{%- endif -%}
 {%- assign tile_clouds = include.clouds | join: " " -%}
 {%- if include.clouds.size > 1 -%}{%- assign tile_clouds = tile_clouds | append: " multi" -%}{%- endif -%}
 {%- assign status_class = include.status | default: "" | slugify -%}
-<article class="pc-tile" data-clouds="{{ tile_clouds }}">
+<article class="pc-tile{% if include.image %} has-image{% endif %}" data-clouds="{{ tile_clouds }}">
+  {%- if include.image %}
+  {%- comment -%} <img> directly inside <a> on one line, so refactor-content.html keeps this link
+  instead of wrapping the image in a popup link of its own. {%- endcomment %}
+  <a class="pc-tile-image" href="{{ tile_url | relative_url }}" tabindex="-1" aria-hidden="true"><img src="{{ include.image | relative_url }}" alt="" width="1200" height="630"></a>
+  {%- endif %}
+  <div class="pc-tile-body">
   <div class="pc-tile-head">
     <span class="pc-kind">{% if include.lab %}<i class="fas fa-flask" aria-hidden="true"></i>{% elsif include.slug %}<i class="fas fa-book-open" aria-hidden="true"></i>{% else %}<i class="fas fa-drafting-compass" aria-hidden="true"></i>{% endif %} {{ include.kind }}</span>
     {%- if include.status %}<span class="pc-status pc-status-{{ status_class }}">{{ include.status }}</span>{% endif %}
@@ -38,5 +44,6 @@
     {%- else -%}
       <a class="pc-open" href="{{ tile_url | relative_url }}">Read the overview <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
     {%- endif -%}
+  </div>
   </div>
 </article>

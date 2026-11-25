@@ -5,7 +5,7 @@ layout: default
 {% comment %}
   Override of jekyll-theme-chirpy 7.6.0 `_layouts/home.html`.
   Local changes (keep in sync when upgrading the theme; see test/theme_sync_test.rb):
-  - Hot topics bubble chart and a "Latest posts" heading above the list, on page 1 only.
+  - Hero (home-hero.html), hot topics bubble chart and a "Latest posts" heading above the list, on page 1 only.
 {% endcomment %}
 
 {% include lang.html %}
@@ -53,6 +53,7 @@ layout: default
 {% endif %}
 
 {% if paginator.page == 1 %}
+  {% include home-hero.html %}
   {% include hot-topics.html %}
   <h2 class="home-section-title px-xl-1">Latest posts</h2>
 {% endif %}
