@@ -137,12 +137,8 @@ article .content {
   font-size: 1.0625rem;
   line-height: 1.75;
 
-  // A readable measure (about 75 characters) inside the wide column, for posts only
-  // (their <article> carries data-toc). Tab pages (Professional Journey, Projects,
-  // Labs, ...) use the full width.
-  @at-root article[data-toc] .content {
-    > p, > ul, > ol, > blockquote { max-width: 76ch; }
-  }
+  // No reading-width cap: posts and pages use the full width of the content column
+  // (the owner's choice). Don't add a max-width to .content or its children.
 
   h2 { font-size: 1.6rem; font-weight: 700; margin-top: 2.75rem; }
   h3 { font-size: 1.25rem; font-weight: 650; margin-top: 2rem; }
@@ -286,6 +282,11 @@ article header h1,
 }
 
 .preview-img img {
+  // Chirpy gives the post-header image `height: 100%` but a width only in
+  // #post-list, so it keeps its 1200px width attribute. With our wider content
+  // column ($main-content-max-width: 1920px) the box gets wider than 1200px,
+  // and `object-fit: cover` crops the picture and leaves an empty strip.
+  width: 100%;
   box-shadow: 0 20px 40px -20px rgb(15 23 42 / 35%);
 }
 
@@ -485,7 +486,7 @@ figure.highlight {
 .home-cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem;
+  gap: 0.6rem;
   margin-top: 1.8rem;
 }
 
@@ -494,7 +495,7 @@ figure.highlight {
   align-items: center;
   gap: 0.5rem;
   min-height: 44px;
-  padding: 0.65rem 1.2rem;
+  padding: 0.65rem 0.95rem;
   border: 1px solid var(--main-border-color);
   border-radius: 0.8rem;
   background: var(--surface);

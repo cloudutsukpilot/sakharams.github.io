@@ -5,6 +5,9 @@ date: 2026-11-21 09:00:00 +0530
 categories: [artifacts]
 tags: [Artifacts, Zot, Nexus, Harbor, ORAS, GitHub Actions, CI/CD, HomeLab]
 description: "GitHub's free artifact storage ran out mid-month and broke my CI. The criteria, numbers and limits I looked at before choosing Zot for CI uploads and Nexus Community Edition as the package proxy, and the plan to change the pipelines."
+image:
+  path: /assets/img/devops/artifacts/choosing-an-artifact-manager-zot-nexus-harbor.webp
+  alt: "Stacked storage layers beside the title: choosing an artifact manager between Zot, Nexus and Harbor"
 ---
 
 In November my GitHub organisation ran out of Actions artifact storage halfway through the month, and from
