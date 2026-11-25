@@ -18,6 +18,17 @@ full log, generated from the project's repo (`platform-wardens/docs/decisions`),
 
 <!-- more -->
 
+The log runs from ADR-0001 to ADR-0049: 48 records (there's no 0014), of which 26 are accepted, 18 are
+still proposed and 4 have been superseded. The early ones set the shape: autonomy granted per action,
+Temporal underneath, Pydantic AI inside a stage, guardrails in code. The recent ones are about running
+the thing as a platform: one repository per agent with `wardens` as a versioned library
+([0040](#adr-0040)), a versioned registry and deploy config in `wardens-deploy` ([0042](#adr-0042)),
+release checks that treat a contract tightening or a stricter check-agent rule as breaking
+([0043](#adr-0043)) and a release job that tags and finishes idempotently ([0045](#adr-0045)), nightly
+evals across the agent repositories that read people's feedback through the console ([0044](#adr-0044), [0046](#adr-0046)), the first level 2 actions after a
+Slack approval ([0047](#adr-0047)), and signed registry approvals that CI asks for and a reviewer's press
+completes ([0048](#adr-0048), [0049](#adr-0049)).
+
 {% include project-nav.html %}
 
 ## How to read this log
