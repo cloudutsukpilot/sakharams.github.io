@@ -8,6 +8,9 @@
 # docs/how-docs/, the agent lifecycle (docs/framework/17-agent-lifecycle.md) and the release flow (framework/README.md).
 # Certificates: Let's Encrypt through cert-manager (cluster issuer `letsencrypt`, DNS-01 via Cloudflare) on every
 # Traefik ingress; in-cluster hops are plaintext behind NetworkPolicies. Not checked with openssl.
+# Updated on the blog 2026-11-25 (not yet in the source): level 2 approve-then-act through Slack buttons (decision 0047),
+# registry approvals asked by CI and committed by wardens-deploy's approvals sync (decisions 0048, 0049), the console's
+# Home and Approvals pages, the agents' current versions, and cluster-upgrade-readiness deployed.
 # Build: PLUGIN=<interactive-diagrams plugin folder> ./build.sh
 title: wardens platform
 description: "How platform-wardens runs on the homelab today: entry points, the ingress bus, the router, one Temporal task queue per agent, models and MCP through LiteLLM, the registry from wardens-deploy, and the whole agent life cycle from a pull request's security scans to a signed, admitted worker."
@@ -102,9 +105,9 @@ nodes:
     status: built
     views: [cicd, security]
     facts:
-      summary: "Approves a registry entry that raises an agent's risk; later also level 2 actions. Never the requester."
-      how: "Opens the console's approval page `/approvals/<id>`, signs in with Keycloak, reads the risk items and approves or rejects; the console signs the record (ADR 0112)."
-      api: "None of their own: the approval page"
+      summary: "Approves a registry entry that raises an agent's risk, and an agent's level 2 action (a drift merge or apply). Never the requester, unless the request allows the owner's self-approval."
+      how: "Registry entries on the console's Approvals page (\"Waiting for you\"); level 2 actions with Approve or Deny on the Slack card, from a linked account in an approver group, or on the console."
+      api: "None of their own: the Approvals page and the Slack card"
 
   - id: github
     label: GitHub
@@ -179,7 +182,7 @@ nodes:
     icon: miscellaneous/slack-18.svg
     status: external
     facts:
-      summary: "Team chat: the four cell channels (#wardens-devops, -sre, -dba, -common) where incidents get a thread and people mention @wardens or use /wardens ask."
+      summary: "Team chat: the four cell channels (#wardens-devops, -sre, -dba, -common) where incidents get a thread, people mention @wardens or use /wardens ask, and level 2 actions get an Approve and Deny card."
       how: "Events, interactions and commands go to hooks.cloudutsuk.com/slack/*; posts come only from the chat egress worker, the only holder of the bot token."
       api: "`https://slack.com/api/chat.postMessage`"
 
@@ -299,19 +302,19 @@ nodes:
                 icon: browser
                 status: built
                 facts:
-                  summary: "Sends a root task to an agent exactly as a trigger does (through the bus), hosts the stack-author chat and serves the nightly evals' feedback reads."
-                  how: "oauth2-proxy sidecar with Keycloak; roles from groups (ADR 0102); relay mode publishes sends to the bus; GET /api/evals/feedback accepts only evals-nightly's OIDC token (ADR 0113)."
+                  summary: "Opens on a Home tab of agent metrics and recent executions; sends a root task exactly as a trigger does (through the bus), hosts the stack-author chat and installs on a phone as an app."
+                  how: "oauth2-proxy sidecar with Keycloak; roles from groups; Home reads the Fleet dashboards' PromQL; machine routes (eval feedback, registry approvals) accept only their own workflow's GitHub OIDC token."
                   url: {Console: "https://console.wardens.home.cloudutsuk.com"}
                   api: "`python -m wardens_services.console.app`"
               - id: approve
-                label: Approval page
-                sub: "/approvals/<id>"
+                label: Approvals
+                sub: "/approvals"
                 icon: check
                 status: built
                 facts:
-                  summary: "Shows a risk-raising registry entry's risk items; a reviewer who isn't the requester approves or rejects, and gets back the signed `approval.json` (ADR 0112)."
-                  how: "Part of the console; signs with the OpenBao transit key `wardens-approval` (ECDSA P-256, not exportable) and audits the decision. Level 2 action approvals and chat buttons will use it too."
-                  api: "`/approvals/<id>`"
+                  summary: "Lists what waits for a decision: registry entries agent-ci asked for and level 2 actions waiting in their approve-then-act workflow, with those the person may decide first."
+                  how: "Signs a registry record with the OpenBao transit key `wardens-approval` and starts wardens-deploy's approvals sync; a level 2 decision becomes the workflow's approval signal. Every decision is audited."
+                  api: "`/approvals`, `/approvals/<id>`, `POST /api/registry-approvals`, `GET /api/registry-approvals/decided`"
               - id: alerts
                 label: wardens-alerts
                 sub: "relay · :8080"
@@ -366,7 +369,7 @@ nodes:
                 icon: message
                 status: built
                 facts:
-                  summary: "The only holder of the Slack bot token: posts incident threads, answers and follow-ups to the cell channels, one claim per key so nothing posts twice."
+                  summary: "The only holder of the Slack bot token: posts incident threads, answers, follow-ups and level 2 approval cards to the cell channels, one claim per key so nothing posts twice."
                   how: "A Temporal worker on queue `wardens-chat-egress` (team-chat C2, C3); its daily membership CronJob compares each cell channel with the account links and Keycloak groups and audits differences."
                   api: "Temporal queue `wardens-chat-egress`"
 
@@ -376,7 +379,7 @@ nodes:
             icon: router
             status: built
             facts:
-              summary: "The only host of the incident workflow: every entry point starts it here; it routes by capability and starts each agent's task as a child on that agent's queue."
+              summary: "The only host of the incident and approve-then-act workflows: every entry point starts incidents here; it routes by capability and starts each agent's task as a child on its queue."
               how: "Two workers poll `wardens-router` with a PodDisruptionBudget (ADR 0104); the classifier (`wardens.route`) only for chat Auto and alerts no rule knows; reads every agent's registry entries."
               api: "`python -m wardens_services.router.worker run`"
 
@@ -415,7 +418,7 @@ nodes:
                     icon: queue
                     status: built
                     facts:
-                      summary: "The incident workflow `wardens.incident`, the classifier `wardens.route` and the chat thread workflow; the console, the ingress consumer and the webhooks start work here."
+                      summary: "The incident workflow `wardens.incident`, the classifier `wardens.route`, chat threads and one `wardens.approve_act` per level 2 action; every entry point starts work here."
                       how: "Polled by the router's two workers; SLO 99% of tasks start within 5 s (alerts/wardens/wardens-router.yaml). Never rename it: open incidents would be stranded."
                       api: "`WARDENS_ROUTER_QUEUE=wardens-router`"
                   - id: q_drift
@@ -465,12 +468,12 @@ nodes:
                       api: "`wardens-chat-egress`"
                   - id: q_cur
                     label: cluster-upgrade-readiness
-                    sub: "planned"
+                    sub: "assessments"
                     icon: queue
-                    status: planned
+                    status: built
                     facts:
-                      summary: "Planned: the weekly schedule's and the console's requests for cluster-upgrade-readiness 0.3.0's worker."
-                      how: "Created by the first poll once `apps/cluster-upgrade-readiness` is deployed (its homelab-gitops app), after its registry entry is approved."
+                      summary: "The weekly schedule's and the console's requests for cluster-upgrade-readiness's worker."
+                      how: "Polled by its worker since 0.3.0 was deployed (its registry entry approved, then its homelab-gitops app)."
                       api: "`TASK_QUEUE=cluster-upgrade-readiness`"
               - id: wardens_db
                 label: wardens-db
@@ -488,17 +491,17 @@ nodes:
             icon: users
             status: built
             facts:
-              summary: "One Temporal worker per agent, from its own repository's image and the shared chart charts/wardens-agent (ADR 0072); four are deployed, all in shadow."
+              summary: "One Temporal worker per agent, from its own repository's image and the shared chart charts/wardens-agent (ADR 0072); all six are deployed, five in shadow (cicd-triage, not drawn, is in build)."
               how: "No ingress: a worker only polls its queue. Egress to Temporal, DNS, OTLP, the state DB and HTTPS; registry and config from wardens-deploy."
               api: "None of its own: Temporal task queues"
             children:
               - id: drift
                 label: terraform-drift
-                sub: "0.2.1 · shadow · L1"
+                sub: "0.3.4 · shadow · L2 on dev"
                 icon: git
                 status: built
                 facts:
-                  summary: "Explains drift between Azure and resources.yaml and opens draft PRs that codify an intended change; answers read-only questions about its runs in chat."
+                  summary: "Explains drift and opens a draft PR or recommends a revert; on development stacks it merges the PR or runs the revert's apply after a Slack approval (decision 0047)."
                   how: "Started when a drift scan finds resource drift (webhook rule drift-scan), under the incident workflow. No schedule (decision 0032)."
                   where: "ns terraform-drift"
                   api: "Temporal queue `terraform-drift`"
@@ -540,17 +543,17 @@ nodes:
                       api: "`wardens.guardrails.check_action`, `is_engaged`"
               - id: correlator
                 label: change-correlator
-                sub: "0.2.0 · shadow · L0"
+                sub: "0.3.1 · shadow · L0"
                 icon: search
                 status: built
                 facts:
-                  summary: "Answers who changed or deleted an Azure or GitHub resource, when and with which client, when terraform-drift hands off `change.correlate`."
-                  how: "Azure: Activity Log and Resource Graph with its own Entra identity. GitHub: the events feed and the recorded change log (decision 0034). No schedule."
+                  summary: "Answers who changed or deleted an Azure or GitHub resource, when, with which client and which Jira ticket covers it, when terraform-drift hands off `change.correlate`."
+                  how: "Azure: Activity Log and Resource Graph with its own Entra identity. GitHub: the events feed and the recorded change log (decision 0034). Jira: rule candidates a model ranks (0036). AWS CloudTrail is built, not live."
                   where: "ns change-correlator"
                   api: "Temporal queue `change-correlator`"
               - id: author
                 label: stack-author
-                sub: "0.2.0 · shadow · L1"
+                sub: "0.2.1 · shadow · L1"
                 icon: message
                 status: built
                 facts:
@@ -570,22 +573,14 @@ nodes:
                   api: "Temporal queue `incident-triage`"
               - id: cur
                 label: cluster-upgrade-readiness
-                sub: "0.3.0 · planned"
+                sub: "0.3.0 · shadow · L1"
                 icon: cluster
-                status: planned
+                status: built
                 facts:
-                  summary: "Planned on the cluster: what blocks the next Kubernetes upgrade, and an ordered upgrade plan. Its worker reads the wardens cluster with its own 15-minute token."
-                  how: "Will read the cluster's versions, deprecated APIs and add-ons through the k3s API. Stage build today (a local CLI); waits for the owner's approval of its registry entry, then its homelab-gitops app."
-                  where: "ns cluster-upgrade-readiness (planned)"
+                  summary: "What blocks the next Kubernetes upgrade, and an ordered upgrade plan. Its worker reads the wardens cluster with its own 15-minute token."
+                  how: "Reads the cluster's versions, deprecated APIs and add-ons through the k3s API; deterministic checks, no model. The same code runs as a local CLI."
+                  where: "ns cluster-upgrade-readiness"
                   api: "Temporal queue `cluster-upgrade-readiness`"
-              - id: agent_l2
-                label: Future L2 agent
-                icon: users
-                status: planned
-                facts:
-                  summary: "Planned: an agent with a level 2 action that waits for a person's approval before it acts."
-                  how: "Declares `await_approval`; the framework waits for the signal until expiresAt (timeout = deny). cicd-triage (stage build, an offline CLI) isn't deployed either."
-                  api: "None yet: decision 0007 allows L0 and L1 only"
 
           - id: ns_mcp
             label: mcp-web-search
@@ -794,8 +789,8 @@ nodes:
             status: built
             views: [cicd, state, observability]
             facts:
-              summary: "The other life-cycle workflows on the same runners: the framework release, the nightly evals and wardens-deploy's registry checks."
-              how: "platform-wardens `wardens-py.yaml` and `evals-nightly.yaml`; wardens-deploy `ci.yaml`."
+              summary: "The other life-cycle workflows on the same runners: the framework release, the nightly evals, wardens-deploy's registry checks and its approvals sync."
+              how: "platform-wardens `wardens-py.yaml` and `evals-nightly.yaml`; wardens-deploy `ci.yaml` and `approvals-sync.yaml`."
               api: "None of its own: see the children"
             children:
               - id: ci_release
@@ -828,6 +823,16 @@ nodes:
                   summary: "Checks every registry entry, the consumer-driven contracts of every handoff, the config, `mcp/` and the routing cases, then that each risk-raising version carries a valid signed approval."
                   how: "`wardens registry check` and `wardens registry verify-approval registry/ --keys keys/wardens-approval.pub`, with the wardens that `tools/` pins."
                   api: "wardens-deploy `.github/workflows/ci.yaml`"
+              - id: ci_sync
+                label: approvals-sync
+                sub: "on approval · every 5 min"
+                icon: check
+                status: built
+                views: [cicd]
+                facts:
+                  summary: "Commits each approved registry record next to its entry and merges the entry's pull request, so the reviewer's press is the last manual step (decisions 0048, 0049)."
+                  how: "Reads the decided requests from the console with its own OIDC token, runs registry check and verify-approval on the result; a record that doesn't verify isn't committed. Started by the console, cron as fallback."
+                  api: "wardens-deploy `.github/workflows/approvals-sync.yaml`"
           - id: scanners
             label: Security scanners
             sub: "security-tools"
@@ -1062,8 +1067,11 @@ edges:
      why: "Used at the end of every run: the run record, insert-once on run_id.",
      certs: {none: "Plain TCP inside the cluster."}}
   - {id: td_gh, from: td_acts, to: gh_iac, proto: HTTPS, port: 443,
-     why: "Used to read drift-scan runs, plan artifacts and resources.yaml, and to open draft PRs on drift/ branches.", certs: github-pub,
-     detail: "GitHub App installation tokens: a read set, and a write set (contents, pull_requests) for open_draft_pr."}
+     why: "Used to read drift-scan runs, plan artifacts and resources.yaml, to open draft PRs on drift/ branches and, after a level 2 approval, to merge one or dispatch a stack's apply.", certs: github-pub,
+     detail: "GitHub App installation tokens: a read set, and a write set (contents, pull_requests, actions) for open_draft_pr, merge_drift_pr and apply_stack_revert."}
+  - {id: td_handoff, oneway: true, from: td_acts, to: q_router, proto: gRPC, port: 7233, label: hand off,
+     why: "Used when a run proposes a level 2 action on a development stack: the hand-off starts the approve-then-act workflow on the router's queue and the run ends.",
+     certs: {none: "Plain gRPC inside the cluster."}}
   - {id: td_llm_lite, from: td_llm, to: litellm, proto: HTTPS, port: 443, label: /v1,
      why: "Used for each model call: chat completions with usage limits and the agent's virtual key.", certs: le-home}
   - {id: td_llm_mcp, from: td_llm, to: litellm, proto: HTTPS, port: 443, label: /mcp,
@@ -1099,10 +1107,8 @@ edges:
      why: "Always on: polls incident-triage for tasks the routing rules send.", certs: {none: "Plain gRPC inside the cluster."}}
   - {id: it_db, view: state, from: triage, to: state_db, proto: PostgreSQL, port: 5432, label: finding,
      why: "Used for each routed alert: the finding and the run record.", certs: {none: "Plain TCP inside the cluster."}}
-  - {id: cur_q, from: cur, to: q_cur, proto: gRPC, port: 7233, label: poll, dashed: true,
-     why: "Planned: the worker polls its queue for the weekly schedule's and the console's requests.", certs: {none: "Plain gRPC inside the cluster."}}
-  - {id: l2_q, view: security, from: agent_l2, to: temporal, proto: gRPC, port: 7233, dashed: true,
-     why: "Planned: the agent's workflow waits in Temporal for the approval signal until expiresAt (timeout = deny).", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: cur_q, from: cur, to: q_cur, proto: gRPC, port: 7233, label: poll,
+     why: "Always on: the worker polls its queue for the weekly schedule's and the console's requests.", certs: {none: "Plain gRPC inside the cluster."}}
 
   # --- approvals ---
   - {id: appr_tr, view: cicd, from: approver, to: w_traefik, proto: HTTPS, port: 443, label: /approvals,
@@ -1116,10 +1122,19 @@ edges:
      detail: "OpenBao down: the decision answers 503; nothing is approved unsigned."}
   - {id: approve_db, view: state, from: approve, to: state_db, proto: PostgreSQL, port: 5432, label: audit,
      why: "Used for each decision: the approval and who made it go to the hash-chained audit log.", certs: {none: "Plain TCP inside the cluster."}}
-  - {id: appr_gh, view: cicd, from: approver, to: gh_deploy, proto: HTTPS, port: 443, label: approval.json,
-     why: "Used after approving: the signed record is committed next to the entry in the registry pull request.", certs: github-pub}
-  - {id: approve_t, view: security, from: approve, to: temporal, proto: gRPC, port: 7233, label: signal, dashed: true,
-     why: "Planned for level 2 actions: the verified decision goes to the waiting workflow as the approval signal.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: registry_ask, view: cicd, from: ci_registry, to: w_traefik, proto: HTTPS, port: 443, label: ask approval,
+     why: "Used after the registry job opens a risk-raising entry's pull request: POST /api/registry-approvals with the agent's current and new manifests and a GitHub OIDC token (decision 0048).", certs: le-home}
+  - {id: approve_dispatch, view: cicd, from: approve, to: gh_deploy, proto: HTTPS, port: 443, label: dispatch sync,
+     why: "Used right after a reviewer approves a registry entry: workflow_dispatch of approvals-sync.yaml with the console's own App; best-effort, the five-minute cron catches up (decision 0049).", certs: github-pub}
+  - {id: sync_tr, view: cicd, from: ci_sync, to: w_traefik, proto: HTTPS, port: 443, label: decided,
+     why: "Used on each sync run: GET /api/registry-approvals/decided with the sync workflow's own GitHub OIDC token.", certs: le-home}
+  - {id: sync_gh, view: cicd, from: ci_sync, to: gh_deploy, proto: HTTPS, port: 443, label: commit · merge,
+     why: "Used for each approved entry: approval.json beside it on the pull request's branch, registry check and verify-approval, then a squash merge.", certs: github-pub}
+  - {id: approve_t, view: security, from: approve, to: temporal, proto: gRPC, port: 7233, label: signal,
+     why: "Used when a reviewer decides a level 2 action on the console: the verified decision goes to the waiting approve-then-act workflow as the approval signal.", certs: {none: "Plain gRPC inside the cluster."}}
+  - {id: ing_signal, oneway: true, view: security, from: ingress, to: temporal, proto: gRPC, port: 7233, label: approval signal,
+     why: "Used for an Approve or Deny press on a Slack card: the consumer builds the decision from the request and the linked person's groups, never from the press, and signals the workflow.",
+     certs: {none: "Plain gRPC inside the cluster."}}
 
   # --- observability ---
   - {id: td_otel, from: td_acts, to: w_collector, proto: OTLP gRPC, port: 4317, view: observability,
@@ -1274,6 +1289,32 @@ scenarios:
          text: "Started after startDelaySeconds, so the scan has finished; then it runs as in the drift use case.",
          result: success, outcome: "Drift incident started"}
 
+  - id: approve-l2
+    title: Level 2 approval in Slack
+    summary: "terraform-drift proposes a merge on a development stack, the router's approve-then-act workflow posts a card, a linked reviewer presses Approve in Slack, and the agent merges (decision 0047)."
+    steps:
+      - {title: Hand off for approval, action: "terraform-drift → wardens-router queue: approve-then-act workflow", path: [td_handoff],
+         text: "The run opened its draft PR and proposed merge_drift_pr at level 2; it hands the action over and ends.",
+         detail: "- Only stacks whose environment is development or qa, under the owner's 30-day waiver; every other stack stays level 1.\n- The workflow id comes from the action's idempotency key, so the same action is never asked twice."}
+      - {title: Card to the cell channel, action: "wardens-router → egress queue → chat egress → Slack", path: [~router_q, router_qe, ~egress_q, egress_slack, ~egress_slack],
+         text: "The card shows the plan summary (what will change), the hashes the approval binds to, Approve and Deny buttons and a console link.",
+         detail: "- Prepare checks the action is in the manifest at level 2 with approvers, point 4 says needs-approval and the act tool is granted.\n- The wait is 24 hours at most; expiry is a denial."}
+      - {title: Reviewer presses Approve, action: "Slack → Cloudflare → cloudflared → Traefik → wardens-slack → Event Hubs", path: [slack_cf, cf_cfd, cfd_tr, tr_slack, slack_eh, ~slack_eh, ~tr_slack, ~cfd_tr, ~cf_cfd, ~slack_cf],
+         text: "The button carries only an opaque id; the relay checks Slack's signature, publishes and answers at once."}
+      - {title: Who pressed, action: "Ingress consumer ← Event Hubs, then ↔ Keycloak", path: [~ing_eh, ing_kc, ~ing_kc],
+         text: "The press counts only from a person linked to an enabled Keycloak account in the action's approver group, read at the press.",
+         detail: "- The decision is built from the request as the workflow holds it, never from the press.\n- A refused press is audited and the presser told why."}
+      - {title: Approval signal, action: "Ingress consumer → Temporal: the approval signal", path: [ing_signal],
+         text: "The workflow checks the decision again (bound, not expired, a person, an approver) before it counts."}
+      - {title: Act on the agent's queue, action: "wardens-router → terraform-drift queue → activities", path: [~router_q, router_qd, ~td_acts_q, td_acts_guard, ~td_acts_guard],
+         text: "The act runs once with the ApprovedAction; the binding checks it matches what was approved, then the kill switch.",
+         detail: "- The PR's head SHA (or main's and the plan, for a revert) must be unchanged since the request.\n- Any difference: nothing is merged or applied, and the run says why."}
+      - {title: Merge the PR, action: "terraform-drift → GitHub: mark ready, squash-merge", path: [td_gh, ~td_gh],
+         text: "The merge runs the stack's apply on main through the IaC pipeline; a revert dispatches the apply instead."}
+      - {title: Result in the thread, action: "wardens-router → egress → Slack: the outcome", path: [router_qe, ~egress_q, egress_slack, ~egress_slack],
+         text: "The card loses its buttons and says who decided; the result goes to its thread and the audit log.",
+         result: success, outcome: "Approved and merged"}
+
   - id: slack-chat
     title: Ask wardens in Slack
     summary: "A person mentions @wardens in an incident thread: Slack → tunnel → relay → bus → consumer → the thread workflow on the router's queue → the agent's queue → answer through the chat egress (team chat C4 to C6)."
@@ -1384,9 +1425,15 @@ scenarios:
          text: "The writer App commits the digest; the deploy waits for Argo CD."}
       - {title: Publish the entry, action: "registry job → wardens-deploy: registry/<agent>/<version>/", path: [registry_gh, ~registry_gh],
          text: "wardens registry diff --risk decides: no new risk is a commit on main; a higher level, a new act tool or a wider credential is a pull request."}
-      - {title: A reviewer approves, action: "Reviewer → console approval page → OpenBao sign → wardens-deploy", when: risk,
-         path: [appr_tr, tr_approve, approve_bao, ~approve_bao, ~tr_approve, ~appr_tr, appr_gh, ~appr_gh],
-         text: "A member of wardens-<cell>-reviewers who isn't the requester approves; the signed approval.json goes into the PR."}
+      - {title: CI asks for approval, action: "registry job → console: POST /api/registry-approvals", when: risk,
+         path: [registry_ask, tr_approve, ~tr_approve, ~registry_ask],
+         text: "agent-ci sends the current and new manifests with its OIDC token; the console computes the risk items itself and lists the request for the cell's reviewers."}
+      - {title: A reviewer approves, action: "Reviewer → console Approvals → OpenBao sign → dispatch the sync", when: risk,
+         path: [appr_tr, tr_approve, approve_bao, ~approve_bao, approve_dispatch, ~approve_dispatch, ~tr_approve, ~appr_tr],
+         text: "The requester is the agent-ci workflow, so any reviewer of the cell approves; the console signs the record, then starts approvals-sync (the cron is the fallback)."}
+      - {title: Sync commits and merges, action: "approvals-sync ↔ console, then → wardens-deploy PR", when: risk,
+         path: [sync_tr, tr_approve, ~tr_approve, ~sync_tr, sync_gh, ~sync_gh],
+         text: "It reads the signed record, writes approval.json beside the entry, verifies it and squash-merges the pull request."}
       - {title: wardens-deploy checks, action: "wardens-deploy CI: registry check, verify-approval", path: [deploy_gh, ~deploy_gh],
          text: "Contracts of every handoff, the config, mcp/ and routing cases; a risk-raising version without a valid signature fails."}
       - {title: Argo CD syncs, action: "Argo CD ↔ homelab-gitops and wardens-deploy, then → k3s API", path: [argo_gitops, ~argo_gitops, argo_deploy, ~argo_deploy, argo_api, api_registry, ~api_registry, ~argo_api],
