@@ -1,0 +1,165 @@
+# DevOps tools shown on the DevOps tab (_tabs/devops.md via {% include topic-grid.html data="devops_tools" %}).
+#
+# groups: one section per group (id, title, fa, summary), with one card per category.
+#   category fields: title, fa (Font Awesome icon for the card head and items without a logo),
+#                    url or post (the category's overview), items.
+#   item fields:     name, what (a few words, the tile subtitle), url or post (post = source path,
+#                    resolved at build time), icon (logo under assets/img/icons/; leave it out to
+#                    show the category's `fa` icon). No url or post = a topic with no article yet.
+
+groups:
+  - id: platforms
+    title: Cloud and platforms
+    fa: fas fa-cloud
+    summary: Where the workloads run, from public clouds to hypervisors and operating systems.
+    categories:
+      - title: Cloud
+        fa: fas fa-cloud
+        url: /posts/cloud/cloud
+        items:
+          - { name: Microsoft Azure, what: Microsoft's public cloud, url: /posts/cloud/azure/microsoft-azure, icon: /assets/img/icons/cloud/azure/azure-18.svg }
+          - { name: Amazon Web Services, what: Amazon's public cloud, url: /posts/cloud/aws/aws, icon: /assets/img/icons/cloud/aws/amazonwebservices-18.svg }
+          - { name: Google Cloud, what: Google's public cloud, url: /posts/cloud/gcp/gcp, icon: /assets/img/icons/cloud/gcp/googlecloudplatform-18.svg }
+      - title: Virtualization
+        fa: fas fa-server
+        url: /posts/virtualization/virtualization
+        items:
+          - { name: Hyper-V, what: Windows hypervisor, url: /posts/virtualization/hyperv/hyperv, icon: /assets/img/icons/virtualization/hyperv-18.svg }
+          - { name: VMware, what: vSphere and ESXi, url: /posts/virtualization/vmware/vmware, icon: /assets/img/icons/virtualization/vmware-18.svg }
+      - title: Operating Systems
+        fa: fas fa-desktop
+        url: /posts/operating systems/os
+        items:
+          - { name: Windows, what: Desktop and server OS, url: /posts/operating systems/windows/windows, icon: /assets/img/icons/operatingsystems/windows-18.svg }
+          - { name: macOS, what: Apple desktop OS, url: /posts/operating systems/macos/macos, icon: /assets/img/icons/operatingsystems/macos-18.svg }
+          - { name: Linux, what: The open-source kernel and OS family, url: /posts/operating systems/linux/linux, icon: /assets/img/icons/operatingsystems/linuxos-18.svg }
+          - { name: Ubuntu, what: Debian-based Linux distribution, url: /posts/operating systems/ubuntu/ubuntu, icon: /assets/img/icons/operatingsystems/ubuntuos-18.svg }
+          - { name: Debian, what: Community Linux distribution, url: /posts/operating systems/debian/debian, icon: /assets/img/icons/operatingsystems/debianos-18.svg }
+
+  - id: delivery
+    title: Code and delivery
+    fa: fas fa-code-branch
+    summary: Version control, pipelines and the build tools each language uses.
+    categories:
+      - title: Git
+        fa: fab fa-git-alt
+        url: /posts/devops/git/git
+        items:
+          - { name: GitHub, what: Git hosting and collaboration, url: /posts/devops/git/github/github, icon: /assets/img/icons/devops/cicd/github-18.svg }
+          - { name: GitLab, what: Git hosting with built-in CI, url: /posts/devops/git/gitlab/gitlab, icon: /assets/img/icons/devops/cicd/gitlab-18.svg }
+      - title: CI/CD
+        fa: fas fa-infinity
+        url: /posts/devops/cicd/cicd
+        items:
+          - { name: GitHub Actions, what: Workflows in GitHub, url: /posts/devops/cicd/github actions/github-actions, icon: /assets/img/icons/devops/cicd/githubactions-18.svg }
+          - { name: Azure DevOps, what: "Boards, repos and pipelines", url: /posts/devops/cicd/azure devops/azure-devops, icon: /assets/img/icons/devops/cicd/azuredevops-18.svg }
+          - { name: GitLab CI, what: Pipelines in GitLab, url: /posts/devops/cicd/gitlab/gitlab, icon: /assets/img/icons/devops/cicd/gitlab-18.svg }
+          - { name: Jenkins, what: Self-hosted automation server, url: /posts/devops/cicd/jenkins/jenkins, icon: /assets/img/icons/devops/cicd/jenkins-18.svg }
+          - { name: TeamCity, what: JetBrains build server, url: /posts/devops/cicd/teamcity/teamcity, icon: /assets/img/icons/devops/cicd/teamcity-18.svg }
+          - { name: Bamboo, what: Atlassian build server, url: /posts/devops/cicd/bamboo/bamboo, icon: /assets/img/icons/devops/cicd/bamboo-18.svg }
+          - { name: Travis CI, what: Hosted CI service, url: /posts/devops/cicd/travisci/travisci, icon: /assets/img/icons/devops/cicd/travisci-18.svg }
+          - { name: Spinnaker, what: Multi-cloud continuous delivery, url: /posts/devops/cicd/spinnaker/spinnaker, icon: /assets/img/icons/devops/cicd/spinnaker-18.svg }
+      - title: Build Ecosystem
+        fa: fas fa-hammer
+        url: /posts/devops/build-tools/language-build-ecosystem
+        items:
+          - { name: Maven, what: Java builds, url: /posts/devops/build-tools/java/maven-build }
+          - { name: Gradle, what: Java builds, url: /posts/devops/build-tools/java/gradle-build }
+          - { name: "npm, pnpm and Yarn", what: JavaScript packages, url: /posts/devops/build-tools/javascript/npm-pnpm-yarn-build }
+          - { name: "Vite, webpack and esbuild", what: JavaScript bundlers, url: /posts/devops/build-tools/javascript/javascript-bundlers-build }
+          - { name: pip and setuptools, what: Python packaging, url: /posts/devops/build-tools/python/pip-setuptools-build }
+          - { name: uv and Poetry, what: Python projects, url: /posts/devops/build-tools/python/uv-poetry-build }
+          - { name: Go toolchain and GoReleaser, what: Go builds and releases, url: /posts/devops/build-tools/go/go-build }
+          - { name: dotnet CLI and MSBuild, what: .NET builds, url: /posts/devops/build-tools/dotnet/dotnet-build }
+          - { name: "CMake, Conan and vcpkg", what: C and C++ builds, url: /posts/devops/build-tools/cpp/cmake-build }
+          - { name: Make and Autotools, what: C and C++ builds, url: /posts/devops/build-tools/cpp/make-autotools-build }
+          - { name: Cargo, what: Rust builds, url: /posts/devops/build-tools/rust/cargo-build }
+          - { name: Bundler and Rake, what: Ruby builds, url: /posts/devops/build-tools/ruby/bundler-rake-build }
+          - { name: Composer, what: PHP packages, url: /posts/devops/build-tools/php/composer-build }
+          - { name: Xcode and SwiftPM, what: Swift and iOS builds, url: /posts/devops/build-tools/swift/xcode-swiftpm-build }
+          - { name: Gradle and AGP, what: Android builds, url: /posts/devops/build-tools/android/android-gradle-build }
+
+  - id: infrastructure
+    title: Infrastructure and automation
+    fa: fas fa-cubes
+    summary: Containers, infrastructure as code and the tools that keep servers configured.
+    categories:
+      - title: Orchestration
+        fa: fas fa-dharmachakra
+        url: /posts/devops/orchestration/orchestration
+        items:
+          - { name: Docker, what: Containers, url: /posts/devops/orchestration/docker/docker, icon: /assets/img/icons/devops/orchestration/docker-18.svg }
+          - { name: Kubernetes, what: Container orchestration, url: /posts/devops/orchestration/kubernetes/kubernetes, icon: /assets/img/icons/devops/orchestration/kuberentes-18.svg }
+          - { name: Helm, what: Kubernetes package manager, url: /posts/devops/orchestration/helm/helm, icon: /assets/img/icons/devops/orchestration/helm-18.svg }
+          - { name: Cloudify, what: Multi-cloud orchestration, url: /posts/devops/orchestration/cloudify/cloudify, icon: /assets/img/icons/devops/orchestration/cloudify-18.jpeg }
+          - { name: Morpheus, what: Hybrid cloud management, url: /posts/devops/orchestration/morpheus/morpheus, icon: /assets/img/icons/devops/orchestration/morpheus-18.svg }
+      - title: Infrastructure as Code
+        fa: fas fa-file-code
+        url: /posts/devops/iac/iac
+        items:
+          - { name: Terraform, what: Multi-cloud IaC, url: /posts/devops/orchestration/terraform/terraform, icon: /assets/img/icons/devops/iac/terraform-18.svg }
+          - { name: Azure Resource Manager, what: Azure templates and Bicep, url: /posts/devops/orchestration/arm/azure-resource-manager, icon: /assets/img/icons/devops/iac/azureresourcemanager-18.svg }
+          - { name: AWS CloudFormation, what: AWS templates, url: /posts/devops/orchestration/aws cloud formation/aws-cloud-formation, icon: /assets/img/icons/devops/iac/awscloudformation-18.svg }
+      - title: Configuration Management
+        fa: fas fa-sliders-h
+        url: /posts/devops/configuration management/configuration-management
+        items:
+          - { name: Ansible, what: Agentless automation, url: /posts/devops/configuration management/ansible/ansible, icon: /assets/img/icons/devops/configurationmanagement/redhatansible-18.svg }
+          - { name: PowerShell, what: Windows automation shell, url: /posts/devops/configuration management/powershell/powershell, icon: /assets/img/icons/devops/configurationmanagement/powershell-18.svg }
+          - { name: Puppet, what: Declarative configuration, url: /posts/devops/configuration management/puppet/puppet, icon: /assets/img/icons/devops/configurationmanagement/puppet-18.svg }
+          - { name: Chef, what: Configuration as Ruby code, url: /posts/devops/configuration management/chef/chef, icon: /assets/img/icons/devops/configurationmanagement/chef-18.svg }
+          - { name: SaltStack, what: Event-driven automation, url: /posts/devops/configuration management/saltstack/saltstack, icon: /assets/img/icons/devops/configurationmanagement/saltstack-18.svg }
+          - { name: Vagrant, what: Reproducible dev VMs, url: /posts/devops/configuration management/vagrant/vagrant, icon: /assets/img/icons/devops/configurationmanagement/vagrant-18.svg }
+          - { name: Consul, what: Service discovery and config, url: /posts/devops/configuration management/consul/consul, icon: /assets/img/icons/devops/configurationmanagement/consul-18.svg }
+
+  - id: security
+    title: Security and identity
+    fa: fas fa-shield-alt
+    summary: Scanners that test code and apps, and the identity services that control access.
+    categories:
+      - title: DevSecOps Tools
+        fa: fas fa-shield-alt
+        url: /posts/devsecops/devsecops
+        items:
+          - { name: SonarQube, what: Code quality and SAST, url: /posts/devsecops/sonarqube/sonarqube, icon: /assets/img/icons/devsecops/sonarqube-18.svg }
+          - { name: Snyk, what: Dependency and code scanning, url: /posts/devsecops/snyk/snyk, icon: /assets/img/icons/devsecops/snyk-18.svg }
+          - { name: tfsec, what: Terraform security scanner, url: /posts/devsecops/tfsec/tfsec, icon: /assets/img/icons/devsecops/tfsec-18.svg }
+          - { name: OWASP ZAP, what: Web app DAST, url: /posts/devsecops/owaspzap/owaspzap, icon: /assets/img/icons/devsecops/owaspzap-18.svg }
+          - { name: Fortify, what: Static code analysis, url: /posts/devsecops/fortify/fortify, icon: /assets/img/icons/devsecops/fortify-18.svg }
+          - { name: Checkmarx, what: Static code analysis, url: /posts/devsecops/checkmarx/checkmarx }
+          - { name: Burp Suite, what: Web security testing, url: /posts/devsecops/burpsuite/burpsuite }
+          - { name: AppScan, what: Application security testing, url: /posts/devsecops/appscan/appscan }
+          - { name: Coverity, what: Static code analysis, url: /posts/devsecops/coverity/coverity }
+      - title: Identity and Access
+        fa: fas fa-user-shield
+        url: /posts/iam/iam
+        items:
+          - { name: Microsoft Entra ID, what: Azure identity, url: /posts/iam/entraid/microsoft-entraid, icon: /assets/img/icons/iam/entraid/azuread-18.svg }
+          - { name: AWS IAM, what: AWS identity and policies, url: /posts/iam/aws/aws-iam, icon: /assets/img/icons/iam/awsiam/iam-18.svg }
+          - { name: GCP IAM, what: Google Cloud identity, url: /posts/iam/gcp/gcp-iam, icon: /assets/img/icons/iam/gcpiam/iam-18.svg }
+          - { name: Single Sign-On, what: One login for many apps, url: /posts/iam/sso/sso, icon: /assets/img/icons/miscellaneous/sso-18.svg }
+
+  - id: observability
+    title: Observability, data and docs
+    fa: fas fa-chart-line
+    summary: Metrics, logs and dashboards, the databases behind the apps, and diagrams kept as code.
+    categories:
+      - title: Monitoring
+        fa: fas fa-chart-line
+        url: /posts/devops/monitoring/monitoring
+        items:
+          - { name: Prometheus, what: Metrics and alerting, url: /posts/devops/monitoring/prometheus/prometheus, icon: /assets/img/icons/devops/monitoring/prometheus-18.svg }
+          - { name: Grafana, what: Dashboards, url: /posts/devops/monitoring/grafana/grafana, icon: /assets/img/icons/devops/monitoring/grafana-18.svg }
+          - { name: Loki, what: Log aggregation, url: /posts/devops/monitoring/loki/loki, icon: /assets/img/icons/devops/monitoring/loki-18.svg }
+          - { name: Datadog, what: Hosted observability, url: /posts/devops/monitoring/datadog/datadog, icon: /assets/img/icons/devops/monitoring/datadog-18.svg }
+      - title: Databases
+        fa: fas fa-database
+        url: /posts/databases/databases
+        items:
+          - { name: SQL Server, what: Microsoft relational database, url: /posts/databases/mssql/mssql, icon: /assets/img/icons/databases/mssql-18.svg }
+          - { name: PostgreSQL, what: Open-source relational database, url: /posts/databases/postgres/postgresql, icon: /assets/img/icons/databases/postgresql-18.svg }
+      - title: Diagrams as Code
+        fa: fas fa-project-diagram
+        url: /posts/devops/dac/dac
+        items:
+          - { name: Diagrams, what: Architecture diagrams in Python, url: /posts/devops/dac/diagrams/diagrams, icon: /assets/img/icons/miscellaneous/diagrams.svg }

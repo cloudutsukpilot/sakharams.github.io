@@ -1,0 +1,63 @@
+{%- comment -%}
+  Card grid used on the DevOps, DevSecOps and AI & ML tabs:
+    {% include topic-grid.html data="devops_tools" %}
+  reads _data/<data>.yml: one section per group, one card per category, one tile per item.
+  Same look as the Cloud tab's service grid (_includes/cloud-compare.html, styles in
+  _sass/cloud-compare.scss).
+
+  Data fields (see the comment at the top of each data file):
+    group:    id, title, fa, summary, categories
+    category: title, fa, post or url (the overview the card title links to), items
+    item:     name, what, post (source path, resolved at build time) or url, icon (optional logo).
+              An item with neither post nor url is a topic with no article yet: no link, "Soon" badge.
+  Icons are CSS backgrounds, not <img>, so refactor-content.html doesn't wrap them in popup links.
+{%- endcomment -%}
+{%- assign tg = site.data[include.data] -%}
+{%- assign tg_soon = false -%}
+<div class="cloud-compare topic-grid">
+<nav class="cc-jump" aria-label="Sections">
+{%- for g in tg.groups -%}
+<a href="#{{ g.id }}"><i class="{{ g.fa }}" aria-hidden="true"></i> {{ g.title }}</a>
+{%- endfor -%}
+</nav>
+{%- if tg.legend %}
+<p class="cc-legend"><span class="cc-soon">Soon</span> marks a topic with no article yet.</p>
+{%- endif -%}
+{%- for g in tg.groups %}
+<section class="cc-section" id="{{ g.id }}" aria-labelledby="{{ g.id }}-title">
+<h3 class="cc-title" id="{{ g.id }}-title"><i class="{{ g.fa }}" aria-hidden="true"></i> {{ g.title }}</h3>
+<p class="cc-summary">{{ g.summary }}</p>
+<div class="cc-grid">
+{%- for c in g.categories -%}
+{%- assign c_href = nil -%}
+{%- if c.post -%}
+{%- assign c_post = site.posts | where: "path", c.post | first -%}
+{%- assign c_href = c_post.url -%}
+{%- elsif c.url -%}
+{%- assign c_href = c.url -%}
+{%- endif -%}
+<div class="cc-col tg-col">
+<div class="cc-col-head"><i class="{{ c.fa }} tg-head-icon" aria-hidden="true"></i>{% if c_href %}<a href="{{ c_href | relative_url }}">{{ c.title }}</a>{% else %}<span>{{ c.title }}</span>{% endif %}</div>
+{%- for t in c.items -%}
+{%- assign t_href = nil -%}
+{%- if t.post -%}
+{%- assign t_post = site.posts | where: "path", t.post | first -%}
+{%- assign t_href = t_post.url -%}
+{%- elsif t.url -%}
+{%- assign t_href = t.url -%}
+{%- endif -%}
+{%- if t_href -%}<a class="cc-tile" href="{{ t_href | relative_url }}">{%- else -%}<div class="cc-tile is-topic">{%- endif -%}
+{%- if t.icon -%}
+<span class="cc-icon" style="background-image:url('{{ t.icon | relative_url }}')" aria-hidden="true"></span>
+{%- else -%}
+<span class="cc-icon tg-icon-fa" aria-hidden="true"><i class="{{ t.fa | default: c.fa }}"></i></span>
+{%- endif -%}
+<span class="cc-text"><span class="cc-name">{{ t.name }}</span><span class="cc-what">{{ t.what }}{% unless t_href %} <span class="cc-soon">Soon</span>{% endunless %}</span></span>
+{%- if t_href -%}</a>{%- else -%}</div>{%- endif -%}
+{%- endfor -%}
+</div>
+{%- endfor -%}
+</div>
+</section>
+{%- endfor %}
+</div>

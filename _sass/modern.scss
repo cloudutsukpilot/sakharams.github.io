@@ -137,8 +137,12 @@ article .content {
   font-size: 1.0625rem;
   line-height: 1.75;
 
-  // A readable measure (about 75 characters) inside the wide column.
-  > p, > ul, > ol, > blockquote { max-width: 76ch; }
+  // A readable measure (about 75 characters) inside the wide column, for posts only
+  // (their <article> carries data-toc). Tab pages (Professional Journey, Projects,
+  // Labs, ...) use the full width.
+  @at-root article[data-toc] .content {
+    > p, > ul, > ol, > blockquote { max-width: 76ch; }
+  }
 
   h2 { font-size: 1.6rem; font-weight: 700; margin-top: 2.75rem; }
   h3 { font-size: 1.25rem; font-weight: 650; margin-top: 2rem; }
@@ -411,17 +415,29 @@ figure.highlight {
   }
 }
 
+.home-topics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  column-gap: 0.45rem;
+
+  // Each topic stays on one line; a dot follows each one but the last, so a wrapped line never starts with a dot.
+  > span { white-space: nowrap; }
+  > span:not(:last-child)::after { content: '·'; margin-left: 0.45rem; opacity: 0.6; }
+}
+
 .home-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.3rem 0.8rem;
+  max-width: 100%;
+  padding: 0.35rem 0.9rem;
+  line-height: 1.5;
   border: 1px solid var(--main-border-color);
-  border-radius: 999px;
+  border-radius: 1rem;
   background: var(--surface);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-muted-color);
 }

@@ -7,7 +7,7 @@
 {%- for e in site.data.projects %}{% unless e[1].hidden %}{% assign hero_playbooks = hero_playbooks | plus: 1 %}{% endunless %}{% endfor -%}
 {%- assign hero_posts = site.posts | size -%}
 <section class="home-hero px-xl-1">
-  <p class="home-eyebrow"><span class="home-dot" aria-hidden="true"></span> Cloud · DevOps · Security · AI</p>
+  <p class="home-eyebrow"><span class="home-dot" aria-hidden="true"></span><span class="home-topics"><span>Cloud</span><span>DevOps</span><span>Security</span><span>Architecture</span><span>System Design</span><span>Observability</span><span>AI</span><span>Machine Learning</span></span></p>
   <h1 class="home-title">Learn the cloud<br>by <span class="home-grad">building it for real.</span></h1>
   <p class="home-lead">
     Hands-on labs with real dashboards, project playbooks from vision to go-live, and field notes from
