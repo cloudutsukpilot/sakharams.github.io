@@ -1,8 +1,8 @@
 {% comment %}
-  Expedition Map: interactive map of the blog (country = topic, state = subtopic).
+  Expedition Map: a 3D globe of the blog (country = topic, state = subtopic), drawn with Three.js.
   Data comes from _plugins/expedition_map.rb (site.data.expedition_atlas), configured in
   _data/expedition_map.yml. The Atlas below is the server-rendered index; it works without
-  JavaScript and on small screens, and assets/js/expedition-map.js reads it to draw the map.
+  JavaScript and on small screens, and assets/js/expedition-map.js reads it to draw the globe.
 {% endcomment %}
 {% assign atlas = site.data.expedition_atlas %}
 <style>
@@ -24,11 +24,13 @@
 </div>
 <div class="xm-stage" hidden>
 <div class="xm-map">
-<svg viewBox="0 0 1000 560" role="group" aria-label="Map of blog topics"></svg>
+<canvas aria-hidden="true"></canvas>
+<div class="xm-labels" role="group" aria-label="Topics on the globe"></div>
+<p class="xm-hint"><i class="fas fa-hand" aria-hidden="true"></i> Drag to spin · scroll to zoom · click a topic</p>
 <button type="button" class="xm-back" hidden><i class="fas fa-earth-americas" aria-hidden="true"></i> World view</button>
 <button type="button" class="xm-fs-btn" aria-label="View map fullscreen" title="Fullscreen"><i class="fas fa-expand" aria-hidden="true"></i></button>
-<div class="xm-tooltip" role="status" hidden></div>
-<p class="xm-loading">Charting the map…</p>
+<div class="xm-pop" role="status" hidden></div>
+<p class="xm-loading">Spinning up the globe…</p>
 </div>
 <aside class="xm-guide" aria-live="polite" aria-label="Travel guide"></aside>
 </div>
@@ -63,8 +65,5 @@
 </section>
 </div>
 <script defer src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/d3-weighted-voronoi@1/build/d3-weighted-voronoi.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/d3-voronoi-map@2/build/d3-voronoi-map.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/d3-voronoi-treemap@1/build/d3-voronoi-treemap.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <script defer src="{{ '/assets/js/expedition-map.js' | relative_url }}"></script>

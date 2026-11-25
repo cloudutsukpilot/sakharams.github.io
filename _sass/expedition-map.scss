@@ -3,8 +3,6 @@
 
 .xm {
   --xm-ink: var(--heading-color);
-  --xm-sea: color-mix(in srgb, #38bdf8 16%, var(--main-bg));
-  --xm-land: color-mix(in srgb, #c8a46a 42%, var(--main-bg));
   --xm-line: color-mix(in srgb, var(--xm-ink) 12%, transparent);
 
   // No `container-type` here: it would trap the fixed fullscreen overlay inside the article.
@@ -107,157 +105,154 @@
 .xm-map {
   position: relative;
   overflow: hidden;
-  background: transparent;
+  height: clamp(28rem, 64vh, 42rem);
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 45%, #0f2240 0%, #060b16 70%);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 
-  svg {
+  &.xm-grabbing {
+    cursor: grabbing;
+  }
+
+  canvas {
     display: block;
     width: 100%;
-    height: auto;
+    height: 100%;
   }
 }
 
-/* --- world map underneath --- */
-
-.xm-ocean {
-  fill: var(--xm-sea);
-  stroke: color-mix(in srgb, #0284c7 35%, var(--main-bg));
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.xm-graticule {
-  fill: none;
-  stroke: var(--xm-line);
-  stroke-width: 0.6;
-  vector-effect: non-scaling-stroke;
-}
-
-.xm-geo-land {
-  fill: var(--xm-land);
-}
-
-.xm-geo-borders {
-  fill: none;
-  stroke: color-mix(in srgb, var(--xm-ink) 22%, transparent);
-  stroke-width: 0.5;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.xm-compass {
-  fill: none;
-  stroke: color-mix(in srgb, var(--xm-ink) 30%, transparent);
-  stroke-width: 1;
-
-  path {
-    fill: color-mix(in srgb, var(--xm-ink) 18%, transparent);
-  }
-
-  text {
-    fill: color-mix(in srgb, var(--xm-ink) 55%, transparent);
-    stroke: none;
-    font-size: 12px;
-    font-weight: 700;
-    text-anchor: middle;
-  }
-}
-
-.xm-shore path {
-  fill: none;
-  stroke: color-mix(in srgb, #0284c7 30%, var(--main-bg));
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
-
-  &:first-child {
-    stroke-dasharray: 3 5;
-  }
-}
-
-.xm-region {
-  stroke: var(--main-bg);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  cursor: pointer;
-  transition: fill-opacity 0.15s, opacity 0.3s;
-
-  // Regions are tinted glass over the world map; hovering makes one solid.
-  &:hover {
-    fill-opacity: 0.8 !important;
-  }
-
-  &.xm-faded {
-    opacity: 0.15;
-  }
-
-  &.xm-active {
-    fill-opacity: 0.85 !important;
-    stroke: var(--xm-ink);
-    stroke-width: 2.5;
-  }
-
-  &:focus-visible {
-    outline: none;
-    stroke: var(--link-color);
-    stroke-width: 3;
-  }
-}
-
-.xm-searching .xm-region:not(.xm-hit) {
-  opacity: 0.18;
-}
-
-.xm-searching .xm-region.xm-hit {
-  stroke: var(--xm-ink);
-  stroke-width: 2;
-}
-
-.xm-border {
-  fill: none;
-  stroke: var(--main-bg);
-  stroke-width: 3.5;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+/* Labels are buttons laid over the canvas; the script moves them with the globe. */
+.xm-labels {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-
-  &:focus-visible {
-    outline: none;
-    stroke: var(--link-color);
-    stroke-width: 4;
-  }
 }
 
-.xm-country-label text,
-.xm-state-label text {
-  fill: #fff;
-  stroke: rgba(0, 0, 0, 0.5);
-  stroke-width: 3px;
-  paint-order: stroke;
-  text-anchor: middle;
-  pointer-events: none;
-  font-family: Lato, sans-serif;
-}
-
-.xm-cname {
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.xm-ccount,
-.xm-scount {
+.xm-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--xm-color) 70%, transparent);
+  border-radius: 999px;
+  background: rgba(6, 11, 22, 0.78);
+  color: #e2e8f0;
+  font-size: 0.78rem;
   font-weight: 600;
-  opacity: 0.9;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  will-change: transform;
+  transition: background 0.15s, box-shadow 0.15s;
+
+  i {
+    color: var(--xm-color);
+  }
+
+  &:hover,
+  &:focus-visible,
+  &.xm-on,
+  &.xm-hit {
+    background: color-mix(in srgb, var(--xm-color) 35%, rgba(6, 11, 22, 0.9));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--xm-color) 35%, transparent), 0 0 18px var(--xm-color);
+    outline: none;
+  }
+
+  &[hidden] {
+    display: none;
+  }
 }
 
-.xm-state-label text:first-child {
+.xm-label-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xm-color) 30%, transparent);
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
-.xm-country-labels {
-  transition: opacity 0.3s;
+.xm-label-state {
+  font-size: 0.72rem;
+  font-weight: 500;
 }
 
-.xm-zoomed .xm-country-labels {
+.xm-hint {
+  position: absolute;
+  bottom: 0.7rem;
+  left: 0.9rem;
+  margin: 0;
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.78rem;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.xm-zoomed .xm-hint {
   opacity: 0;
+}
+
+/* Hover card */
+.xm-pop {
+  position: absolute;
+  z-index: 3;
+  width: 17rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--xm-color) 55%, transparent);
+  border-top: 3px solid var(--xm-color);
+  border-radius: 12px;
+  background: rgba(8, 14, 28, 0.94);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.7), 0 0 24px -8px var(--xm-color);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+
+  &[hidden] {
+    display: none;
+  }
+
+  ul {
+    margin: 0.4rem 0;
+
+    li {
+      overflow: hidden;
+      padding: 0.15rem 0 0.15rem 0.7rem;
+      border-left: 2px solid color-mix(in srgb, var(--xm-color) 60%, transparent);
+      color: #cbd5e1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+.xm-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+
+  i {
+    color: var(--xm-color);
+  }
+}
+
+.xm-pop-meta,
+.xm-pop-hint {
+  margin: 0.15rem 0 0;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.xm-pop-hint {
+  color: var(--xm-color);
+  font-weight: 600;
 }
 
 .xm-back,
@@ -314,10 +309,6 @@
 
   .xm-map {
     height: 100%;
-
-    svg {
-      height: 100%;
-    }
   }
 
   .xm-guide {
@@ -330,18 +321,6 @@ body.xm-fullscreen-open {
   overflow: hidden;
 }
 
-.xm-tooltip {
-  position: absolute;
-  z-index: 2;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--xm-line);
-  border-radius: 6px;
-  background: var(--main-bg);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  font-size: 0.85rem;
-  white-space: nowrap;
-  pointer-events: none;
-}
 
 .xm-loading {
   position: absolute;
@@ -349,12 +328,14 @@ body.xm-fullscreen-open {
   display: grid;
   place-items: center;
   margin: 0;
-  color: var(--text-muted-color);
+  padding: 2rem;
+  color: #94a3b8;
   font-style: italic;
+  text-align: center;
 }
 
 .xm-guide {
-  max-height: 32rem;
+  max-height: clamp(28rem, 64vh, 42rem); /* same height as the globe */
   overflow: auto;
   padding: 1rem;
   border: 1px solid var(--xm-line);
