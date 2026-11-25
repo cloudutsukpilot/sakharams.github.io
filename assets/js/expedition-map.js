@@ -1,19 +1,23 @@
 /*
- * Expedition Map: draws _includes/expedition-map.html's Atlas as an interactive map.
- * Countries (topics) and states (subtopics) are Voronoi-treemap regions sized by post count.
- * Click a country to zoom in, click a state to list its posts in the travel guide.
- * Deep links: #devops, #devops/cicd. A real world map (Natural Earth, world-atlas) sits underneath.
+ * Expedition Map: draws _includes/expedition-map.html's Atlas as a 3D globe (Three.js).
+ * Countries (topics) and states (subtopics) are labels pinned to places on a real Earth; a
+ * topic's area (used for hovering and for how close the camera flies) grows with its post count.
+ * Drag to spin, scroll to zoom, hover for a card, click a topic to fly to it and a subtopic to
+ * list its posts in the travel guide. Labels are buttons, so the map works from the keyboard.
+ * Deep links: #devops, #devops/cicd. Small screens, no WebGL or no network: the Atlas list.
  */
 (function () {
   'use strict';
 
-  var W = 1000;
-  var H = 560;
-  var SEED = 20251001;
-  var CACHE_KEY = 'xm-layout-v2';
+  var THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
   var WORLD_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
   var ANTARCTICA = '010';
+  var TEX_W = 2048;
+  var TEX_H = 1024;
+  var DEG = Math.PI / 180;
+  var FOV = 35;
   var WIDE = window.matchMedia('(min-width: 850px)');
+  var REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var root = document.getElementById('expedition-map');
   if (!root) return;
@@ -21,25 +25,34 @@
   var viewer = root.querySelector('.xm-viewer');
   var fsBtn = root.querySelector('.xm-fs-btn');
   var stage = root.querySelector('.xm-stage');
-  var svg = root.querySelector('svg');
+  var mapBox = root.querySelector('.xm-map');
+  var canvas = root.querySelector('.xm-map canvas');
+  var labelLayer = root.querySelector('.xm-labels');
+  var pop = root.querySelector('.xm-pop');
   var guide = root.querySelector('.xm-guide');
-  var tooltip = root.querySelector('.xm-tooltip');
   var backBtn = root.querySelector('.xm-back');
   var search = root.querySelector('.xm-search input');
   var loading = root.querySelector('.xm-loading');
 
   var countries = readAtlas();
   var allPosts = [];
+  var allStates = [];
   countries.forEach(function (c) {
     c.states.forEach(function (s) {
+      allStates.push(s);
       s.posts.forEach(function (p) { allPosts.push(p); });
     });
   });
 
   var rendered = false;
   var current = { country: null, state: null, district: null };
-  var world, statePaths, countryPaths, stateLabels;
-  var zoomScale = 1;
+  var searchHits = null; /* Set of states with a search match, or null */
+  var hover = null; /* {country} or {state} */
+
+  /* The country the globe is zoomed into; none while a search shows its hits worldwide. */
+  function focus() {
+    return searchHits ? null : current.country;
+  }
 
   /* ---------- data ---------- */
 
@@ -77,7 +90,200 @@
     return country && country.states.filter(function (s) { return s.id === id; })[0] || null;
   }
 
-  /* ---------- layout ---------- */
+  function latest(posts, n) {
+    return posts.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }).slice(0, n);
+  }
+
+  /* ---------- geography: where each topic sits on the globe ---------- */
+
+  /* Topics on a golden-angle spiral between about 50°N and 40°S, so none sits on a pole
+     and the big ones are far apart. Territory radius grows with the square root of posts. */
+  function placeTopics() {
+    var n = countries.length;
+    var maxCount = Math.max.apply(null, countries.map(function (c) { return c.count; })) || 1;
+    countries.forEach(function (c, i) {
+      var t = (i + 0.5) / n;
+      c.lat = Math.asin(0.76 - 1.4 * t) / DEG;
+      c.lon = ((i * 137.508) % 360) - 180;
+      c.radius = 6 + 13 * Math.sqrt(c.count / maxCount);
+      /* Subtopics in an even grid centred on the topic, biggest first: one row of up to three,
+         otherwise two columns. Columns sit far apart because labels are wider than tall. */
+      var m = c.states.length;
+      var cols = m <= 3 ? m : 2;
+      var rows = Math.ceil(m / cols);
+      var step = 1.9;
+      var dLon = 4.2 * step;
+      c.states.forEach(function (s, k) {
+        var row = Math.floor(k / cols);
+        var inRow = row === rows - 1 ? m - row * cols : cols;
+        var col = k % cols;
+        s.lat = c.lat + ((rows - 1) / 2 - row) * step;
+        s.lon = c.lon + ((col - (inRow - 1) / 2) * dLon) / Math.cos(c.lat * DEG);
+      });
+      /* Half-size of the grid in degrees, plus room for the labels themselves. */
+      c.halfH = ((rows - 1) / 2) * step + 1.2 * step;
+      c.halfW = ((cols - 1) / 2) * dLon + 0.6 * dLon;
+    });
+  }
+
+  /* Same convention as THREE.SphereGeometry's UVs, so markers line up with the texture. */
+  function toVec(T, lat, lon, r) {
+    var phi = (lon + 180) * DEG;
+    var la = lat * DEG;
+    return new T.Vector3(-Math.cos(phi) * Math.cos(la), Math.sin(la), Math.sin(phi) * Math.cos(la)).multiplyScalar(r || 1);
+  }
+
+  /* ---------- 3D scene ---------- */
+
+  var T, renderer, scene, camera, globe, baseCtx, baseTex, land, borders;
+  var worldDist = 3.6; /* set by resize() so the whole globe fits the frame */
+  var halfFov = 0.3; /* the narrower of the vertical and horizontal half-angles */
+  var halfV = 0.3, halfH = 0.3; /* vertical and horizontal half-angles of the camera */
+  var TILT = 0.15; /* camera tilt when zoomed in, for a sense of depth */
+  var view = { yaw: 0, pitch: 0.32, dist: worldDist, tilt: 0 };
+  var goal = { yaw: 0, pitch: 0.32, dist: worldDist, tilt: 0 };
+  var spin = { vx: 0, vy: 0 };
+  var lastInteraction = 0;
+  var pointerInside = false;
+  var visible = true;
+  var frameRequested = false;
+
+  function render() {
+    if (rendered || !WIDE.matches || !window.d3) return;
+    rendered = true;
+    stage.hidden = false;
+    import(THREE_URL).then(function (mod) {
+      T = mod;
+      build();
+      loading.remove();
+      root.classList.add('xm-ready');
+      applyHash();
+    }).catch(function () {
+      loading.textContent = 'The 3D globe needs WebGL and a network connection. The Atlas below lists every post.';
+      rendered = false;
+    });
+  }
+
+  function build() {
+    placeTopics();
+    renderer = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    scene = new T.Scene();
+    camera = new T.PerspectiveCamera(FOV, 1, 0.1, 100);
+
+    scene.add(new T.AmbientLight(0xffffff, 1.6));
+    var sun = new T.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(-3, 2, 4);
+    scene.add(sun);
+
+    globe = new T.Group();
+    globe.rotation.order = 'XYZ';
+    scene.add(globe);
+
+    /* Earth: ocean, graticule and land drawn into an equirectangular canvas. */
+    baseCtx = makeCanvas();
+    baseTex = new T.CanvasTexture(baseCtx.canvas);
+    baseTex.colorSpace = T.SRGBColorSpace;
+    baseTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    drawBase();
+    globe.add(new T.Mesh(new T.SphereGeometry(1, 128, 96),
+      new T.MeshStandardMaterial({ map: baseTex, roughness: 0.85, metalness: 0.05 })));
+    loadLand();
+
+    scene.add(atmosphere());
+    scene.add(stars());
+    addLabels();
+
+    /* Start with the biggest topic in view. */
+    var first = countries[0];
+    var aim = aimAt(first.lat, first.lon);
+    view.yaw = goal.yaw = aim.yaw + 0.5;
+
+    wireInput();
+    new ResizeObserver(resize).observe(mapBox);
+    resize();
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (es) { visible = es[0].isIntersecting; if (visible) requestFrame(); }).observe(mapBox);
+    }
+    document.addEventListener('visibilitychange', requestFrame);
+    requestFrame();
+  }
+
+  function makeCanvas() {
+    var c = document.createElement('canvas');
+    c.width = TEX_W;
+    c.height = TEX_H;
+    return c.getContext('2d');
+  }
+
+  function geoPath(ctx) {
+    var projection = d3.geoEquirectangular().scale(TEX_W / (2 * Math.PI)).translate([TEX_W / 2, TEX_H / 2]);
+    return d3.geoPath(projection, ctx);
+  }
+
+  function drawBase() {
+    var ctx = baseCtx;
+    var g = ctx.createLinearGradient(0, 0, 0, TEX_H);
+    g.addColorStop(0, '#0a1a33');
+    g.addColorStop(0.5, '#0d2445');
+    g.addColorStop(1, '#0a1a33');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, TEX_W, TEX_H);
+    var path = geoPath(ctx);
+    ctx.beginPath();
+    path(d3.geoGraticule10());
+    ctx.strokeStyle = 'rgba(125, 211, 252, 0.10)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (land) {
+      ctx.beginPath();
+      path(land);
+      ctx.fillStyle = '#1d3a52';
+      ctx.fill();
+      ctx.beginPath();
+      path(borders);
+      ctx.strokeStyle = 'rgba(148, 197, 230, 0.22)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    baseTex.needsUpdate = true;
+  }
+
+  /* The real world map; the globe still works (plain ocean) if it fails to load. */
+  function loadLand() {
+    if (!window.topojson) return;
+    d3.json(WORLD_URL).then(function (topo) {
+      var geo = topojson.feature(topo, topo.objects.countries);
+      geo.features = geo.features.filter(function (f) { return f.id !== ANTARCTICA; });
+      land = geo;
+      borders = topojson.mesh(topo, topo.objects.countries, function (a, b) { return a !== b; });
+      drawBase();
+      requestFrame();
+    }).catch(function () { /* offline or blocked */ });
+  }
+
+  function atmosphere() {
+    var mat = new T.ShaderMaterial({
+      vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vN; void main(){ float i = pow(0.68 - dot(vN, vec3(0.0, 0.0, 1.0)), 3.0); gl_FragColor = vec4(0.18, 0.83, 0.75, 1.0) * i; }',
+      side: T.BackSide, blending: T.AdditiveBlending, transparent: true, depthWrite: false
+    });
+    return new T.Mesh(new T.SphereGeometry(1.16, 64, 48), mat);
+  }
+
+  function stars() {
+    var g = new T.BufferGeometry();
+    var pts = [];
+    var rand = mulberry32(7);
+    for (var i = 0; i < 900; i++) {
+      var u = rand() * 2 - 1, a = rand() * Math.PI * 2, r = 18 + rand() * 12;
+      var s = Math.sqrt(1 - u * u);
+      pts.push(r * s * Math.cos(a), r * u, r * s * Math.sin(a));
+    }
+    g.setAttribute('position', new T.Float32BufferAttribute(pts, 3));
+    return new T.Points(g, new T.PointsMaterial({ color: 0x9fb4d9, size: 0.06, transparent: true, opacity: 0.7 }));
+  }
 
   function mulberry32(seed) {
     return function () {
@@ -89,262 +295,314 @@
     };
   }
 
-  /* An irregular convex "continent" inside the globe outline (the treemap needs a convex clip). */
-  function continent(rand) {
-    var points = [];
-    for (var i = 0; i < 48; i++) {
-      var a = (i / 48) * Math.PI * 2;
-      var r = 0.86 + rand() * 0.14;
-      points.push([W / 2 + Math.cos(a) * 440 * r, H / 2 + Math.sin(a) * 245 * r]);
-    }
-    return d3.polygonHull(points);
-  }
+  /* ---------- labels (buttons positioned over the canvas) ---------- */
 
-  function signature() {
-    return countries.map(function (c) {
-      return c.id + ':' + c.states.map(function (s) { return s.id + '=' + s.posts.length; }).join(',');
-    }).join('|');
-  }
-
-  function computeLayout() {
-    var sig = signature();
-    try {
-      var cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (cached && cached.sig === sig) return cached.layout;
-    } catch (e) { /* storage unavailable */ }
-
-    var rand = mulberry32(SEED);
-    var clip = continent(rand);
-    var hierarchy = d3.hierarchy({
-      children: countries.map(function (c) {
-        return {
-          id: c.id,
-          children: c.states.map(function (s) {
-            /* Dampen size differences so one-post states stay clickable. */
-            return { id: c.id + '/' + s.id, weight: Math.pow(s.posts.length, 0.8) + 1.2 };
-          })
-        };
-      })
-    }).sum(function (d) { return d.weight || 0; });
-
-    d3.voronoiTreemap()
-      .clip(clip)
-      .prng(rand)
-      .convergenceRatio(0.005)
-      .maxIterationCount(80)(hierarchy);
-
-    var layout = { clip: round(clip), regions: {} };
-    hierarchy.descendants().forEach(function (node) {
-      if (node.depth > 0) layout.regions[node.data.id] = round(node.polygon);
-    });
-
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ sig: sig, layout: layout }));
-    } catch (e) { /* storage unavailable */ }
-    return layout;
-  }
-
-  function round(polygon) {
-    return polygon.map(function (p) { return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; });
-  }
-
-  /* ---------- drawing ---------- */
-
-  function pathOf(polygon) {
-    return 'M' + polygon.map(function (p) { return p.join(','); }).join('L') + 'Z';
-  }
-
-  function area(polygon) {
-    return Math.abs(d3.polygonArea(polygon));
-  }
-
-  function shore(clip, scale, rand) {
-    var c = d3.polygonCentroid(clip);
-    var pts = clip.map(function (p) {
-      var k = scale + (rand() - 0.5) * 0.012;
-      return [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k];
-    });
-    return d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5))(pts);
-  }
-
-  function render() {
-    if (rendered || !WIDE.matches || !window.d3 || !d3.voronoiTreemap) return;
-    rendered = true;
-    stage.hidden = false;
-
-    /* Let the "Charting the map…" message paint before the layout work. */
-    setTimeout(function () {
-      var layout = computeLayout();
-      draw(layout);
-      loading.remove();
-      root.classList.add('xm-ready');
-      applyHash();
-    }, 30);
-  }
-
-  function draw(layout) {
-    var s = d3.select(svg);
-    var rand = mulberry32(SEED + 1);
-
-    world = s.append('g').attr('class', 'xm-world');
-    drawEarth(world.append('g').attr('class', 'xm-earth'));
-    var shoreG = world.append('g').attr('class', 'xm-shore');
-    [1.045, 1.02].forEach(function (k) { shoreG.append('path').attr('d', shore(layout.clip, k, rand)); });
-    drawCompass(s.append('g').attr('class', 'xm-compass').attr('transform', 'translate(56,' + (H - 56) + ')'));
-
-    var states = [];
+  function addLabels() {
     countries.forEach(function (c) {
-      c.polygon = layout.regions[c.id];
-      c.states.forEach(function (st, i) {
-        st.polygon = layout.regions[c.id + '/' + st.id];
-        st.shade = 0.3 + 0.28 * ((i * 7) % 5) / 4;
-        states.push(st);
+      var b = labelButton('xm-label xm-label-country', c.color, function () { selectCountry(c); });
+      var i = document.createElement('i');
+      i.className = c.icon;
+      i.setAttribute('aria-hidden', 'true');
+      b.appendChild(i);
+      b.appendChild(el('span', 'xm-label-name', c.name));
+      b.appendChild(el('span', 'xm-label-count', c.count));
+      b.setAttribute('aria-label', c.name + ', ' + plural(c.count, 'post') + '. Fly to it on the globe');
+      hoverable(b, { country: c });
+      c.label = b;
+      c.anchor = toVec(T, c.lat, c.lon, 1.01);
+      c.states.forEach(function (s) {
+        var sb = labelButton('xm-label xm-label-state', c.color, function () { selectState(s); });
+        sb.appendChild(el('span', 'xm-label-name', s.name));
+        sb.appendChild(el('span', 'xm-label-count', s.posts.length));
+        sb.setAttribute('aria-label', c.name + ', ' + s.name + ', ' + plural(s.posts.length, 'post'));
+        hoverable(sb, { state: s });
+        s.label = sb;
+        s.anchor = toVec(T, s.lat, s.lon, 1.01);
       });
     });
+  }
 
-    statePaths = world.append('g').attr('class', 'xm-states-layer').selectAll('path')
-      .data(states).enter().append('path')
-      .attr('class', 'xm-region')
-      .attr('d', function (d) { return pathOf(d.polygon); })
-      .style('fill', function (d) { return d.country.color; })
-      .style('fill-opacity', function (d) { return d.shade; })
-      .attr('role', 'button')
-      .attr('aria-label', function (d) { return d.country.name + ', ' + d.name + ', ' + d.posts.length + ' posts'; })
-      .on('mouseenter', function (e, d) { showTip(e, d.country.name + ' › ' + d.name, d.posts.length); })
-      .on('mousemove', moveTip)
-      .on('mouseleave', hideTip)
-      .on('click', function (e, d) { activate(d); })
-      .on('keydown', function (e, d) { if (isActivate(e)) { e.preventDefault(); activate(d); } });
+  function labelButton(cls, color, onClick) {
+    var b = button(cls, onClick);
+    b.style.setProperty('--xm-color', color);
+    labelLayer.appendChild(b);
+    return b;
+  }
 
-    countryPaths = world.append('g').attr('class', 'xm-borders').selectAll('path')
-      .data(countries).enter().append('path')
-      .attr('class', 'xm-border')
-      .attr('d', function (d) { return pathOf(d.polygon); })
-      .attr('role', 'button')
-      .attr('aria-label', function (d) { return d.name + ', ' + d.count + ' posts. Open on map'; })
-      .on('keydown', function (e, d) { if (isActivate(e)) { e.preventDefault(); selectCountry(d); } });
+  function hoverable(b, item) {
+    var show = function () { setHover(item); showPop(item, b.getBoundingClientRect()); };
+    b.addEventListener('mouseenter', show);
+    b.addEventListener('focus', show);
+    b.addEventListener('mouseleave', clearHover);
+    b.addEventListener('blur', clearHover);
+  }
 
-    var labels = world.append('g').attr('class', 'xm-country-labels').selectAll('g')
-      .data(countries).enter().append('g')
-      .attr('class', 'xm-country-label')
-      .attr('transform', function (d) { var c = d3.polygonCentroid(d.polygon); return 'translate(' + c + ')'; });
-    labels.each(function (d) {
-      var size = Math.max(13, Math.min(24, Math.sqrt(area(d.polygon)) / 9));
-      var g = d3.select(this);
-      g.append('text').attr('class', 'xm-cname').attr('font-size', size).text(d.name);
-      g.append('text').attr('class', 'xm-ccount').attr('font-size', size * 0.62).attr('dy', size * 0.95)
-        .text(d.count + ' posts');
+  /* Project every candidate label, then place them biggest first and hide any that would
+     overlap one already placed (the hovered and selected ones always win). */
+  var tmp, tmpN, tmpC;
+  function placeLabels() {
+    tmp = tmp || new T.Vector3();
+    tmpN = tmpN || new T.Vector3();
+    tmpC = tmpC || new T.Vector3();
+    var w = mapBox.clientWidth, h = mapBox.clientHeight;
+    var candidates = [];
+    function consider(item, btn, anchor, show, weight) {
+      if (!show) { btn.hidden = true; return; }
+      tmp.copy(anchor).applyMatrix4(globe.matrixWorld);
+      /* Facing the camera? (dot of the surface normal with the direction to the camera) */
+      var facing = tmpN.copy(tmp).normalize().dot(tmpC.copy(camera.position).sub(tmp).normalize());
+      if (facing < 0.08) { btn.hidden = true; return; }
+      tmp.project(camera);
+      var x = (tmp.x + 1) / 2 * w, y = (1 - tmp.y) / 2 * h;
+      if (x < 0 || x > w || y < 0 || y > h) { btn.hidden = true; return; }
+      var on = hover && (hover.state === item || hover.country === item) || current.state === item;
+      candidates.push({ btn: btn, x: x, y: y, facing: facing, weight: on ? 1e9 : weight });
+    }
+    countries.forEach(function (c) {
+      consider(c, c.label, c.anchor, !focus(), c.count);
+      c.states.forEach(function (s) {
+        consider(s, s.label, s.anchor, focus() === c || (searchHits && searchHits.has(s)), s.posts.length);
+      });
     });
-
-    stateLabels = world.append('g').attr('class', 'xm-state-labels');
-    setTabStops();
+    candidates.sort(function (a, b) { return b.weight - a.weight; });
+    var placed = [];
+    candidates.forEach(function (c) {
+      var b = c.btn;
+      if (b.hidden) b.hidden = false;
+      if (!b._w) { b._w = b.offsetWidth; b._h = b.offsetHeight; }
+      var r = { x0: c.x - b._w / 2 - 3, x1: c.x + b._w / 2 + 3, y0: c.y - b._h - 3, y1: c.y + 3 };
+      var clash = placed.some(function (p) { return r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0; });
+      if (clash && c.weight < 1e9) { b.hidden = true; return; }
+      placed.push(r);
+      b.style.transform = 'translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px) translate(-50%, -100%)';
+      b.style.opacity = Math.min(1, (c.facing - 0.08) * 4).toFixed(2);
+    });
   }
 
-  /* Real world map underneath; the topic map still works if it fails to load. */
-  function drawEarth(g) {
-    if (!window.topojson) return;
-    var projection = d3.geoNaturalEarth1().fitExtent([[8, 8], [W - 8, H - 8]], { type: 'Sphere' });
-    var path = d3.geoPath(projection);
-    g.append('path').attr('class', 'xm-ocean').attr('d', path({ type: 'Sphere' }));
-    g.append('path').attr('class', 'xm-graticule').attr('d', path(d3.geoGraticule10()));
-    d3.json(WORLD_URL).then(function (topo) {
-      var countriesGeo = topojson.feature(topo, topo.objects.countries);
-      countriesGeo.features = countriesGeo.features.filter(function (f) { return f.id !== ANTARCTICA; });
-      g.append('path').attr('class', 'xm-geo-land').attr('d', path(countriesGeo));
-      g.append('path').attr('class', 'xm-geo-borders')
-        .attr('d', path(topojson.mesh(topo, topo.objects.countries, function (a, b) { return a !== b; })));
-    }).catch(function () { /* offline or blocked: keep the plain ocean */ });
+  /* ---------- hover card ---------- */
+
+  function setHover(item) {
+    var same = hover && item && hover.country === item.country && hover.state === item.state;
+    if (same) return;
+    hover = item;
+    mapBox.style.cursor = item ? 'pointer' : '';
+    styleLabels();
   }
 
-  function drawCompass(g) {
-    g.append('circle').attr('r', 30);
-    g.append('path').attr('d', 'M0,-40L7,0L0,40L-7,0Z');
-    g.append('path').attr('class', 'xm-compass-ew').attr('d', 'M-40,0L0,-6L40,0L0,6Z');
-    g.append('text').attr('y', -46).text('N');
+  function clearHover() {
+    setHover(null);
+    pop.hidden = true;
   }
 
-  function isActivate(e) {
-    return e.key === 'Enter' || e.key === ' ';
+  function showPop(item, rect, x, y) {
+    pop.textContent = '';
+    var c = item.country || item.state.country;
+    pop.style.setProperty('--xm-color', c.color);
+    var head = el('div', 'xm-pop-head');
+    var i = document.createElement('i');
+    i.className = c.icon;
+    i.setAttribute('aria-hidden', 'true');
+    head.appendChild(i);
+    head.appendChild(el('strong', null, item.state ? c.name + ' › ' + item.state.name : c.name));
+    pop.appendChild(head);
+    var posts = item.state ? item.state.posts : [].concat.apply([], c.states.map(function (s) { return s.posts; }));
+    pop.appendChild(el('p', 'xm-pop-meta', item.state ? plural(posts.length, 'post') :
+      plural(c.count, 'post') + ' · ' + plural(c.states.length, 'state')));
+    var ul = el('ul');
+    latest(posts, 3).forEach(function (p) { ul.appendChild(el('li', null, p.title)); });
+    pop.appendChild(ul);
+    pop.appendChild(el('p', 'xm-pop-hint', item.state ? 'Click to list its posts' : 'Click to fly there'));
+    pop.hidden = false;
+
+    var box = mapBox.getBoundingClientRect();
+    var px = rect ? rect.left + rect.width / 2 - box.left : x;
+    var py = rect ? rect.bottom - box.top + 8 : y + 18;
+    var pw = pop.offsetWidth, ph = pop.offsetHeight;
+    px = Math.max(8, Math.min(box.width - pw - 8, px - pw / 2));
+    if (py + ph > box.height - 8) py = (rect ? rect.top - box.top : y) - ph - 10;
+    pop.style.left = px + 'px';
+    pop.style.top = Math.max(8, py) + 'px';
   }
 
-  function activate(state) {
-    if (current.country !== state.country) selectCountry(state.country);
-    else selectState(state);
+  /* ---------- camera ---------- */
+
+  function aimAt(lat, lon) {
+    var v = toVec(T, lat, lon, 1);
+    return { yaw: -Math.atan2(v.x, v.z), pitch: lat * DEG };
   }
 
-  /* ---------- tooltip ---------- */
-
-  function showTip(e, label, count) {
-    tooltip.textContent = '';
-    var strong = document.createElement('strong');
-    strong.textContent = label;
-    tooltip.appendChild(strong);
-    tooltip.appendChild(document.createTextNode(' · ' + count + (count === 1 ? ' post' : ' posts')));
-    tooltip.hidden = false;
-    moveTip(e);
+  function wrap(a) {
+    while (a > Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    return a;
   }
 
-  function moveTip(e) {
-    var box = stage.querySelector('.xm-map').getBoundingClientRect();
-    tooltip.style.left = (e.clientX - box.left + 14) + 'px';
-    tooltip.style.top = (e.clientY - box.top + 14) + 'px';
+  function flyTo(country) {
+    if (!country) {
+      goal.dist = worldDist;
+      goal.pitch = 0.32;
+      goal.tilt = 0;
+    } else {
+      goal.tilt = TILT;
+      var aim = aimAt(country.lat, country.lon);
+      goal.yaw = view.yaw + wrap(aim.yaw - view.yaw);
+      goal.pitch = aim.pitch;
+      /* Close enough that the grid of subtopics fills the frame, in height and in width. */
+      goal.dist = Math.max(1.6, /* never so close that only blurry ocean shows */
+        1 + Math.sin(country.halfH * DEG) / 0.9 / Math.tan(halfV),
+        1 + Math.sin(country.halfW * DEG) / 0.9 / Math.tan(halfH));
+    }
+    spin.vx = spin.vy = 0;
+    requestFrame();
   }
 
-  function hideTip() {
-    tooltip.hidden = true;
+  function resize() {
+    var w = mapBox.clientWidth, h = mapBox.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    var v = FOV / 2 * DEG;
+    halfV = v;
+    halfH = Math.atan(Math.tan(v) * camera.aspect);
+    halfFov = Math.min(halfV, halfH);
+    /* The atmosphere reaches 1.16; leave a little space around it. */
+    worldDist = 1.2 / Math.sin(halfFov);
+    if (focus()) flyTo(focus()); else goal.dist = worldDist;
+    if (!view.ready) { view.dist = goal.dist; view.ready = true; }
+    requestFrame();
+  }
+
+  function requestFrame() {
+    if (frameRequested || !renderer) return;
+    frameRequested = true;
+    requestAnimationFrame(frame);
+  }
+
+  function frame() {
+    frameRequested = false;
+    if (!visible || document.hidden) return;
+    var idle = performance.now() - lastInteraction > 2500;
+    if (!focus() && !dragging && !pointerInside && idle && !REDUCE && !searchHits) {
+      goal.yaw += 0.0016;
+    }
+    if (!dragging && (spin.vx || spin.vy)) {
+      goal.yaw += spin.vx;
+      goal.pitch += spin.vy;
+      spin.vx *= 0.92;
+      spin.vy *= 0.92;
+      if (Math.abs(spin.vx) < 1e-5 && Math.abs(spin.vy) < 1e-5) spin.vx = spin.vy = 0;
+    }
+    goal.pitch = Math.max(-1.25, Math.min(1.25, goal.pitch));
+    var k = REDUCE ? 1 : 0.09;
+    view.yaw += (goal.yaw - view.yaw) * k;
+    view.pitch += (goal.pitch - view.pitch) * k;
+    view.dist += (goal.dist - view.dist) * k;
+    view.tilt += (goal.tilt - view.tilt) * k;
+    globe.rotation.set(view.pitch, view.yaw, 0);
+    /* World view: look at the centre. Zoomed in: look at the topic (the front of the globe)
+       from a little below, for a sense of depth. */
+    var f = view.tilt / TILT;
+    var dd = view.dist - f;
+    camera.position.set(0, -Math.sin(view.tilt) * dd, f + Math.cos(view.tilt) * dd);
+    camera.lookAt(0, 0, f);
+    globe.updateMatrixWorld();
+    renderer.render(scene, camera);
+    placeLabels();
+    var moving = Math.abs(goal.yaw - view.yaw) + Math.abs(goal.pitch - view.pitch) +
+      Math.abs(goal.dist - view.dist) + Math.abs(goal.tilt - view.tilt) > 1e-4;
+    var autoSpin = !focus() && !REDUCE && !searchHits;
+    if (moving || autoSpin || spin.vx || spin.vy) requestFrame();
+  }
+
+  /* ---------- input ---------- */
+
+  var dragging = false;
+  var down = null;
+
+  function wireInput() {
+    canvas.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      dragging = true;
+      down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t: performance.now(), moved: 0 };
+      spin.vx = spin.vy = 0;
+      canvas.setPointerCapture(e.pointerId);
+      mapBox.classList.add('xm-grabbing');
+      lastInteraction = performance.now();
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      lastInteraction = performance.now();
+      if (dragging && down) {
+        var dx = e.clientX - down.lx, dy = e.clientY - down.ly;
+        down.lx = e.clientX;
+        down.ly = e.clientY;
+        down.moved += Math.abs(dx) + Math.abs(dy);
+        var s = 0.0042 * Math.min(1, (view.dist - 1) / (worldDist - 1));
+        goal.yaw += dx * s;
+        goal.pitch += dy * s;
+        view.yaw = goal.yaw;
+        view.pitch = Math.max(-1.25, Math.min(1.25, goal.pitch));
+        spin.vx = dx * s;
+        spin.vy = dy * s;
+        if (down.moved > 5) clearHover();
+        requestFrame();
+      }
+    });
+    canvas.addEventListener('pointerup', function (e) {
+      if (!dragging) return;
+      dragging = false;
+      mapBox.classList.remove('xm-grabbing');
+      if (REDUCE) spin.vx = spin.vy = 0;
+      if (down && down.moved < 6) spin.vx = spin.vy = 0;
+      down = null;
+      requestFrame();
+    });
+    canvas.addEventListener('pointercancel', function () { dragging = false; down = null; mapBox.classList.remove('xm-grabbing'); });
+    mapBox.addEventListener('scroll', function () { mapBox.scrollTop = 0; mapBox.scrollLeft = 0; });
+    mapBox.addEventListener('pointerenter', function () { pointerInside = true; });
+    mapBox.addEventListener('pointerleave', function () {
+      pointerInside = false;
+      lastInteraction = performance.now();
+      if (!dragging) clearHover();
+      requestFrame();
+    });
+    canvas.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      goal.dist = Math.max(1.35, Math.min(worldDist * 1.6, goal.dist * Math.exp(e.deltaY * 0.0012)));
+      lastInteraction = performance.now();
+      requestFrame();
+    }, { passive: false });
   }
 
   /* ---------- selection ---------- */
 
-  function zoomTo(country) {
-    var t = 'translate(0,0) scale(1)';
-    var k = 1;
-    if (country) {
-      var xs = country.polygon.map(function (p) { return p[0]; });
-      var ys = country.polygon.map(function (p) { return p[1]; });
-      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
-      var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-      k = Math.min(4, 0.86 * Math.min(W / (x1 - x0), H / (y1 - y0)));
-      t = 'translate(' + (W / 2 - k * (x0 + x1) / 2) + ',' + (H / 2 - k * (y0 + y1) / 2) + ') scale(' + k + ')';
-    }
-    zoomScale = k;
-    world.transition().duration(650).ease(d3.easeCubicInOut).attr('transform', t);
-    drawStateLabels(country);
+  function refresh() {
+    if (!renderer) return;
+    styleLabels();
   }
 
-  /* Label sizes are in screen pixels, so they read the same inline and in fullscreen. */
-  function drawStateLabels(country) {
-    stateLabels.selectAll('*').remove();
-    if (!country) return;
-    var z = zoomScale * (svg.getBoundingClientRect().width / W || 1);
-    country.states.forEach(function (s) {
-      if (area(s.polygon) * z * z < 5200) return;
-      var c = d3.polygonCentroid(s.polygon);
-      var g = stateLabels.append('g').attr('class', 'xm-state-label').attr('transform', 'translate(' + c + ')');
-      g.append('text').attr('font-size', 14 / z).text(s.name);
-      g.append('text').attr('class', 'xm-scount').attr('font-size', 11.5 / z).attr('dy', 13.5 / z).text(s.posts.length);
+  /* Highlight the hovered, selected and search-hit labels. */
+  function styleLabels() {
+    countries.forEach(function (c) {
+      c.label.classList.toggle('xm-on', !!(hover && hover.country === c));
+      c.states.forEach(function (s) {
+        s.label.classList.toggle('xm-on', !!(current.state === s || (hover && hover.state === s)));
+        s.label.classList.toggle('xm-hit', !!(searchHits && searchHits.has(s)));
+      });
     });
+    requestFrame();
   }
-
-  var resizeTimer;
-  window.addEventListener('resize', function () {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function () { if (rendered) drawStateLabels(current.country); }, 150);
-  });
 
   function selectCountry(country, state) {
     current.country = country;
     current.state = state || null;
     current.district = null;
-    if (rendered) {
-      zoomTo(country);
+    if (renderer) {
+      flyTo(country);
       backBtn.hidden = !country;
       root.classList.toggle('xm-zoomed', !!country);
-      countryPaths.classed('xm-active', function (d) { return d === country; });
-      statePaths
-        .classed('xm-faded', function (d) { return country && d.country !== country; })
-        .classed('xm-active', function (d) { return d === current.state; });
-      setTabStops();
+      pop.hidden = true;
+      refresh();
     }
     if (current.state) renderState(current.state);
     else if (country) renderCountry(country);
@@ -356,15 +614,9 @@
     if (current.country !== state.country) return selectCountry(state.country, state);
     current.state = state;
     current.district = null;
-    if (rendered) statePaths.classed('xm-active', function (d) { return d === state; });
+    refresh();
     renderState(state);
     setHash();
-  }
-
-  function setTabStops() {
-    if (!statePaths) return;
-    countryPaths.attr('tabindex', current.country ? -1 : 0);
-    statePaths.attr('tabindex', function (d) { return current.country && d.country === current.country ? 0 : -1; });
   }
 
   /* ---------- travel guide ---------- */
@@ -421,7 +673,7 @@
     guide.textContent = '';
     guide.appendChild(guideHeader('World atlas', 'fas fa-earth-americas', null,
       plural(allPosts.length, 'post') + ' across ' + countries.length + ' countries. ' +
-      'Pick a country on the map to explore it.'));
+      'Spin the globe and pick a country to explore it.'));
     var list = el('div', 'xm-choices');
     countries.forEach(function (c) {
       var b = button('xm-choice', function () { selectCountry(c); });
@@ -450,11 +702,10 @@
     });
     guide.appendChild(list);
 
-    var latest = [];
-    c.states.forEach(function (s) { latest = latest.concat(s.posts); });
-    latest.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    var all = [];
+    c.states.forEach(function (s) { all = all.concat(s.posts); });
     guide.appendChild(el('h4', null, 'Latest dispatches'));
-    guide.appendChild(postList(latest, 5));
+    guide.appendChild(postList(latest(all, 5)));
   }
 
   function renderState(s) {
@@ -472,7 +723,7 @@
     var posts = s.posts;
     if (names.length > 1) {
       var label = function (name) { return name ? name + ' (' + districts[name] + ')' : 'All districts'; };
-      var pick = function (name) { current.district = name; renderState(s); };
+      var pickDistrict = function (name) { current.district = name; renderState(s); };
       if (names.length > 6) {
         var select = el('select', 'xm-district-select');
         select.setAttribute('aria-label', 'Filter by district');
@@ -482,12 +733,12 @@
           option.selected = current.district === name;
           select.appendChild(option);
         });
-        select.addEventListener('change', function () { pick(select.value || null); });
+        select.addEventListener('change', function () { pickDistrict(select.value || null); });
         guide.appendChild(select);
       } else {
         var chips = el('div', 'xm-districts');
         [null].concat(names).forEach(function (name) {
-          var b = button('xm-district', function () { pick(name); });
+          var b = button('xm-district', function () { pickDistrict(name); });
           b.textContent = name ? label(name) : 'All';
           b.setAttribute('aria-pressed', String(current.district === name));
           chips.appendChild(b);
@@ -520,7 +771,7 @@
     guide.appendChild(ul);
   }
 
-  /* ---------- search (filters both the map and the Atlas) ---------- */
+  /* ---------- search (filters both the globe and the Atlas) ---------- */
 
   var searchTimer;
   function onSearch() {
@@ -529,7 +780,6 @@
       var q = search.value.trim().toLowerCase();
       var active = q.length >= 2;
       var matches = active ? allPosts.filter(function (p) { return p.title.toLowerCase().indexOf(q) !== -1; }) : [];
-      var hitStates = new Set(matches.map(function (p) { return p.state; }));
 
       countries.forEach(function (c) {
         var cHit = false;
@@ -548,15 +798,15 @@
         if (active) c.el.open = cHit;
       });
 
-      if (rendered) {
+      searchHits = active ? new Set(matches.map(function (p) { return p.state; })) : null;
+      if (renderer) {
         root.classList.toggle('xm-searching', active);
-        statePaths.classed('xm-hit', function (d) { return active && hitStates.has(d); });
         if (active) {
-          /* Show every match; clearing the search restores the previous view. */
-          zoomTo(null);
+          /* Show every match from the world view; clearing the search restores the previous view. */
+          flyTo(null);
           root.classList.remove('xm-zoomed');
           backBtn.hidden = true;
-          statePaths.classed('xm-faded', false).classed('xm-active', false);
+          refresh();
         }
       }
       if (active) renderResults(search.value.trim(), matches);
@@ -582,7 +832,7 @@
   /* Back/forward and edited URLs; other anchors on the page (e.g. #atlas-title) are left alone. */
   window.addEventListener('hashchange', function () {
     var id = decodeURIComponent(location.hash.slice(1)).split('/')[0];
-    if (rendered && (id === '' || findCountry(id))) applyHash();
+    if (renderer && (id === '' || findCountry(id))) applyHash();
   });
 
   backBtn.addEventListener('click', function () { selectCountry(null); });
@@ -610,8 +860,8 @@
       document.exitFullscreen().catch(function () {});
     }
     if (!on) nativeFullscreen = false;
-    hideTip();
-    if (rendered) drawStateLabels(current.country);
+    pop.hidden = true;
+    if (renderer) resize();
   }
 
   fsBtn.addEventListener('click', function () { setFullscreen(!isFullscreen()); });
@@ -623,7 +873,7 @@
 
   /* Esc: zoom out first, then leave the overlay. */
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape' || !rendered) return;
+    if (e.key !== 'Escape' || !renderer) return;
     if (current.country && (isFullscreen() || viewer.contains(document.activeElement))) {
       selectCountry(null);
     } else if (isFullscreen()) {
@@ -634,7 +884,7 @@
   root.querySelectorAll('.xm-passport a').forEach(function (a) {
     a.addEventListener('click', function (e) {
       var country = findCountry(a.dataset.country);
-      if (rendered && !stage.hidden && getComputedStyle(stage).display !== 'none') {
+      if (renderer && !stage.hidden && getComputedStyle(stage).display !== 'none') {
         e.preventDefault();
         selectCountry(country);
         stage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -644,6 +894,7 @@
     });
   });
 
+  /* d3 and topojson load with `defer`; this script too, so they are ready here. */
   if (WIDE.addEventListener) WIDE.addEventListener('change', render);
   render();
 
