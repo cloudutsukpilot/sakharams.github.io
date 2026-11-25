@@ -304,3 +304,34 @@ $cct-providers: 'aws', 'azure', 'gcp';
   font-size: 0.93rem;
   color: var(--cc-muted);
 }
+
+// DevOps, DevSecOps and AI & ML tabs (_includes/topic-grid.html): same grid, one card per
+// category, site accent on top. A topic with no article yet is a plain tile, not a link.
+.topic-grid .tg-col {
+  --cc-accent: var(--accent, #0d9488);
+}
+
+.tg-head-icon {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--cc-accent);
+}
+
+.tg-icon-fa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cc-line);
+  color: var(--cc-muted);
+  font-size: 0.95rem;
+}
+
+.cc-tile.is-topic {
+  border-style: dashed;
+  background: transparent;
+
+  &:hover {
+    transform: none;
+    border-color: var(--cc-line);
+  }
+}

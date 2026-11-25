@@ -1,0 +1,132 @@
+# AI and ML topics on the AI & ML tab (_tabs/artificialintelligence.md via topic-grid.html data="ai_topics").
+# Fields: see the comment at the top of _data/devops_tools.yml. Items link with post: (source path);
+# an item without post is a topic with no article yet and shows a "Soon" badge.
+legend: true
+
+groups:
+  - id: foundations
+    title: AI foundations
+    fa: fas fa-brain
+    summary: What AI is, how machines learn from data, and the neural networks behind modern models.
+    categories:
+      - title: Artificial Intelligence
+        fa: fas fa-brain
+        post: _posts/artificialintelligence/2024-04-05-introduction-to-artificial-intelligence.md
+        items:
+          - { name: Introduction to AI, what: What AI is and where it is used, post: _posts/artificialintelligence/2024-04-05-introduction-to-artificial-intelligence.md }
+          - { name: AI terminologies, what: The vocabulary in one place, post: _posts/artificialintelligence/azureai/2024-06-30-ai-terminologies.md }
+          - { name: Types of AI, what: "Narrow, general, superintelligent and hybrid" }
+          - { name: Applications of AI, what: "Healthcare, finance, transport and more" }
+          - { name: Ethics and responsible AI, what: "Bias, privacy, transparency, accountability" }
+          - { name: Future of AI, what: Where the field is heading }
+      - title: Machine Learning
+        fa: fas fa-chart-line
+        post: _posts/artificialintelligence/machinelearning/2026-01-29-introduction-to-machine-learning.md
+        items:
+          - { name: Machine learning basics, what: Learning patterns from data, post: _posts/artificialintelligence/machinelearning/2026-01-29-introduction-to-machine-learning.md }
+          - { name: Approaches to ML, what: "Supervised, unsupervised and more", post: _posts/artificialintelligence/machinelearning/2026-01-29-approaches-for-machine-learning.md }
+          - { name: Challenges in ML, what: "Data, bias, overfitting", post: _posts/artificialintelligence/machinelearning/2026-01-29-challenges-in-machine-learning.md }
+          - { name: Reinforcement learning, what: Learning by reward, post: _posts/artificialintelligence/reinforcementlearning/2024-04-06-introduction-to-reinforcement-learning.md }
+          - { name: Reinforcement learning use cases, what: Where it works, post: _posts/artificialintelligence/reinforcementlearning/2024-04-06-reinforcement-learning-use-cases.md }
+          - { name: Classic algorithms, what: "Regression, decision trees, SVMs, random forests" }
+      - title: Deep Learning
+        fa: fas fa-project-diagram
+        post: _posts/artificialintelligence/deeplearning/2024-04-06-introduction-to-deep-learning.md
+        items:
+          - { name: Introduction to deep learning, what: Neural networks with many layers, post: _posts/artificialintelligence/deeplearning/2024-04-06-introduction-to-deep-learning.md }
+          - { name: Building neural networks, what: "Layers, weights and activations", post: _posts/artificialintelligence/deeplearning/2024-04-06-building-neural-networks.md }
+          - { name: How neural networks learn, what: Loss and backpropagation, post: _posts/artificialintelligence/deeplearning/2024-04-06-how-neural-networks-learn.md }
+          - { name: Deep learning use cases, what: Where it shines, post: _posts/artificialintelligence/deeplearning/2024-04-06-deep-learning-use-cases.md }
+          - { name: CNNs and RNNs, what: Networks for images and sequences }
+          - { name: Transformers, what: The architecture behind LLMs }
+
+  - id: genai
+    title: Language, vision and generative AI
+    fa: fas fa-comments
+    summary: Large language models from first principles to serving them, retrieval, and models for text and images.
+    categories:
+      - title: Large Language Models
+        fa: fas fa-comment-dots
+        post: _posts/artificialintelligence/largelanguagemodels/2024-03-04-introduction-to-large-language-models.md
+        items:
+          - { name: Introduction to LLMs, what: How large language models work, post: _posts/artificialintelligence/largelanguagemodels/2024-03-04-introduction-to-large-language-models.md }
+          - { name: LLM inference and serving, what: From weights to an API, post: _posts/artificialintelligence/largelanguagemodels/inference/2024-03-04-llm-inference-and-serving.md }
+          - { name: vLLM loading a model, what: Inside a Kubernetes pod, post: _posts/artificialintelligence/largelanguagemodels/inference/2026-10-28-what-happens-when-vllm-loads-a-model-in-a-kubernetes-pod.md }
+          - { name: Thinking mode and tokens, what: Why a chatbot took minutes, post: _posts/artificialintelligence/largelanguagemodels/inference/2026-11-05-why-my-chatbot-took-minutes-to-answer-thinking-mode.md }
+          - { name: Fine-tuning, what: Adapting a model to your data }
+      - title: Generative AI and RAG
+        fa: fas fa-magic
+        post: _posts/artificialintelligence/generativeai/2024-07-23-getting-started-with-genai.md
+        items:
+          - { name: Getting started with GenAI, what: First steps, post: _posts/artificialintelligence/generativeai/2024-07-23-getting-started-with-genai.md }
+          - { name: "Do you need a vector database?", what: The retrieval pyramid, post: _posts/artificialintelligence/largelanguagemodels/2026-11-09-do-you-still-need-a-vector-database.md }
+          - { name: RAG retrieval noise, what: When context drowns the answer, post: _posts/artificialintelligence/2026-10-31-rag-retrieval-noise-drowns-out-ground-truth.md }
+          - { name: Prompt engineering, what: Getting reliable answers }
+          - { name: Image and video generation, what: Diffusion models }
+      - title: Language and vision
+        fa: fas fa-eye
+        post: _posts/artificialintelligence/naturallanguageprocessing/2024-04-06-introduction-to-natural-language-processing.md
+        items:
+          - { name: Natural language processing, what: Machines that read text, post: _posts/artificialintelligence/naturallanguageprocessing/2024-04-06-introduction-to-natural-language-processing.md }
+          - { name: NLP use cases, what: Where NLP is used, post: _posts/artificialintelligence/naturallanguageprocessing/2024-04-06-natural-language-processing-use-cases.md }
+          - { name: Computer vision, what: Machines that see, post: _posts/artificialintelligence/computervision/2022-04-06-introduction-to-computer-vision.md }
+          - { name: Speech recognition, what: Turning speech into text }
+
+  - id: agents
+    title: Agents and AI tools
+    fa: fas fa-robot
+    summary: Agents that plan and call tools, the protocol that connects them, and AI in the developer's editor.
+    categories:
+      - title: Agentic AI
+        fa: fas fa-robot
+        post: _posts/agenticai/2026-05-25-agentic-ai.md
+        items:
+          - { name: Agentic AI guide, what: For architects, post: _posts/agenticai/2026-05-25-agentic-ai.md }
+          - { name: AI agent architecture, what: "User, agent, LLM and tools", post: _posts/agenticai/2026-10-09-ai-agent-architecture.md }
+          - { name: Securing MCP calls, what: LiteLLM vs agentgateway, post: _posts/agenticai/2026-11-06-securing-mcp-calls-litellm-vs-agentgateway.md }
+          - { name: Multi-agent systems, what: Agents that work together }
+      - title: Model Context Protocol
+        fa: fas fa-plug
+        items:
+          - { name: MCP basics, what: "Servers, tools and resources" }
+          - { name: MCP TLS handshake failure, what: SonarQube MCP server debugging, post: _posts/artificialintelligence/modelcontextprotocol/2026-07-04-mcp-tls-handshake-failure.md }
+      - title: AI coding tools
+        fa: fas fa-laptop-code
+        items:
+          - { name: Claude Code tips, what: Getting more from it, post: _posts/aicodingtools/claudecode/2026-06-26-claude-code-tips.md }
+          - { name: The .claude folder, what: "Settings, skills, agents, hooks", post: _posts/aicodingtools/claudecode/2026-10-10-claude-folder-structure.md }
+          - { name: The .github folder for Copilot, what: "Instructions, prompts, agents", post: _posts/aicodingtools/githubcopilot/2026-10-10-github-copilot-folder-structure.md }
+          - { name: CodeGraphContext, what: Codebase as a knowledge graph, post: _posts/aicodingtools/graphtools/2026-06-26-codegraphcontext.md }
+          - { name: Graphify, what: A map of your codebase, post: _posts/aicodingtools/graphtools/2026-06-26-graphify.md }
+      - title: Personal assistants
+        fa: fas fa-user-astronaut
+        items:
+          - { name: OpenClaw with Ollama, what: A local assistant in WSL, post: _posts/artificialintelligence/personalassistant/2026-02-01-setup-openclaw-with-ollama-wsl.md }
+
+  - id: operations
+    title: AI in the cloud and in operations
+    fa: fas fa-cogs
+    summary: Managed AI services, running models in production, and using AI to run systems and processes.
+    categories:
+      - title: Azure AI
+        fa: fab fa-microsoft
+        post: _posts/artificialintelligence/azureai/2024-06-30-introduction-to-azure-ai.md
+        items:
+          - { name: Introduction to Azure AI, what: The service family, post: _posts/artificialintelligence/azureai/2024-06-30-introduction-to-azure-ai.md, icon: /assets/img/icons/cloud/azure/azure-18.svg }
+          - { name: Pre-trained models, what: Ready-made AI services, post: _posts/artificialintelligence/azureai/2024-06-30-azure-pre-trained-models.md }
+          - { name: Computer Vision API, what: Image analysis as a service, post: _posts/artificialintelligence/azureai/2024-07-01-computer-vision-api.md }
+          - { name: Language services, what: NLP as a service, post: _posts/artificialintelligence/azureai/2024-07-01-natural-language-processing.md }
+      - title: MLOps
+        fa: fas fa-sync-alt
+        items:
+          - { name: Building the ML model package, what: Packaging a model for deployment, post: _posts/mlops/2024-04-21-building-the-ml-model-package.md }
+          - { name: AI infrastructure interview questions, what: "GPUs, serving and scaling", post: _posts/mlops/2026-10-08-ai-infrastructure-interview-questions.md }
+          - { name: Model registry and deployment, what: Versioning and releasing models }
+          - { name: Model monitoring, what: Drift and quality in production }
+      - title: AIOps and automation
+        fa: fas fa-cogs
+        items:
+          - { name: Predicting memory leaks, what: From heap dumps, post: _posts/aiops/2026-10-26-predicting-memory-leaks-from-heap-dumps.md }
+          - { name: Robotic process automation, what: Bots for repetitive work, post: _posts/artificialintelligence/roboticsprocessautomation/2024-04-06-introduction-to-robotic-process-automation.md }
+          - { name: RPA use cases, what: Where RPA pays off, post: _posts/artificialintelligence/roboticsprocessautomation/2024-04-06-robotic-process-automation-use-cases.md }
+          - { name: Anomaly detection, what: Spotting unusual behaviour }

@@ -5,98 +5,64 @@ icon: fas fa-cloud
 order: 7
 ---
 
-### Introduction:
+{% comment %}
+  Topic cards come from _data/ai_topics.yml (groups, categories, items), rendered by
+  _includes/topic-grid.html with the Cloud tab's styles. Items without a post show a "Soon" badge.
+{% endcomment %}
 
-Artificial Intelligence(AI) is a rapidly evolving field that focuses on creating intelligent machines capable of performing tasks that typically require human intelligence. In recent years, AI has gained significant attention due to its potential to revolutionize various industries and improve our daily lives.
+## Introduction
 
-#### Types of AI:
+Artificial intelligence (AI) is the field of building systems that do tasks which normally need human
+intelligence: understanding language, recognising images, making predictions and decisions. Machine learning
+(ML) is the part of AI where systems learn those skills from data instead of being programmed rule by rule,
+and deep learning is the part of ML that uses neural networks with many layers. Large language models, the
+engines behind chat assistants and AI agents, are deep learning models trained on huge amounts of text.
 
-There are different types of AI, each with its own characteristics, applications, and limitations. Two commonly discussed types of AI are narrow AI and general AI.
+Read more in the [Introduction to Artificial Intelligence]({% post_url artificialintelligence/2024-04-05-introduction-to-artificial-intelligence %}).
 
-1. Narrow AI:
-    - Also known as weak AI, is designed to perform specific tasks and is limited to a narrow domain. It excels at performing a single task or a set of closely related tasks. - Examples of narrow AI include voice assistants like Siri and Alexa, recommendation systems, and image recognition systems. 
-    - Narrow AI is widely used in various industries and has proven to be highly effective in solving specific problems.
+## Topics
 
-2. General AI
-    - Also known as strong AI or artificial general intelligence (AGI), refers to AI systems that possess human-level intelligence and can perform any intellectual task that a human being can do. 
-    - General AI is capable of understanding, learning, and applying knowledge across different domains. 
-    - However, achieving true general AI is still a significant challenge, and current AI systems are far from reaching this level of intelligence.
+{% include topic-grid.html data="ai_topics" %}
 
-3. Superintelligent AI 
-    - Refers to AI systems that surpass human intelligence and have the ability to outperform humans in virtually every cognitive task. 
+## AI in brief
 
-4. Hybrid AI systems 
-    - Combine multiple AI techniques, such as machine learning, expert systems, and natural language processing, to achieve better performance and flexibility.
+### Types of AI
 
+| Type | What it means |
+|---|---|
+| Narrow AI | Built for one task or a few related tasks: voice assistants, recommendations, image recognition. Every AI system in use today is narrow AI. |
+| General AI (AGI) | A system that can learn and do any intellectual task a person can. It does not exist yet. |
+| Superintelligent AI | A system that would outperform people at almost every cognitive task. Still hypothetical. |
+| Hybrid AI | Combines techniques, such as machine learning with rules or expert systems, for better accuracy and control. |
 
-#### Machine Learning and Deep Learning
+### Machine learning and deep learning
 
-Machine learning and deep learning are subfields of artificial Intelligence(AI) that focus on enabling machines to learn from data and make predictions or decisions. 
+- **Machine learning** finds patterns and relationships in data with statistical methods, without being
+  explicitly programmed. Common algorithms are linear regression, decision trees, support vector machines
+  and random forests.
+- **Deep learning** uses artificial neural networks with many layers, loosely inspired by the brain.
+  Convolutional networks (CNNs) work well on images, recurrent networks (RNNs) on sequences, and
+  transformers power today's language models. Deep learning leads in image and speech recognition, language
+  processing and autonomous driving.
 
-1. Machine learning
-    - Involves the development of algorithms and models that can automatically learn patterns and relationships in data, without being explicitly programmed. 
-    - It relies on statistical techniques and computational power to analyze large datasets and extract meaningful insights. 
+### Where AI is used
 
-2. Deep learning, 
-    - Is specific approach to machine learning that is inspired by the structure and function of the human brain. 
-    - It uses artificial neural networks with multiple layers of interconnected nodes (neurons) to process and learn from data. 
-    - Deep learning has shown remarkable success in tasks such as image and speech recognition, natural language processing, and autonomous driving.
+| Industry | Examples |
+|---|---|
+| Healthcare | Diagnostics, personalised treatment plans, drug discovery |
+| Finance | Fraud detection, algorithmic trading, risk assessment |
+| Transportation | Autonomous vehicles, traffic management, logistics |
+| Customer service | Chatbots and virtual assistants |
+| Manufacturing | Quality control, predictive maintenance, process optimisation |
+| Education | Personalised learning, tutoring systems, content generation |
+| Agriculture | Crop monitoring, yield prediction, precision farming |
+| Cybersecurity | Threat detection, anomaly detection, network security |
 
-Both machine learning and deep learning have revolutionized various industries by enabling the development of intelligent systems that can automate tasks, make accurate predictions, and provide valuable insights. They have been applied in areas such as healthcare, finance, transportation, and entertainment, among others.
+### Ethics and responsible AI
 
-- Popular algorithms and frameworks used in machine learning and deep learning include 
-    a. Linear regression 
-    b. Decision trees 
-    c. Support vector machines 
-    d. Random forests 
-    e. Convolutional neural networks (CNNs) 
-    f. Recurrent neural networks (RNNs). we can unlock new possibilities and solve complex problems in a wide range of industries.
-
-#### Applications of AI
-
-Artificial Intelligence(AI) has a wide range of applications across various industries. Some of the key areas where AI is being used include:
-
-1. Healthcare: AI is being used to improve diagnostics, develop personalized treatment plans, and assist in drug discovery.
-2. Finance: AI is used for fraud detection, algorithmic trading, and risk assessment.
-3. Transportation: AI is being used in autonomous vehicles, traffic management systems, and logistics optimization.
-4. Customer Service: AI-powered chatbots and virtual assistants are being used to provide personalized customer support and improve user experience.
-5. Manufacturing: AI is used for quality control, predictive maintenance, and process optimization.
-6. Education: AI is being used for personalized learning, intelligent tutoring systems, and educational content generation.
-7. Agriculture: AI is used for crop monitoring, yield prediction, and precision farming.
-8. Cybersecurity: AI is used for threat detection, anomaly detection, and network security.
-
-##### Ethical Considerations
-
-As artificial Intelligence(AI) continues to advance, it is crucial to address the ethical implications associated with its development and use. Some key ethical considerations in AI include:
-
-1. Bias and Fairness: 
-    - AI systems can inherit biases from the data they are trained on, leading to unfair outcomes and discrimination. 
-    - It is important to ensure that AI algorithms are designed and trained in a way that promotes fairness and avoids reinforcing existing biases.
-2. Privacy and Data Protection: 
-    - AI systems often rely on large amounts of personal data. It is essential to handle this data responsibly, ensuring privacy protection and obtaining proper consent from individuals. 
-    - Additionally, AI systems should be designed to minimize the risk of data breaches and unauthorized access.
-
-3. Transparency and Explainability: 
-    - AI algorithms can be complex and difficult to understand. It is important to promote transparency and develop methods to explain the decisions made by AI systems. 
-    - This helps build trust and allows individuals to understand and challenge the outcomes produced by AI.
-
-4. Accountability and Liability: 
-    - As AI systems become more autonomous, questions arise regarding who should be held accountable for their actions. 
-    - Clear frameworks and regulations need to be established to determine liability in cases where AI systems cause harm or make incorrect decisions.
-
-5. Job Displacement and Economic Impact: 
-    - The widespread adoption of AI technologies may lead to job displacement and economic disruption. 
-    - It is important to consider the impact on workers and communities and develop strategies to mitigate these effects, such as retraining programs and social safety nets.
-
-6. Security and Malicious Use: 
-    - AI systems can be vulnerable to attacks and misuse. 
-    - Ensuring the security of AI systems and protecting them from malicious use is crucial to prevent potential harm and maintain public trust.
-
-
-#### Future of AI
-
-- AI technology are expected to revolutionize industries such as healthcare, finance, transportation, and more. 
-- We can anticipate the development of more sophisticated AI systems, including general AI that possesses human-level intelligence. 
-- The integration of AI with other emerging technologies like robotics and quantum computing will further enhance its capabilities. 
-- However, ethical considerations such as bias, privacy, transparency, and accountability must be addressed to ensure responsible and beneficial AI deployment.
-- Overall, the future of AI promises exciting possibilities and challenges that will shape our society in profound ways.
+- **Bias and fairness:** models inherit bias from their training data, so data and outcomes need checking.
+- **Privacy:** AI often relies on personal data, which needs consent, protection and minimal use.
+- **Transparency:** people should be able to understand, and challenge, what a system decided and why.
+- **Accountability:** it must be clear who is responsible when an AI system causes harm.
+- **Jobs and the economy:** automation displaces work, so retraining and support matter.
+- **Security and misuse:** AI systems can be attacked or misused and need the same protection as any other system.

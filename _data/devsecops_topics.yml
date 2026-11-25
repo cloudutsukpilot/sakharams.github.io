@@ -1,0 +1,129 @@
+# DevSecOps and security topics on the DevSecOps tab (_tabs/devsecops.md via topic-grid.html data="devsecops_topics").
+# Fields: see the comment at the top of _data/devops_tools.yml. Items link with post: (source path).
+
+groups:
+  - id: practice
+    title: DevSecOps practice
+    fa: fas fa-shield-alt
+    summary: How security fits into the delivery pipeline, and the scanners that test code and running apps.
+    categories:
+      - title: DevSecOps
+        fa: fas fa-shield-alt
+        post: _posts/devsecops/2021-01-01-devsecops.md
+        items:
+          - { name: DevSecOps overview, what: Security in every stage, post: _posts/devsecops/2021-01-01-devsecops.md }
+          - { name: Six pillars of DevSecOps, what: The principles behind it, post: _posts/devsecops/2024-06-01-six-pillars-of-devsecops.md }
+          - { name: Secure coding practices, what: Habits that prevent bugs, post: _posts/devsecops/2024-05-27-secure-coding-practices.md }
+          - { name: Seven axes of code quality, what: What a scanner measures, post: _posts/devsecops/2024-07-11-seven-axis-of-source-code-quality.md }
+          - { name: Security testing types, what: "SAST, SCA, DAST, IAST and more", post: _posts/devsecops/2026-10-10-devsecops-security-testing-types-and-tools.md }
+          - { name: Interview questions, what: DevSecOps Q&A, post: _posts/devsecops/2024-05-27-devsecops-interview-questions.md }
+      - title: Static analysis (SAST)
+        fa: fas fa-code
+        post: _posts/devsecops/2026-10-10-devsecops-security-testing-types-and-tools.md
+        items:
+          - { name: SonarQube, what: Code quality and SAST, post: _posts/devsecops/sonarqube/2024-07-11-sonarqube.md, icon: /assets/img/icons/devsecops/sonarqube-18.svg }
+          - { name: SonarQube installation, what: Getting started, post: _posts/devsecops/sonarqube/2024-07-11-sonarqube-getting-started.md, icon: /assets/img/icons/devsecops/sonarqube-18.svg }
+          - { name: Fortify, what: Static code analysis, post: _posts/devsecops/fortify/2021-01-01-fortify.md, icon: /assets/img/icons/devsecops/fortify-18.svg }
+          - { name: Checkmarx, what: Static code analysis, post: _posts/devsecops/checkmarx/2021-01-01-checkmarx.md }
+          - { name: Coverity, what: Static code analysis, post: _posts/devsecops/coverity/2021-01-01-coverity.md }
+      - title: Dependency, IaC and dynamic testing
+        fa: fas fa-bug
+        post: _posts/devsecops/2026-10-10-devsecops-security-testing-types-and-tools.md
+        items:
+          - { name: Snyk, what: Dependency and code scanning, post: _posts/devsecops/snyk/2021-01-01-snyk.md, icon: /assets/img/icons/devsecops/snyk-18.svg }
+          - { name: tfsec, what: Terraform security scanner, post: _posts/devsecops/tfsec/2021-01-01-tfsec.md, icon: /assets/img/icons/devsecops/tfsec-18.svg }
+          - { name: OWASP ZAP, what: Web app DAST, post: _posts/devsecops/owaspzap/2021-01-01-owaspzap.md, icon: /assets/img/icons/devsecops/owaspzap-18.svg }
+          - { name: Burp Suite, what: Web security testing, post: _posts/devsecops/burpsuite/2021-01-01-burpsuite.md }
+          - { name: AppScan, what: Application security testing, post: _posts/devsecops/appscan/2021-01-01-appscan.md }
+
+  - id: foundations
+    title: Security foundations
+    fa: fas fa-lock
+    summary: The basics, the frameworks most programmes follow, and web and operating system security.
+    categories:
+      - title: Cybersecurity
+        fa: fas fa-lock
+        post: _posts/cybersecurity/2024-05-15-introduction-to-cybersecurity.md
+        items:
+          - { name: Introduction to cybersecurity, what: Threats and defences, post: _posts/cybersecurity/2024-05-15-introduction-to-cybersecurity.md }
+          - { name: Zero Trust, what: "Never trust, always verify", post: _posts/cybersecurity/zero-trust/2024-06-12-introduction-to-zero-trust.md }
+          - { name: Public blob leaks, what: Azure Storage misconfiguration, post: _posts/cybersecurity/2026-11-16-azure-storage-public-blob-leaks.md }
+          - { name: Over-permissive IAM roles, what: Service roles with too much access, post: _posts/cybersecurity/2026-11-17-over-permissive-iam-service-roles.md }
+      - title: NIST Cybersecurity Framework
+        fa: fas fa-sitemap
+        post: _posts/cybersecurity/nist-cybersecurity-framework/2024-05-15-introduction-to-nist-cybersecurity-framework.md
+        items:
+          - { name: Introduction to NIST CSF, what: The framework at a glance, post: _posts/cybersecurity/nist-cybersecurity-framework/2024-05-15-introduction-to-nist-cybersecurity-framework.md }
+          - { name: Core, what: "Functions, categories and outcomes", post: _posts/cybersecurity/nist-cybersecurity-framework/2024-05-15-nist-core.md }
+          - { name: Profiles, what: Current and target state, post: _posts/cybersecurity/nist-cybersecurity-framework/2024-05-15-nist-profiles.md }
+          - { name: Tiers, what: How mature the programme is, post: _posts/cybersecurity/nist-cybersecurity-framework/2024-05-15-nist-tiers.md }
+      - title: OWASP and web applications
+        fa: fas fa-globe
+        post: _posts/cybersecurity/owasp/2024-06-24-introduction-to-owasp.md
+        items:
+          - { name: Introduction to OWASP, what: The open web security project, post: _posts/cybersecurity/owasp/2024-06-24-introduction-to-owasp.md }
+          - { name: Web application security, what: How web apps are attacked, post: _posts/cybersecurity/webapplicationsecurity/2024-06-24-introduction-to-web-application-security.md }
+          - { name: Web application scanning, what: Finding flaws automatically, post: _posts/cybersecurity/webapplicationsecurity/2024-06-24-web-application-scanning.md }
+          - { name: Input validation, what: OWASP cheat sheet, post: _posts/cybersecurity/owasp/bestpractices/2024-07-01-owasp-input-validation-cheatsheet.md }
+          - { name: HTTP header injection, what: WAF rule, post: _posts/cybersecurity/owasp/rules/2024-06-26-http-header-injection-attack-via-payload.md }
+          - { name: Missing User-Agent header, what: WAF rule, post: _posts/cybersecurity/owasp/rules/2024-06-26-missing-user-agent-header.md }
+          - { name: Missing Accept header, what: WAF rule, post: _posts/cybersecurity/owasp/rules/2024-07-01-request-missing-an-accept-header.md }
+          - { name: Invalid character in request, what: WAF rule, post: _posts/cybersecurity/owasp/rules/2024-07-01-invalid-character-in-request.md }
+          - { name: SQL comment sequence, what: WAF rule, post: _posts/cybersecurity/owasp/rules/2024-07-01-sql-comment-sequence-detected.md }
+      - title: Operating system security
+        fa: fab fa-linux
+        post: _posts/cybersecurity/operatingsystems/2024-07-03-security-architectures-in-linux.md
+        items:
+          - { name: Linux security architectures, what: "DAC, MAC and LSMs", post: _posts/cybersecurity/operatingsystems/2024-07-03-security-architectures-in-linux.md }
+          - { name: SELinux, what: Mandatory access control, post: _posts/cybersecurity/operatingsystems/2024-07-03-selinux.md }
+
+  - id: cloud-security
+    title: Cloud security
+    fa: fas fa-cloud
+    summary: Principles and benchmarks for each cloud, then Azure in depth with Defender for Cloud and Sentinel.
+    categories:
+      - title: Cloud security
+        fa: fas fa-cloud
+        post: _posts/cybersecurity/cloudsecurity/2024-05-15-introduction-to-cloud-security.md
+        items:
+          - { name: Introduction to cloud security, what: Shared responsibility and risks, post: _posts/cybersecurity/cloudsecurity/2024-05-15-introduction-to-cloud-security.md }
+          - { name: Cloud security principles, what: What to get right first, post: _posts/cybersecurity/cloudsecurity/2024-05-15-cloud-security-principles.md }
+          - { name: Cloud security tooling, what: "CSPM, CWPP and friends", post: _posts/cybersecurity/cloudsecurity/2024-05-19-cloud-security-tooling.md }
+          - { name: AWS foundational best practices, what: AWS Security Hub standard, post: _posts/cybersecurity/cloudsecurity/aws/2024-05-29-aws-foundational-security-best-practices-framework.md, icon: /assets/img/icons/cloud/aws/amazonwebservices-18.svg }
+          - { name: Google Cloud security foundations, what: Google's blueprint, post: _posts/cybersecurity/cloudsecurity/gcp/2024-05-29-google-cloud-security-foundations-framework.md, icon: /assets/img/icons/cloud/gcp/googlecloudplatform-18.svg }
+      - title: Azure security
+        fa: fab fa-microsoft
+        post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-azure-security-benchmark.md
+        items:
+          - { name: Azure Security Benchmark, what: Microsoft's baseline, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-azure-security-benchmark.md, icon: /assets/img/icons/cloud/azure/azure-18.svg }
+          - { name: Virtual machines, what: Securing VMs, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-21-securing-virtual-machines-in-azure.md }
+          - { name: Network, what: Securing the network, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-securing-network-in-azure.md }
+          - { name: Storage, what: Securing storage, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-securing-storage-in-azure.md }
+          - { name: Storage accounts, what: Account-level controls, post: _posts/cybersecurity/cloudsecurity/azure/2024-06-01-azure-storage-account-security.md }
+          - { name: SQL Database, what: Database security, post: _posts/cybersecurity/cloudsecurity/azure/2024-06-01-azure-sql-database-security.md }
+          - { name: Containers, what: Securing containers, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-securing-containers-in-azure.md }
+          - { name: Kubernetes, what: Securing AKS, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-securing-kuberenetes-in-azure.md }
+          - { name: Just-in-time access, what: Time-boxed VM access, post: _posts/cybersecurity/cloudsecurity/azure/2024-05-29-just-in-time-access.md }
+          - { name: Azure Policy examples, what: Guardrails as policy, post: _posts/cybersecurity/cloudsecurity/azure/2024-07-15-azure-policies-examples.md }
+          - { name: Threat Modeling Tool, what: Design-time threat models, post: _posts/cybersecurity/cloudsecurity/azure/2024-06-10-azure-threat-modeling-tool.md }
+      - title: Microsoft Defender for Cloud
+        fa: fas fa-user-shield
+        post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-28-microsoft-defender-for-cloud.md
+        items:
+          - { name: Defender for Cloud, what: CSPM and workload protection, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-28-microsoft-defender-for-cloud.md }
+          - { name: Recommendations, what: Fixing posture findings, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-06-07-microsoft-defender-for-cloud-recommendations.md }
+          - { name: Security alerts, what: Threats it detects, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-29-microsoft-defender-security-alerts.md }
+          - { name: Workload protection, what: Defender plans, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-29-microsoft-defender-workload-protection.md }
+          - { name: Workflow automation, what: Responding automatically, post: _posts/cybersecurity/cloudsecurity/azure/microsoftdefenderforcloud/2024-05-29-microsoft-defender-workflow-automation.md }
+      - title: Microsoft Sentinel
+        fa: fas fa-satellite-dish
+        post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-29-microsoft-sentinel.md
+        items:
+          - { name: Microsoft Sentinel, what: Cloud SIEM and SOAR, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-29-microsoft-sentinel.md }
+          - { name: How Sentinel works, what: From data to incidents, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-29-how-sentinel-works.md }
+          - { name: Connectors, what: Bringing data in, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-connectors.md }
+          - { name: Tables, what: Where the data lands, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-tables.md }
+          - { name: Analytics, what: Detection rules, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-analytics.md }
+          - { name: Hunting, what: Proactive queries, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-hunting.md }
+          - { name: Workbooks, what: Dashboards, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-workbooks.md }
+          - { name: Playbooks, what: Automated response, post: _posts/cybersecurity/cloudsecurity/azure/microsoftsentinel/2024-05-30-microsoft-sentinel-playbooks.md }
