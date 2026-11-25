@@ -60,7 +60,16 @@
         {%- assign areas = proj_posts | size | minus: iq -%}
         {%- assign stack = p.facts | where: "label", "Stack" | first -%}
         {%- assign arch = p.facts | where: "label", "Architecture" | first -%}
-        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds
+        {%- comment -%} Cover: the card's `image:`, else the hero of the project's first post (01 Vision). {%- endcomment -%}
+        {%- assign tile_img = p.image -%}
+        {%- unless tile_img -%}
+          {%- assign by_path = proj_posts | sort: "path" -%}
+          {%- for x in by_path -%}{%- assign xi = x.image.path | default: x.image -%}{%- if xi contains "/01-" -%}{%- assign tile_img = xi -%}{%- break -%}{%- endif -%}{%- endfor -%}
+          {%- unless tile_img -%}
+            {%- for x in by_path -%}{%- assign xi = x.image.path | default: x.image -%}{%- if xi -%}{%- assign tile_img = xi -%}{%- break -%}{%- endif -%}{%- endfor -%}
+          {%- endunless -%}
+        {%- endunless -%}
+        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds image=tile_img
             summary=p.summary slug=slug kind="Playbook" areas=areas iq=iq stack=stack.value arch=arch.url -%}
       {%- endfor -%}
       {%- for entry in site.data.labs -%}
@@ -68,8 +77,14 @@
         {%- if sid == "__other" -%}
           {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
         {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}
-        {%- assign lab_parts = site.posts | where: "lab", slug | where_exp: "x", "x.lab_part" | size -%}
-        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds
+        {%- assign lab_posts = site.posts | where: "lab", slug | where_exp: "x", "x.lab_part" -%}
+        {%- assign lab_parts = lab_posts | size -%}
+        {%- assign tile_img = p.image -%}
+        {%- unless tile_img -%}
+          {%- assign by_part = lab_posts | sort: "lab_part" -%}
+          {%- for x in by_part -%}{%- assign xi = x.image.path | default: x.image -%}{%- if xi -%}{%- assign tile_img = xi -%}{%- break -%}{%- endif -%}{%- endfor -%}
+        {%- endunless -%}
+        {%- include projects-catalog-tile.html name=p.name status=p.status clouds=p.clouds image=tile_img
             summary=p.summary slug=slug kind="Lab" lab=true areas=lab_parts experiments=p.experiments.size
             stack=p.platform.runtime -%}
       {%- endfor -%}
@@ -77,7 +92,12 @@
         {%- if sid == "__other" -%}
           {%- if known_ids contains p.category -%}{%- continue -%}{%- endif -%}
         {%- elsif p.category != sid -%}{%- continue -%}{%- endif -%}
-        {%- include projects-catalog-tile.html name=p.name url=p.url status=p.status clouds=p.clouds
+        {%- assign tile_img = p.image -%}
+        {%- unless tile_img -%}
+          {%- assign xp = site.posts | where: "url", p.url | first -%}
+          {%- assign tile_img = xp.image.path | default: xp.image -%}
+        {%- endunless -%}
+        {%- include projects-catalog-tile.html name=p.name url=p.url status=p.status clouds=p.clouds image=tile_img
             summary=p.summary kind=p.kind links=p.links -%}
       {%- endfor -%}
     {%- endcapture -%}

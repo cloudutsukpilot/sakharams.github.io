@@ -99,23 +99,37 @@
 
 .pc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
-  gap: 1rem;
+  // Two cards per row in the content column; three only on very wide screens.
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1.25rem;
 }
 
 .pc-tile {
   display: flex;
   flex-direction: column;
-  padding: 1rem 1.1rem;
+  overflow: hidden;
   border: 1px solid var(--pc-line);
-  border-top: 3px solid var(--pc-accent);
-  border-radius: 0.6rem;
-  background: var(--pc-card);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 16px;
+  background: var(--card-bg, var(--pc-card));
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 
+  &:not(.has-image) {
+    border-top: 3px solid var(--pc-accent);
+  }
+
+  // Same hover as the Astro prototype's post tiles: lift, accent border, glow under the bottom edge.
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--heading-color) 10%, transparent);
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--accent, var(--pc-accent)) 45%, var(--pc-line));
+    box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--accent, var(--pc-accent)) 45%, transparent);
+  }
+
+  &:hover .pc-tile-image img {
+    transform: scale(1.04);
+  }
+
+  &:hover .pc-tile-title a {
+    color: var(--accent, var(--pc-accent));
   }
 
   &[hidden] {
@@ -131,6 +145,33 @@
   }
 }
 
+.pc-tile-image {
+  display: block;
+  aspect-ratio: 1200 / 630;
+  overflow: hidden;
+  background: var(--pc-line);
+  border-bottom: 1px solid var(--pc-line);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    img { transition: none; }
+  }
+}
+
+.pc-tile-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1rem 1.15rem 0.9rem;
+}
+
 .pc-tile-head {
   display: flex;
   align-items: center;
@@ -141,9 +182,13 @@
 }
 
 .pc-kind {
-  color: var(--pc-muted);
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent-soft, color-mix(in srgb, var(--pc-accent) 12%, transparent));
+  color: var(--accent, var(--pc-muted));
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 
   i {
     color: var(--pc-accent);
@@ -186,6 +231,11 @@
 .pc-tile-summary {
   font-size: 0.9rem;
   margin-bottom: 0.6rem;
+  color: var(--text-muted-color);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pc-tile-stack {
@@ -236,4 +286,14 @@
 .pc-empty {
   margin-top: 1.5rem;
   color: var(--pc-muted);
+}
+
+// Titles and footer links are not body links: no theme underline.
+.projects-catalog .pc-tile a {
+  border-bottom: none;
+  text-decoration: none;
+}
+
+.projects-catalog .pc-tile-foot a:not(.pc-open):hover {
+  text-decoration: underline;
 }
