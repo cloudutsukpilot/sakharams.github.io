@@ -10,6 +10,9 @@ tags:
 - DevOps
 description: Discover how misconfigured Azure Storage containers expose sensitive
   data to the public internet and learn the Terraform fix to secure them.
+image:
+  path: /assets/img/cybersecurity/azure-storage-public-blob-leaks.webp
+  alt: "Azure logo beside the title: public blob leaks from misconfigured Azure Storage containers"
 ---
 <!-- Written by shorts-studio from the short "Azure Blob Leak: Fix Public Access" on 2026-11-16; review before merging. -->
 
