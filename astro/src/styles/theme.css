@@ -1,0 +1,57 @@
+/* Register design tokens for Tailwind v4 */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent2: var(--accent2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-surface: var(--surface);
+  --font-app: var(--font-inter);
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Light theme */
+:root,
+[data-theme="light"] {
+  --background: #f7f8fa;
+  --surface: #ffffff;
+  --foreground: #0f172a;
+  --accent: #0d9488;
+  --accent2: #6366f1;
+  --accent-foreground: #ffffff;
+  --muted: #eef1f5;
+  --muted-foreground: #5b6474;
+  --border: #e3e7ee;
+  --glow: rgba(13, 148, 136, 0.14);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --background: #0a0f1a;
+  --surface: #111827;
+  --foreground: #e6eaf2;
+  --accent: #2dd4bf;
+  --accent2: #818cf8;
+  --accent-foreground: #04201d;
+  --muted: #1a2232;
+  --muted-foreground: #9aa4b6;
+  --border: #1f2a3c;
+  --glow: rgba(45, 212, 191, 0.12);
+}
+
+/* Chirpy's variable names, used by the blog's widget and page styles (jekyll-widgets.scss). */
+:root,
+[data-theme] {
+  --main-bg: var(--background);
+  --card-bg: var(--surface);
+  --text-color: var(--foreground);
+  --heading-color: var(--foreground);
+  --text-muted-color: var(--muted-foreground);
+  --main-border-color: var(--border);
+  --border-color: var(--border);
+  --link-color: var(--accent);
+  --highlight-bg-color: var(--muted);
+}

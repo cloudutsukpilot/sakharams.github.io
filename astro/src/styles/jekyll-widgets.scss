@@ -1,0 +1,14 @@
+// The Jekyll site's widget styles, compiled unchanged from ../_sass. Sass load paths are set in
+// astro.config.ts. The rules use Chirpy's CSS variables, which theme.css maps to the new palette.
+@use 'flow-anim';
+@use 'diagram';
+@use 'scene3d';
+@use 'project-index';
+@use 'lab';
+@use 'projects-catalog';
+@use 'interview-index';
+@use 'hot-topics';
+@use 'cloud-compare';
+@use 'domains';
+@use 'expedition-map';
+@use 'site-custom';

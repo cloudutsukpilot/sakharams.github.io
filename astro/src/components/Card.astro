@@ -1,0 +1,46 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getPostUrl } from "@/utils/getPostPaths";
+import Datetime from "./Datetime.astro";
+
+type Props = {
+  variant?: "h2" | "h3";
+  layout?: "row" | "tile";
+} & CollectionEntry<"posts">;
+
+const { variant: Heading = "h2", layout = "row", id, data, filePath } = Astro.props;
+const { title, description, image, categories, ...props } = data;
+const img = typeof image === "string" ? image : image?.path;
+const topic = categories?.[categories.length - 1];
+const href = getPostUrl(id, filePath, Astro.currentLocale);
+---
+
+{
+  layout === "tile" ? (
+    <li class="post-tile group">
+      <a href={href} class="flex h-full flex-col">
+        <div class="post-tile-img">
+          {img ? <img src={img} alt="" loading="lazy" /> : <div class="post-tile-fallback">{topic}</div>}
+        </div>
+        <div class="flex flex-1 flex-col gap-2 p-4">
+          {topic && <span class="post-chip">{topic}</span>}
+          <Heading class="text-foreground group-hover:text-accent text-base leading-snug font-semibold">{title}</Heading>
+          <p class="text-muted-foreground line-clamp-2 text-sm">{description}</p>
+          <div class="mt-auto pt-1 text-xs"><Datetime {...props} /></div>
+        </div>
+      </a>
+    </li>
+  ) : (
+    <li class="post-row group">
+      <a href={href} class="flex items-start gap-5">
+        <div class="min-w-0 flex-1">
+          {topic && <span class="post-chip">{topic}</span>}
+          <Heading class="text-foreground group-hover:text-accent mt-1.5 text-lg leading-snug font-semibold">{title}</Heading>
+          <p class="text-muted-foreground mt-1 line-clamp-2 text-[0.95rem]">{description}</p>
+          <div class="mt-2 text-sm"><Datetime {...props} /></div>
+        </div>
+        {img && <img class="post-row-img" src={img} alt="" loading="lazy" />}
+      </a>
+    </li>
+  )
+}

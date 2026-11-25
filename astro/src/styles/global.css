@@ -1,0 +1,157 @@
+@import "tailwindcss";
+@import "./theme.css";
+@import "./typography.css";
+@import "rehype-callouts/theme/obsidian";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@layer base {
+  * {
+    @apply border-border outline-accent/75;
+    scrollbar-width: auto;
+    scrollbar-color: var(--color-muted) transparent;
+  }
+  a,
+  button,
+  #main-content {
+    @apply outline-accent outline-offset-1 focus-visible:no-underline focus-visible:outline-2 focus-visible:outline-dashed;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility max-w-app {
+  @apply max-w-6xl;
+}
+
+@utility app-layout {
+  @apply max-w-app mx-auto w-full px-4;
+}
+
+@utility active-nav {
+  @apply underline decoration-wavy decoration-2 underline-offset-8;
+}
+
+:target {
+  scroll-margin-block: 1rem;
+}
+
+/* ---- Prototype: modern look ---- */
+
+/* Native cross-document view transitions (Chromium, Safari 18.2+); no JS router needed. */
+@view-transition {
+  navigation: auto;
+}
+
+body {
+  background-image:
+    radial-gradient(60rem 30rem at 85% -10%, var(--glow), transparent 60%),
+    radial-gradient(40rem 25rem at -10% 10%, color-mix(in srgb, var(--accent2) 10%, transparent), transparent 60%);
+  background-repeat: no-repeat;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Chirpy prompts (`{: .prompt-tip }`), restyled */
+blockquote.prompt {
+  --p: var(--accent);
+  margin: 1.5rem 0;
+  padding: 0.9rem 1.1rem 0.9rem 3rem;
+  border: 1px solid color-mix(in srgb, var(--p) 35%, var(--border));
+  border-left: 4px solid var(--p);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--p) 7%, var(--surface));
+  font-style: normal;
+  position: relative;
+}
+blockquote.prompt::before {
+  position: absolute;
+  left: 1rem;
+  top: 0.95rem;
+  font: 900 1rem/1 "Font Awesome 6 Free";
+  color: var(--p);
+}
+blockquote.prompt > :first-child { margin-top: 0; }
+blockquote.prompt p::before,
+blockquote.prompt p::after { content: none !important; }
+blockquote.prompt > :last-child { margin-bottom: 0; }
+blockquote.prompt-tip { --p: #16a34a; }
+blockquote.prompt-tip::before { content: "\f0eb"; }
+blockquote.prompt-info { --p: #2563eb; }
+blockquote.prompt-info::before { content: "\f05a"; }
+blockquote.prompt-warning { --p: #d97706; }
+blockquote.prompt-warning::before { content: "\f071"; }
+blockquote.prompt-danger { --p: #dc2626; }
+blockquote.prompt-danger::before { content: "\f06a"; }
+
+/* Mermaid diagrams, drawn client-side */
+pre.mermaid {
+  display: flex;
+  justify-content: center;
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+/* Post cards */
+.post-chip {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.post-row {
+  list-style: none;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.post-row-img {
+  width: 9.5rem;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  flex: none;
+}
+@media (max-width: 640px) { .post-row-img { width: 6rem; } }
+.post-tile {
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.post-tile:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.post-tile-img { aspect-ratio: 1200 / 630; overflow: hidden; background: var(--muted); }
+.post-tile-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+.post-tile:hover .post-tile-img img { transform: scale(1.04); }
+.post-tile-fallback {
+  display: grid; place-items: center; height: 100%;
+  font-weight: 700; text-transform: capitalize; color: var(--accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--surface)), color-mix(in srgb, var(--accent2) 18%, var(--surface)));
+}
+@media (prefers-reduced-motion: reduce) {
+  .post-tile, .post-tile-img img { transition: none; }
+}
+
+/* Bootstrap utility classes that the Jekyll includes use */
+.text-muted { color: var(--muted-foreground) !important; }
+.small { font-size: 0.875em; }

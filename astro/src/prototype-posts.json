@@ -1,0 +1,23 @@
+[
+  "projects/platform-wardens/2026-11-09-01-vision-and-business-context.md",
+  "projects/platform-wardens/2026-11-09-05-technical-architecture.md",
+  "projects/platform-wardens/2026-10-08-architecture-decision-records.md",
+  "projects/job-hunter-agent/2026-10-22-01-vision-and-business-context.md",
+  "projects/job-hunter-agent/2026-10-22-05-technical-architecture.md",
+  "projects/job-hunter-agent/2026-10-22-12-cicd-and-release-management.md",
+  "projects/job-hunter-agent/2026-10-22-interview-questions.md",
+  "labs/ebpf-lab/2026-10-11-01-overview.md",
+  "labs/ebpf-lab/2026-10-11-05-monitor.md",
+  "labs/ebpf-lab/2026-10-11-06-experiments.md",
+  "labs/opentelemetry-lab/2026-10-08-01-overview.md",
+  "cloud/2026-10-09-cloud-security-services.md",
+  "homelab/2026-10-26-homelab-setup-3d-dgx-spark-home-pc.md",
+  "homelab/2026-09-30-targus-displaylink-dock-dgx-spark.md",
+  "homelab/2026-10-22-backstage-keycloak-sso-503-startup-race.md",
+  "devops/2025-01-10-devops-interview-questions.md",
+  "devops/monitoring/prometheus/2021-01-01-prometheus.md",
+  "artificialintelligence/largelanguagemodels/2026-11-09-do-you-still-need-a-vector-database.md",
+  "artificialintelligence/largelanguagemodels/inference/2026-10-28-what-happens-when-vllm-loads-a-model-in-a-kubernetes-pod.md",
+  "artificialintelligence/largelanguagemodels/inference/2026-11-05-why-my-chatbot-took-minutes-to-answer-thinking-mode.md",
+  "devops/cicd/github-actions/2026-11-14-speeding-up-gpu-image-builds-github-actions.md"
+]

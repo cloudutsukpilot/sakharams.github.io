@@ -1,0 +1,185 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Card from "@/components/Card.astro";
+import { getSortedPosts } from "@/utils/getSortedPosts";
+import { getSite } from "@/jekyll/site";
+
+const posts = getSortedPosts(await getCollection("posts"));
+const site = getSite();
+
+// Counts come from the Jekyll site's data, so they match the live blog even in the sample build.
+const projects = Object.entries(site.data.projects ?? {})
+  .filter(([, p]: [string, any]) => !p.hidden)
+  .map(([slug, p]: [string, any]) => ({ slug, ...p }));
+const labs = Object.entries(site.data.labs ?? {}).map(([slug, p]: [string, any]) => ({ slug, ...p }));
+const stats = [
+  { n: site.posts.length.toLocaleString("en"), label: "posts" },
+  { n: labs.length, label: "hands-on labs" },
+  { n: projects.length, label: "project playbooks" },
+  { n: (site.data.about_agents ?? []).length, label: "AI agents built" },
+];
+
+const topics = [
+  { name: "Cloud", href: "/posts/", icon: "fa-cloud", text: "Azure, AWS and GCP services compared side by side." },
+  { name: "DevOps", href: "/posts/", icon: "fa-infinity", text: "CI/CD, IaC, Kubernetes, GitOps and DORA metrics." },
+  { name: "DevSecOps", href: "/posts/", icon: "fa-shield-halved", text: "Scanning, policy, supply chain and compliance." },
+  { name: "AI & ML", href: "/posts/", icon: "fa-robot", text: "LLM serving, RAG and agents that stay safe in production." },
+];
+const statusClass = (s: string) => (s === "Live" || s === "Built" ? "is-live" : "is-wip");
+---
+
+<Layout>
+  <Header />
+  <main id="main-content" class="app-layout">
+    <section class="home-hero">
+      <p class="home-eyebrow"><span class="home-dot"></span> Cloud · DevOps · Security · AI</p>
+      <h1>
+        Learn the cloud<br />by <span class="home-grad">building it for real.</span>
+      </h1>
+      <p class="home-lead">
+        Hands-on labs with real dashboards, project playbooks from vision to go-live, and field notes from
+        15+ years of running platforms. Written by <a href="/about/">Sakharam Shinde</a>.
+      </p>
+      <div class="home-cta">
+        <a class="home-btn home-btn-primary" href="#labs"><i class="fas fa-flask"></i> Explore the labs</a>
+        <a class="home-btn" href="#projects"><i class="fas fa-diagram-project"></i> Project playbooks</a>
+        <a class="home-btn" href="/search/"><i class="fas fa-magnifying-glass"></i> Search</a>
+      </div>
+      <ul class="home-stats">
+        {stats.map(s => <li><strong>{s.n}</strong><span>{s.label}</span></li>)}
+      </ul>
+    </section>
+
+    <section class="home-section">
+      <div class="home-head">
+        <h2>Latest writing</h2>
+        <a href="/posts/">All posts <i class="fas fa-arrow-right"></i></a>
+      </div>
+      <ul class="home-grid">
+        {posts.slice(0, 6).map(p => <Card variant="h3" layout="tile" {...p} />)}
+      </ul>
+    </section>
+
+    <section class="home-section" id="labs">
+      <div class="home-head">
+        <h2>Hands-on labs</h2>
+        <p>Runnable repos, real screenshots, experiments you can repeat.</p>
+      </div>
+      <ul class="home-cards">
+        {
+          labs.map(l => (
+            <li>
+              <a class="home-card" href={`/tags/${l.slug}/`}>
+                <span class:list={["home-status", statusClass(l.status)]}>{l.status ?? "Lab"}</span>
+                <h3><i class="fas fa-flask"></i> {l.name}</h3>
+                <p>{l.summary}</p>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="home-section" id="projects">
+      <div class="home-head">
+        <h2>Project playbooks</h2>
+        <p>One post per delivery area, from vision to continuous improvement.</p>
+      </div>
+      <ul class="home-cards">
+        {
+          projects.map(p => (
+            <li>
+              <a class="home-card" href={`/tags/${p.slug}/`}>
+                <span class:list={["home-status", statusClass(p.status)]}>{p.status}</span>
+                <h3><i class="fas fa-book-open"></i> {p.name}</h3>
+                <p>{p.summary}</p>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="home-section">
+      <div class="home-head"><h2>Browse by topic</h2></div>
+      <ul class="home-topics">
+        {
+          topics.map(t => (
+            <li>
+              <a href={t.href}>
+                <i class:list={["fas", t.icon]}></i>
+                <strong>{t.name}</strong>
+                <span>{t.text}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .home-hero { position: relative; padding: 4.5rem 0 3rem; }
+  .home-eyebrow {
+    display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .home-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+  h1 {
+    margin: 1.4rem 0 1rem; font-size: clamp(2.5rem, 6.5vw, 4.6rem); line-height: 1.02; font-weight: 800; letter-spacing: -0.045em;
+  }
+  .home-grad {
+    background: linear-gradient(100deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .home-lead { max-width: 42rem; font-size: 1.15rem; line-height: 1.6; color: var(--muted-foreground); }
+  .home-lead a { color: var(--foreground); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+  .home-cta { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 1.8rem; }
+  .home-btn {
+    display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.2rem; border-radius: 0.8rem;
+    border: 1px solid var(--border); background: var(--surface); font-weight: 600; transition: transform 0.15s, border-color 0.15s;
+  }
+  .home-btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .home-btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-foreground); }
+  .home-stats { display: flex; flex-wrap: wrap; gap: 2.5rem; margin-top: 3rem; padding-top: 1.6rem; border-top: 1px solid var(--border); }
+  .home-stats strong { display: block; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+  .home-stats span { color: var(--muted-foreground); font-size: 0.9rem; }
+
+  .home-section { padding: 2.5rem 0; }
+  .home-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1.5rem; margin-bottom: 1.4rem; }
+  .home-head h2 { font-size: 1.7rem; font-weight: 750; letter-spacing: -0.02em; }
+  .home-head p { color: var(--muted-foreground); }
+  .home-head a { color: var(--accent); font-weight: 600; }
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1.25rem; }
+
+  .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; }
+  .home-card {
+    display: flex; flex-direction: column; gap: 0.5rem; height: 100%; padding: 1.25rem;
+    border: 1px solid var(--border); border-radius: 1rem; background: var(--surface);
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .home-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--accent) 50%, transparent); }
+  .home-card h3 { font-size: 1.05rem; font-weight: 650; }
+  .home-card h3 i { color: var(--accent); margin-right: 0.3rem; }
+  .home-card p { font-size: 0.92rem; color: var(--muted-foreground); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .home-status { align-self: flex-start; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .home-status.is-live { color: #16a34a; background: color-mix(in srgb, #16a34a 14%, transparent); }
+  .home-status.is-wip { color: #d97706; background: color-mix(in srgb, #d97706 14%, transparent); }
+
+  .home-topics { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; padding-bottom: 2rem; }
+  .home-topics a {
+    display: flex; flex-direction: column; gap: 0.35rem; padding: 1.25rem; border-radius: 1rem;
+    border: 1px solid var(--border);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface));
+  }
+  .home-topics a:hover { border-color: var(--accent); }
+  .home-topics i { font-size: 1.3rem; color: var(--accent); }
+  .home-topics span { font-size: 0.9rem; color: var(--muted-foreground); }
+  @media (prefers-reduced-motion: reduce) { .home-card, .home-btn { transition: none; } }
+</style>

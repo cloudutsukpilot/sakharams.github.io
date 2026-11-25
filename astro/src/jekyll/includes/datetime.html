@@ -1,0 +1,2 @@
+{%- comment -%} Stand-in for Chirpy's datetime.html (the theme gem's include). {%- endcomment -%}
+<time{% if include.class %} class="{{ include.class }}"{% endif %} datetime="{{ include.date | date: '%Y-%m-%d' }}">{{ include.date | date: '%-d %b %Y' }}</time>

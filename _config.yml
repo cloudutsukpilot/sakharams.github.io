@@ -247,6 +247,7 @@ exclude:
   - nohup.out
   - "*.pkg"
   - venv
+  - astro # Astro prototype (see astro/README.md); not part of the Jekyll site
 
 jekyll-archives:
   enabled: [categories, tags]

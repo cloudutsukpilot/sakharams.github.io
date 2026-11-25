@@ -1,0 +1,26 @@
+---
+// Rendered before </body> on every page. Draws Mermaid diagrams (```mermaid blocks in posts) when the
+// page has any, in the current light/dark theme, and redraws them when the theme changes.
+---
+
+<script is:inline type="module">
+  const blocks = document.querySelectorAll("pre.mermaid");
+  if (blocks.length) {
+    const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs");
+    blocks.forEach(b => (b.dataset.src = b.textContent));
+    let drawn = "";
+    const draw = async () => {
+      const dark = document.documentElement.dataset.theme === "dark";
+      if (drawn === (dark ? "dark" : "light")) return;
+      drawn = dark ? "dark" : "light";
+      mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "default", fontFamily: "Inter, sans-serif" });
+      blocks.forEach(b => {
+        b.removeAttribute("data-processed");
+        b.textContent = b.dataset.src;
+      });
+      await mermaid.run({ nodes: blocks });
+    };
+    await draw();
+    new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+</script>

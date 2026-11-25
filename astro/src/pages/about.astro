@@ -1,0 +1,26 @@
+---
+// The About page is the Jekyll site's own _tabs/about.md, rendered unchanged (Liquid, then Markdown).
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import config from "@/config";
+import { renderJekyllPage } from "@/jekyll/site";
+
+const { data, html } = await renderJekyllPage("_tabs/about.md");
+---
+
+<Layout title={`${data.title} | ${config.site.title}`} description="Cloud & Platform Architect: platform engineering, DevSecOps, SRE and agentic AI.">
+  <Header />
+  <main id="main-content" class="app-layout pb-12">
+    <h1 class="mt-8 mb-6 text-3xl font-bold tracking-tight">{data.title}</h1>
+    <div class="about-page" set:html={html} />
+  </main>
+  <Footer />
+</Layout>
+
+<style is:global>
+  .about-page h2 { font-size: 1.6rem; font-weight: 700; margin: 2.5rem 0 1rem; letter-spacing: -0.01em; }
+  .about-page h3 { font-weight: 600; }
+  .about-page a { color: var(--accent); }
+  .about-page p { margin: 0.75rem 0; }
+</style>
