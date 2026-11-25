@@ -39,11 +39,17 @@ I'd talk about Platform Wardens, a framework for agents that do routine DevOps, 
 the point of decision. It's a backend system: there's no product UI, the "frontend" is a Slack message,
 a draft pull request and a small operator console.
 
-End to end, I took one agent, terraform-drift, all the way through: a daily schedule after the drift
-scan, deterministic stages that read the plans, one model stage that writes the explanation, a handoff to
-a second agent that says who changed the resource, one Slack message per incident, and a draft PR that
-codifies the change. The framework grew underneath it: contracts, a registry from manifests, Temporal
-workflows, guardrails at four points, a run record and a trace per incident.
+End to end, I took one agent, terraform-drift, all the way through: started by the drift scan's webhook
+when a scan finds resource drift, deterministic stages that read the plans, one model stage that writes
+the explanation, a handoff to a second agent that says who changed the resource, one Slack message per
+incident, and a draft PR that codifies the change. The framework grew underneath it: contracts, a
+registry from manifests, Temporal workflows, guardrails at four points, a run record and a trace per
+incident.
+
+Two later steps changed the shape. Every agent moved out into its own `warden-<agent>` repository and
+pins `wardens` as a versioned, signed library, with a separate repository for the registry and the
+deploy config. And terraform-drift became the first agent that acts: on development stacks, after a
+person presses Approve in Slack, it merges its own PR or dispatches the stack's apply.
 
 The trade-off I'd name: building the framework around one real agent instead of designing it all first
 meant a long "not yet" list per module, but every module that exists was needed by something running.
@@ -74,9 +80,10 @@ async def run(task: TaskContext, acts: Activities) -> RunOutcome:
 ```
 
 ```bash
-uv sync
-uv run --directory agents/devops/terraform-drift pytest -q tests/unit
-uv run python -m wardens.runtime.console --dev-server
+cd warden-terraform-drift && uv sync --frozen
+uv run pytest -q tests/unit
+uv run wardens check-agent .                                   # the agent rules its CI runs
+cd ../platform-wardens && uv run python -m wardens_services.console.app --dev-server --router-worker
 ```
 
 The gotcha: `worker.py` must do no I/O at import, because Temporal's sandbox re-imports it.
@@ -87,7 +94,7 @@ The gotcha: `worker.py` must do no I/O at import, because Temporal's sandbox re-
 
 From the delivery side, an agent is an image and a values file:
 
-- **Build:** one GitHub Actions workflow per image with path filters; on `main` it calls the platform's reusable build (Gitleaks, Semgrep, Trivy, Checkov, Hadolint, SBOM, Cosign), pushes a multi-arch image to the registry, and commits the digest to gitops.
+- **Build:** each agent repository calls the platform's shared `agent-ci` workflow: check-agent, the tests and the eval gate, then the reusable build (Gitleaks, Semgrep, Trivy, Checkov, Hadolint, SBOM, Cosign, an attestation), a push to the image registry, the digest committed to gitops, and the manifest published to the wardens-deploy registry.
 - **Deploy:** Argo CD syncs `apps/<agent>/values.yaml` with a shared `wardens-agent` chart to the `wardens` k3d cluster.
 - **Config and secrets:** env vars in values; secrets from OpenBao through External Secrets.
 
@@ -123,7 +130,9 @@ The gap: there's no staging cluster; the shadow stage in production is the stagi
 Operations work has the same shape in every domain: a signal, evidence from three systems, correlation
 with what changed, a recommendation, a person's decision, a check. Only the decision really needs a
 person. The goal is for agents to absorb everything up to that decision, at L0 (observe) and L1
-(recommend) in v1, while people build and govern the agents.
+(recommend) first, while people build and govern the agents. L2 (act after a person approves) is granted
+per action: the framework ceiling went to L2 in November, and the first L2 actions are terraform-drift's
+merge and revert-apply, on development and qa stacks only, under a time-boxed owner waiver.
 
 How I know it's working is the honest part. The design defines six measures (coverage, toil absorbed,
 quality, speed, cost, reuse) with a hard floor: zero safety failures. What I can show today is
@@ -185,8 +194,10 @@ if tool["kind"] == "act" and caller == "llm":
 uv run --directory framework pytest -q tests/test_tool_calls.py
 ```
 
-The gap I'd own: the import rules are enforced by review, not by a lint rule, so a careless PR could
-break them.
+These started as review rules. Now `lint-imports` layer contracts fail platform-wardens CI, and
+`wardens check-agent` (`public-api`, `model-stages`, `clients`, `stage-acts` and more) fails an agent
+repository's CI. The gap I'd own: they're static checks, so something dynamic can still get past them,
+and review still matters.
 
 </div>
 
@@ -208,8 +219,9 @@ kubectl --context k3d-wardens get ns | grep -E 'terraform-drift|change-correlato
 kubectl --context k3d-wardens -n terraform-drift get externalsecret,networkpolicy,configmap
 ```
 
-The gotcha: adding an agent still touches three repos by hand (wardens, gitops, the infra repo for its
-Entra app).
+The gotcha: adding an agent still touches several repos. `wardens new-agent` renders its repository
+from the template and the GitHub repo and teams are code in the org's IaC repo, but gitops still needs
+its values and the infra repo its Entra app.
 
 </div>
 
@@ -278,7 +290,7 @@ Then the agent shape: a deterministic `run(task, acts)` over stages, with I/O be
 protocol so it can be tested without Temporal or a network.
 
 ```bash
-ls contracts/schemas/          # task, message, artifact, finding, proposed-action, run-record, agent-manifest …
+ls framework/src/wardens/contracts/schemas/   # task, message, artifact, finding, proposed-action, run-record, agent-manifest …
 uv run --directory framework pytest -q tests/test_runtime.py
 ```
 
@@ -294,20 +306,24 @@ approvals and policy checks are all code; the model only explains.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-Three layers with one job each, and the `wardens` package split into ten modules:
+Three layers with one job each, and two distributions: `wardens`, the agent SDK that agents install,
+and `wardens-services`, the processes around the agents.
 
 | Component | Responsibility |
 |---|---|
-| `runtime` | Registry from manifests, root tasks, entry points, the console |
+| `runtime` | Registry from manifests, root tasks, entry points |
 | `routing` | Capability routing: rules, classifier, person |
 | `handoff` | Child tasks with hop budgets; limits only narrow |
-| `durable` | Temporal workflows, incident workflow, approval wait, schedules |
+| `durable` | Temporal workflows, incident workflow, approve-then-act, approval wait, schedules |
 | `guardrails` | Autonomy, approval policy, kill switch, audit |
 | `llm` | Every model call, cost limits, guarded tools, MCP |
 | `state`, `telemetry`, `notify`, `eval` | Stores, traces and run records, messages, scoring |
+| `check`, `release`, `registry` | check-agent's rules, the release checks, the wardens-deploy registry tools |
+| `wardens_services` | Router worker, console, webhooks, ingress, approval endpoint |
 
 Agents own only their domain logic: stages, tools, policies. They import the public API of `wardens`
-and nothing else. The split means a security reviewer can read `guardrails` once instead of every agent.
+(each subpackage's `__all__`) and nothing else, and never `wardens_services`. The split means a security
+reviewer can read `guardrails` once instead of every agent.
 
 Deeper: [components](/posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture), [agent anatomy](/posts/projects/platform-wardens/08-development-preparation/#project-structure).
 
@@ -342,7 +358,8 @@ At runtime the components are separate deployments in the `wardens` cluster:
 
 | Deployment | Namespace |
 |---|---|
-| Console, alerts relay, hooks relay, Event Hubs emulator, ingress consumer, router | `wardens-console` |
+| Console, alerts relay, hooks relay, Event Hubs emulator, ingress consumer | `wardens-console` |
+| Router: the only host of the incident and approve-then-act workflows, two replicas and a PDB | its own namespace |
 | Temporal and its Postgres | Temporal, `wardens-db` |
 | The state store | `wardens-state-db` |
 | One worker per agent | One namespace each |
@@ -356,8 +373,8 @@ kubectl --context k3d-wardens get deploy -A | grep -v kube-system
 kubectl --context k3d-wardens -n wardens-console get pods
 ```
 
-The gap: everything runs as a single replica on one homelab host. The target plan's two replicas for
-shared agents aren't there yet.
+The gap: apart from the router, everything runs as a single replica on one homelab host. The target
+plan's two replicas for shared agents aren't there yet.
 
 </div>
 
@@ -434,8 +451,8 @@ Deeper: [ADR log](/posts/projects/platform-wardens/05-technical-architecture/#ar
 <div class="iq-role" data-role="architect" markdown="1">
 
 A modular monolith for the framework, and a separate deployable per agent. The `wardens` package is one
-Python package with ten modules and strict boundaries; agents are separate images, workers and task
-queues.
+Python package with strict module boundaries, released as a versioned library; agents are separate
+repositories, images, workers and task queues.
 
 Why not microservices for the framework: the modules share contracts and run inside the same worker
 process; splitting routing or guardrails into services would add network hops and failure modes to every
@@ -451,42 +468,122 @@ Deeper: [hosting](/posts/projects/platform-wardens/05-technical-architecture/#ho
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-In code it's one uv workspace: the `framework` package and each agent as a workspace member, one
-`uv.lock`, one `.venv`. Agents depend on `wardens` by path, so a framework change is tested against every
-agent in the same PR.
+platform-wardens is one uv workspace for the framework, the services and `mcp-guard`. It used to hold
+every agent as a workspace member too; now each agent is its own repository that pins a released
+`wardens` and copies its signed wheel in.
 
-- **Module boundaries:** agents import only the public API; two modules own the risky dependencies (`durable` for Temporal, `llm` for models).
-- **Why it stays a monolith:** guardrail point 2 runs inside the model call's tool loop; a network hop there would be a new failure mode on every call.
+- **Module boundaries:** agents import only the public API; two modules own the risky dependencies (`durable` for Temporal, `llm` for models), and `lint-imports` fails CI if anything else imports them.
+- **Why the framework stays a monolith:** guardrail point 2 runs inside the model call's tool loop; a network hop there would be a new failure mode on every call.
 
 ```toml
-[tool.uv.workspace]
-members = ["framework", "agents/devops/terraform-drift", "agents/devops/change-correlator", …]
+# warden-terraform-drift/pyproject.toml
+dependencies = ["wardens==0.10.0", …]
+```
+
+```dockerfile
+# its Dockerfile: the same version, pinned by digest
+ARG WARDENS_PY=<zot>/platform/wardens-py:0.10.0@sha256:…
 ```
 
 ```bash
-uv sync --frozen
-uv run --directory framework pytest -q
+uv run wardens bump 0.10.0 --repo ../warden-terraform-drift --dry-run   # moves both pins and uv.lock together
 ```
 
-The gotcha: a new agent with a `pyproject.toml` must be added to `members` or it silently isn't part of
-the workspace.
+The gotcha: the pin lives in two places that must change together. check-agent's `supply-chain` rule
+refuses a mismatch, and `wardens bump` moves them as one change.
 
 </div>
 
 <div class="iq-role" data-role="devops" markdown="1">
 
-Deployment-wise each agent is its own service: its own image, built only when a file in it changes,
+Deployment-wise each agent is its own service: its own repository and image, built by its own CI run,
 deployed by its own Argo CD Application with the shared chart.
 
-- **Path filters:** the workflow triggers on `framework/**`, `contracts/**`, the agent's folder, `uv.lock`, and skips READMEs, changelogs and docs; prompts still count.
-- **Images from the repo root,** because they need the workspace lock, `framework/` and `contracts/`.
+- **One publish path:** every `warden-*` repository calls the shared `agent-ci` workflow; Kyverno admits a `warden-*` image only with that workflow's attestation.
+- **No framework source in the build:** the image job puts the wheel the `wheel` job verified into the context as `.wheels/` and installs it; nothing is pulled from the monorepo.
 
 ```bash
-docker buildx build -f agents/devops/terraform-drift/Dockerfile .
+cd warden-terraform-drift && make wheels && docker buildx build .
 ```
 
-The trade-off: a framework change rebuilds every image that contains it. That's correct (every agent is
-re-tested), but there's no canary: every worker takes the new framework at once.
+The trade-off changed with the split. A framework release used to rebuild every agent image at once.
+Now nothing moves until each agent merges its own bump PR, which is a canary by construction, at the
+cost of version skew: the router reads each worker's `wardens` version from its build id and alerts
+when it can't place it.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="system-design-and-architecture-q6">
+<summary>Why did you split the monorepo into one repository per agent, and how did you keep the framework consistent across them?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+Because the monorepo stopped matching the ownership model. An agent belongs to a domain cell, but in one
+tree it couldn't be built, reviewed, released or owned on its own; the framework had no versioned
+boundary (agents imported internal modules, and the framework found agents by walking the folder
+layout); and many practices were conventions a reviewer caught in one tree but nobody would catch across
+seven. So every agent moved to `warden-<agent>` and imports `wardens` as a versioned library
+([ADR 0040](/posts/projects/platform-wardens/architecture-decision-records/#adr-0040)).
+
+The part I'd stress is the order: harden first, move second. The framework stopped finding anything by
+repo layout, got a public API and a check command, and the pilot moved only once every agent already
+passed. Consistency then comes from four places, not a shared folder:
+
+| Mechanism | What it enforces |
+|---|---|
+| The library | Guardrails, contracts, limits and tracing in the binding, not agent code |
+| `wardens check-agent` | Folder, manifest and code rules, in every agent's CI |
+| A copier template | New agents start compliant; `copier update` carries template changes |
+| `wardens-deploy` | One registry of manifests and the config that names several agents |
+
+The trade-off: version skew is now a real state, so the router measures each worker's version instead of
+assuming it.
+
+Deeper: [repository strategy](/posts/projects/platform-wardens/08-development-preparation/#repository-and-branching-strategy), [hosting](/posts/projects/platform-wardens/05-technical-architecture/#hosting-and-deployment-model).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+What had to change in the framework before any agent could leave:
+
+- **Nothing found by layout:** contracts and framework config ship inside the wheel (`wardens.contracts.schema_dir()`, `config_path` at call time); other agents' manifests come from one registry directory, `wardens.registry.agents_root()` (`WARDENS_REGISTRY_DIR`).
+- **Public API through `__all__`:** a name an agent needs is added to the subpackage's `__all__`; `test_public_api.py` and check-agent's `public-api` rule refuse anything else.
+- **Two distributions:** `wardens` for agents, `wardens-services` for the router, console and edges; agents never import the second.
+
+```python
+from wardens.durable import ActivityOptions, AgentBinding   # public; wardens.durable.binding.guards is not
+```
+
+```bash
+uv run wardens new-agent sre/lock-watch --cell sre --dest ../warden-lock-watch
+uv run wardens check-agent ../warden-lock-watch --json
+```
+
+The gotcha: a template update re-adds the template's placeholder files in an agent that deleted them on
+purpose, so each agent's CLAUDE.md lists which ones to delete again.
+
+</div>
+
+<div class="iq-role" data-role="devops" markdown="1">
+
+The pipeline split into three paths:
+
+- **Framework:** a PR that sets `version` in `framework/pyproject.toml` publishes `platform/wardens-py:<version>`, a signed FROM-scratch image holding only the wheel, and tags `wardens-v<version>`.
+- **Agent:** each repository's `agent-ci` run tests, gates, builds, signs, attests and publishes its registry entry; a `main` run commits the digest to gitops.
+- **Bumps:** after a final release, a job opens a bump PR in every `warden-*` repo as a GitHub App (switched off by a repository variable until it's trusted).
+
+```bash
+docker buildx build -f framework/wheel.Dockerfile .      # the wheel image
+uv run wardens release check                             # what the release workflow checks
+```
+
+The gotcha that cost a release: GitHub refused the release tag because a workflow change had merged in
+the minutes before the release job ran, and `GITHUB_TOKEN` can't create a ref there. The fix was a
+GitHub App token for the tag and an idempotent release job
+([ADR 0045](/posts/projects/platform-wardens/architecture-decision-records/#adr-0045)).
 
 </div>
 
@@ -502,7 +599,8 @@ re-tested), but there's no canary: every worker takes the new framework at once.
 
 | Layer | Choice | Why |
 |---|---|---|
-| Language | Python 3.12, uv workspace | The model and ops ecosystems are there |
+| Language | Python 3.12, uv; `wardens` as a versioned, signed wheel | The model and ops ecosystems are there |
+| Packages | Through the homelab's Nexus proxy, releases at least 14 days old | One audited path in; no day-zero releases |
 | Model calls | Pydantic AI | Typed output with validation retries, provider from config |
 | Durability | Temporal (self-hosted) | Runs that survive restarts, timers for approvals, schedules |
 | Contracts | JSON Schema, A2A-shaped | Language-neutral, strict |
@@ -599,10 +697,12 @@ from pydantic_ai.models.test import TestModel   # agent tests never call a live 
 ```
 
 ```bash
-uv add --package wardens <library>   # then pin; new MCP-related packages only take 14-day-old releases
+uv add --package wardens <library>   # resolved through Nexus; exclude-newer = "14 days" for every package
 ```
 
-The gotcha: new packages bring transitive dependencies; the 14-day rule applies only to the ones listed.
+The gotcha: new packages bring transitive dependencies. The 14-day rule used to cover only the packages
+listed by name; now it's a rolling `exclude-newer = "14 days"` over the whole lock, and an exception is a
+dated, commented entry.
 
 </div>
 
@@ -661,13 +761,16 @@ on purpose, so a misconfigured gateway still can't reach a tool the agent wasn't
 <div class="iq-role" data-role="architect" markdown="1">
 
 There's no frontend framework, and that was a decision, not an omission. People meet the agents in Slack,
-in GitHub and in a small operator console. The console is one HTML page served by the framework, with
-plain JavaScript calling a few JSON endpoints; there's no routing library and no client state beyond the
+in GitHub and in a small operator console. The console is one HTML page served by `wardens-services`,
+with plain JavaScript calling JSON endpoints; there's no routing library and no client state beyond the
 page.
 
-Why: the console's job is to send a task the way a trigger would and show what the run did. Every agent
-appears in it from its manifest and samples, so adding an agent needs no UI work. A React app would be
-more UI to secure and maintain for three screens.
+Why: the console's job is to send a task the way a trigger would, show what the run did, and let a
+reviewer decide. It has grown tabs (Home with agent metrics and recent executions, Agents, Incidents,
+Author, Approvals, Feedback, Calibration, Memory) and a web app manifest with a service worker, so it
+installs on a phone and approvals can be decided from there. Every agent still appears from its
+registry entry, so adding an agent needs no UI work. A React app would be more UI to secure and maintain
+for a handful of screens.
 
 If the interviewer wants the classic answer: for an approvals UI with many users I'd build a React SPA
 with routes for runs, approvals and agents, server state through a query library, and the same JSON API.
@@ -678,12 +781,14 @@ Deeper: [information architecture](/posts/projects/platform-wardens/04-user-expe
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-The console is `wardens.runtime.console`: a standard-library `BaseHTTPRequestHandler` with an asyncio
-loop on a background thread for the Temporal client, and `console.html` (about 500 lines) for the page.
+The console is `wardens_services.console`: a standard-library `BaseHTTPRequestHandler` with an asyncio
+loop on a background thread for the Temporal client, one module per area under `routes/`, and
+`static/console.html` (about 2,100 lines now) for the page, plus `approvals.html` and a `pwa/` folder.
 
 Concepts, mapped to what it actually uses:
 
-- **Single page, no router:** tabs (Send, recent runs, Author/Chat) switch sections of one page.
+- **Single page, no router:** tabs (Home, Agents, Incidents, Author, Approvals and more) switch sections of one page.
+- **Installable:** `manifest.webmanifest` and `sw.js`; the profile menu shows the running and the latest version, so a phone can update itself.
 - **Data fetching:** `fetch` with `redirect: "manual"`, so an expired sign-in shows as a redirect instead of silently loading the login page into a JSON call.
 - **Forms:** the sample picker fills an editable JSON task; **Preview** shows the exact envelope before **Send**.
 - **State:** the page holds only what's on screen; runs are read back from Temporal.
@@ -693,7 +798,7 @@ const res = await fetch(path, {...opts, redirect: "manual"});
 ```
 
 ```bash
-uv run python -m wardens.runtime.console --dev-server     # http://127.0.0.1:8765
+uv run python -m wardens_services.console.app --dev-server     # http://127.0.0.1:8765
 ```
 
 The gotcha: it binds to 127.0.0.1 and signs no one in; hosted, the oauth2-proxy sidecar does the sign-in.
@@ -740,7 +845,7 @@ def _narrow(constraints: dict[str, Any], narrow: dict[str, Any]) -> None:
 ```
 
 ```bash
-uv run --directory framework pytest -q tests/test_console.py   # builds a task from every sample in the repo
+uv run --directory services pytest -q tests/test_console.py   # builds a task from every sample in the frozen registry
 ```
 
 The gap: polling, not push; fine for a few operators.
@@ -811,13 +916,16 @@ depend on it to run.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-The console is built into its own image from the framework, plus every agent's manifest, input schemas
-and samples, but no agent code. It's served on two names: an internal one behind Keycloak, and a public
-one through the Cloudflare tunnel behind Access and then Keycloak. Configuration per environment is
-environment variables: the user header to trust, the incident queue, the Temporal address.
+The console is built into its own image from `wardens` and `wardens-services`, with no agent code and
+no agent files. Agents' manifests, input schemas and samples come from the wardens-deploy registry,
+mounted at `WARDENS_REGISTRY_DIR` and re-read when a new entry is published, without a restart. It's
+served on two names: an internal one behind Keycloak, and a public one through the Cloudflare tunnel
+behind Access and then Keycloak. Configuration per environment is environment variables and the
+wardens-deploy `config/` directory.
 
 The design point: the console can't run an agent; it can only start the same workflow a trigger starts,
-on the real workers, with the signed-in person as the requester.
+on the router's queue, with the signed-in person as the requester. In relay mode it doesn't even start
+it: it publishes to the ingress hub like any other edge.
 
 Deeper: [hosting](/posts/projects/platform-wardens/05-technical-architecture/#hosting-and-deployment-model), [names](/posts/projects/platform-wardens/11-infrastructure-and-environments/#networking-and-dns).
 
@@ -830,11 +938,12 @@ Configuration the console reads:
 | Variable | Effect |
 |---|---|
 | `WARDENS_CONSOLE_USER_HEADER=X-Forwarded-Email` | Take the requester from the proxy; 401 without it |
-| `WARDENS_CONSOLE_INCIDENT_QUEUE` | Where incident-mode runs go (the drift worker on the homelab) |
+| `WARDENS_CONSOLE_INCIDENT_QUEUE` | Override for the router's queue (default `wardens-router`) |
+| `WARDENS_CONSOLE_GROUPS_HEADER` | Keycloak groups from the proxy: viewer, editor or admin |
 | `WARDENS_CONSOLE_USER` | The requester locally (default: the OS user) |
 
 ```bash
-uv run python -m wardens.runtime.console --incident-worker      # local, with an incident worker
+uv run python -m wardens_services.console.app --router-worker   # local, with the router in-process
 docker build -f framework/console.Dockerfile -t wardens-console .
 ```
 
@@ -847,7 +956,7 @@ framework identities such as `drift-scan-trigger`, so a sample can replay exactl
 
 Delivery for the console:
 
-- **Image:** `framework/console.Dockerfile`, built by `wardens-console.yaml`, which also runs the framework tests on every framework change.
+- **Image:** `framework/console.Dockerfile`, built by `wardens-console.yaml` on `main` after its tests; a pull request runs the one `checks` job instead.
 - **Chart:** the shared `wardens-web` chart, with an oauth2-proxy sidecar (Keycloak client, platform admins only) in the same pod.
 - **Routing:** Traefik ingress with a Let's Encrypt certificate; the public name through the Cloudflare tunnel with Access in front.
 
@@ -941,7 +1050,7 @@ Deeper: [integration architecture](/posts/projects/platform-wardens/05-technical
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-- **Contracts in `contracts/schemas/`**, draft 2020-12, `additionalProperties: false`, validated on write and on read.
+- **Contracts in `framework/src/wardens/contracts/schemas/`**, shipped inside the wheel, draft 2020-12, `additionalProperties: false`, validated by the binding on the worker, never by agent code.
 - **Idempotent starts:** the workflow id derives from the source (`incident-drift-<owner>-<repo>-<run>` for a drift scan), so a redelivery answers `{"duplicate": …}`.
 - **Signature before parsing:**
 
@@ -954,8 +1063,8 @@ def signature_valid(secret, body, header):
 
 ```bash
 WARDENS_GITHUB_WEBHOOK_SECRET=$(openssl rand -hex 32) \
-  uv run python -m wardens.runtime.github_webhook --host 127.0.0.1 --port 8080
-uv run --directory framework pytest -q tests/test_github_webhook.py
+  uv run python -m wardens_services.webhooks.github.receiver --host 127.0.0.1 --port 8080
+uv run --directory services pytest -q tests/test_github_webhook.py
 ```
 
 The gotcha: one JSON log line per delivery is written whole under a lock, because concurrent deliveries
@@ -970,9 +1079,11 @@ once interleaved their lines.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-Internally it's ten framework modules and one package per agent; background work is all of it. Every run
-is a Temporal workflow on the agent's own worker and task queue, so "background" isn't a separate
-system: the webhooks answer at once, and the work happens on workers at their own pace.
+Internally it's the framework's modules plus one package per agent, each in its own repository;
+background work is all of it. Every run is a Temporal workflow on the agent's own worker and task
+queue, so "background" isn't a separate system: the webhooks answer at once, and the work happens on
+workers at their own pace. The router hosts the two workflows that span agents: the incident workflow
+and, per proposed level 2 action, the approve-then-act workflow.
 
 Scheduled work is declared in the manifest (`schedules[]`) and created as Temporal Schedules by the
 framework at worker start, with an explicit time zone, an overlap policy, a catch-up window and jitter.
@@ -986,18 +1097,18 @@ Deeper: [components](/posts/projects/platform-wardens/05-technical-architecture/
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-A schedule is data in the manifest, not code:
+A schedule is data in the manifest, not code (cluster-upgrade-readiness's weekly run):
 
 ```yaml
 schedules:
-  - id: daily-infra-azure
-    capability: terraform.drift.explain
-    cron: "0 8 * * *"
-    timezone: UTC
+  - id: weekly
+    capability: k8s.upgrade.readiness
+    cron: "0 6 * * 1"
+    timezone: Asia/Kolkata
     overlap: skip                 # a run still going makes the next fire a no-op
-    catchupWindowMinutes: 1440    # after an outage, a missed day still runs within a day
+    catchupWindowMinutes: 720     # after an outage, a missed fire still runs within 12 hours
     jitterSeconds: 300
-    incident: true                # under the incident workflow, so handoffs run
+    inputs: { clusters: [k3d-wardens], trigger: schedule }
 ```
 
 `sync_schedules` creates or updates `<agent>-<id>` at worker start; each fire is a fresh root task on
@@ -1024,9 +1135,10 @@ kubectl --context k3d-wardens -n terraform-drift get deploy,pods
 temporal task-queue describe --task-queue terraform-drift --namespace wardens
 ```
 
-The router (the classifier for unmatched alerts and chat's Auto) is its own worker too, so a slow model
-call there doesn't hold up an agent. The gap: one replica each; a worker restart delays runs, it doesn't
-lose them.
+The router (the only host of the incident and approve-then-act workflows, plus the classifier for
+unmatched alerts and chat's Auto) is its own worker too, in its own namespace with two replicas and a
+PDB, so a slow model call there doesn't hold up an agent. The gap: agent workers are one replica each; a
+worker restart delays runs, it doesn't lose them.
 
 </div>
 
@@ -1083,13 +1195,14 @@ Repeat-safety is what makes redeliveries and restarts boring:
 - **Alert repeats:** the workflow id derives from the alert group key and its earliest `startsAt`, so a re-notification starts nothing.
 - **Bus restarts:** the emulator's checkpoints are per hub instance, so a restart is read from the start, and the duplicate starts are refused the same way.
 - **A worker dies mid-run:** Temporal resumes from the last completed activity.
+- **A lost GitHub delivery:** a daily CronJob, signed in as the GitHub App, lists the App's deliveries of the last 70 hours and redelivers each event with no 2xx attempt; the fixed workflow id makes a double delivery harmless.
 
 ```bash
 kubectl --context k3d-wardens -n wardens-console logs deploy/wardens-ingress --since=1h | grep duplicate
 ```
 
-The gap: the redelivery job for lost GitHub deliveries is planned; until then the daily schedule is the
-fallback.
+The gap: up to a day passes before a lost delivery comes back, and drift has no schedule to fall back on
+any more.
 
 </div>
 
@@ -1139,12 +1252,13 @@ The gotcha: no pool is fine at a few runs a minute; with more agents it'd be the
 <div class="iq-role" data-role="devops" markdown="1">
 
 Both databases are Postgres in the `wardens` cluster, each its own app in gitops with its credentials
-from OpenBao. The state store's schema is applied by a Job (`wardens-state-schema-0006`) running
-`python -m wardens.state.migrate` from the console image, in a sync wave after its secrets.
+from OpenBao. The state store's schema is applied by a Job named after the newest migration
+(`wardens-state-schema-<NNNN>`) running `python -m wardens.state.migrate` from the console image, in a
+sync wave after its secrets.
 
 ```bash
 kubectl --context k3d-wardens -n wardens-state-db get pods,jobs
-kubectl --context k3d-wardens -n wardens-state-db logs job/wardens-state-schema-0006
+kubectl --context k3d-wardens -n wardens-state-db logs job/wardens-state-schema-<NNNN>
 ```
 
 Backups today: a nightly dump of both to another host, kept seven nights, alerted if late, until Velero
@@ -1179,11 +1293,13 @@ Deeper: [data model](/posts/projects/platform-wardens/05-technical-architecture/
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-Six numbered migrations, one table family each:
+Twenty numbered migrations by now, one change each. The first six are the core tables; the later ones
+came with features (change events, action claims, verdicts, chat links, approval requests, read-only roles):
 
 ```text
 0001_run_records.sql   0002_dedupe_claims.sql   0003_kill_switches.sql
 0004_audit_events.sql  0005_memory_items.sql    0006_artifacts.sql
+0009_action_claims.sql 0013_approval_requests.sql 0015_eval_reader_role.sql … 0020_chat_link_nonce_channel.sql
 ```
 
 - **Expiry as data:** `expires_at` (or `until`) on rows that expire, so retention is one literal `DELETE … WHERE expires_at < now()` per table.
@@ -1223,7 +1339,7 @@ Deeper: [migrations](/posts/projects/platform-wardens/07-data-and-integration/#d
 
 Adding a migration:
 
-1. Add `0007_<name>.sql` under `wardens/state/migrations/`.
+1. Add `0021_<name>.sql` under `wardens/state/migrations/`.
 2. Make it safe to re-run (it runs in a transaction; the migrate command records what's applied).
 3. Use it from the store code, with a test against Postgres.
 
@@ -1245,7 +1361,7 @@ then the agents that use it.
 
 ```yaml
 metadata:
-  name: wardens-state-schema-0006          # renamed with each new migration
+  name: wardens-state-schema-<NNNN>        # renamed with each new migration
   annotations:
     argocd.argoproj.io/sync-wave: "1"      # after the password and pull secrets (wave 0)
 ```
@@ -1333,8 +1449,11 @@ calls JSON endpoints on the same pod, behind an oauth2-proxy sidecar that signs 
 Keycloak and passes the user's email in a header. The console then talks to Temporal as a client: it
 starts workflows, signals conversations and reads results.
 
-Slack and GitHub are outputs: agents post with incoming webhooks and their own GitHub Apps. Nothing in
-Slack calls back yet; the planned approval page will be the second inbound path from a person.
+Slack is no longer output only. Team chat and the approval cards send button presses back: Slack's
+signed request goes to a relay that publishes it to the ingress hub, and the consumer checks the
+signature again, the Slack user's link to a Keycloak account and that account's groups before anything
+becomes a signal. The console's `/approvals` page is the other inbound path from a person, and it works
+without Slack. GitHub stays an output plus signed webhooks in.
 
 Deeper: [integration](/posts/projects/platform-wardens/05-technical-architecture/#api-and-integration-architecture), [sign-in](/posts/projects/platform-wardens/06-security-and-privacy/#authentication-and-authorization).
 
@@ -1345,6 +1464,7 @@ Deeper: [integration](/posts/projects/platform-wardens/05-technical-architecture
 - **Same-origin JSON** from `console.html` to the console's handler; `fetch` with `redirect: "manual"` to catch an expired sign-in.
 - **Identity from the proxy:** `X-Forwarded-Email`, trusted only because the proxy is the only way into the pod.
 - **Chat as signals:** starting a chat is a Send on the `console-chat` channel; each turn is a signal to that conversation's workflow, and only its starter can read or send.
+- **Decisions as signals too:** an Approve on `/approvals/<workflow id>` becomes the `approval` signal to that action's approve-then-act workflow, with the approver taken from the session, never the body.
 
 ```bash
 curl -s -H 'X-Forwarded-Email: me@example.com' http://127.0.0.1:8765/healthz
@@ -1382,7 +1502,7 @@ The request I'd trace is an operator sending drift's sample from the console:
 
 1. Browser → Traefik (HTTPS) → oauth2-proxy (Keycloak session) → console.
 2. Console: validate the data against the input schema, channel constraints, dedupe, guardrail point 1, root task with a correlation id and the person as requester.
-3. Console → Temporal: start the incident workflow on the drift worker's queue, memo `submittedBy`.
+3. Console → ingress hub → consumer → Temporal: the incident workflow starts on the router's queue (`wardens-router`), memo `submittedBy`, and the router hands the root task to drift's queue.
 4. Drift's worker: activities read GitHub and Azure with the agent's own identity; one stage calls the model through LiteLLM.
 5. Handoff: a child task to the Change Correlator.
 6. Each child writes its run record to `wardens-state-db`; one Slack message per incident.
@@ -1399,7 +1519,7 @@ Deeper: [user flows](/posts/projects/platform-wardens/04-user-experience-and-des
 In the code, the pieces of that trace:
 
 - `Console.build` → `create_root_task` (schema, constraints, dedupe, point 1).
-- `wardens.incident` workflow → the agent's task workflow as a child → `plan_child_task` for the handoff (hop budget, limits capped at the target's grants).
+- `wardens.incident` workflow on the router → the agent's task workflow as a child on the agent's queue → `plan_child_task` for the handoff (hop budget, limits capped at the target's grants).
 - `wardens.llm.model_call` with `usage_limits` from the remaining budget; tools through `GuardedToolset`.
 - The run-record activity → Postgres, or the local file.
 
@@ -1552,6 +1672,7 @@ Synchronous only where a person or a sender is waiting for an answer, and even t
 | Stage → model | Sync inside an activity | One call, with a cost limit and a circuit breaker |
 | Agent → agent | Async child workflow | Limits narrow; artifacts by reference |
 | Console → Temporal | Async start, then poll | The page doesn't hold a connection for a run |
+| Approval → act | Async, durable wait up to 24 hours | A person answers when they can; no answer is a no |
 
 The earlier design started the workflow inside the webhook request, and a burst held a thread per
 request while each waited on Temporal; that's what the bus fixed.
@@ -1566,11 +1687,11 @@ The relay mode is the change that made the edge asynchronous:
 
 - `--mode relay`: after the token or signature check, publish the bus form (a CloudEvents `IngressEvent`) and answer 202, or 503 when the hub won't take it.
 - `--max-in-flight` caps concurrent requests in either mode.
-- The consumer (`python -m wardens.runtime.ingress`) runs the same receivers as the direct path, with the same workflow ids, plus `sourceEventId`.
+- The consumer (`python -m wardens_services.ingress.consumer`) runs the same receivers as the direct path, with the same workflow ids, plus `sourceEventId`.
 
 ```bash
-uv run python -m wardens.runtime.github_webhook --mode relay --max-in-flight 32
-uv run --directory framework pytest -q tests/test_relay.py tests/test_ingress.py
+uv run python -m wardens_services.webhooks.github.receiver --mode relay --max-in-flight 32
+uv run --directory services pytest -q tests/test_relay.py tests/test_ingress.py
 ```
 
 The gotcha: the consumer must skip stale events after an outage, or a backlog of hour-old alerts would
@@ -1592,7 +1713,7 @@ start incidents that no longer matter.
 |---|---|---|
 | GitHub | In and out | Signed App webhooks in; an App per agent for reads and draft PRs |
 | Azure | In | Resource Graph and Activity Log, read with the agent's federated Entra identity |
-| Kubernetes | In | Read-only cluster access for upgrade readiness (short-lived tokens planned) |
+| Kubernetes | In | Read-only cluster access for upgrade readiness, with its service account's 15-minute token |
 | Alertmanager | In | Webhook with a bearer token, allowlisted labels only |
 | LiteLLM | Out | Every model call and every MCP call, a key per agent |
 | Slack, Teams, email | Out | Notifications; never fail a run |
@@ -1619,7 +1740,7 @@ Deeper: [integrations](/posts/projects/platform-wardens/07-data-and-integration/
 ```
 
 ```bash
-cd agents/devops/terraform-drift && GITHUB_READ_TOKEN=$(gh auth token) uv run python -m terraform_drift.worker run
+cd warden-terraform-drift && GITHUB_READ_TOKEN=$(gh auth token) uv run python -m terraform_drift.worker run
 ```
 
 The gotcha: without the App's write permission accepted, the write token set can't be minted and the
@@ -1682,8 +1803,9 @@ kubectl --context k3d-wardens -n terraform-drift logs deploy/terraform-drift --s
 ```
 
 Failure I'd plan for: GitHub doesn't retry a webhook that got a 503, so a delivery lost while the bus was
-refusing is gone until someone redelivers it from the App's page. The daily schedule is the fallback, and
-a redelivery job is planned. The gap: no alert yet on "GitHub delivery answered 503".
+refusing would be gone, so a daily redelivery CronJob lists the App's failed deliveries and sends them
+again (at most 100 a run, given up after three failed tries). It counts `redelivered`, `failed`,
+`deferred` and `given_up`. The gap: a lost delivery can wait up to a day.
 
 </div>
 
@@ -1697,12 +1819,14 @@ a redelivery job is planned. The gap: no alert yet on "GitHub delivery answered 
 Schedules are declared in each agent's manifest and created by the framework as Temporal Schedules, never
 by cron jobs or agent code. Each fire is a fresh root task with its own correlation id, through the same
 channel checks as any trigger. The fields force the decisions people forget: an explicit IANA time zone,
-what happens when the previous run is still going (`overlap: skip` for drift), how far back to catch up
-after an outage, and jitter so fleet-wide schedules don't all start at once.
+what happens when the previous run is still going (`overlap: skip`), how far back to catch up after an
+outage, and jitter so fleet-wide schedules don't all start at once.
 
-Coordination between scheduled work: drift runs at 08:00 UTC, two hours after the drift scan it reads;
-and an event-driven path (the webhook) starts it sooner when the scan found drift, with the schedule as
-the fallback.
+Coordination between scheduled work changed my mind once. Drift used to run on a daily schedule two hours
+after the drift scan, plus a webhook. It ran on days with nothing to explain, so now it has no schedule:
+the scan's drift-only job is the one trigger, and a daily redelivery job covers a lost webhook
+([ADR 0032](/posts/projects/platform-wardens/architecture-decision-records/#adr-0032)). Schedules are
+for work with no event, like cluster-upgrade-readiness's weekly check.
 
 Deeper: [timing](/posts/projects/platform-wardens/12-cicd-and-release-management/#release-calendar), [proactive and reactive runs](/posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture).
 
@@ -1715,23 +1839,24 @@ Deeper: [timing](/posts/projects/platform-wardens/12-cicd-and-release-management
 - **CI rejects** a schedule whose capability isn't the agent's, or whose time zone is unknown.
 
 ```bash
-temporal schedule describe --schedule-id terraform-drift-daily-infra-azure --namespace wardens
-temporal schedule trigger --schedule-id terraform-drift-daily-infra-azure --namespace wardens   # a manual fire
+temporal schedule describe --schedule-id cluster-upgrade-readiness-weekly --namespace wardens
+temporal schedule trigger --schedule-id cluster-upgrade-readiness-weekly --namespace wardens   # a manual fire
 ```
 
-The gotcha: changing a schedule's id (weekly to daily) leaves the old Temporal schedule; it has to be
-deleted once by hand.
+The gotcha: changing or removing a schedule's id leaves the old Temporal schedule behind; it has to
+be deleted once by hand.
 
 </div>
 
 <div class="iq-role" data-role="devops" markdown="1">
 
 Nothing scheduled lives in Kubernetes for the agents; Temporal owns it, so it's visible in one place and
-survives a worker restart. The CronJobs that do exist are the database's own: daily retention and the
-audit anchor in `wardens-state-db`.
+survives a worker restart. The CronJobs that do exist are housekeeping: daily retention and the audit
+anchor in `wardens-state-db`, and the GitHub redelivery beside the console.
 
 ```bash
 kubectl --context k3d-wardens -n wardens-state-db get cronjobs     # wardens-state-retention, anchor
+kubectl --context k3d-wardens -n wardens-console get cronjobs      # the GitHub redelivery
 temporal schedule list --namespace wardens
 ```
 
@@ -1754,7 +1879,9 @@ purpose yet.
 Two kinds of principal. **People** sign in through Keycloak (an oauth2-proxy in front of the console,
 platform admins only; Cloudflare Access first from outside), and the signed-in user becomes the task's
 requester. **Agents** are their own principals: a Kubernetes service account federated to the agent's own
-Entra app, and its own GitHub App. Never a person's credentials, never shared.
+Entra app, and its own GitHub App. Never a person's credentials, never shared. A person can also
+decide from Slack, but only through a link between their Slack user and their Keycloak account that the
+console confirmed; the press is judged by the Keycloak account's groups, read at the moment of the press.
 
 Authorization is four guardrail points in code: at submission (capability, level, cost, quarantine), on
 every tool call (declared, no act tool from a model, parameters and bounds), at policy gates, and at
@@ -1816,8 +1943,10 @@ installation tokens are minted by the worker and refreshed before expiry. Each a
 keys, models and MCP-only, so one leaking can't be used for the other.
 
 The rules that matter more than the store: no secret or sensitive attribute value in a prompt, a report
-or a PR; Stack Author refuses to propose a value that looks like a secret; at L2, write credentials will be
-just-in-time per approved action.
+or a PR; Stack Author refuses to propose a value that looks like a secret. L2 now exists, and its acts
+use the agent's own GitHub App write token only inside an act the binding guards, after it re-checks
+that the PR head, `main` and the plan are what was approved. Just-in-time credentials per approved
+action are still a design.
 
 Deeper: [secrets](/posts/projects/platform-wardens/06-security-and-privacy/#secrets-and-key-management).
 
@@ -1933,8 +2062,8 @@ The control I'd show for prompt injection is architectural: the model can't choo
 - Control evidence: every denial test has an allowed twin and fails when the control is removed.
 
 ```bash
-ls agents/devops/terraform-drift/evals/scenarios/ | grep -i injection
-uv run --directory agents/devops/terraform-drift pytest -q tests/unit -k injection
+cd warden-terraform-drift && ls evals/scenarios/ | grep -i injection   # plan, commit message and chat cases
+uv run pytest -q tests/unit -k injection
 ```
 
 The gap: a model could still write a misleading rationale for a correct recommendation; that's caught by
@@ -1945,16 +2074,149 @@ people in shadow, not by code.
 <div class="iq-role" data-role="devops" markdown="1">
 
 - **Network:** a NetworkPolicy per agent with egress only to what it needs; the hooks path bypasses Access only because GitHub can't sign in, and the HMAC signature is checked before the body is parsed; over 1 MB is refused.
-- **Images:** Gitleaks, Semgrep, Trivy, Checkov, Hadolint; signed; Kyverno admits digest-pinned images only.
+- **Images:** Gitleaks, Semgrep, Trivy, Checkov, Hadolint; signed; Kyverno admits digest-pinned images only, and a `warden-*` image only with the shared `agent-ci` workflow's attestation.
 - **Pods:** non-root, read-only root filesystem, restricted security context, no service-account token where it isn't needed.
 
 ```bash
 kubectl --context k3d-wardens get clusterpolicy
-cosign verify <registry>/platform/terraform-drift@sha256:… --key <cosign-pub>
+cosign verify <registry>/<project>/warden-terraform-drift@sha256:… --key <cosign-pub>
 ```
 
 The gotcha: the drift agent's container needs a writable scratch directory for the sparse clone; it's an
 `emptyDir`, not a writable root.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="security-and-identity-q5">
+<summary>How do you make sure an Approve button pressed in Slack really comes from someone allowed to approve?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+By never trusting the press itself. A Slack webhook can't tell you who clicked, which is why approving in
+Slack was ruled out at first. What changed was team chat: signed requests, and a link between a Slack
+user and a Keycloak account that the person confirms in the console. With that, I could let an Approve
+in Slack count
+([ADR 0047](/posts/projects/platform-wardens/architecture-decision-records/#adr-0047)), with four rules:
+
+1. **The button carries nothing but an id:** `approve:<workflow id>` or `deny:<workflow id>`. No action, no parameters, no approver.
+2. **The approver comes from the link, never the request:** an unlinked Slack user is refused.
+3. **Groups are read at the press,** from Keycloak. A directory that can't be read refuses the press (fail closed).
+4. **The decision is built on our side** from the waiting workflow's own request: its key, target, parameter hash and the hash of the change summary the card showed. Then it's checked twice, before the signal and again inside the workflow.
+
+The trade-off I accepted: self-approval is allowed for these actions because the owner is also the
+reviewer on the homelab, so it's recorded as `selfApproved` rather than hidden.
+
+Deeper: [authorization](/posts/projects/platform-wardens/06-security-and-privacy/#authentication-and-authorization), [approval gates](/posts/projects/platform-wardens/12-cicd-and-release-management/#approval-gates).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+The check both sides run is one pure function, `wardens.guardrails.invalid_reason`:
+
+```python
+if (decision.idempotency_key, decision.target, decision.parameters_sha256) != (
+    request.idempotency_key, request.target, request.parameters_sha256):
+    return "decision is bound to a different action, target or parameters"
+if decision.summary_sha256 != request.summary_sha256:
+    return "decision is bound to a different change summary than the one shown"
+if decision.approver.get("kind") != "person":
+    return "only a person can approve"
+```
+
+- **Consumer side:** `wardens_services.chat.approvals` checks the link, the groups and that the press came from the card's own channel and message, then sends the `approval` signal.
+- **Workflow side:** `wardens.durable.approval` runs `invalid_reason` again; an invalid decision is audited as ignored and the wait goes on.
+- **Every press is audited:** `approval.pressed` or `approval.press-refused` with the reason, and the presser gets an ephemeral reply saying which.
+
+```bash
+uv run --directory services pytest -q tests/test_chat_approvals.py
+```
+
+The gotcha: binding the change summary's hash matters. Without it, an Approve on a card that showed one
+plan could approve a different one.
+
+</div>
+
+<div class="iq-role" data-role="devops" markdown="1">
+
+The path a press takes, and what each hop needs:
+
+- **Slack → relay:** the Slack relay checks Slack's signature and timestamp on the raw body and publishes the press, as Slack signed it, to the ingress hub; it never resolves a user or starts a workflow.
+- **Hub → consumer:** the consumer checks Slack's signature again, the link and the account, and needs the Keycloak directory configured, or every press is refused.
+- **Consumer → router:** the signal goes to the approve-then-act workflow on the router; the card also links the console's `/approvals/<id>`, which works when Slack doesn't.
+
+```bash
+kubectl --context k3d-wardens -n wardens-state-db exec deploy/wardens-state-db -- \
+  psql -U postgres -d wardens -c "select at, type from wardens.audit_events where type like 'approval.press%' order by seq desc limit 10"
+```
+
+The gap: the link is only as strong as the Keycloak account behind it; there's no second factor on an
+approval beyond the Keycloak sign-in that confirmed the link.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="security-and-identity-q6">
+<summary>How does a change that raises an agent's permissions get reviewed and approved before it can run?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+The manifest is what an agent may do, so a manifest change that raises risk needs a signed approval from
+a reviewer before any router will route to it. Risk-raising means: a higher autonomy or action level, a
+new act tool, a higher data classification or budget, wider bounds or egress, or more agents allowed to
+hand off to it ([ADR 0040](/posts/projects/platform-wardens/architecture-decision-records/#adr-0040) rule 5).
+
+The registry in wardens-deploy holds every version of every agent, immutable. A publish that raises
+nothing is committed straight to `main`; a risk-raising one opens a pull request that merges only with
+an `approval.json` beside it. Then I took the hand work out of it:
+
+| Step | Who |
+|---|---|
+| Ask | The agent's CI, after it opens the PR, with a GitHub OIDC token ([ADR 0048](/posts/projects/platform-wardens/architecture-decision-records/#adr-0048)) |
+| Decide | A reviewer in the console's Approvals list, the only manual step |
+| Sign | The console, with a key that never leaves OpenBao |
+| Commit and merge | wardens-deploy's approvals sync, started by the console right after the press ([ADR 0049](/posts/projects/platform-wardens/architecture-decision-records/#adr-0049)) |
+
+The trade-off: the requester is the CI workflow, not a person, so "requester isn't approver" holds even
+when the owner approves.
+
+Deeper: [approval gates](/posts/projects/platform-wardens/12-cicd-and-release-management/#approval-gates), [policy enforcement](/posts/projects/platform-wardens/17-governance-and-compliance/#policy-enforcement).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+- **Risk is computed, not declared:** `wardens.registry.diff.risk_reasons(previous, new)` lists each item the new entry raises over the last one; a wardens without that function publishes every entry as a PR, so a missing check never skips review.
+- **The record is signed canonical JSON:** `signing_payload` is the record without its `signature`; the console signs it with the OpenBao transit key `wardens-approval` (ECDSA P-256), and anyone verifies it offline with the public half.
+- **The gate:** an agent's lowest version is the baseline; each later version is accepted only when it raises nothing over the last accepted one or its `approval.json` verifies, else it's refused (`approval_missing`) and isn't routable.
+
+```bash
+uv run wardens registry diff --risk <old-entry> <new-entry>
+uv run wardens registry verify-approval registry/<agent>   # wardens-deploy CI's check, which the sync runs too
+```
+
+The gotcha: the record binds the entry's hash, so an approval for one version can't be copied onto
+another; the sync refuses to commit a record that doesn't verify.
+
+</div>
+
+<div class="iq-role" data-role="devops" markdown="1">
+
+Two machine routes on the console, both behind GitHub OIDC rather than a stored secret:
+
+- **`POST /api/registry-approvals`:** only `agent-ci.yaml` on `main`, and only for the caller's own `warden-<name>` repository.
+- **`GET /api/registry-approvals/decided`:** only wardens-deploy's `approvals-sync.yaml` on `main`; it writes the record, runs `wardens registry check`, commits and squash-merges.
+- **The dispatch:** after an approval the console starts the sync through its own small GitHub App (Actions write, wardens-deploy only), best effort within 15 seconds; the five-minute cron stays as the fallback.
+
+```bash
+gh run list --repo <org>/wardens-deploy --workflow approvals-sync.yaml --limit 5
+```
+
+Why the dispatch exists: GitHub ran the scheduled sync late, and one approved entry waited hours with
+the agent's deploy blocked behind it. The gap: one more App and key to look after.
 
 </div>
 
@@ -2080,7 +2342,7 @@ Deeper: [what was built and why](/posts/projects/platform-wardens/09-implementat
 - **Fewer calls:** classification is deterministic where code can do it; cicd-triage's core extracts and classifies the failure offline before any model call.
 
 ```bash
-uv run --directory agents/devops/cicd-triage pytest -q tests/unit
+cd warden-cicd-triage && uv run pytest -q tests/unit
 ```
 
 The gotcha: live `chat` and `execute_tool` spans from Pydantic AI's hooks aren't built yet; spans are
@@ -2117,9 +2379,11 @@ The gap: no latency SLO, so "improved" means "better than last week", not "withi
 | Temporal | Webhooks still answer; the bus keeps events; the consumer waits |
 | The state store | Run records to the local file, counted and alerted |
 | The model | Breaker opens; stages fall back to "unknown" or a template |
-| GitHub delivery lost | The daily schedule still runs |
-| The bus | Relays answer 503; GitHub won't retry, so redelivery is manual today |
+| GitHub delivery lost | The daily redelivery job sends it again |
+| The bus | Relays answer 503; GitHub won't retry, so the redelivery job picks it up within a day |
 | An agent misbehaves | Kill switch within 60 seconds, fails closed |
+| Nobody answers an approval | It expires after 24 hours as a denial; nothing acts |
+| The PR or plan changed after the approval | The act re-checks and refuses, and says why in the thread |
 
 The design principle: degrade to "a person does it", never to "the agent guesses".
 
@@ -2232,7 +2496,7 @@ uv run --directory framework pytest -q tests/test_durable.py   # includes replay
 ```
 
 The gotcha: the patch has to stay until every workflow that started before it has finished, which for an
-approval wait can be days.
+approval wait is up to a day, and for a conversation can be much longer.
 
 </div>
 
@@ -2247,7 +2511,81 @@ git -C homelab-gitops revert <digest-commit> && git -C homelab-gitops push
 argocd app wait terraform-drift --health
 ```
 
-The gap: no canary; a framework change rolls every worker at once.
+The gap: an agent now takes a framework release only through its own bump PR, so agents roll one at a
+time; but the router and the console still take a release at once, and they upgrade first.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="reliability-and-resilience-q4">
+<summary>How do you design a human-approval step that survives restarts and deploys, and what happens when nobody answers?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+I made the approval its own durable workflow, not a step inside the run that proposed it. A drift
+incident has a 2-hour deadline, and a person might answer the next morning, so the agent hands the
+proposed action over and its run ends. The router then runs one approve-then-act workflow per action,
+keyed by the action's idempotency key
+([ADR 0047](/posts/projects/platform-wardens/architecture-decision-records/#adr-0047)):
+
+1. **Prepare:** the agent, the action at level 2 in its catalog, the owning domain, an unexpired proposed action and a granted act tool. Anything else ends as `invalid`, and nobody is asked.
+2. **Ask:** a Slack card with Approve and Deny and a link to the console's `/approvals/<id>`; then a Temporal signal plus a timer.
+3. **Act:** on an approval, the agent's own act activity runs once on its queue, behind the kill switch, and re-checks its target before it writes.
+4. **Report:** to the card's thread and the audit log.
+
+No answer within 24 hours, or before the proposal's own `expiresAt`, is a denial. The design choice I'd
+defend: silence must never become consent, so the safe default is the one the timer produces.
+
+Deeper: [resilience](/posts/projects/platform-wardens/05-technical-architecture/#resilience-and-disaster-recovery), [business rules](/posts/projects/platform-wardens/02-requirements-gathering/#business-rules).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+The wait is plain workflow code in `wardens.durable.approval`, so a worker restart or a redeploy replays
+it and the timer keeps its place:
+
+```python
+while True:
+    remaining = request.expires_at - workflow.now()
+    if remaining <= timedelta(0):
+        break
+    try:
+        await workflow.wait_condition(lambda: len(decisions) > seen, timeout=remaining)
+    except TimeoutError:
+        break
+    ...   # each decision checked with invalid_reason; the first valid one is returned
+await audit("approval.expired", request, framework)
+```
+
+- **Asked once:** the workflow id is `approval_workflow_id(agent, idempotencyKey)`, so a retried hand-off finds the running one.
+- **Agent side:** one call from workflow code, `acts.hand_off_for_approval(handoff)`; the binding fills in the run's capability, ceiling and requester.
+- **The act gets an `ApprovedAction`** and answers an `ActResult`; drift's merge refuses if the PR's head SHA moved.
+
+```bash
+uv run --directory framework pytest -q tests/test_approve_act.py -k "expiry or kill_switch or asked_once"
+```
+
+The gotcha: metrics and audit go through activities, never from workflow code, and a failed card send
+doesn't stop the wait, because timeout-as-denial covers an unseen card.
+
+</div>
+
+<div class="iq-role" data-role="sre" markdown="1">
+
+What I watch, and what proved it live:
+
+- **Outcomes:** approved, denied and expired counts and the wait time per agent and action, from the approval metrics.
+- **The audit chain:** `approval.requested`, then `granted`, `self_granted`, `denied` or `expired`, then `action.executed`.
+- **Live checks on the homelab:** a development revert approved in Slack and applied, a development merge approved and merged by the agent, and a production stack that asked nobody and stayed at a draft PR.
+
+```bash
+temporal workflow list --namespace wardens --query 'WorkflowType="wardens.approve_act" AND ExecutionStatus="Running"'
+```
+
+The gap: the waiver that allows these L2 actions runs out after 30 days or 30 approved runs; after that
+they need the normal evidence floors and a promotion gate, and that evidence is still being collected.
 
 </div>
 
@@ -2261,9 +2599,11 @@ The gap: no canary; a framework change rolls every worker at once.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-Two halves. The code around the model is ordinary software: about 960 tests across the workspace, the
-framework's against a local Temporal with toy agents, agents' with recorded fixtures and Pydantic AI's
-`TestModel`; no test calls a live model. What the model says is evaluated, not unit-tested: eval sets per
+Two halves. The code around the model is ordinary software: the framework and services suites in
+platform-wardens, against a local Temporal with toy agents and frozen copies of real agents' manifests,
+and each agent's own suite in its repository, with recorded fixtures and Pydantic AI's `TestModel`; no
+test calls a live model. The wheel test installs the built wheel outside the checkout and runs the
+framework and services suites against it, which is what keeps "agents install a library" honest. What the model says is evaluated, not unit-tested: eval sets per
 action, scored against expected outcomes, re-run on any model, prompt, tool or policy change.
 
 There's no frontend to speak of and the data layer is tested against Postgres. The honest gap is the eval
@@ -2281,8 +2621,8 @@ Deeper: [testing](/posts/projects/platform-wardens/10-quality-assurance/#unit-te
 - **Every console sample** built into a root task in CI.
 
 ```bash
-uv run --directory framework pytest -q
-WARDENS_SKIP_TEMPORAL=1 uv run --directory agents/devops/terraform-drift pytest -q tests/unit
+uv run --directory framework pytest -q -m "not temporal"      # quick, without a Temporal dev server
+cd ../warden-terraform-drift && WARDENS_SKIP_TEMPORAL=1 uv run pytest -q tests/unit
 ```
 
 The gotcha: the framework tests download a Temporal dev server once; on a runner without network that
@@ -2320,11 +2660,12 @@ if forbidden:
 ```
 
 ```bash
-cd agents/devops/terraform-drift && GH_TOKEN=$(gh auth token) uv run python evals/run.py --model none   # deterministic stages only
+cd warden-terraform-drift && GH_TOKEN=$(gh auth token) uv run wardens eval run . --model none   # deterministic stages only
 ```
 
-The gotcha: none of drift's 10 cases has labelled drift yet, so the most important behaviour is the least
-measured.
+The gotcha: drift's set has grown to a few dozen harvested and synthetic cases (including three for the
+L2 path, one a production stack that must stay L1), but some are still unlabelled and none is
+owner-confirmed yet, so the eval report says so on every run.
 
 </div>
 
@@ -2350,9 +2691,11 @@ these checks are run by hand after a deploy, not by a pipeline.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-Before merge: the workflow's tests on the homelab runner (`uv sync --frozen`, framework tests, the agent's
-tests), and for a change to a model, prompt, tool or policy, the agent's evals, with no merge if the pass
-rate falls or the false-action rate rises. Review by someone other than the author.
+Before merge, in platform-wardens: one `checks` job on the homelab runner (`uv sync --frozen`, the docs
+check, ruff, `lint-imports`, pyright, `wardens release check`, the framework, services and mcp-guard
+tests, and the wheel test). In an agent repository: check-agent, its tests and the eval gate, which
+fails on a safety failure or a regression against its accepted report. Review by someone other than the
+author.
 
 Before ship: the image gates (Gitleaks, Semgrep, Trivy, Checkov, Hadolint), an SBOM, a Cosign signature,
 and Kyverno admitting only digest-pinned images. Then the lifecycle gates, which are evidence files, not
@@ -2367,30 +2710,98 @@ Deeper: [scanning](/posts/projects/platform-wardens/12-cicd-and-release-manageme
 What a developer runs before pushing:
 
 ```bash
-uv sync --frozen
+uv sync --frozen                                                   # in platform-wardens
+uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run lint-imports
+uv run wardens docs check                                          # module tables, matrix statuses, contracts README, links
 uv run --directory framework pytest -q
-uv run --directory agents/devops/<agent> pytest -q tests/unit
+cd ../warden-<agent> && make check                                 # in an agent repo: everything agent-ci runs
 ```
 
-And the rules a reviewer checks: no `temporalio` or model client outside their module, no I/O in
-`workflow.py`, schema changes with every caller, the conformance matrix and module table updated, the
-README matching the manifest. The gap: there's no linter or PR template enforcing those; it's review.
+Most of what used to be review is a check now: `temporalio` and model clients outside their module
+(`lint-imports`), the README matching the manifest and the agent card (check-agent), the module table
+and matrix (`wardens docs check`). What's still review: no I/O in `workflow.py` and whether a schema
+change really ships with every caller.
 
 </div>
 
 <div class="iq-role" data-role="devops" markdown="1">
 
 The pipeline gates, in order: tests on the self-hosted runner, then the reusable build's Gitleaks, Semgrep,
-Trivy, Checkov and Hadolint, the SBOM and Cosign, the push to the registry, the digest commit, and Kyverno
-at admission.
+Trivy, Checkov and Hadolint, the SBOM, Cosign and the attestation, the push to the registry, the digest
+commit, and Kyverno at admission. An agent repo also publishes its registry entry, which waits for a
+signed approval when it raises risk.
 
 ```bash
-gh run list --workflow terraform-drift.yaml --limit 5
+gh run list --repo <org>/warden-terraform-drift --limit 5
 gh run view <id> --log-failed
 ```
 
 The gotcha that bit twice: a CVE in a base image's `apt` blocked every build until the
-image took the newer package, then Checkov needed an `apt-get upgrade` in the Dockerfile.
+image took the newer package, then Checkov needed an `apt-get upgrade` in the Dockerfile. OS packages
+now come only from each agent's `apt-packages.txt`, which the template's Dockerfile installs.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="testing-and-quality-q4">
+<summary>How do you evaluate model-backed agents continuously once each one lives in its own repository?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+Two gates, one harness. On every change, each agent's CI runs its eval set through the real workflow
+and fails on a safety failure or a regression against the agent's accepted report. Every night, one
+workflow in platform-wardens runs every agent's set live against the deployed model settings and sends
+the scores to Mimir, where eval alerts fire.
+
+The decision I'd talk about is where the nightly run lives once the agents left the monorepo. I kept it
+central ([ADR 0046](/posts/projects/platform-wardens/architecture-decision-records/#adr-0046)): it reads
+the agent list from the wardens-deploy registry, checks out each repository's `main`, verifies the wheel
+that agent pins, and runs its own cases and thresholds. A new agent is in the nightly run as soon as its
+first registry entry is published, with no secret copied into six agent repositories.
+
+And it folds in what people said about real runs, without CI ever touching the database
+([ADR 0044](/posts/projects/platform-wardens/architecture-decision-records/#adr-0044)): the console
+serves a read-only page of verdicts to that one workflow.
+
+Deeper: [regression testing](/posts/projects/platform-wardens/10-quality-assurance/#regression-testing), [user feedback](/posts/projects/platform-wardens/18-continuous-improvement/#user-feedback).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+- **One command everywhere:** `wardens eval run .` in an agent repo, with `--model test` (scripted), `recorded`, `live` or `none`; `--gate` is CI's verdict and `--accept` writes `evals/accepted.json`.
+- **Comparisons are fair:** a regression is judged only against an accepted report of the same model family.
+- **Feedback:** `wardens.eval.ConsoleFeedback` pages through `GET /api/evals/feedback`, which serves only run id, stage, verdict, state and case id.
+- **Honesty in the report:** unlabelled and not owner-confirmed cases raise a label warning; it never changes a score.
+
+```bash
+GH_TOKEN=$(gh auth token) uv run wardens eval run ../warden-terraform-drift --model test --gate
+WARDENS_STATE_DSN=... uv run wardens eval feedback list ../warden-terraform-drift
+```
+
+The gotcha: an eval case must be runnable by the nightly job. Some of drift's harvested cases point at a
+repository under an anonymised name that no token can clone, so they can never run live; they need
+repinning or dropping.
+
+</div>
+
+<div class="iq-role" data-role="devops" markdown="1">
+
+The trust chain for the nightly job, with no stored secret:
+
+- **Wheel:** fetched and signature-verified with a pull-only role whose token is revoked before any agent code runs.
+- **Feedback:** a GitHub OIDC token minted at the read, audience `wardens-console-evals`; the console checks it is `evals-nightly.yaml` on `main` on a self-hosted runner, and reads as the `wardens_eval` role, which can only `SELECT` two tables.
+- **The sign-in proxy** skips its session check for that one path, and the console answers it before reading any proxy header.
+
+```bash
+gh workflow run evals-nightly.yaml                     # recorded, by hand
+gh api repos/<org>/platform-wardens/dispatches -f event_type=evals-run -F 'client_payload[agent]=terraform-drift' -F 'client_payload[model]=recorded'
+```
+
+The gap: on the first live nightly after the split, terraform-drift and stack-author failed their gates
+exactly as they had before the move. The causes are in the cases (repositories no token can clone,
+scripted turns a live model has nothing to answer), and fixing them is open.
 
 </div>
 
@@ -2423,7 +2834,7 @@ Deeper: [production](/posts/projects/platform-wardens/11-infrastructure-and-envi
 <div class="iq-role" data-role="devops" markdown="1">
 
 - **Cluster:** k3d, API `172.30.0.1:6446`, load balancer `172.30.0.6`, created by Terragrunt in `infra-local`.
-- **In it:** Temporal (`clusters/wardens/temporal.yaml` in gitops), `wardens-db`, `wardens-state-db`, `wardens-console`, one namespace per agent, `mcp-web-search`.
+- **In it:** Temporal (`clusters/wardens/temporal.yaml` in gitops), `wardens-db`, `wardens-state-db`, `wardens-console`, the router's namespace, one namespace per agent, `mcp-web-search`.
 - **Workloads:** Deployments and Jobs with requests, a memory limit, read-only root, restricted security context.
 
 ```bash
@@ -2439,8 +2850,8 @@ the nodes' host aliases.
 <div class="iq-role" data-role="sre" markdown="1">
 
 What I'd watch about where it runs: it's one host. The PC going down takes the agents, Temporal and the
-state store with it; the work waits rather than being lost (Temporal resumes, the daily schedule catches
-up within a day), but nothing runs.
+state store with it; the work waits rather than being lost (Temporal resumes, schedules catch up within
+their window, and the redelivery job resends lost webhooks), but nothing runs.
 
 ```bash
 kubectl --context k3d-wardens get pods -A --field-selector=status.phase!=Running
@@ -2469,8 +2880,9 @@ Three setups, one codebase:
 | Secrets | Environment | OpenBao | Key Vault |
 
 There's no shared test environment and deliberately no staging for agents: the shadow stage replaces it.
-An agent runs on live inputs at L0, can't act, and people score each run, which is better evidence than a
-staging copy. The code doesn't change between setups; only configuration does.
+An agent runs on live inputs, doesn't act beyond what its stage allows, and people score each run, which
+is better evidence than a staging copy. Drift's L2 waiver is deliberately scoped to development and qa
+stacks, so the first acts happen where a mistake is cheapest. The code doesn't change between setups; only configuration does.
 
 The trade-off: framework changes have no staging to catch them, only tests and history replay.
 
@@ -2483,13 +2895,14 @@ Deeper: [parity](/posts/projects/platform-wardens/11-infrastructure-and-environm
 Local is close because the parts that differ are behind configuration:
 
 ```bash
-uv run python -m wardens.runtime.console --dev-server     # console + local Temporal and its UI
-cd agents/devops/terraform-drift && uv run python -m terraform_drift.worker run   # second terminal
+uv run python -m wardens_services.console.app --dev-server --router-worker   # console, router, local Temporal and its UI
+cd ../warden-terraform-drift && uv run python -m terraform_drift.worker run     # second terminal
 ```
 
 - **Models:** `WARDENS_LLM_*` points at the homelab's LiteLLM or any OpenAI-compatible endpoint.
 - **GitHub:** my own token for reads; without a write token nothing gets opened.
 - **State:** run records and audit to local files unless `WARDENS_STATE_DSN` is set.
+- **Deploy config:** `WARDENS_CONFIG_DIR` points at the test fixtures or a wardens-deploy checkout; without it the worker refuses to start.
 
 The gotcha: the local path never exercises federation or the GitHub App; those only run in the cluster.
 
@@ -2529,6 +2942,8 @@ As code, split by what changes it:
 | The k3d cluster, network, host scripts | `infra-local` (Terragrunt) |
 | Everything inside it | `homelab-gitops` (Argo CD) |
 | Each agent's Entra app and federated credential | `infra-azure` |
+| The `warden-*` repositories, teams and access | The GitHub org's IaC repo |
+| The agent registry and the config that names agents | `wardens-deploy`, read by Argo CD |
 | The OIDC issuer | A Cloudflare Worker serving the discovery and JWKS files |
 | Secrets | OpenBao, seeded by host scripts |
 
@@ -2566,14 +2981,17 @@ again or every Azure call fails.
 
 <div class="iq-role" data-role="architect" markdown="1">
 
-1. A pull request runs the image's tests on the homelab runner (`uv sync --frozen`, framework and agent tests).
+For an agent, from its own repository:
+
+1. A pull request runs the shared `agent-ci` workflow on the homelab runner: the verified `wardens` wheel, `uv sync --frozen`, check-agent, the tests, the eval gate, and an image build with its gates (nothing pushed).
 2. Review, merge to `main`.
-3. The platform's reusable build: Gitleaks, Semgrep, Trivy, Checkov, Hadolint, a multi-arch image, an SBOM, a Cosign signature, a push to Zot.
-4. The digest is committed to `homelab-gitops` (`apps/<agent>/values.yaml`).
-5. Argo CD syncs `wardens`; Kyverno admits only the digest-pinned image.
+3. The reusable build: Gitleaks, Semgrep, Trivy, Checkov, Hadolint, a multi-arch image, an SBOM, a Cosign signature and an attestation, a push to Zot.
+4. The digest is committed to `homelab-gitops` (`apps/<agent>/values.yaml`), and the manifest is published to the wardens-deploy registry: committed, or a PR that waits for a signed approval when it raises risk.
+5. Argo CD syncs `wardens`; Kyverno admits only the digest-pinned, attested image.
 6. Temporal hands running workflows to the new worker.
 
-CI never talks to the cluster. Each image has its own workflow and builds only when its code changes.
+The framework has its own path: a release PR publishes `wardens-py:<version>`, then bump PRs carry it into
+each agent. CI never talks to the cluster.
 
 Deeper: [build](/posts/projects/platform-wardens/12-cicd-and-release-management/#build-automation), [deployment](/posts/projects/platform-wardens/12-cicd-and-release-management/#deployment-automation).
 
@@ -2582,22 +3000,25 @@ Deeper: [build](/posts/projects/platform-wardens/12-cicd-and-release-management/
 <div class="iq-role" data-role="devops" markdown="1">
 
 ```yaml
+# warden-terraform-drift/.github/workflows/ci.yaml
 jobs:
-  test:
-    runs-on: homelab
-  build:
-    uses: cloudutsukpilot/homelab-gitops/.github/workflows/build-image.yaml@main
+  agent:
+    uses: <org>/homelab-gitops/.github/workflows/agent-ci.yaml@main
+    with:
+      image: warden-terraform-drift
+      gitops-path: apps/terraform-drift
 ```
 
-- **Path filters:** docs-only changes build nothing; `*.prompt.md` counts as code.
-- **Build context:** the repo root, because images need the workspace lock, `framework/` and `contracts/`.
+- **One job per PR in platform-wardens:** `pr.yaml`'s `checks` runs every check in order, so one run shows every failure; a docs-only PR runs just the docs check.
+- **Build context:** the agent repository plus the verified wheel as `.wheels/`; no monorepo checkout.
 
 ```bash
-gh run list --workflow terraform-drift.yaml --limit 5
+gh run list --repo <org>/warden-terraform-drift --limit 5
 argocd app get terraform-drift
 ```
 
-The gotcha: a framework change rebuilds every image that contains it, so one PR can roll every worker.
+The gotcha that drove the one-job PR: a framework change used to start about 22 jobs on the shared
+runners, with 29 minutes of run time and 258 minutes of queue time.
 
 </div>
 
@@ -2627,11 +3048,11 @@ Deeper: [rollback](/posts/projects/platform-wardens/12-cicd-and-release-manageme
 <div class="iq-role" data-role="devops" markdown="1">
 
 ```bash
-cd /home/sakharam/gitrepos/cloudutsuk/homelab-gitops && git revert <digest-commit> && git push
+git -C homelab-gitops revert <digest-commit> && git -C homelab-gitops push
 argocd app wait terraform-drift --health --timeout 300
 ```
 
-- **No canary:** a framework change reaches every worker at once.
+- **A canary by construction for agents:** a framework release reaches an agent only through its bump PR; the router and the console upgrade first.
 - **Sync waves:** secrets, then schema Jobs, then the apps.
 - **Workflow code** behind `workflow.patched`, replayed against recorded histories in CI, so rolling forward or back doesn't break a waiting run.
 
@@ -2664,7 +3085,7 @@ digest. The gap: no deploy annotations on the dashboards, so "after the deploy" 
 Two databases, two rules. Temporal's database is resettable by design: no business data, its schema Job
 comes with the chart. The state store holds run records, the audit chain, kill switches and memory, so its
 migrations are numbered, idempotent and forward-only, shipped in the console image and run by a Job named
-after the newest migration (`wardens-state-schema-0006`), in a sync wave after secrets and before the apps.
+after the newest migration (`wardens-state-schema-<NNNN>`), in a sync wave after secrets and before the apps.
 
 Data shape changes are contract changes: every record carries `schemaVersion`, schemas reject unknown
 fields, and a schema change ships with every caller in the same PR.
@@ -2675,9 +3096,9 @@ Deeper: [database deployment](/posts/projects/platform-wardens/12-cicd-and-relea
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-- **Migrations** `0001` to `0006` in `wardens/state/migrations/`, applied under an advisory lock so two Jobs can't race.
+- **Migrations** `0001` to `0020` in `wardens/state/migrations/`, applied under an advisory lock so two Jobs can't race.
 - **Idempotent DDL** so a re-run is harmless.
-- **Contracts first:** a change to `contracts/schemas/*.json` updates the Pydantic models and every caller together.
+- **Contracts first:** a change to `framework/src/wardens/contracts/schemas/*.json` ships with every caller, and `wardens release check` classifies it as an expansion or a tightening.
 
 ```sql
 CREATE TABLE wardens.kill_switches (
@@ -2698,11 +3119,11 @@ a new migration is a new Job:
 
 ```bash
 kubectl --context k3d-wardens -n wardens-state-db get jobs
-kubectl --context k3d-wardens -n wardens-state-db logs job/wardens-state-schema-0006
+kubectl --context k3d-wardens -n wardens-state-db logs job/wardens-state-schema-<NNNN>
 ```
 
 Order is a sync wave: the `ExternalSecret`, then the schema Job, then the console and agents that read
-the tables. The gap: nothing stops an image that expects migration 0007 from starting before the 0007 Job
+the tables. The gap: nothing stops an image that expects a new migration from starting before its Job
 has run, apart from the wave order.
 
 </div>
@@ -2719,8 +3140,11 @@ cost ceiling, kill-switch operators); CI checks it against the registry's rules.
 per environment is configuration: environment variables, OpenBao paths, the values file in gitops. Code
 never reads a hostname or a secret from itself; placeholders are refused.
 
-Versions: each agent has `version` and a `CHANGELOG.md`, images are identified by digest, and the gitops
-commit that changed the digest is the release record.
+Versions: each agent has `version` and a `CHANGELOG.md`, and each version is an immutable registry entry
+in wardens-deploy (with `source.json`: the repository, commit, run and image digest that published it);
+images are identified by digest; `wardens` itself is a semantic version with its own CHANGELOG. The
+config that names several agents (routing, entry points, ownership, webhooks, redaction, chat) lives
+only in wardens-deploy, and a worker refuses to start without it.
 
 Deeper: [configuration](/posts/projects/platform-wardens/11-infrastructure-and-environments/#configuration-and-secret-management), [versioning](/posts/projects/platform-wardens/12-cicd-and-release-management/#versioning-and-release-notes).
 
@@ -2728,7 +3152,7 @@ Deeper: [configuration](/posts/projects/platform-wardens/11-infrastructure-and-e
 
 <div class="iq-role" data-role="developer" markdown="1">
 
-- **Manifest** in the agent's folder: the source of truth, validated by the JSON Schema and the registry's cross-field rules.
+- **Manifest** in the agent's repository: the source of truth, validated by the JSON Schema and the registry's cross-field rules, and restated in a generated agent card (`wardens docs agent .`).
 - **Settings** from the environment through `WorkerSettings`; a placeholder value is refused at start.
 - **Model prices** are configuration too: a model with no price stops the worker (`UnpricedModelError`).
 
@@ -2758,6 +3182,66 @@ git -C homelab-gitops log --oneline -5 -- apps/terraform-drift/values.yaml
 ```
 
 The gap: only one environment exists, so "across environments" is still a design.
+
+</div>
+
+</details>
+
+<details class="project-iq" markdown="1" id="ci-cd-and-deployment-q5">
+<summary>When a shared library is used by many repositories, how do you stop one release from breaking all of them?</summary>
+
+<div class="iq-role" data-role="architect" markdown="1">
+
+I treat two kinds of change as breaking and let a check, not memory, decide which a release contains:
+
+1. **Contract tightening.** The contracts use `additionalProperties: false`, so a removed or renamed field, a new `required`, a narrower type or a new `pattern` refuses what the last release accepted. Contracts change by expand, then contract: add a field as optional, emit it once every consumer accepts it, make it required later, in a major version ([ADR 0040](/posts/projects/platform-wardens/architecture-decision-records/#adr-0040) rule 2).
+2. **A stricter lint rule.** I learned this one the hard way: a minor release added a check-agent rule (`doc-set`) and an agent's CI failed after the bump until someone fixed its manifest by hand. Now a new or stricter FAIL rule that the last release's agents fail is breaking too: it's named under Breaking in the CHANGELOG, ships in a major, and brings its fix ([ADR 0043](/posts/projects/platform-wardens/architecture-decision-records/#adr-0043)).
+
+The fix travels with the bump: `wardens bump` applies each migration released after the agent's pin, so
+the agent's bump PR is green, not a surprise. The alternative is to add a rule as a warning first.
+
+Deeper: [versioning](/posts/projects/platform-wardens/12-cicd-and-release-management/#versioning-and-release-notes), [contract testing](/posts/projects/platform-wardens/10-quality-assurance/#contract-testing).
+
+</div>
+
+<div class="iq-role" data-role="developer" markdown="1">
+
+`wardens release check` runs on every framework PR:
+
+- **Schemas:** `diff_schema` compares each contract with the last `wardens-v*` release and calls every change `expand` or `tighten`, conservatively: what it can't prove is an expansion counts as tightening. A tightening must be named by its `<schema>#<pointer>` in the CHANGELOG.
+- **Rules:** it renders the last release's agent template fresh and checks every `warden-<agent>` main that pins that release or newer, with this checkout's check-agent rules. A rule they now fail must be under Breaking with its migration, and no agent to check fails the check.
+- **Migrations** are data plus a pure function over the repository's files, frozen once released.
+
+```python
+@dataclass(frozen=True)
+class Fix:
+    files: dict[str, str]          # file -> new text
+    notes: tuple[str, ...] = ()    # what a person still has to do, listed in the bump PR
+```
+
+```bash
+uv run wardens release check --agent-repos ../warden-terraform-drift --agent-repos ../warden-cicd-triage
+```
+
+The gotcha: once the agents left the monorepo, the old baseline (the agents at the release tag) was
+empty, so the baseline became the template rendered fresh plus the real agent repositories.
+
+</div>
+
+<div class="iq-role" data-role="devops" markdown="1">
+
+How a release reaches the agents:
+
+- **Release PR:** sets `version` and renames `Unreleased` in `framework/CHANGELOG.md`; merging it builds and signs `wardens-py:<version>` and creates the tag and GitHub release, never by hand.
+- **Bump PRs:** after a final release, a job opens one per `warden-*` repository as a GitHub App: `copier update`, the pin in `pyproject.toml`, the Dockerfile's digest, `uv.lock`, and any migrations.
+- **Measured, not declared:** each worker reports its `wardens` version in its Temporal build id; the router alerts when a worker is ahead of it, absent or unreadable.
+
+```bash
+uv run wardens bump 0.10.0 --repo ../warden-x --dry-run      # majors need --allow-major
+```
+
+The gap: the bump job is behind a repository variable that's off until the bump App is trusted, so bumps
+are still started by hand.
 
 </div>
 
@@ -2867,6 +3351,7 @@ WardensRunRecordNotStored     records fell back to the local file
 WardensIngressDown / RelayRefusing / LagHigh / DeadLettered / BusReset
 a missed or paused schedule, a run near its deadline, a worker not polling
 WardensDailyCostOverBudget / RunCostOverCeiling / CostPerRunAnomaly
+WardensAgentFrameworkVersionAhead / Absent / Unknown   the router can't place a worker's wardens version
 ```
 
 ```bash
@@ -2992,8 +3477,8 @@ the shape of the spend, not a real invoice.
 <div class="iq-role" data-role="architect" markdown="1">
 
 Each agent has an owner and a reviewer from another domain; the framework has an owner; the cluster is
-the platform's. Support is the operator role: score shadow runs, approve actions later, pull the kill
-switch.
+the platform's. Support is the operator role: score shadow runs, approve or deny level 2 actions in
+Slack or the console, approve risk-raising registry entries, pull the kill switch.
 
 Two kinds of bug, two paths: wrong code gets an issue and a PR with a test; a wrong answer becomes a new
 eval case the fix must pass. Upgrades with care: Temporal (replay histories first), Pydantic AI (re-run
@@ -3005,15 +3490,16 @@ Deeper: [ownership](/posts/projects/platform-wardens/16-support-and-maintenance/
 
 <div class="iq-role" data-role="devops" markdown="1">
 
-- **One `uv.lock`,** updated deliberately; `uv sync --frozen` fails CI on a stale lock.
-- **MCP client packages** only take releases at least 14 days old.
+- **One `uv.lock` per repository,** updated deliberately; `uv sync --frozen` fails CI on a stale lock, and the framework version moves through `wardens bump`.
+- **Every package** comes through the homelab's Nexus proxy and only in releases at least 14 days old.
 - **Base images:** the gates catch CVEs; an `apt` CVE needed a newer package before the base image had it, then Checkov needed `apt-get upgrade` instead of naming the package.
 
 ```bash
 uv lock --upgrade-package pydantic-ai && uv run --directory framework pytest -q
 ```
 
-The gap: no Renovate or Dependabot; updates are manual.
+Renovate now opens the update PRs, extending the homelab's shared rules, and the 14-day span still
+applies. The gap: those PRs still need a person to read the run and merge.
 
 </div>
 
@@ -3102,15 +3588,16 @@ Deeper: [onboarding](/posts/projects/platform-wardens/15-documentation-and-knowl
 What I'd hand a new developer on day one:
 
 ```bash
-cp -r templates/agent agents/<domain>/<new-agent>
-uv run python -m wardens.runtime.console --dev-server
-cd agents/devops/terraform-drift && uv run pytest -q tests/unit
+uv run wardens new-agent sre/lock-watch --cell sre --dest ../warden-lock-watch   # a repository from the template
+uv run python -m wardens_services.console.app --dev-server --router-worker
+cd ../warden-terraform-drift && make check                                       # everything its CI runs, in order
 ```
 
 - **The rules that bite first:** no `temporalio` or model client outside their module, no I/O in `workflow.py`, act tools never model-callable, every denial test with an allowed twin.
-- **The checklist:** manifest, README matching the manifest, eval cases, runbook, the conformance row.
+- **The checklist:** manifest, README header and agent card matching it, eval cases, runbook, CHANGELOG, CLAUDE.md.
 
-The gap: no linter or PR template enforces those rules; review does.
+Most of that is now enforced by `wardens check-agent` in the agent's CI. The gap: how long a new agent
+takes from the template is unmeasured; the first real data point will be the DBA agent.
 
 </div>
 
@@ -3166,9 +3653,10 @@ The gap: live `chat` and `execute_tool` spans from the agent library's own hooks
 
 Three things:
 
-1. **Eval cases before the agent.** Every agent went into shadow short of the 30 cases per action the framework asks for; drift's 10 cases have no labelled drift yet.
+1. **Eval cases before the agent.** Every agent went into shadow short of the 30 cases per action the framework asks for; drift's set has grown, but some cases are still unlabelled and none is owner-confirmed.
 2. **The edge as a bus from day one.** The webhooks first called Temporal directly, so a burst held a thread per request; relay mode through a bus fixed it, and Event Hubs replaced the first choice, Service Bus.
 3. **Telemetry contracts first.** Delta counters and millisecond buckets on second-scale histograms both produced dashboards that looked fine and showed nothing.
+4. **A versioned library boundary earlier.** Agents imported internal modules and the framework walked the repo layout; 44 of the first 154 merges changed the framework and an agent in one PR. Splitting into one repository per agent meant a whole hardening phase first that a public API from day one would have avoided.
 
 What I'd keep: guardrails in code, the manifest as the source of truth, Temporal underneath.
 
@@ -3183,7 +3671,7 @@ Deeper: [retrospectives](/posts/projects/platform-wardens/18-continuous-improvem
 - **Typed outputs everywhere** paid off; I'd add the "fall back to unknown" path to every model stage on day one, not after the first malformed answer.
 
 ```bash
-cd agents/devops/terraform-drift && GH_TOKEN=$(gh auth token) uv run python evals/run.py --model none   # deterministic stages only
+cd warden-terraform-drift && GH_TOKEN=$(gh auth token) uv run wardens eval run . --model none   # deterministic stages only
 ```
 
 The gap that remains: cases are still being collected for every agent.
@@ -3217,8 +3705,10 @@ The gap: secret rotation is still manual and needs a worker restart.
 | Runbooks partly template | Fill from real incidents; kill-switch drill with a date |
 | No restore or rollback rehearsal | Timed restore of the state store; revert a digest with a run in flight |
 | No SLOs | Pick two the users feel, with targets |
-| 17 proposed ADRs | Accept the proven, supersede the disproven |
+| 18 proposed ADRs | Accept the proven, supersede the disproven |
 | Inter-agent auth by namespace only | A decision on signed caller assertions |
+| Version skew across seven repositories | Bump PRs from the release job, once its App is trusted; the router's version alerts meanwhile |
+| An L2 waiver instead of evidence | Collect the real cases and pass the promotion gate before the waiver ends |
 
 The rule: debt lives in the module table's *Not yet* column and agents' folders, and closes in the PR that
 fixes it.
@@ -3232,7 +3722,7 @@ Deeper: [debt](/posts/projects/platform-wardens/16-support-and-maintenance/#tech
 - **Live spans** from the agent library's hooks instead of writing them after the activity.
 - **Structured log export** from the framework (it's in the telemetry module's *Not yet* column).
 - **Connection pooling** in the state store (one connection per operation today).
-- **A linter in CI;** today there's none.
+- **Log context:** the framework CLIs still print, and the router's activities don't set the log context.
 
 ```bash
 grep -n "Not yet" -A40 framework/README.md | head -60
@@ -3246,15 +3736,17 @@ one that hurts during an incident.
 <div class="iq-role" data-role="devops" markdown="1">
 
 - **Manual secret rotation** with a restart: move to a reloader or a sidecar that re-reads.
-- **No canary** for framework changes: one agent's worker on the new image first.
-- **Redelivery** of GitHub webhooks lost while the bus refused: a job that asks GitHub for failed deliveries.
-- **No dependency bot.**
+- **The router and console take a release at once:** agents now roll one at a time through bump PRs, but the shared services don't.
+- **Bumps by hand:** the bump job stays off until its GitHub App is trusted.
+
+Paid down recently: the redelivery job for lost GitHub deliveries, Renovate for dependencies, and lint,
+type and import checks in CI.
 
 ```bash
-gh api /app/hook/deliveries --jq '.[] | select(.status_code==503) | .id'   # with the App's JWT
+gh workflow run wardens-py.yaml      # finishes a release whose bump didn't run (idempotent)
 ```
 
-The gap: these are written down, not scheduled.
+The gap: what's left is written down, not scheduled.
 
 </div>
 
@@ -3267,12 +3759,13 @@ The gap: these are written down, not scheduled.
 
 Up the autonomy ladder and across domains, without changing the core:
 
-1. **L2 actions with approval:** a named approver, parameters bound to the action's idempotency key, just-in-time write credentials. The first planned ones: drift's remediation PR for DevOps, and `KILL` of a head-blocker session after approval for DBA.
-2. **More agents:** CI/CD triage out of build into shadow, the DBA domain's first agent (SQL blocking, designed), then the rest of the catalog.
+1. **L2 earned, not waived:** the approve-then-act path is built and generic, and drift's merge and revert-apply run on it under a waiver. Next is the evidence (real cases, zero safety failures) and the promotion gate, so it outlives the waiver; then the next L2 actions, such as `KILL` of a head-blocker session after approval for DBA, and just-in-time write credentials per approved action.
+2. **More agents:** CI/CD triage out of build into shadow, the DBA domain's first agent (SQL blocking, designed, made with `wardens new-agent`), then the rest of the catalog, each in its own repository.
 3. **The Azure target:** AKS per landing zone, Foundry behind APIM, Entra Agent ID replacing the app registrations one to one.
 
-The architecture supports it because the hard parts are in the framework: a new agent is a manifest, tools
-and stages; a new environment is configuration; a higher level is a gate with evidence.
+The architecture supports it because the hard parts are in the framework: a new agent is a repository
+from the template with a manifest, tools and stages; a new environment is configuration; a higher level
+is a signed registry approval plus a gate with evidence.
 
 Deeper: [roadmap](/posts/projects/platform-wardens/03-product-planning/#product-roadmap), [hosting model](/posts/projects/platform-wardens/05-technical-architecture/#hosting-and-deployment-model).
 

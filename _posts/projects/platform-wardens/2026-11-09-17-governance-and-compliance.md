@@ -16,7 +16,8 @@ Governance for agents has a reputation for being a committee that slows things d
 Wardens most of it is a file in the right folder: a gate decision is a markdown file merged with the
 manifest change it allows, an agent's level lives in its action catalog, and the evidence is the run
 records and eval results the framework already produces. The committee still exists; it just reads
-files instead of slides.
+files instead of slides, and since November most of its decisions are a button: a reviewer's
+**Approve** on a registry entry, or an approver's **Approve** on a Slack card.
 
 <!-- more -->
 
@@ -29,7 +30,16 @@ The project conforms to a reference standard for multi-agent systems
 ([ADR-0006](/posts/projects/platform-wardens/architecture-decision-records/#adr-0006)), tracked category by
 category in a conformance matrix. Changes to the plan go through the change-control process in
 [Product Planning](/posts/projects/platform-wardens/03-product-planning/#change-control-process); changes
-to the design go through a numbered decision record.
+to the design go through a numbered decision record (up to 0049 so far). The owner's choices on open questions
+are recorded as decisions too, sometimes several in one record
+([ADR-0043](/posts/projects/platform-wardens/architecture-decision-records/#adr-0043) holds six from one
+day), so "why is it like this?" always has a page.
+
+With one repository per agent ([ADR-0040](/posts/projects/platform-wardens/architecture-decision-records/#adr-0040)),
+governance is also split by repository. The framework repo governs the library and its releases, each
+agent repository is owned by its domain cell, and `wardens-deploy` is where an agent's published version
+meets the platform's rules: a published version never changes, and every entry's contracts are checked
+against the agents it talks to.
 
 ## Decision-making and approval authorities
 {: #decision-making-and-approval-authorities }
@@ -37,18 +47,24 @@ to the design go through a numbered decision record.
 | Decision | Who decides | On what |
 |---|---|---|
 | A lifecycle gate (G0 to G4) | The sponsor | Evidence from the owner, confirmed by the independent reviewer |
+| Waiving a gate's evidence floors | The sponsor, by a decision record that names the scope and the end, written into the manifest and the eval report | Why waiting is worse (drift's L2 on development and qa, until 2026-12-20 or 30 approved runs, [ADR-0047](/posts/projects/platform-wardens/architecture-decision-records/#adr-0047)) |
 | Lowering a level (demotion) | Any owner, reviewer or the framework owner | No gate needed |
-| An L2 action | A named approver in the owning domain's group, not the requester | The full parameters, bound to the action's idempotency key |
+| An L2 action | A member of the action's approver group (a Keycloak group), pressing in Slack from a linked account or in the console; self-approval only where the request allows it, recorded as `selfApproved` | What will change, bound to the summary's hash and the action's idempotency key |
+| A risk-raising registry entry (a higher level, a new acting tool, a wider credential, a bigger budget) | A reviewer of the agent's cell, in the console; the requester is the agent's CI workflow, so the owner can approve without self-approval ([ADR-0048](/posts/projects/platform-wardens/architecture-decision-records/#adr-0048)) | The current and new manifests and the risk items the console computes |
 | The kill switch | The operators named in the manifest | Anything that looks wrong |
 | A framework or design change | Framework owner, via a decision record | The options considered |
+| A `wardens` release | Framework owner, by merging the release PR; a tag is never pushed by hand | The release check: contracts and check-agent rules against the last release and every agent that pins it |
 
 ## Audit requirements
 {: #audit-requirements }
 
 Every task state change is recorded with a timestamp and the identity that caused it; every act-tool call
 with its full (redacted) parameters; every approval names its approver; level changes, quarantine and
-the kill switch are audit events too. An action doesn't run unless its pre-action audit event is
-persisted. The log is append-only and hash-chained, with the chain's daily head kept in `mon`. See
+the kill switch are audit events too, and so are approval presses, refused presses and self-approvals.
+An action doesn't run unless its pre-action audit event is persisted. The log is append-only and
+hash-chained, with the chain's daily head kept in `mon`. Registry approvals leave a second trail outside
+the cluster: the signed `approval.json` is committed beside the entry it approves, and `wardens-deploy` CI
+verifies it against that entry's hash. See
 [Audit logging](/posts/projects/platform-wardens/06-security-and-privacy/#audit-logging).
 
 ## Access reviews
@@ -59,8 +75,14 @@ reviewed as a whole (one tool's scope can look fine and the union can still be t
 access and permissions are reviewed quarterly. At retirement, the identity is revoked and the revocation
 confirmed.
 
+Chat access has a daily review of its own: a job compares each cell channel's members with the cell's
+Keycloak groups and reports guests, other apps' bots, unlinked members and people in none of the groups;
+a disabled Keycloak account revokes its Slack link at once. That matters more since a Slack button can
+approve a level 2 action.
+
 > **TODO:** No quarterly review has happened yet (the first agents went into shadow on 2026-11-01).
-> When is the first one, and where is it recorded?
+> When is the first one, and where is it recorded? The `sre` cell's named reviewer isn't an org member
+> yet, which the first review should settle.
 {: .prompt-warning }
 
 ## License management
@@ -102,9 +124,13 @@ obligations override the framework. See [Data and Integration](/posts/projects/p
 ## Policy enforcement
 {: #policy-enforcement }
 
-Policies are code, not prompts: the four guardrail points, the agents' `policies/`, the registry's
-cross-field rules, Kyverno on the cluster (digest-pinned images, restricted security context, requests and
-limits), the image gates in CI. A model may tighten a policy gate, never loosen it. Whether the
+Policies are code, not prompts: the four guardrail points, the agents' `policies/` (drift's
+`level_two.py` enforces the waiver's environments and dates), the registry's cross-field rules,
+`wardens check-agent`'s rules in every agent's CI, the risk gate on registry entries, Kyverno on the
+cluster (digest-pinned images, restricted security context, requests and limits, and no `warden-*` image
+without an `agent-ci` attestation), the image gates in CI. A new or stricter check-agent rule that the
+last release's agents fail is a breaking change: it ships in a major version with a migration that
+`wardens bump` applies, or as a warning first. A model may tighten a policy gate, never loosen it. Whether the
 guardrail rules move to OPA once there are more of them and more owners is an open question; v1 keeps
 them in Python, with tests.
 
@@ -112,8 +138,9 @@ them in Python, with tests.
 {: #evidence-collection }
 
 Evidence is collected as a side effect of running: the run record (evidence, decisions, cost), the trace,
-the audit chain, the eval report. What the gates add is where it's filed: `gates/0N-*.md` in the agent's
-folder, merged in the same PR as the manifest change. The proposed control-evidence rule
+the audit chain, the eval report, the nightly eval gauges, and for each registry entry a `source.json`
+naming the repository, commit, CI run and image digest that published it. What the gates add is where
+it's filed: `gates/0N-*.md` in the agent's repository, merged in the same PR as the manifest change. The proposed control-evidence rule
 ([ADR-0024](/posts/projects/platform-wardens/architecture-decision-records/#adr-0024)) makes a test count as
 evidence only if it names the exact denial, has an allowed twin, and fails when the control is removed.
 
@@ -125,6 +152,8 @@ evidence only if it names the exact denial, has an allowed twin, and fails when 
 - [ ] The first quarterly access review is scheduled
 - [ ] Licences in the agent images are checked from the SBOM
 - [ ] Every third party is reached through the gateway or the reviewed MCP list
-- [ ] Proposed decisions the build has proven are moved to accepted
+- [ ] Proposed decisions the build has proven are moved to accepted (team chat's 0041 is still Proposed)
+- [ ] Every risk-raising registry entry has a verified approval record beside it
+- [ ] Drift's waiver is reviewed before it ends, with its approved-run count
 
 {% include project-nav.html %}

@@ -18,6 +18,17 @@ full log, generated from the project's repo (`platform-wardens/docs/decisions`),
 
 <!-- more -->
 
+The log runs from ADR-0001 to ADR-0049: 48 records (there's no 0014), of which 26 are accepted, 18 are
+still proposed and 4 have been superseded. The early ones set the shape: autonomy granted per action,
+Temporal underneath, Pydantic AI inside a stage, guardrails in code. The recent ones are about running
+the thing as a platform: one repository per agent with `wardens` as a versioned library
+([0040](#adr-0040)), a versioned registry and deploy config in `wardens-deploy` ([0042](#adr-0042)),
+release checks that treat a contract tightening or a stricter check-agent rule as breaking
+([0043](#adr-0043)) and a release job that tags and finishes idempotently ([0045](#adr-0045)), nightly
+evals across the agent repositories that read people's feedback through the console ([0044](#adr-0044), [0046](#adr-0046)), the first level 2 actions after a
+Slack approval ([0047](#adr-0047)), and signed registry approvals that CI asks for and a reviewer's press
+completes ([0048](#adr-0048), [0049](#adr-0049)).
+
 {% include project-nav.html %}
 
 ## How to read this log
@@ -434,7 +445,7 @@ flowchart LR
 ```
 
 Rules:
-- **v1 ships L0 and L1 only**, unchanged from 0001.
+- **v1 ships L0 and L1 only**, unchanged from 0001. Amended 2026-11-21 by [0047](#adr-0047): L2 for terraform-drift's two merge and apply actions, on development and qa stacks, under an owner waiver of the floors below.
 - **L2** is granted per action after that action path passes evaluation (floors below), has a proven rollback, and gets independent reviewer sign-off at the Promote gate.
 - **L3** is granted only to actions rated reversible on **both** tests:
   - *action reversibility*: can the system change be undone?
@@ -464,6 +475,25 @@ Rules:
 - **Resolves open decision:** Tier-2 promotion criteria (partly; see Consequences). Supersedes [0001](#adr-0001).
 - **Written exception:** [0028](#adr-0028) (proposed): one approval covers `cicd-triage`'s bounded fix loop.
 - **Refined by:** [0024](#adr-0024) (proposed): the evidence a promotion needs for each control (allowed twin, exact denial, mutation test), and [0023](#adr-0023) (proposed): G3 and G4 evidence comes from evaluating the deployed shadow worker.
+
+#### Implementation note (2026-11-17, plan repo-per-agent phase 3 step 2)
+
+The levels are enforced by the framework, not by each agent. `wardens.durable`'s binding
+(guards.py) runs guardrail point 2 before every `Activities`
+method the manifest declares as a tool, read or act; around every act tool it checks the kill switch first (fails
+closed) and writes a `tool.act` audit event; and it runs point 4 (`check_action`: catalog, level within the task's
+ceiling and the framework's, owning domain, goal drift) on every artifact an emitting activity returns and on what the
+run returns, recording a refusal in the run record instead of raising it. A level 2 action still waits for approval
+through the binding.
+
+Since 2026-11-21 ([0047](#adr-0047), plan drift-merge-on-approval
+step 2) `FRAMEWORK_MAX_LEVEL` is 2. Point 4 still caps each action at its own manifest level and the task's ceiling,
+so only an agent whose manifest has a level 2 action can reach it, and only through the approve-then-act workflow
+(`wardens.durable.approve_act`): the agent hands the proposed action over, a person in its `approvers` groups approves
+it in Slack or the console, and the act runs once with the `ApprovedAction`, which the binding checks against what was
+approved (10). Agent code never calls `check_action`, and `wardens check-agent` refuses a tool with no
+`Activities` method, an act tool that isn't its own method, and an act client called outside one. Where each point
+runs: 9.
 
 ## ADR-0008: Contracts follow the A2A data model: task, message, artifact
 {: #adr-0008 }
@@ -1019,7 +1049,7 @@ We tested Microsoft's Azure MCP server (`@azure/mcp` 3.0.0, `--read-only`) on th
 
 **1. The Change Correlator agent is the one place that answers "who changed this, when, how, and is there a ticket".**
 - It is the shared agent already planned in phase 2 (capability `change.correlate`).
-- Other agents ask it through `wardens.handoff`. The drift agent lists `change.correlate` in its manifest's `handoffs.mayRequest`, and the Correlator's capability accepts handoffs from any agent (`acceptsHandoffs`), since it has no actions. (Updated November 2026: handoffs are consented in the two manifests; the central `framework/config/handoff.yaml` pair list this decision first named is gone.)
+- Other agents ask it through `wardens.handoff`; `terraform.drift.explain → change.correlate` is already in `framework/config/handoff.yaml`.
 - No agent queries audit logs on its own, and we do not build a change-evidence MCP server.
 
 **2. Per provider, it uses the provider's MCP server only where that server passes our acceptance test.** Otherwise it uses a small read tool of its own, in its `tools/`.
@@ -1035,6 +1065,7 @@ We tested Microsoft's Azure MCP server (`@azure/mcp` 3.0.0, `--read-only`) on th
 | AWS | **Candidate:** the AWS Labs CloudTrail MCP server (`lookup_events`, 90 days of management events) | Searches events by resource name rather than resolving a live resource; run the acceptance test before adopting it |
 | GCP | **Own tool:** Cloud Audit Logs, Admin Activity (400 days) | No Google-published MCP server for Cloud Logging found (2026-11-02) |
 | Cloudflare | To test: Cloudflare's MCP servers against the account audit logs API | |
+| GitHub | **Planned, [0034](#adr-0034):** the events API plus a webhook log the console records (the org audit-log API needs Enterprise Cloud; the org is on Free) | GitHub's MCP server not tested against the two cases yet: test it in step G1 |
 | Jira | To test: Atlassian's MCP server against a JQL search of our own | Needs a Jira site and projects, which the infra repositories don't have yet (`jira.enabled: false`) |
 
 **3. Lookups run from the Correlator's code, not from LLM tool calls.**
@@ -1504,7 +1535,31 @@ Nothing is applied without review. The scaffolder opens the pull requests; the n
 
 #### Related
 
+- **Date note:** onboarding steps updated 2026-11-20, see the note at the end
 - **Resolves open decision:** n/a (extends the adoption steps in 17 and `templates/agent/`). Items A3 and A4 of the blueprint gap review.
+
+#### Note (2026-11-20): onboarding is a new repository, not a folder
+
+Decision [0040](#adr-0040) moved every agent into its own repository (plan
+repo-per-agent phases 7 and 8; the monorepo's `agents/` folder was removed in #294). Step
+2 of the onboarding above no longer adds a folder and a workspace member to this repo. The steps are now:
+
+1. **Intake:** unchanged.
+2. **Agent repository:** `wardens new-agent <domain>/<name> --cell <cell> --dest ../warden-<name>` renders the copier
+   template (`copier.yml`, `templates/agent/`) into a new `cloudutsukpilot/warden-<name>` repository, with the manifest
+   and README header filled from the answers and the `wardens` release and wheel image digest pinned. The GitHub
+   repository itself is created as code in infra-github. Its CI calls homelab-gitops `agent-ci.yaml` (ADR 0111),
+   which also publishes the agent's registry entry to cloudutsukpilot/wardens-deploy
+   ([0042](#adr-0042)).
+3. **Identity:** unchanged.
+4. **Wrapper chart:** unchanged (homelab-gitops `apps/<name>/values.yaml`; agent-ci writes the image digest).
+5. **Secrets:** unchanged.
+6. **Staying current:** a new `wardens` release reaches the repository through `wardens bump`: a pull request (opened by
+   `wardens-py.yaml`'s bump job when `WARDENS_BUMP_ENABLED` is on, else `wardens bump --open-pr` by hand) that moves the pin, the Dockerfile's wheel image digest and `uv.lock` together and runs
+   `copier update`, so the template's version is the one in the repository's `.copier-answers.yml`.
+
+One copier template (`templates/agent/`) is built so far, not the three shapes above; its version is the `wardens`
+release it was rendered from. The rest of this decision (the shapes, the portal front door) is still proposed.
 
 ## ADR-0023: Release path: one digest promoted from shadow to operate on deployed evidence, with provenance, a behaviour hash, a rehearsed rollback and retirement without leftovers
 {: #adr-0023 }
@@ -1725,7 +1780,7 @@ The blueprint uses a fixed tag contract (application, agent, tenant, cost centre
 
 #### Consequences
 
-- `wardens.telemetry`: the resource and span attributes, and live `chat` and `execute_tool` spans from Pydantic AI hooks (the "not yet" item).
+- `wardens.telemetry`: the resource and span attributes, and live `chat` and `execute_tool` spans from Pydantic AI's instrumentation (built in plan repo-per-agent phase 3 step 13).
 - `wardens.durable` and `wardens.llm`: the run-wide budget.
 - homelab-gitops: chart labels, the collector's `unallocated` default, a Grafana dashboard per cell, and the platform measures dashboard of 0021. infra-azure: tags on agent identities and APIM subscriptions.
 - 0010's collector rules gain one step before export: add `wardens.cell = "unallocated"` when the attribute is missing.
@@ -1789,6 +1844,18 @@ It ends after 30 idle minutes, 40 messages, the cost ceiling, the 4-hour deadlin
 - The model's quality on tool calling isn't measured yet. The eval scenarios cover the guards, not its judgment. A weak local model means more questions and rejected proposals, not unsafe pull requests.
 - GitHub Free has no branch rules: the same accepted risk as [0013's amendment](#adr-0013), with its own `author/` guard in code. People merge by hand, and no CODEOWNERS routes the review yet.
 - The long-term store is a file on the worker's volume. It's fine for advisory notes and not the shared store 21 still leaves open.
+
+**Note (2026-11-18, plan repo-per-agent phase 3 step 11, [0040](#adr-0040) rule 13):** the store is now `wardens.memory_items` in the state database, with row-level security per agent, reached only through the binding's `acts.memory`; the file store remains for local runs without `WARDENS_STATE_DSN`. The three items have keys (`last_cloud`, `last_stack`, `last_location`), the binding sets their provenance (the run, the task and the proposed action), recalled items are in the run record's `inputsRead` and in a prompt block marked advisory, and people review and forget them on the console's Memory page. Items written before under the old keys are no longer recalled and expire within 90 days.
+
+**Note (2026-11-18, plan repo-per-agent phase 3 step 16, owner decisions 2026-11-18):** a conversation is still one
+workflow (one workflow id), but no longer always one Temporal run. Past Temporal's history threshold it continues as a
+new run of the same workflow id instead of ending: the library carries its turns, first start, idle clock, limits,
+spend and unread messages, and stack-author's own state (`ChatCarry`: the model's short-term memory whole, the page
+transcript's tail with a line saying how many earlier messages it no longer shows, the diff on the table, the pull
+requests and the plans being watched). No limit or budget resets; the daily budget is checked again when the new run
+starts, and a spent one ends the conversation with a message. It still writes one run record, keyed by its first run
+id and counting its runs. Its text now also crosses runs in the carried state, under the same retention.
+07 has the details.
 
 #### Related
 
@@ -2120,6 +2187,20 @@ The adapter (`EventHubsSource` / `EventHubsSink`) is the same code everywhere; o
 - **Supersedes:** [0015](#adr-0015) (Azure Service Bus at the edges)
 - **Relates to:** [0004](#adr-0004), [0009](#adr-0009), [0029](#adr-0029), 16, 19. Implementation plan: event-bus-ingress.
 
+#### Note 2026-11-20: the webhook receiver runs two replicas and stops gracefully
+
+Owner decision, after 307 failed GitHub deliveries in 72 hours (none of them lost an incident): some were the receiver's
+single pod restarting during a rollout, with no drain.
+
+- `wardens-hooks` runs **two replicas** with a PodDisruptionBudget of `minAvailable: 1` (homelab-gitops
+  `apps/wardens-console`). Two replicas are safe: a delivery reaches one pod, the incident workflow id dedupes a
+  redelivered one, and relay mode publishes to the same hub.
+- **Graceful shutdown:** a 5-second preStop pause so Traefik stops sending to the pod first, then SIGTERM makes the
+  receiver stop accepting, answer the requests in flight and close the hub producer
+  (`wardens_services.webhooks.github.handler.drain_on_signal`, `serve_and_drain`).
+- **Redelivery stays daily** (decision [0032](#adr-0032)), now over 70 hours, oldest
+  first; hourly was considered and not taken.
+
 ## ADR-0031: MCP calls go through a gateway that checks the agent per tool; no server forwards the agent's token, and each shared MCP server reaches its backend with its own identity
 {: #adr-0031 }
 
@@ -2307,6 +2388,19 @@ The other LiteLLM methods ([MCP authentication](https://docs.litellm.ai/docs/mcp
 - **Per-user credentials** are keyed by user, not by key or team.
 - **On-behalf-of** (`oauth2_token_exchange`, with an `entra_obo` profile) needs a user token and has no fallback to client credentials. It is the candidate for `credential: person`.
 
+#### Note (2026-11-18): `mcp-guard` logs through `wardens`
+
+`mcp-guard`, the sidecar this decision puts in front of a third-party MCP server, was built without the framework: its
+image installed neither `wardens` nor the contracts, and it set up its own logging (`logging.basicConfig`, one JSON
+string per line). The owner decided on 2026-11-18 that it depends on `wardens` for its logs: `python -m mcp_guard`
+calls `wardens.telemetry.configure("mcp-guard", <version>)`, so every line is a JSON line in the agents' format
+(12: `timestamp`, `level`, `logger`, `message`, `service.name`, redacted),
+with the guard's fields (`event`, `agent`, `sub`, `run`, `trace`, `method`, `tool`, `decision`, `reason`, `status`,
+`ms`) at the top level instead of inside the message, and the node's collector parses it like any wardens line. Its
+image builds `framework/` with it. Nothing else changes: it still checks the token, the agent and the tool itself, keeps
+its own allow list and metrics, and is still not an agent (it has no manifest and stays in platform-wardens after the
+split, decision [0040](#adr-0040)).
+
 #### Sources
 
 - [MCP specification: Security Best Practices (2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices): token passthrough, confused deputy, scope minimisation.
@@ -2317,6 +2411,1603 @@ The other LiteLLM methods ([MCP authentication](https://docs.litellm.ai/docs/mcp
 - [Traefik: MCP Gateway best practices](https://doc.traefik.io/traefik-hub/mcp-gateway/guides/mcp-gateway-best-practices): exchange in the server, policy in the gateway.
 - [CoSAI: A practical guide to MCP security](https://coalitionforsecureai.org/securing-the-ai-agent-revolution-a-practical-guide-to-mcp-security).
 - [A gateway architecture for enterprise MCP authentication (arXiv)](https://arxiv.org/html/2608.10760v1): the `act` claim for agent-for-person calls.
+
+## ADR-0032: The terraform-drift agent runs on drift events only, with no schedule
+{: #adr-0032 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-09 · `platform-wardens`</span>
+
+#### Context
+
+Two things started the terraform-drift agent:
+
+- **A Temporal schedule**, `daily-infra-azure` at 08:00 UTC. It analysed the newest completed drift scan of the last 7 days, whatever that scan found.
+- **The GitHub webhook rule `drift-scan`**, which started the agent when the job `Drift Detection - Teams Notification` finished.
+
+The Teams job runs when a scan found drift **or** a stack failed to plan. The analyze step also counts a plan error as drift (`drift_found`). So the agent ran on days with nothing to explain. For example, infra-azure run 42482427115 (2026-11-08) had 0 drifted stacks and 1 failed stack, and both triggers fired.
+
+A run with no drift makes no model call, but it still:
+
+- reads the run and downloads every plan artifact,
+- clones the shared module,
+- writes a run record,
+- posts a "no drift" message every day.
+
+The owner wants the agent to run only when drift is found, in any `infra-*` repository (2026-11-09).
+
+#### Decision
+
+1. **One trigger: a drift-only job in the pipeline.**
+   - The shared module's analyze step has a new output, `resource_drift_found`. It is true only when a stack plans to add, change or destroy resources.
+   - The template's new job `Drift Detection - Agent Trigger` runs only on that output. It has no permissions and does nothing; its job name is the contract.
+   - The webhook rule `drift-scan` matches that job with conclusion `success`.
+   - A scan where stacks only failed to plan starts nothing. The Teams card and JIRA ticket still report it.
+2. **No schedule.** The agent's manifest has no `schedules`, and the Temporal schedule `terraform-drift-daily-infra-azure` is deleted.
+3. **Every `infra-*` repository has the trigger job.** The webhook rule's `repositoryPattern` follows the agent's `config/scope.yaml`. A provider is added to both once the agent can read its plans and map its attributes, so a repository never starts a run that can only stop as "out of scope". How a provider is onboarded: [decision 0033](#adr-0033).
+4. **A lost delivery is redelivered once a day.** GitHub never retries a webhook, and the schedule used to hide a lost delivery. `wardens.runtime.redeliver` runs as a Kubernetes CronJob every day. Signed in as the App, it lists the last 70 hours of deliveries (GitHub keeps 3 days) and sends again the newest attempt of every event that has no 2xx attempt, oldest event first, at most 100 per run. It gives up on an event after 3 failed redeliveries, or once its original delivery is older than the window, so a failure that repeats is not resent every day. This is phase 6 of the event-bus plan, run daily rather than hourly by the owner's choice. (Amended 2026-11-20: the job first looked back 26 hours and sent the newest events first, so events over the cap aged out of the next run's window and were lost, 64 on 2026-11-18; and it resent a deterministic failure every day until GitHub dropped it.)
+5. **Each repository scans at its own time.** `drift_scan_cron` in its `config.yaml`; without it, the generator picks a fixed time per repository. Every repository used to queue at `0 6 * * *`, and GitHub started those runs about 6 hours late.
+6. **One exception: the plans of the agent's own import PRs.** The webhook rule `own-pull-request-plan` starts the agent on a successful plan of a pull request on one of its own `drift/` branches. An object being imported that differs from the code (a tag set by hand) shows only in that plan, and the merge's apply would overwrite Azure's value; the agent comments on the PR and can add a codify to it. The owner considered removing the rule (only scans start the agent) and kept it (2026-11-10). A closed PR's plan stops the agent before any read.
+
+#### Consequences
+
+- **Fewer runs.** A day without drift costs nothing: no artifact download, no clone, no run record, no message.
+- **Slower recovery from a lost delivery.** With a daily redelivery, a lost delivery's drift is explained up to a day late. Before, the next 08:00 schedule picked it up. The CronJob's failed Job and `wardens.github.redeliveries{result="failed"}` show when redelivery itself fails; `result="given_up"` counts events whose redeliveries kept failing.
+- **The job name is an interface** between the shared module and platform-wardens. Renaming it in the template without changing `framework/config/webhooks.yaml` silently stops the agent. Tests on both sides pin the name.
+- **Another agent can still have a schedule.** The framework keeps `wardens.durable.schedules`.
+- **An operator can still start a run** from the console with a run id.
+
+#### Related
+
+- **Status note:** amended by the note of 2026-11-20 (a scan that found no drift leaves a small run)
+- **Relates to:** [0016](#adr-0016), [0030](#adr-0030). Implementation plan: event-driven-drift-agent.
+
+#### Note 2026-11-20: a scan that found no drift leaves a small run
+
+Owner decision (team-chat C6, "A3a"). A team-chat ask reads the agent's latest completed run, and under this decision a
+clean scan left none: on 2026-11-19 an ask described a drift incident from before the WAF rule's apply as the latest
+state, though a newer scan (infra-cloudflare run 44634649995) had planned no changes. Point 1's "a scan with no drift
+starts nothing" changes to "starts one small run that records it"; point 2 (no schedule) and the rest stand.
+
+- **The signal is the analyze job, not a skipped Agent Trigger.** The webhook rule `scan-completed` matches "Drift
+  Detection - Analyze Plans" with conclusion `success`. That job runs only on a drift scan (a schedule, or a dispatch
+  with `drift_scan=true`). GitHub does send the Agent Trigger's `skipped` event (43 in the week to 2026-11-20 in the
+  hooks' logs), but the same event comes from every ordinary plan and apply run, which the payload can't tell apart, and
+  the receiver has no GitHub credential to ask. Matched on it, every push to `main` would start a run that, completed,
+  becomes the agent's "latest" for the ask. The analyze job filters at no cost, and the agent still confirms what the
+  run did.
+- **No incident, a task alone.** The rule's `start: task` starts `terraform-drift.task` on the agent's queue, workflow
+  id `<correlationId>-<taskId>` (the shape the ask reads runs by), with both ids derived from the rule, repository and
+  run, so a redelivery starts nothing new (the drift path's dedupe per repository and run). The incident workflow
+  always opens a chat thread and hands off; a clean scan needs neither, so it doesn't go through it rather than having
+  its posts suppressed. `repositoryPattern` and `branchPattern` stay in step with `drift-scan`.
+- **What the agent does (trigger `scan-completed`):** the kill switch, then the run by id (accepted only as a completed
+  drift scan, as before), then one read of the run's jobs. When the Agent Trigger job ran, it records that the scan found
+  resource drift and the drift-scan incident explains it. Otherwise it records "no drift in N stacks" and names each
+  stack whose plan failed: those weren't checked, so they never count as clean. No plan artifact download, no clone, no
+  model call, no handoff, no message (its notification is none; a failed run still goes to the escalation channel).
+- **Cost:** two or three GitHub API reads and a run record per scan. The Consequences' "a day without drift costs
+  nothing: no run record" no longer holds for the record.
+
+## ADR-0033: Onboarding a new cloud or provider to the terraform-drift agent
+{: #adr-0033 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-10 · `platform-wardens`</span>
+
+#### Context
+
+The agent started with Azure only. Step 8a made the parts that read plans and map attributes work for any
+provider under the shared module's `cloud/` (the provider is the stack path's first segment,
+`providers.py`). Steps 8b to 8f add infra-aws, infra-gcp, infra-cloudflare, infra-github and infra-local one
+at a time. Decision 0032 says a repository joins the scope "once the agent can read its plans and map its
+attributes", but not how to check that. The owner asked for the steps to be written down so that the next
+cloud follows them too (2026-11-10).
+
+#### Decision
+
+A provider (a new cloud, or a new `infra-*` repository) is onboarded in **one pull request in
+platform-wardens**, after the two prerequisites below, and only when every step of the checklist is done or
+recorded as not applicable in that PR.
+
+### Prerequisites (outside platform-wardens)
+
+1. **The repository runs the shared module's pipeline** with the `Drift Detection - Agent Trigger` job and
+   its own `drift_scan_cron` in `config.yaml` (decision 0032, points 1 and 5). Regenerate the workflow with
+   the entrypoint; never edit it by hand.
+2. **The GitHub App** `cloudutsuk-wardens-terraform-drift` is installed on the repository (it is installed on
+   every org repository today). The scope check refuses a repository without it.
+
+### Checklist (the onboarding PR)
+
+1. **Coverage.** List the resource types the repository's `resources.yaml` files use, and check each against
+   the attribute map built from the shared module's `main` (`build_map`). Write the result in the plan's
+   Progress row as "mapped / used". A type the map can't read still gets findings; it only loses codify PRs.
+   Extend the map or the YAML locator in the same PR when a used type has a unit pattern they don't parse
+   yet. A pattern no repository uses waits.
+2. **Provider-specific parts.** The Change Correlator ("who changed it") reads the providers in
+   `providers.CORRELATED` (Azure; GitHub repositories since decision 0034, `CORRELATED_TYPES`). Import proposals and
+   the `already_exists` check are Azure-only (`EXISTENCE_CHECKED`). For anything else they say "not checked". The webhook rule `own-pull-request-plan` (decision 0032, point 6) exists for import PRs, so it
+   stays on Azure repositories too. Adding a provider to `CORRELATED` is its own decision: it needs a correlator source for that
+   cloud's audit log first (decision 0016).
+3. **Eval data.** Harvest a real scan with drift from the repository (`evals/harvest.py <repo> --run <id>`)
+   and run the evals. If the repository has no drift, make a small, reversible change by hand (a tag on a
+   test resource), with the owner's approval for that cloud, scan, harvest, then remove it. If neither is
+   possible yet, the PR says so and the plan lists it under "What is left"; the scope is widened anyway,
+   because findings work without it, but the step is not Done until the data is in.
+4. **Scope.** Widen `config/scope.yaml`'s `repositoryPattern` and the webhook rule `drift-scan`'s
+   `repositoryPattern` (`framework/config/webhooks.yaml`) together. A test checks that both accept the same
+   repositories, so a repository can never start a run that stops as "out of scope".
+5. **Stacks the scan can't see.** A stack whose plan runs somewhere that can't see its real objects (infra-local's
+   Spark-only `network-gpu` and `gpu` stacks, planned on the homelab PC's runner) reports false drift. List it
+   in the repository's opt-out file, `.github/drift-agent.yaml` (`skipStacks`), in a PR to that repository.
+6. **Records.** The agent's `CHANGELOG.md`, the plan's Progress row, and the README's scope line.
+
+### After the merge
+
+7. **Deploy.** The image is built on `main` and its digest committed to homelab-gitops; Argo CD deploys both
+   the console (the webhook rule) and the agent. Check the running digest.
+8. **End-to-end check.** Dispatch a scan with `drift_scan=true` on the repository's `main`. With drift, the
+   Agent Trigger job runs, the webhook starts `incident-drift-<repo>-<run>`, and the incident completes.
+   Without drift, the trigger job is skipped and nothing starts. Record which one you saw in the plan.
+
+#### Consequences
+
+- Every provider goes through the same steps, and the plan shows what each one is missing (coverage, eval
+  data) instead of a provider being "on" or "off".
+- A provider can be in scope without eval data from its own repository. The plan keeps that visible until
+  the data is harvested.
+- The two `repositoryPattern`s stay in step through a test, not only a comment.
+- Outside Azure the agent never says who changed something; that waits for a correlator source per cloud.
+
+#### Related
+
+- **Relates to:** [0032](#adr-0032) (point 3), [0016](#adr-0016). Implementation plan: event-driven-drift-agent, steps 8a to 8f.
+
+## ADR-0034: Change evidence for GitHub on the Free plan: the events API, and a recorded webhook log
+{: #adr-0034 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-10 · `platform-wardens`</span>
+
+#### Context
+
+The terraform-drift agent covers every `infra-*` repository since 2026-11-10, but "who changed it" works only
+for Azure: the Change Correlator reads the Azure Activity Log and Resource Graph. The owner wants a source per
+cloud, GitHub first (2026-11-10): infra-github has real drift today, and GitHub needs no new cloud account.
+
+GitHub's organization audit log is the obvious source, but its REST API
+(`GET /orgs/{org}/audit-log`) exists only on GitHub Enterprise Cloud. `cloudutsukpilot` is on the Free plan, and
+the call returns 404 whatever the token's permissions (checked 2026-11-10). Two sources remain on Free:
+
+- **The events API** (`GET /repos/{owner}/{repo}/events`, `GET /orgs/{org}/events`): read-only, at most 300
+  events; GitHub documents 90 days but keeps older events of a quiet repository. Only some kinds of change. It has `PublicEvent` (a repository made public),
+  `MemberEvent` (a collaborator added or removed), `CreateEvent` and `DeleteEvent`. It has nothing for settings,
+  custom properties, teams or environments. It already answers today's case: `basic-ai-agent` was made public by
+  a person on 2026-06-26 (`PublicEvent`).
+- **Webhooks:** the org's GitHub App receives events with the acting user (`sender`) for repository settings
+  (`repository`: edited, publicized, privatized, renamed, archived), collaborators (`member`), teams (`team`,
+  `membership`), custom properties (`custom_property_values`), branch protection and rulesets. GitHub keeps
+  deliveries only a few days, so they are useful as evidence only if we record them.
+
+#### Decision
+
+1. **Both sources, owner's choice (2026-11-10).** The Change Correlator gets a GitHub source that reads the
+   events API for history and a recorded webhook log for everything from the day it is turned on.
+2. **The existing App, `cloudutsuk-wardens-terraform-drift`.** It already receives the org's `workflow_job`
+   events through the console's `POST /github`. It subscribes to the change events listed above, with the read
+   permissions they need (org members, custom properties). The owner approves the new permissions in the org
+   settings. No second App.
+3. **The console records the change events; the correlator reads them.** `wardens.runtime.github_webhook`
+   keeps a whitelisted summary of each change event (delivery id, event, action, repository, object, sender's
+   login and type, time, and the changed fields' names and values from `changes`) in a `github_change_events`
+   table in `wardens-state-db`, kept 400 days. Not the whole payload. A delivery id is stored once, so a
+   redelivery is harmless.
+4. **The correlator reads GitHub with a down-scoped token.** It signs in as the same App with its own copy of
+   the App key in OpenBao (`kv/wardens/change-correlator`), and asks for an installation token limited to
+   `metadata: read` (enough for the events API on private repositories). It reads the recorded log from
+   `wardens-state-db` with a read-only role.
+5. **A request names the object, not a URL.** A GitHub resource id is `github:<org>/<repo>` for a repository
+   and `github:<org>/<repo>#<kind>/<name>` for something in it (an environment, a collaborator, a property); the
+   drift agent builds it from the plan's `before`. The change event's `source` is `github-events` or
+   `github-webhooks`.
+6. **GitHub joins `providers.CORRELATED`** when the correlator answers the two acceptance cases of 0016 for it:
+   the `basic-ai-agent` visibility change (events API) and one change made after the webhook log is on.
+7. **The person stays out of models.** The sender's login is an actor id like a UPN: shown to people,
+   masked in evals, never sent to a model (the correlator's `neverDoes`).
+
+#### Consequences
+
+- "Who changed it" for infra-github: visibility made public, collaborators and repository creation from the events
+  API at once (as far back as the feed goes; making a repository private has no event); every subscribed kind from the day the webhook log is on; older changes of the
+  other kinds stay "not found".
+- One more thing to keep: a table in `wardens-state-db` with people's logins, kept 400 days. The threat model
+  and the data inventory list it.
+- The App's permissions widen to org-level reads. Its key is in two OpenBao paths; both rotate together.
+- If the org ever moves to Enterprise Cloud, the audit-log API replaces both sources in this one tool.
+- AWS (CloudTrail), GCP (Cloud Audit Logs) and Cloudflare (audit log API) each get their own decision when
+  their turn comes; 0016's table lists the candidates.
+
+#### Related
+
+- **Relates to:** [0016](#adr-0016) (the Change Correlator), [0033](#adr-0033) (point 2: a provider joins `CORRELATED` by its own decision). Plan: correlator-other-clouds.
+
+#### Note 2026-11-21: the organization's own objects, and five more events
+
+The owner asked (2026-11-21) for "who changed it" on every kind of object infra-github manages, not only
+repositories. The record already kept team and team-membership changes, but as organization rows (no repository)
+that the correlator never read, and the App already sent `custom_property` (definitions), which nothing recorded.
+
+1. **Five more events, no new permission.** The record also keeps `organization` (members added, invited, removed;
+   the organization renamed), `custom_property` (the organization's property definitions), `team_add`,
+   `branch_protection_configuration` and `security_and_analysis` (a repository's code security features). They need
+   only the permissions the App was granted on 2026-11-11 (members, administration and custom properties read). The
+   owner ticks the four events the App doesn't send yet in its settings; `custom_property` is already on.
+2. **Rows of the organization are read too.** `ChangeLog.for_organization` returns the rows without a repository
+   (`github:<org>` and `github:<org>#<kind>/<name>`: team, member, custom_property, org ruleset). The same agent role,
+   the same table and the same 400 days.
+3. **No email.** An invitation's email is never kept, only the invitee's login (or `unknown` for an invitation by
+   email), like a collaborator's login.
+4. **What stays without a source on Free:** repository settings GitHub doesn't document in `repository.edited`
+   (it names topics, default branch, description and homepage; merge buttons, issues, wiki, projects,
+   delete-branch-on-merge, auto-merge, Pages and vulnerability alerts are recorded only if GitHub sends them), environments, Actions secrets and
+   variables, org settings, org webhooks, custom and organization roles, and a deleted or transferred repository (an
+   App gets no `repository.deleted`). `GET /orgs/{org}/events` lists public events only and has no team or membership
+   types, so it adds nothing to the repository feed. The audit log in the org's settings (180 days, export by hand)
+   stays the owner's own check; its API is Enterprise Cloud only.
+
+The trust and the retention of this decision don't change, so this is a note, not a new decision.
+
+## ADR-0035: Change evidence for AWS: CloudTrail event history, through a federated read-only role
+{: #adr-0035 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-12 · `platform-wardens`</span>
+
+#### Context
+
+AWS is next after GitHub (owner, 2026-11-10). infra-aws manages one stack today, `aws/dev/hello-world` (a VPC in
+`ap-south-1`), and the shared module has units for VPCs, subnets, internet gateways, security groups and S3
+buckets. Drift there is reported with "who changed it: not checked".
+
+Every AWS account records management events in CloudTrail **event history** without any setup: 90 days, per
+region, free, read with `cloudtrail:LookupEvents`. A trail (to S3 or CloudWatch Logs) keeps more and adds data
+events, but costs storage and needs a bucket and a query engine; the correlator only needs management events.
+Decision 0016 named two candidates: the AWS Labs CloudTrail MCP server, or `LookupEvents` directly.
+
+The correlator has no AWS credentials, and the infra-aws CI signs in with static access keys. The wardens
+cluster already has a public OIDC issuer (`https://oidc.cloudutsuk.com/wardens`, homelab ADR 0071) that Entra
+trusts for the correlator's Azure identity.
+
+#### Decision
+
+1. **CloudTrail event history through `LookupEvents`, called directly.** A local read tool,
+   `lookup_cloudtrail_events`, like the Azure and GitHub ones. Not the MCP server: it would add a second process
+   for one call, and 0016 requires an acceptance test before any MCP source is used. No trail: 90 days of
+   management events matches the Azure Activity Log's window.
+2. **A federated read-only role, no keys.** infra-aws creates an IAM OIDC identity provider for
+   `https://oidc.cloudutsuk.com/wardens` (audience `sts.amazonaws.com`) and a role `wardens-change-correlator`
+   that only `system:serviceaccount:change-correlator:change-correlator` can assume, with one permission:
+   `cloudtrail:LookupEvents` (it has no resource-level scoping). The pod gets a projected service account token
+   for `sts.amazonaws.com` and `AWS_ROLE_ARN`; boto3 exchanges it with `AssumeRoleWithWebIdentity`. Nothing to
+   store in OpenBao or rotate. The IAM units are new shared-module units; if infra-aws's CI keys can't create
+   IAM objects, the owner applies that stack once.
+3. **A request names the resource by its ARN.** `provider: aws`, `resourceId` the resource's ARN, which the drift
+   agent takes from the plan's `arn` attribute. The correlator looks it up in the ARN's region (the default
+   region, `ap-south-1`, for S3, whose ARNs have none) by the last part of the ARN (`vpc-0abc…`, the bucket
+   name), which is CloudTrail's `ResourceName`.
+4. **Mapping.** Read-only events are dropped; an `errorCode` marks the event failed. An event is a create or a
+   delete only when it creates or deletes the requested kind of resource (`CreateVpc` for a VPC); a lifecycle
+   event of another kind that names it (`CreateSubnet` names its VPC) is about a child and is left out; every
+   other write (`CreateTags`, `ModifyVpcAttribute`, `PutBucketPolicy`) is an update of it. CloudTrail says who
+   called which API, not the values before and after: only tag changes carry values.
+5. **Actors.** An ARN listed in `config/actors.yaml` `awsPipelines` is that pipeline (infra-aws's CI user). Root,
+   an IAM user and an IAM Identity Center session (`AWSReservedSSO_*` roles) are people; any other assumed role
+   or AWS service is a workload. The client comes from the event: the console (`sessionCredentialFromConsole`,
+   or a `console.`/`signin.` user agent), the AWS CLI (`aws-cli/`, CloudShell included), PowerShell, else an SDK.
+   Like a UPN, the ARN is shown to people only and never sent to a model.
+6. **AWS joins `providers.CORRELATED`** when the correlator, deployed with the role, names who made one change
+   by hand to a resource in infra-aws (a tag on the `hello-world` VPC, workspace PENDING 8) from a direct
+   `change.correlate` request. Then a dispatched infra-aws drift scan checks the handoff end to end. Until then
+   the drift agent keeps saying "not checked" for AWS.
+
+#### Consequences
+
+- "Who changed it" for infra-aws's VPC, subnet, internet gateway, security group and S3 bucket units, 90 days
+  back, in one region per resource. Other types stay "not checked" until they are listed.
+- No secret to keep: the role trusts one service account of one cluster. If the cluster's issuer or signing key
+  changes, Entra and AWS both need the new one.
+- `LookupEvents` allows 2 calls a second per account and region; one call per resource, with boto3's standard
+  retries, is enough for a drift run.
+- Data events (S3 object reads and writes) and changes older than 90 days are not covered. A trail would add
+  them, at a cost, if a case needs it.
+- GCP (Cloud Audit Logs) and Cloudflare (audit log API) follow with their own decisions.
+
+#### Related
+
+- **Relates to:** [0016](#adr-0016) (the Change Correlator),
+
+## ADR-0036: Jira tickets as change evidence in the Change Correlator
+{: #adr-0036 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-15 · `platform-wardens`</span>
+
+#### Context
+
+The Correlator says who changed or deleted a resource, when and with which client, but not why. The owner wants
+the drift agent to decide what to do about a deletion (restore it or remove it from code), and only a ticket
+says whether a deletion was meant. The change-event contract has had a `tickets` field since 0016; nothing fills
+it. The org now has a Jira Cloud site (`cloudutsuk.atlassian.net`) with project `CLOUD` for infra changes.
+
+Tickets rarely carry an Azure resource id. People write the resource name in the summary or description, or put
+the ticket key in the commit or pull request that changed the code. Free text varies, so a plain text match finds
+candidates but can't tell "delete X" from "X is slow".
+
+#### Decision
+
+1. **Jira Cloud REST API, read only, called directly.** A local tool, `search_jira` (JQL search over the
+   configured projects and issue reads), like the Azure, GitHub and AWS tools. A dedicated Jira user with the
+   Viewer role on `CLOUD` and a classic API token, in OpenBao `kv/wardens/change-correlator` with the site and
+   project keys. No Jira MCP server: one call shape, and 0016's acceptance test would apply.
+2. **Candidates are found by rules.** (a) The resource's name or full id in the ticket text, among tickets
+   updated in a window around the change; (b) a ticket key in a commit message or pull request that touched the
+   drifted stack's folder in that window (`get_stack_commits`, the existing App with `contents: read` and
+   `pull_requests: read`). Only keys from the configured projects. At most 10 candidates per resource.
+3. **A model ranks the candidates and states the intent.** Per candidate: `covers` (the ticket asks for this
+   change), `related` or `unrelated`; the intent (`remove`, `keep`, `unclear`); a quote from the ticket. Output
+   is validated: only candidate keys, and the quote must appear in the ticket's text. On any model failure,
+   timeout or cost ceiling, a rule match stands as `related` with intent `unclear`. The model never decides
+   whether a change is evidence on its own: no candidate, no ticket.
+4. **People's details never reach the model.** Assignee, reporter and comment authors are not sent; emails,
+   `@`-mentions and Atlassian account ids are removed from the text first. The manifest's "never sends a
+   person's name, UPN or object id to a model" stays, and `reachesModel` becomes true for ticket text only.
+5. **Output without a contract change.** Keys that `covers` go in `ChangeEvent.tickets`. Every finding gets one
+   evidence item per candidate kept (`source: search_jira`, `ref: jira:<key>`, the excerpt states match, intent
+   and quote), which terraform-drift reads. A resource with no recorded change can still have a ticket.
+6. **The drift handoff passes repository, stack and commit** in an optional `context` object of the
+   `change.correlate` input, so 2(b) can run. Without it only 2(a) runs.
+
+#### Consequences
+
+- Drift findings and the decision in 0037 can say "CLOUD-12 asked for this deletion" or "no ticket found".
+- A wrong ticket match misleads people: the excerpt always shows the quote, and the match is labelled
+  correlation, not cause, like every Correlator answer.
+- One more secret to rotate: Atlassian tokens expire within a year (PENDING.md has the date).
+- The Correlator gets a model and a model key (cost ceiling raised to cover ranking).
+
+#### Related
+
+- **Relates to:** [0016](#adr-0016) (the Change Correlator; ticket
+
+#### Amendment (2026-11-24): an unrelated ticket adds nothing
+
+Live checks on CLOUD-3 found a ticket only through its key in a commit under the stack, and its text named neither the
+resource nor the change. The owner decided: when a ticket doesn't refer to the drifted resource, by its exact name or
+in other words (for example a key added to a commit by accident), the Correlator doesn't contribute it to the analysis.
+It only says the ticket was found and Jira holds no evidence for the change: `ticket CLOUD-3 found, but no evidence for
+this change in Jira`. The ranking prompt calls such a ticket `unrelated`; it is never in the answer's tickets, so it
+changes neither the outcome nor terraform-drift's verdict, and terraform-drift shows the note as written
+(warden-change-correlator 0.3.1, warden-terraform-drift 0.3.4).
+
+## ADR-0037: Deletion decisions in terraform-drift: remove from code or restore
+{: #adr-0037 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-15 · `platform-wardens`</span>
+
+#### Context
+
+A resource deleted outside Terraform became a finding and nothing else: "re-create it with an apply, or remove it
+from resources.yaml if intended". On 2026-11-14 the owner deleted a resource group in the portal to stop a monthly
+cost, and the agent reported it with who and when but couldn't say which of the two it should be. Until someone
+edits the code, every apply of that stack re-creates the group.
+
+The two fixes are both one-file changes to the stack's `resources.yaml`:
+
+- **remove**: drop the entry, and the entries in the same file that can't exist without it (a private DNS zone
+  whose `resource_group_name` is the deleted group). The plan then creates nothing.
+- **restore**: the code is already right, but nothing runs the apply until the stack's files change. A dated
+  comment line above the entry is a change that leaves the YAML the same, so the merge runs the apply.
+
+Choosing between them needs to know whether the deletion was meant. Since 0036 the Change Correlator says who
+deleted it and which Jira ticket covers it, with the intent the model read (`remove`, `keep`, `unclear`).
+
+#### Decision
+
+At the end of an incident, after the imports, terraform-drift runs `incident_deletions` for every deleted
+resource. The decision is deterministic. A model's output only reaches it through the ticket intent, which 0036
+already validates (a quote that really appears in the ticket):
+
+| Evidence | What the agent does |
+|---|---|
+| A ticket covers the deletion with intent `remove` | Opens the **remove** draft PR, citing the ticket |
+| A data-holding type (storage, Key Vault, databases, registries, …), another stack names it, no deletion in the audit log, or an entry the agent can't edit (nested types) | **Investigate**: no branches, the message says why |
+| A ticket covers it with intent `keep` | Prepares both branches and asks, recommending **restore** |
+| No covering ticket, and other entries in the stack name it | Prepares both, recommends **restore** |
+| No covering ticket, nothing names it | Prepares both, recommends **remove** |
+
+The covering-ticket row comes before the audit-log row: a ticket asking for removal decides even if the
+deletion itself wasn't found (the Activity Log keeps 90 days).
+
+- **Preparing a branch** means the change is committed on a new `drift/<stack>/<key>` branch and no pull request is
+  opened. The message links GitHub's compare page, which fills the PR form from the commit message. A person who
+  disagrees with both does nothing; the branches stay until someone deletes them.
+- **Two new actions** at L1: `remove_deleted_pr` and `restore_deleted_pr`, both through the `open_draft_pr` tool and
+  its guards (only `drift/` branches, only the stack's `resources.yaml`, the diff must match the proposed action's
+  `patchSha256`, the kill switch read just before the first write). `neverDoes` is unchanged: the agent never
+  merges, and never runs the apply a restore triggers.
+- Both edits are line edits of the original text, checked by parsing: a removal must equal the original without
+  exactly those entries, a restore must parse the same as the original. Anything else is "investigate".
+- Data-holding types are never restored automatically: re-creating one gives an empty object, and the right fix may
+  be a restore from backup. The agent doesn't prepare a remove either, so nobody merges away the only record of it.
+- The message shows each deleted resource in plain sentences: what and where, what the next apply does, who and
+  when, the ticket (or why none was found), what depends on it, the verdict and its reason, and the links.
+
+#### Consequences
+
+- The case that started this (a ticket asking for removal) needs one review and a merge instead of a person
+  working out what the finding means and editing the file by hand.
+- A wrong `remove` intent from the ranking opens a PR that removes an entry the owner wanted. It is a draft, its
+  plan shows the change, and the ticket quote is in its body; the cost of a mistake is closing it.
+- The agent writes branches it doesn't open PRs for. They appear in the repository's branch list until deleted.
+- Not built yet: an open or merged pull request that already removes the entry should be linked instead of
+  preparing branches. Today the one-open-drift-PR-per-stack rule returns the agent's own open PR for the stack,
+  but a person's PR isn't found.
+
+#### Related
+
+- **Relates to:** [0013](#adr-0013) (a draft PR is the agent's recommendation, L1),
+
+## ADR-0038: The console's incident view, console sends through the ingress hub, and console roles
+{: #adr-0038 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-16 · `platform-wardens`</span>
+
+#### Context
+
+An operator could not see one incident from start to end while it ran. The console followed only the runs started
+from that browser and showed tasks and artifacts after the workflow completed. Grafana's Correlation dashboard shows
+the spans of one correlation id, but mostly after the fact, and Temporal's UI shows one workflow at a time without the
+agents' stages, cost or guardrail results.
+
+A Send from the console also took a different path from every other event. It built the root task and started a
+workflow in the request, by default the agent's task workflow rather than the incident workflow, so it skipped the
+ingress hub, the consumer, handoffs and the single digest message. What an operator tested was not what an alert or a
+GitHub event runs.
+
+Only two Keycloak groups were let into the hosted console, because it had no read-only mode: anyone who could open it
+could start agent runs.
+
+#### Decision
+
+1. **An incident view in the console.** A third tab shows one incident, by correlation id or workflow id, as a Flow of
+   blocks (the default) or a Timeline, with an inspector per step. It reads, it starts nothing. The document is a
+   contract (`contracts/schemas/incident-view.schema.json`) built by `wardens.runtime.incidents` from three sources:
+   the incident workflow's new read-only `view` query, its children's descriptions and histories
+   (`wardens.durable.inspect`, the only place that reads Temporal for it), and the agents' run records. Tempo is not
+   read; the page links to Grafana for spans. A guardrail point is shown only when a record proves its result.
+2. **A console Send takes the ingress path.** The console validates the request (input schema, requester, channel
+   policy, guardrail point 1) and publishes `com.cloudutsuk.wardens.console.task.submitted` to the ingress hub. The
+   ingress consumer builds the root task with the same code, claims the dedupe key and always starts the incident
+   workflow as `incident-<correlationId>`. The console chooses the correlation id, so the page opens the incident at
+   once. The hub not taking the event is a 503 and nothing starts, as for the webhooks' relays. A direct mode runs the
+   same receiver in the request, for a laptop without a hub. Conversations keep starting their agent's workflow
+   directly: a conversation is one workflow with signals, not an incident.
+3. **Three console roles from the sign-in proxy's groups header**: viewer (the catalogue, incidents, runs), editor
+   (also Preview, Send, Chat), admin (also the kill switches). One table in the console says which permission each
+   route needs; a route not in it is not served.
+
+#### Considered options
+
+- **Keep starting workflows from the console, but always the incident workflow.** Same view, no contract or consumer
+  change, but a console send would still skip the hub, the consumer and the `wardens.ingress` span. Turned down by
+  the owner on 2026-11-16.
+- **Build the view from Tempo traces.** Agent spans are written from the run record when an agent ends, so the view
+  would not be live, and spans may be sampled.
+- **A Temporal search attribute for the correlation id.** It must be registered on the server first. The incident
+  workflows carry `correlationId` in their memo instead, and the read model resolves a correlation id from the
+  workflow id, the run records' `incidentWorkflowId`, or a bounded scan of recent incidents.
+
+#### Consequences
+
+- Every console Send is an incident: handoffs run and one digest message is sent, as for a real event.
+- The ingress consumer must be deployed before a console switches to relay mode; an older consumer dead-letters the
+  new event type. The consumer needs the console's incident queue and a state database role that can claim dedupe keys.
+- A Send that is a duplicate of another task is reported by the consumer, not on the page.
+- Cost, tool calls and output of an agent appear when it ends, because they come from its run record.
+- Eval scores have no record the console can read yet; the inspector shows the manifest's thresholds and says so.
+  Superseded by [0039](#adr-0039): the accepted report in the agent's folder.
+- Viewer and editor groups can be let into the hosted console once it runs this code with the groups header.
+
+#### Related
+
+- **Relates to:** [0030](#adr-0030) (the ingress hub and consumer), [0026](#adr-0026)
+
+## ADR-0039: The accepted eval report lives in the agent's folder, and console conversations are their starter's alone
+{: #adr-0039 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-16 · `platform-wardens`</span>
+
+#### Context
+
+The console's inspector shows each agent's eval thresholds but no scores: an eval run printed its report and, at
+most, wrote it to a file someone attached to a PR. Nothing kept the last accepted result, so `regressions` had no
+baseline to compare with, and the console had nothing to read.
+
+Decision 0038 also gave the console a viewer role. `GET /api/runs/<workflowId>` returned any run's result to anyone
+who knew the id, including a conversation another person had with an agent.
+
+#### Decision
+
+1. **Each agent commits its accepted eval report as `agents/<domain>/<agent>/evals/accepted.json`**, a contract
+   (`contracts/schemas/eval-report.schema.json`): agent version, when it ran, the model mode and name, the version of
+   every prompt file, the case counts, metrics, verdicts, the thresholds they were judged against and the failed case
+   ids. Summary only. An agent's eval runner writes it with `--accept` (`wardens.eval.accepted_report`,
+   `write_accepted`); every run compares itself with it (`regressions`). It is reviewed in the PR that changed the
+   prompt, model or code, and ships in the agent's image, so the console reads it from the registry's agent folder.
+2. **The inspector shows the accepted scores beside the thresholds**, with a verdict per metric, and says whether
+   the run's prompt versions (from its run record) are ones the report was measured on. The scores describe the
+   agent, not the run, and the page says so.
+3. **A conversation's or an Auto proposal's run is readable only by the person who started it**, whatever their
+   role. Incidents, and runs with no starter (scheduled), stay readable by any viewer.
+
+#### Considered options
+
+- **A table in the state database written by an eval job.** Live and queryable, but it needs a job with database
+  write access and the model credentials, a new migration and role, and a record that can disagree with the code
+  in the image. Nothing runs evals on a schedule yet. Worth revisiting when online (sampled live) grading exists;
+  the table would hold the same contract.
+- **CI artifacts.** Expire, are not reviewed with the change, and the console can't read them.
+- **Keep the scores out.** The inspector would keep showing thresholds that look like results.
+
+#### Consequences
+
+- An agent shows scores only after someone runs its eval set with a model and accepts it; until then the inspector
+  says no accepted report is committed. terraform-drift's runner has `--accept`; the other agents' runners gain it
+  when they get one.
+- A `--model none` run can be accepted, and the file and the inspector say it measured the deterministic stages only.
+- A broken `accepted.json` fails `read_accepted` (a bug to fix); the console logs it and leaves the scores out.
+- A viewer can't read another person's conversation, and neither can an admin through this route.
+
+#### Related
+
+- **Relates to:** [0038](#adr-0038) (the incident view and console roles),
+
+#### Note (2026-11-18, plan repo-per-agent phase 3 step 14)
+
+The runner is now the library's: `wardens eval run <agent folder> --accept --accepted-by <who>` writes
+`evals/accepted.json` for any agent whose manifest names an `evaluation.harness`, and terraform-drift's own
+`evals/run.py` is gone. The report says how it was run: `model.mode` is `none`, `test`, `recorded` or `live` (`env`
+stays for reports written before), with `repeats`, `passRate` and `safetyFailures`. What counts toward promotion
+(`countedTowardPromotion`) is decided by the library from each case's label provenance (real and confirmed by the
+manifest's owner), not by the agent. An accepted `test` or `none` run measures the workflow and the deterministic
+stages only, as a `--model none` run did before.
+
+#### Note (2026-11-18, plan repo-per-agent phase 3 step 14, production feedback)
+
+The "table in the state database" alternative is now used for one thing the repo can't hold: people's verdicts on
+production runs (`wardens.run_verdicts`, migration 0010). The scores stay in `evals/accepted.json`. `wardens eval run`
+reads the verdicts and the report gains `feedback` (right and wrong per lifecycle stage, the wrong runs not yet
+accepted as a case in the set or dismissed) and `promotionBlockers`, both optional in the eval-report contract (an
+expansion). `promotionReady` is false while a wrong run is unresolved, or when the verdicts could not be read (no
+state store, as in CI): an accepted report written there says so in `promotionBlockers`.
+
+#### Note (2026-11-18, plan repo-per-agent phase 3 step 14, calibrated judges)
+
+The report gains an optional `judges` block (an expansion of the eval-report contract): per judged measure, the judge
+model and family, the rubric version, the judge's raw mean score and its calibration against people's scores. The
+accepted report keeps it. A judged measure's value is in `metrics`, and so compared with the accepted report, only
+while its judge is calibrated; people's calibration scores live in the state database (`wardens.judge_samples`,
+migration 0011), like the production verdicts, not in the repo.
+
+## ADR-0040: One repository per agent, with wardens as a versioned library
+{: #adr-0040 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-17 · `platform-wardens`</span>
+
+#### Context
+
+platform-wardens is one uv workspace: the `wardens` framework, six agents, `mcp-guard`, the contracts, the shared
+config and the docs share one tree, one lock and one CI. That made it fast to build the framework and the first agents
+together, but:
+
+- An agent can't be built, reviewed, released or owned on its own by its domain cell (0020), and a new agent starts as a
+  folder in someone else's repo instead of a golden path of its own (0022).
+- The framework has no versioned boundary. Agents import internal modules, the framework finds agents, prompts, config
+  and samples by walking the repo layout, and 44 of the 154 merges up to 2026-11-17 changed the framework and an agent in
+  one PR.
+- Many of the platform's practices are followed by convention in agent code, not enforced by the library: guardrail
+  calls, model limits, memory access, tracing, eval scoring, idempotency, heartbeats. In one tree a reviewer catches a
+  slip; across seven repos nobody would.
+
+#### Decision
+
+Every agent moves to its own repository, `warden-<agent>`, and imports `wardens` as a versioned Python library. The
+framework enforces the platform's practices through the library, a check command, a reusable CI workflow and a
+template, not by sharing a folder tree. The owner's choices (the plan's "Owner's decisions" 1 to 11) are:
+
+- **Repos:** `warden-terraform-drift`, `warden-change-correlator`, `warden-stack-author`, `warden-incident-triage`,
+  `warden-cicd-triage`, `warden-cluster-upgrade-readiness`; `sql-blocking` is created from the template when built.
+  `mcp-guard` isn't an agent and stays. Each repo starts fresh; its first commit names the platform-wardens commit it
+  came from.
+- **Distribution:** the `wardens` wheel is published to Zot inside a small signed FROM-scratch image,
+  `platform/wardens-py:<version>`. An agent pins the version in `pyproject.toml` and the image digest in its
+  Dockerfile, and copies the wheel in; there is no base image with wardens installed, so each agent keeps one lock.
+- **Two distributions:** `wardens` (the agent SDK) and `wardens-services` (router, console, ingress, webhooks, approval
+  endpoint). Agents install only `wardens`.
+- **The console and the router get separate images;** the router (`wardens-router`) is the only host of the incident
+  workflow.
+- **Shared config that names several agents** moves to a new `wardens-deploy` repo that Argo CD reads directly,
+  with a versioned registry of agent manifests.
+- **One decision log**, here, for the framework and every agent.
+- **The framework is hardened in the monorepo first** (plan phase 3), so agents move out already compliant. The pilot
+  (`warden-incident-triage`) runs on the real pipeline, with no seed and no one-off CI.
+
+### Rules every phase relies on
+
+1. **Workflow changes are versioned.** Code that runs inside a workflow goes behind `workflow.patched` or worker
+   versioning and passes a replay test against recorded histories before it ships.
+2. **Contracts change by expand, then contract.** Contracts use `additionalProperties: false`, so a new field is first
+   accepted by every consumer and only then emitted; a removal goes the other way. CI checks compatibility in both
+   directions; a rename or removal is a major version.
+3. **Upgrade order:** the router and the console first, then agents. The current and previous minor versions are
+   supported.
+4. **The framework version is measured, not declared:** each worker reports the `wardens` version it runs (from the
+   installed wheel) in its Temporal build id and in every run record; the router reads it from the task queue's
+   pollers. One minor behind is a warning window; two behind is refused with a reason until bumped.
+5. **Risk-raising manifest changes need an approval record** from a person in the cell's reviewer group who isn't the
+   requester: raising an autonomy or action level, adding an act tool, raising the data classification or a budget,
+   widening `bounds`, egress or who may hand off to a capability. Enforced in `wardens-deploy` and by the router.
+6. **Version bumps by a `wardens bump` script** run by the release workflow. Renovate is turned down for now (no repo
+   uses a bot, and Renovate would need self-hosting to see Zot).
+7. **Eval tiers:** every bump PR runs the deterministic evals and the replay test; model evals run on a schedule, on a
+   manifest, prompt or model-stage change, and before a promotion.
+8. **Control evidence** across repos comes from the registry (manifests, approval records, accepted eval reports per
+   agent version) and the run records (0024).
+9. **The org stays on GitHub Free.** Required reviews and status checks stay unavailable on private repos, so the
+   guarantees come from the publish path, a Cosign attestation written only by `agent-ci.yaml`, Kyverno admission and
+   the approval gate. The Team plan is the alternative that was turned down.
+10. **Python standards:** python-standards. The public API of each subpackage
+    (its `__all__`) is what semantic versioning covers; a moved or renamed public name keeps a shim with a
+    `DeprecationWarning` for one minor version.
+11. **Handoffs by consent, not a central list:** the source declares `handoffs.mayRequest`, the target capability
+    declares `acceptsHandoffs.from` (`any` only on a capability with no act actions), the target's data classification
+    is at least the source's, and today's checks still pass. Refusals have fixed reason codes (`not_requested`,
+    `not_accepted`, `act_needs_named_source`, `classification`). `framework/config/handoff.yaml` goes.
+12. **Cost budgets at four levels, by the library:** per model call (from what the run has left), per run, per
+    incident (a running total; a handoff gets a share of what is really left) and per day per agent and per cell, with
+    the manifest's `onReach`. LiteLLM key budgets sit just above `perDayUsd` as the hard stop.
+13. **Long-term memory is bound to the manifest:** only through the binding, provenance set by the framework, reads
+    recorded and marked advisory, unreviewed memory can't justify an action, review and forget in the console, row-level
+    isolation per agent. Knowledge (runbooks, past RCAs) is a shared read-only retrieval capability, not memory.
+14. **Limits come from the manifest and are applied by the library:** requests, tool calls and timeouts per stage, run
+    and conversation, and incident breadth caps, under framework ceilings agents can only lower.
+15. **Traces are complete per step and follow the data classification:** live per-request spans, every gateway call
+    joined to its incident trace, prompt text kept only for agents at Internal or lower, tool outputs as size, hash and
+    a redacted excerpt.
+16. **Evaluations are owned by the library and gated in CI:** one case format with label provenance, the ten measures
+    of 13 Evaluation computed from the run record (deterministic wherever code can
+    check), calibrated judges only for measures of degree, every agent's deterministic evals gating its PRs, nightly
+    live runs, production runs marked wrong becoming cases before promotion, a `postCheck` for every act.
+17. **Tools are defined, fail and repeat safely through the library:** `wardens.tools` with required descriptions and a
+    definition hash, one error taxonomy that tells the model what it can fix, retry policy from the manifest, and every
+    act idempotent by a key the library claims before acting, with a declared guard.
+18. **Durable execution has stated rules:** the checkpoint is the activity, so an LLM stage is read-only and short;
+    every activity heartbeats; operators can hold and resume a run; long workflows continue as new; recovery is tested.
+19. **Docs change with the code:** each step's PR updates the docs it makes stale, and each agent repo carries a fixed
+    doc set, with an agent card generated from its manifest and checked in CI.
+
+### Enforcement
+
+Four layers, so no single one has to catch everything (plan section 13): the library runs the agent (the binding,
+`stage`, the toolset, the clients); the router decides cross-agent matters (routing, handoffs, version window); the
+build path (`agent-ci.yaml`, `wardens check-agent`, the attestation, a publish credential only `agent-ci` has); and
+the platform (Kyverno `verifyImages`, LiteLLM, `mcp-guard`, the chart's kill switch and settings).
+
+#### Considered options
+
+- **Keep the monorepo, harden the framework only.** Gets the enforcement but not ownership by the cells, independent
+  releases or a golden path per agent. The hardening is done first anyway, so this stays the fallback if the split
+  stalls.
+- **A base image with wardens installed, agents building `FROM` it.** wardens' dependencies would be installed before
+  the agent's, so the agent's lock and the image could disagree on shared packages, and tests outside Docker would
+  still need a wheel.
+- **A Python package index (devpi, a hosted index).** One more service to run and secure; Zot already stores signed
+  OCI artifacts and the agents' images.
+- **Git submodules or a git dependency on platform-wardens.** No signed artifact, a GitHub token in every build, and
+  no measured version.
+- **An orchestrator agent that wraps every agent.** It can't see inside another process; enforcement belongs in the
+  library the agent runs, with the router deciding only what crosses agents.
+- **GitHub Team for required reviews and checks.** Turned down by the owner; the attestation and approval gate give the
+  same guarantees for what matters.
+- **Renovate for bumps.** Turned down for now (above).
+
+#### Consequences
+
+- About 55 to 65 PRs across platform-wardens, `wardens-deploy`, six agent repos, homelab-gitops, infra-local and
+  infra-github; phase 3 (the hardening) is the largest.
+- A change to the framework and an agent becomes a release, a bump PR and an agent PR. The hardening first, release
+  candidates and `wardens bump` keep this short; the success criteria in the plan measure it.
+- Agents lose access to internal framework modules; what they need is promoted to a public API with a deprecation
+  window.
+- The guarantees that GitHub Free can't give (required reviews, required checks) move to the publish path and
+  admission, so a bypass of `agent-ci` produces an image Kyverno refuses.
+- Decisions for every agent stay here; agent repos link to them.
+
+#### Related
+
+- **Relates to:** [0004](#adr-0004) (Temporal), [0012](#adr-0012)
+
+#### Note (2026-11-18): how rule 2 is checked, and what counts as a major change
+
+Plan phase 4 step 2 built the check rule 2 asks for: `wardens release check` (`wardens.release`, in
+`.github/workflows/wardens-py.yaml` on every framework change) compares the contracts with the last final `wardens-v*`
+release. Every schema change is either an **expansion** (the new schema accepts everything the released one did: an
+optional property, a dropped `required`, a new enum value, a looser type or bound), which passes and is listed so
+producers wait for consumers, or a **tightening** (the new schema refuses something the released one accepted, or the
+check can't prove it doesn't: a changed `pattern`, `$ref` or `oneOf` branch counts). Rule 2 names renames and removals;
+the check treats every tightening the same way, because each one breaks an older producer the same way: a contract step
+must be named in `framework/CHANGELOG.md` by its `<schema>#<pointer>`, and ships only in a major version over the last
+release. That includes making an expanded field required (`handoffs`, `memory.items[].key`), and it applies before 1.0
+too, since rule 3 supports the previous minor version. Confirmed by the owner on 2026-11-18, before the first release (`0.2.0`). Release candidates are not a baseline: they are tried on agents,
+not deployed.
+
+#### Note (2026-11-18): where `agent-ci.yaml` lives, and its trust model
+
+Recorded in homelab-gitops ADR 0111 (plan phase 4 steps 3 and 4). `agent-ci.yaml` lives in homelab-gitops next to
+`build-image.yaml`, not here: that repo already holds the publish path's trust roots (the build workflow, Kyverno's
+policies and public keys) and is open to the org's repositories for reusable workflows, which platform-wardens isn't.
+What is specific to wardens stays in the `wardens` command it runs. GitHub's OIDC token names the innermost reusable
+workflow, so `agent-ci.yaml` builds, pushes, signs and attests in its own jobs, with `build-image.yaml`'s steps shared as
+composite actions. No agent code runs in a job that holds `id-token`: the tests, `check-agent`, replay and evals run in
+a job without it, and the jobs that sign read the repository as data. OpenBao role `agent-ci` accepts only that file
+at `refs/heads/main` from a `warden-*` repository and is the only role that can sign with the transit key `agent-ci`,
+which signs the agent-ci attestation Kyverno will check (step 5); `build-image.yaml` refuses role `main` to `warden-*`
+repositories.
+
+#### Note (2026-11-20): owner self-approval of registry entries (rule 5)
+
+Owner decision, in chat on 2026-11-20: "owner self approval is fine". The homelab has one real reviewer: the owner (the
+second GitHub account, `sakharam2s`, is the same person), so rule 5's "a person who isn't the requester" could only be
+met by pretending. Instead the record says honestly what happened:
+
+- **Who is an owner:** a member of a Keycloak group the console sees in the person's groups header, like the reviewer
+  groups: `wardens-owners` by default, `WARDENS_APPROVAL_OWNER_GROUPS` (comma-separated) in the console's values to
+  change it. Not "whoever asked", and not a list of subjects in a config file: membership is assigned in one place
+  (infra-local `host/keycloak/configure-realm.sh --grant`, homelab-gitops ADR 0078), and the console already resolves
+  roles and reviewer groups from that header.
+- **Owner does not imply reviewer:** the owner must still be in the cell's reviewer group (`wardens-<cell>-reviewers`).
+  Being an owner lifts only the requester rule, so the record's `approver.group` stays a real reviewer group and a
+  cell's reviewers stay the one list of who may decide for it.
+- **Only with a reason, only registry entries, only approve:** the console's "Self-approve (owner)" needs a non-empty
+  written reason (400 without), signs `selfApproved: true` and `selfApprovalReason` into `approval.json`, and audits
+  `approval.self_granted`. A requester who isn't an owner still gets 403. Chat actions (`chat-action`) keep the
+  two-person rule (the workflow's `wardens.guardrails` check), and nobody self-rejects.
+- **The gate accepts it by default:** `wardens registry verify-approval` and the router accept a signed self-approval.
+  `--require-two-person` or `WARDENS_APPROVAL_TWO_PERSON=true` refuse it, so wardens-deploy CI can require two people
+  again without a release. A record whose approver is the requester but lacks the marker is always refused.
+
+**Revisit** when a second real reviewer joins any cell: set `WARDENS_APPROVAL_TWO_PERSON=true` in wardens-deploy CI and
+the router (or pass `--require-two-person`), and empty `wardens-owners`.
+
+## ADR-0041: Team chat: one channel per cell, threads as durable sessions, Slack first
+{: #adr-0041 }
+
+<span class="adr-status adr-status-proposed">Proposed</span> <span class="adr-meta text-muted">2026-11-18 · `platform-wardens`</span>
+
+#### Context
+
+Today the only ways into wardens are the operator console, webhooks and schedules. Slack is outbound only, through
+incoming webhooks. An incident's investigation is visible only in the console, and a console conversation can be read
+only by the person who started it (0026), so the reasoning stays with one person instead of the on-call team. The
+standard asks to "use existing collaboration and ticketing systems" (category
+16). The AgentConnect comparison
+(openagents.md) concluded: adopt the front door, not the engine. That means team
+channels, a thread as a durable session, results posted back into the thread, and approval cards. It rejects channels
+as the agent-to-agent bus, open-ended coding harnesses, and memory that agents write freely.
+
+The owner's answers are in the plan, from 2026-11-18. They cover the channel shape, multi-agent threads, the platform,
+identity, the classification ceiling, the Slack plan, and the security questions S1 to S4.
+
+#### Decision
+
+1. **One channel per domain cell** (`#wardens-devops`, `#wardens-sre`, `#wardens-dba`, `#wardens-common`), private,
+   bound in a deploy config file `chat.yaml` (platform, channel id, classification ceiling, filters, open-thread cap).
+   Each binding is a new `slackBot` channel kind on the cell's existing domain audience, so 0011's routing by domain
+   and its approver audiences stay.
+2. **One Slack app.** Agents post under their own name, set only from the registry, with a fixed "via wardens" line.
+3. **Slack is first, behind a platform-neutral port.** A `ChatChannel` protocol and a `conversationRef`
+   (`platform`, `workspace`, `channel`, `thread`) on the task. The chat events are normalized into two CloudEvent
+   types. Teams is later work: Bot Framework through the tunnel or Azure Bot Service, an Entra app for the bot, and
+   Adaptive Cards.
+4. **A thread is a durable session.** A `wardens.thread` workflow runs on the router queue, one per thread. The
+   router routes and waits, and never calls a model with an agent's identity. Follow-ups run as the agent's own
+   read-only `<agent>.ask` capability, on its own queue, with its own key, budget and limits.
+5. **Several agents in a thread, but only because a person asks.** Tagging an agent starts a new root task with
+   `causationId` to the thread's incident. It passes the handoff consent and classification checks, plus the
+   requester's editor role in the **target agent's cell**. The relay drops every bot post, so an agent never starts
+   another through chat. Note on 0009: this is person-mediated routing, and group chat stays out of production.
+6. **Inbound through the tunnel and the ingress hub.** The Slack Events API reaches `hooks.cloudutsuk.com/slack/*`
+   (Access bypass; the signature is the authentication), then a relay, then Event Hubs, then the consumer. This is the
+   same path as GitHub and alerts. Socket Mode was turned down.
+7. **People are platform principals only through an explicit link.** The person signs in with Keycloak, using a
+   single-use nonce sent to them alone. Roles per cell are read from Keycloak each time they are used. Matching on the
+   Slack profile email was turned down.
+8. **Visibility follows the cell channel's membership.** This amends 0026 for chat threads. A daily check compares
+   each channel's members with its cell's Keycloak group.
+9. **What chat may do.**
+   - A linked viewer may ask.
+   - A linked editor may start a task, bring in an agent, hold and resume.
+   - A linked editor whose link was renewed in the last 7 days may confirm level 1, once a red-team exercise has
+     passed.
+   - **Level 2 is only in the console**, and the approver is identified only by an OIDC sign-in.
+   - A manifest operator may engage the kill switch; it is never released from chat.
+   - Effective level = min(manifest action level, the `chat` channel policy's cap, the requester's role cap, the
+     framework's cap).
+10. **Authorization at three points, each checking on its own:** the ingress consumer (the person and the channel),
+    the router (agents and consent), and the agent's binding (manifest and level).
+11. **The security architecture is the plan's section 2.7.** The owner chose the recommended options on 2026-11-18:
+    - Slack's signature is checked again at the consumer from the forwarded raw body.
+    - Buttons carry opaque ids only.
+    - A message holding a secret is refused and never stored.
+    - Thread turns are quoted as data with their author.
+    - `ask`'s read tools are bound in code to the task's `contextRefs`.
+    - Tools with `credential: person` are refused for chat.
+    - **One chat egress worker holds the bot token** (S1).
+    - **Chat text stays out of Temporal history**, which keeps only hashes and redacted excerpts (S2).
+    - **Level 1 needs a link renewed in the last 7 days** (S3).
+    - **The cell channels are private** (S4).
+    - The output is filtered by the channel's **Internal** ceiling and by the reply's taint.
+    - Every task carries `principal.via`, and every chat decision writes a hash-chained `chat.*` audit event.
+
+#### Considered options
+
+- **A channel per agent.** Turned down: it duplicates the domain audiences, splits a cell's on-call team, and needs a
+  binding per agent.
+- **One shared channel for all agents.** Turned down: too noisy, and every agent's data gets the same ceiling.
+- **Agents tagging each other in a thread.** Turned down: it is group chat (0009), and it needs a loop guard.
+- **The follow-up model stage on the router.** Turned down: the router would call models with another agent's key,
+  budget and classification, outside that agent's run records and evals.
+- **A bot per agent.** Turned down: more secrets and more tokens that can post, for a name that the registry can set.
+- **A Temporal payload codec instead of keeping text out of history.** Turned down for now: a wider change that needs
+  key management for every worker and the Temporal UI. It stays the later alternative.
+
+#### Consequences
+
+- The contracts and manifest fields come first (repo-per-agent phase 3 step 18, expand only): `conversationRef`,
+  `principal.via`, the `chat` channel kind, the chat event types, `interaction.chat`, `capabilities[].acceptsChat`,
+  and memory scopes. Agents leave the monorepo already compatible.
+- New public route `hooks.cloudutsuk.com/slack/*`. New secrets in OpenBao `kv/wardens/slack`: the signing secret,
+  read by the relay, and the bot token, read only by the egress.
+- New state tables: `chat_links` (migration 0012), `chat_threads`, and chat message text by reference.
+- Slack is a third-party processor outside the tenant. Content at most Internal is posted, and nothing regulated
+  (category 24). For the Azure target, Teams in the tenant is the better
+  data-residency fit.
+- On the Slack Free plan, SSO and 2FA can't be forced, so level 1 is bounded by the 7-day link freshness. Slack keeps
+  90 days of history, and the console keeps the record.
+- Category docs updated: 08, 09,
+  10, 11 and
+  18 with this decision. 16, 20 and 21 follow step 18's own edits.
+
+#### Related
+
+- **Status note:** the note of 2026-11-20 sets how a thread closes and what an ask sees of it
+- **Amends:** [0011](#adr-0011) (a `slackBot` channel on the domain audiences),
+- **Relates to:** [0018](#adr-0018) (model gateway),
+
+#### Note 2026-11-20: idle threads close after 15 minutes, and a reply resumes the whole thread
+
+Owner request (2026-11-20): "reduce the idle timeout to 15 mins as temporal would just consume resources for no
+reason", and a prompt in the same Slack thread must reach the thread "with the context of the complete thread and not
+start from scratch; if required, store it in long term memory".
+
+- **Idle close.** A thread waiting only on people (a thread from chat, or one reopened by a reply) closes after 15
+  minutes with nothing (`FOLLOW_UP_IDLE`), instead of 24 hours, and posts nothing when it does: the next message
+  resumes it. An incident thread whose incident hasn't ended keeps the 24-hour wait (`INCIDENT_WAIT`), because the
+  incident's own events can take longer than 15 minutes (a cold Change Correlator takes about that long); closing
+  early would drop its posts.
+- **The whole thread on every ask.** Each answered question and the answer posted to it are kept in the state store
+  by the router (migration 0018): `chat_turns` holds the thread's turns in order by message id and sha256, like
+  Temporal history (no text), and the answer's text joins the people's in `chat_messages` as `wardens:<agent>`, so an
+  ask reads it by id and hash exactly as it reads a question. Inside a running thread the answer joins the next ask's
+  turns; a run that starts after a close reads the thread's last 20 turns first. The ask is told which turns are
+  agents' earlier answers: context for what a question refers to, never a record and never instructions.
+- **Why not long-term memory.** Category 21's memory (`memory_items`) is one agent's, manifest-gated, with row security
+  per agent, and a thread spans agents (an incident thread has every agent that worked on it). The thread's history is
+  chat state with chat's retention (30 days) and chat's grants, so it lives with the thread index and the message text.
+- **What stays the same.** People's text never enters Temporal history. An answer is kept as the channel saw it:
+  redacted, and only the egress's notice when it was above the channel's ceiling; an earlier answer tainted above the
+  answering agent's classification is left out of its ask. The router and the agents share the `wardens_agent` login,
+  so the database can't stop an agent from adding a row; every turn is quoted to the model as data and checked against
+  the sha256 in the task. Threads started before the change (patch `team-chat-thread-context`) keep their 24-hour wait
+  and closing post until they close.
+
+**Expiry (same day).** The owner added: "The thread should eventually expire after 48hrs of idle time configurable and
+no new comment will be allowed". A thread expires when 48 hours pass with no message (chat.yaml
+`threadExpiryHours` per cell, 15 minutes to 30 days), measured from its last message (an incident thread's end counts
+too; a row from before migration 0019 counts from its close, else its opening). The router keeps the last message and
+the cell's expiry in the thread index (migration 0019), and the ingress consumer, which reads the index before it
+routes a reply, refuses a message in an expired thread: its text isn't kept, nothing is routed or asked, and the first
+such message gets one reply in the thread ("This thread expired after 48 hours without a message. Mention @wardens in
+the channel to start a new one"), posted by a one-shot thread run because only the egress posts in a thread; later
+messages are only audited (`chat.message.refused`) and logged, so an expired thread can't be made to flood the channel.
+An incident thread whose incident is still running never expires. The index row now lives 30 days past the last
+message, so it always outlives the expiry and an expired thread is refused rather than started anew.
+
+## ADR-0042: wardens-deploy: an immutable versioned registry, publish by commit or pull request, contract checks per version pair
+{: #adr-0042 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `platform-wardens`</span>
+
+#### Context
+
+Decision 0040 moves the config that names several agents, and a registry of agent manifests, to a new repository,
+`wardens-deploy`, which Argo CD reads; each agent's `agent-ci` run publishes its entry there. The plan left open how an
+entry is laid out and published, what "the entry matching the worker's version" means when there is none, which version
+pairs the handoff contract checks cover, and how the monorepo keeps working while the files move.
+
+#### Decision
+
+1. **Layout of `wardens-deploy`:** `config/` (the files that name agents, cells or channels: `routing`, `entry-points`,
+   `ownership`, `webhooks`, `redaction` and `chat`, `wardens.config.DEPLOY_FILES`), `registry/<agent>/<version>/`
+   (manifest, `schemas/`, `samples/`, `evals/accepted.json`, `approval.json` when needed, `source.json`), `mcp/`
+   (generated from the registry) and `evals/routing/cases.yaml`. Framework-only config (`limits`, `cells`,
+   `mcp-servers`, `notify`) stays in the wheel.
+2. **A published version never changes.** Publishing a version that is already there with other content is refused
+   (raise the manifest's version); the same content publishes nothing, so a re-run is safe. `source.json` records the
+   repository, commit, run and image digest that published it (control evidence, 0040 rule 8).
+3. **Commit or pull request, failing closed.** `wardens registry publish` commits a non-risk-raising entry to `main` and
+   opens a pull request on `registry/<agent>/<version>` for a risk-raising one, by
+   `wardens.registry.diff.risk_reasons` (plan phase 5 step 4). A wardens without that function publishes **every**
+   entry as a pull request: nothing skips review because the check is missing. The commit carries `mcp/` regenerated
+   from the whole registry; a push that loses a race starts again from the new `main`.
+4. **The router uses the entry for the version the worker reports** (`agent=<name>@<version>` in the build id, phase 4
+   step 8): the registry keeps every version, and capability resolution and handoff planning use that version's
+   manifest, so a rolled-back image is checked against its own. With no reported version, or no entry for it, the
+   newest entry is used and the router logs it; that version's entry not serving the capability or not routable is
+   refused (reason `registry_entry`). Refusing an unknown version instead would stop every agent whose entry isn't
+   published yet, which is all of them until their repositories exist.
+5. **Contract checks cover each agent's two newest versions**, the deployed one and the one a rollback goes back to,
+   for every declared handoff (a source's `mayRequest` and a target that consents). The producer's evidence is its
+   **producer samples**: `suggestedHandoffs` entries with `inputs` in any JSON under its entry's `samples/`
+   (`samples/handoffs/*.json` by convention), each validated against the consumer's input schema; a declared handoff
+   without one fails. Consent and classification are checked as the router decides them.
+6. **The deterministic checks run in `wardens-deploy` CI** (`wardens registry check`, with a pinned `wardens`): the
+   entries, the contracts, the config with the framework's own loaders, `mcp/` regenerated and compared, and the
+   routing cases against the registry. The routing evals against the real model stay a manual run
+   (`wardens registry routing-eval`): they cost model calls and need a gateway key, and the threshold is a reviewed
+   change to `config/routing.yaml`.
+7. **Transition:** `config_path` uses `$WARDENS_CONFIG_DIR/<name>` when the file is there and the packaged copy
+   otherwise, until plan phase 5 step 7 removes the agent-naming files from the wheel. Until phase 5 step 6 mounts
+   `wardens-deploy` into the pods, the packaged copies are what runs, so a change to one of those files is made in both
+   places; the monorepo's `deploy/mcp/` stays generated and checked until the agents leave (phase 8 step 4).
+8. **The `registry` job runs the `wardens` that `wardens-deploy` pins**, not the agent's: the job holds a write
+   credential to `wardens-deploy`, so the publishing code is the version that repository's CI checks with, and the agent
+   repository is read as data (YAML and JSON; no agent code runs).
+
+#### Considered options
+
+- **Fall back to the newest entry silently, or refuse an unknown version.** Silent hides a missing publish; refusing
+  stops every agent until it has its own repository. Logged fallback, with the version's own entry when there is one.
+- **Contract checks for every version in the registry.** The list only grows, and versions nothing can run any more
+  would fail checks for nothing. Two covers the deployed version and its rollback (0040 rule 3's "current and previous").
+- **Derive producer samples from the agents' code or eval outputs.** The registry holds no code, and eval outputs are
+  not always present; a sample in the entry is what the consumer can see and check.
+- **Treat a missing risk check as "not risk-raising".** Turned down: the gate must fail closed.
+
+#### Consequences
+
+- Each agent with a handoff keeps a producer sample next to its code; check-agent already checks its suggestions are
+  in `mayRequest`.
+- A risk-raising entry waits for a pull request merge, with the approval record of phase 5 step 4.
+- Until phase 5 step 6, wardens-deploy is checked and published to but not yet what the pods read.
+
+#### Related
+
+- **Relates to:** [0040](#adr-0040) (repo per agent: rules 4, 5, 8 and
+
+#### Note (2026-11-19): how the pods read this repository (phase 5 step 6, first for incident-triage)
+
+Owner decision of 2026-11-19: Argo CD reads the private `wardens-deploy` with **its own read-only SSH deploy key**, the
+pattern it already uses for homelab-gitops (recorded in homelab-gitops ADR 0038's note of 2026-11-19; infra-local
+`host/argocd/deploy-key.sh --repo --kv` and the ExternalSecret `repo-wardens-deploy`). Not the `gitops-writer` App
+(it can write), not a new read-only App (more to run for one repository).
+
+The plan's kustomization became a **Helm chart at the repository root**: kustomize's `configMapGenerator` names every
+file, so each `wardens registry publish` would have to edit it, while Helm's `.Files.Glob` reads `registry/` at render
+time. It renders `wardens-registry-<agent>` (keys `<version>__<path>`) and `wardens-config`, at sync wave -1, as a
+second source of each consuming Argo CD app; homelab-gitops `charts/wardens-agent` 0.1.7 copies the keys back to a tree
+in an init container and sets `WARDENS_REGISTRY_DIR` and `WARDENS_CONFIG_DIR`. A pod reads the registry as it was when
+it started; a new version of an agent comes with a new image, which restarts it.
+
+#### Note (2026-11-20): the wheel stops carrying the deploy config (phase 5 step 7, wardens 0.6.0)
+
+Rule 7's transition is over. The six `DEPLOY_FILES` are gone from `wardens/config/defaults/`; `config_path` refuses
+one (`DeployConfigMissing`) unless its per-file variable or `$WARDENS_CONFIG_DIR` gives it, and `WorkerSettings`
+refuses to start without `WARDENS_CONFIG_DIR`. Every loader reads the path at call time. Choices:
+
+- **No fallback, not even to an empty map.** The ownership map and the redaction labels decide guardrail handoffs and
+  what reaches telemetry, so a worker without them doesn't run (it would otherwise fail at its first guarded call, or,
+  where a stage catches the error, take its fallback silently).
+- **Test copies, not the wheel, for tests and evals.** platform-wardens' tests read `framework/tests/fixtures/config/`
+  (a frozen copy of wardens-deploy `config/`). An agent repository gets template-owned copies of the three files a
+  binding and its tests read (`ownership.yaml`, `redaction.yaml`, `entry-points.yaml`) in `tests/fixtures/config/`, a
+  template-owned `tests/conftest.py` and a Makefile export that point `WARDENS_CONFIG_DIR` there unless set, and
+  homelab-gitops agent-ci sets the same directory for `wardens eval run`. `evals-nightly.yaml` reads wardens-deploy's
+  own `config/`. The agent copies change only with a template release; a real ownership or redaction change is made in
+  wardens-deploy, and the copies follow when they matter to a test.
+
+#### Note (2026-11-20): the router and console (phase 5 step 6 for the services)
+
+The router and every pod on the console image (console, alerts, hooks, ingress consumer, Slack relay, chat egress and
+the redeliver and membership jobs) read the registry and config the same way (homelab-gitops #363: wardens-deploy's
+chart as a second source of `wardens-router` and `wardens-console` with no `agents` filter, `charts/wardens-web` 0.8.0's
+`registry.configMaps` and `config.configMap` and its `wardens-web.deploy.*` helpers for the console's other pods). Their
+images hold no registry any more, and `deploy/registry-moved/` and its `registry-required` check are gone. Two choices:
+
+- **The services list every agent by name** (`registry.configMaps` in both apps), since a pod mounts a ConfigMap by
+  name and nothing at render time sees what wardens-deploy holds. Not one combined ConfigMap of every agent: the 1 MiB
+  limit would then cover every version of every agent. A new agent is added to both lists, as its own worker app is;
+  `services/tests/test_service_registry_mounts.py` (pr.yaml, with checkouts of both repositories) fails when the lists
+  differ, miss a deployed worker or a published agent, or name one wardens-deploy doesn't render (its pods couldn't start).
+- **They read the registry once, at start**, like the agents. Unlike an agent, the router doesn't restart when an agent
+  publishes a new version: until its next rollout (any image or values change, or `kubectl rollout restart`), a worker
+  reporting that version is checked against the newest entry the router holds (`Registry.entry_for`), logged as a
+  fallback. Not a sidecar that keeps copying and a router that reloads: more code for a case a rollout covers.
+
+#### Note (2026-11-20): owner decision A2a, agent CI tests against the template's copies of the deploy config
+
+Owner decision of 2026-11-20 (A2a), confirming the step 7 note above: an agent repository's CI (homelab-gitops
+`agent-ci.yaml`, its tests and the eval gate) reads the template's test copies of `ownership.yaml` and
+`redaction.yaml` in `tests/fixtures/config/`, not wardens-deploy's real `config/`. The nightly evals
+(`evals-nightly.yaml`, decision [0046](#adr-0046)) read
+the real config. So a pull request's verdict doesn't depend on another repository's state, and an ownership or
+redaction change in wardens-deploy shows in an agent's results the next night, not in its pull requests; when a
+change matters to a test, the template's copies follow in a template release.
+
+#### Note (2026-11-20): the router and every pod follow newly published entries without a restart
+
+Owner decision of 2026-11-20 (B5) reverses the second choice of the note above ("they read the registry once, at
+start"). A pod now picks up a newly published entry within about two minutes of wardens-deploy's sync:
+
+- **The ConfigMaps stay flat and are still copied into a tree**, because the keys (`<version>__<path>`) are only known
+  when wardens-deploy's chart renders them, so the pod specs in homelab-gitops can't map them to paths with projected
+  `items`, and the framework reads `<agent>/<version>/…`. The copy now writes each new tree beside the old one in the
+  emptyDir and swaps a `current` symlink, which `WARDENS_REGISTRY_DIR` names; the init container makes the first tree
+  before the app starts, and a native sidecar on the same image (`restartPolicy: Always`) copies again whenever the
+  ConfigMap volumes change (kubelet updates them in about a minute; never mounted with `subPath`, which doesn't
+  update). A reader sees the old tree or the new one, never a mix; the sidecar keeps the previous tree, so a reader
+  still walking it isn't cut short. It runs in the router, every console pod (`charts/wardens-web`) and every agent
+  worker (`charts/wardens-agent`), with no new image or wheel: the copy is the charts' inline Python.
+- **The services reload cheaply**: the console, webhooks, ingress consumer and classifier already re-read the registry
+  on every request; the router's incident and thread activities hold a `wardens.runtime.LiveRegistry`, which checks a
+  fingerprint of the directory every `WARDENS_REGISTRY_RELOAD_SECONDS` (default 30), swaps a new registry in whole,
+  logs the versions added and removed, and keeps the one read before when the new one can't be read, holds no agent or
+  has a manifest newly failing the schema. An agent's worker reads its cell's manifests at each budget check, so the
+  agents need no new wardens release; the router and console images build from platform-wardens `main`.
+
+## ADR-0043: Owner decisions of 2026-11-19: check-agent rule changes are breaking, the nightly evals read the state store, and four interim choices kept
+{: #adr-0043 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `platform-wardens`</span>
+
+#### Context
+
+Six choices were made as interim values while the repo-per-agent plan ran, each waiting for the owner:
+
+1. whether the agent template ships the minimal eval harness by default (phase 4 step 6);
+2. a gap in the release rule, found when `warden-ci-check` moved from wardens 0.2.0 to 0.3.0: 0.3.0's check-agent rule
+   `doc-set` failed the agent until its manifest named `docs.readme`, `docs.changelog` and `docs.claudeMd`, fixed by
+   hand (warden-ci-check #2). `wardens release check` classified schema changes, but not a new or stricter check-agent
+   FAIL rule, so a minor release could break every agent's CI;
+3. what the router does with an agent whose measured framework version it can't place (phase 4 step 8);
+4. the `chat` entry point's limits (phase 3 step 18);
+5. whether the nightly eval run may read the state store (phase 3 step 14), without which its reports say production
+   feedback and judge calibration were "not checked";
+6. the judge settings (phase 3 step 14).
+
+#### Decision
+
+1. **The template ships the minimal eval harness by default.** The copier question `eval_harness` stays default yes;
+   `wardens new-agent --no-eval-harness` leaves it out. Without a harness agent-ci's eval gate passes a new agent with
+   "no harness" and its first real cases have nothing to run on.
+2. **A release that adds or tightens a check-agent FAIL rule that existing agents would fail is breaking**, like a
+   contract step: it is named under **Breaking** in `framework/CHANGELOG.md` with its migration, and it ships only in a
+   major version (rule 2: every schema tightening is a major, and so is this). `wardens bump` applies the fix in each
+   agent's bump pull request, so an agent's CI doesn't fail by surprise after the bump:
+   - `wardens release check` runs this checkout's check-agent rules on the agent folders as they were at the last final
+     release (`agents/` at its `wardens-v*` tag; each passed check-agent then). A rule they now fail is listed and fails
+     the check unless the `Unreleased` (or current) section names it (`` `doc-set` ``) under `### Breaking` with its
+     migration: a bump migration for that rule released after the baseline, or the fix described in the entry with the
+     word "migration" (for a fix that `copier update` brings). Once the version moves, it must be a major over the last
+     release. `--no-rules` skips it (`wardens.release._rules`). Since 2026-11-20 (the agents left `agents/` in #294,
+     so a later tag holds none) the baseline's agents are its agent template rendered fresh and every `warden-<agent>`
+     main that pins it or newer (`--agent-repos`); no agent to run the rules on fails the check.
+   - `wardens bump` applies every **bump migration** (`wardens.release._migrations.MIGRATIONS`: the release, the rule,
+     a summary and a pure fix over the repository's files) whose release is after the agent's pin and at or before the
+     target, after `copier update` and the pins; the pull request lists each one. The one known case is in:
+     `0.3.0` / `doc-set` names README.md, CHANGELOG.md and CLAUDE.md in the manifest's `docs` and adds their rows to
+     the agent card (what warden-ci-check #2 did by hand); a missing file is left to a person, with a note.
+   - Limit: the baseline is the monorepo's agents. When the agents have left for their own repositories (phase 8), the
+     check needs another baseline (the template rendered at the last release); until then the template-made repos are
+     covered because their rules are the same as the monorepo agents'.
+3. **The router routes an agent whose version it can't place, and alerts** (the current behaviour, kept): a worker
+   newer than the router (`ahead`) is routed and `WardensAgentFrameworkVersionAhead` (P3) fires after an hour; an agent
+   with no live worker (`absent`) or a reading that failed (`unknown`) is routed as before (the task waits on its
+   queue), and `WardensAgentFrameworkVersionAbsent` / `WardensAgentFrameworkVersionUnknown` (P3, added with this
+   decision in homelab-gitops) fire when it lasts 30 minutes. A worker without a wardens build id counts as 0.2.0.
+   Refusing instead would stop an agent's tasks for a router-side reading problem; the alerts make it visible.
+4. **The `chat` entry point keeps its limits for now:** level 0 by default (at most level 1 with a person's role), 0.25
+   USD per request or follow-up, a 30-minute deadline and a hop budget of 1 (`entry-points.yaml`). They are accepted
+   interim values. **Revisit** after real use: once team chat's thread workflow (team-chat C6) has run for 30 days, or
+   sooner when a chat task hits one of these limits (`WardensAgentHittingLimits`, the run records' stop reasons).
+5. **The nightly eval run reads the state store**, as its own read-only role: `wardens_eval` (migration 0015) may
+   `SELECT` `run_verdicts` and `judge_samples` and nothing else. The console's role, the only one that could read them
+   before, also writes kill switches, verdicts, samples, memory reviews, holds, chat links and approvals, which a CI job
+   running agent code must not hold. The DSN reaches CI from OpenBao (`kv/ci/wardens-evals`, `state_dsn`) through a
+   GitHub OIDC role, `wardens-evals`, bound to `evals-nightly.yaml` at `refs/heads/main` on a self-hosted runner; never
+   a GitHub secret. `evals-nightly.yaml` reads it when the repository variable `WARDENS_EVALS_STATE_DB` is `true`, and
+   revokes the OpenBao token before the agent's code runs. A live `--judge` run as `wardens_eval` reads calibration but
+   can't set samples aside (an insert): judging in the nightly run is a later choice. The database is a ClusterIP in
+   the `wardens` cluster and the ARC runner pod is on `platform`, so it is not reachable yet: how to reach it is a
+   separate owner choice (the plan's phase 3 step 14 item lists the options); nothing is opened by this decision.
+   **Amended 2026-11-19 by [0044](#adr-0044):** the owner chose option
+   (d). The nightly run reads the verdicts from the console's read-only endpoint (`GET /api/evals/feedback`) with a
+   GitHub OIDC token, and the console reads them as `wardens_eval`; the OpenBao role `wardens-evals` and
+   `kv/ci/wardens-evals` are gone.
+6. **The judge settings stay:** terraform-drift's judge is `gemma-4-26b-a4b` (Google's Gemma, another family than the
+   agents' Qwen, on the homelab LiteLLM at no cost), declared for `intentResolution` and `narrativeQuality` with no
+   threshold; a judged measure counts only while at least 80 % of at least 10 people-scored samples in 30 days agree
+   with the judge within one point (`evaluation.judges`, per agent).
+7. **Turning team chat on is not risk-raising by itself** (added 2026-11-19, a later owner decision the same day, given
+   in chat). `wardens registry diff --risk` drops the rule `chat_enabled` (`interaction.chat.enabled` turning true, or
+   a new chat `tools` entry), so such an entry needs no approval record. Reason: a chat `ask` is read-only and level 0:
+   the framework caps the level at 0, refuses every tool that isn't `kind: read` (`ask_read_only`) and enforces the
+   budget, the kill switch and holds; and the owner has no second reviewer account, so every agent that turned chat
+   on waited on an approval nobody could give (terraform-drift 0.2.1, wardens-deploy #8, failed CI with
+   `approval_missing` only for this). The rules that raise real risk stay exactly as they were: `chat_act_capability`
+   (`acceptsChat` on an agent with act actions), `chat_level1_confirm` (`interaction.confirmFromChat`), and every
+   other rule, including `budget_raised` and `limits_relaxed` on the chat budget and turns of an agent that already
+   had chat on. Shipped in wardens 0.5.1; wardens-deploy CI checks with its pinned `tools/` version, so it takes effect
+   there when that pin moves.
+
+#### Considered options
+
+- **Release rules: a static rule-set diff** (rule ids added since the tag). Turned down: a new rule every agent passes
+  isn't breaking, and a stricter old rule keeps its id. Running the rules on the last release's agents finds exactly
+  what the owner's rule names: what existing agents would fail.
+- **Release rules: only print the fix in the CHANGELOG** (the person applies it). Turned down by the owner: six repos
+  bump at once in phase 8, and each would fail its CI first.
+- **Nightly state access as the console's role.** Works, but hands a CI job running agent code the console's writes.
+- **A new read-only role later, the console's now.** Turned down: the role is one migration and one Job, and the
+  network isn't there yet anyway.
+
+#### Consequences
+
+- A minor release can no longer carry a check-agent rule that the last release's agents fail; such a change waits for
+  the next major (or is made a WARN first, then a FAIL in the major).
+- Each such rule change comes with a bump migration or a template change, written in the same PR.
+- homelab-gitops creates `wardens_eval` in the `wardens-state-roles` job (its password in OpenBao
+  `kv/wardens/wardens-state-db` `eval_password`) before the schema job applies migration 0015. (infra-local's
+  `configure-ci.sh` added the role `wardens-evals`, its policy and the `kv/ci/wardens-evals` copy; removed again with
+  decision 0044.)
+- The `chat` limits and the judge settings are no longer listed as waiting on the owner; the `chat` limits have a
+  revisit trigger.
+
+#### Related
+
+- **Status note:** decision 5's way in amended by [0044](#adr-0044)
+- **Decided by:** the owner, 2026-11-19 (six pending items in the workspace's PENDING.md and the plan's "Waiting on the
+- **Relates to:** [0040](#adr-0040) (rules 2, 3, 4, 6 and 16),
+
+## ADR-0044: The nightly evals read production feedback through a read-only console endpoint, not from Postgres
+{: #adr-0044 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `platform-wardens`</span>
+
+#### Context
+
+Decision 0043 decision 5 let the nightly eval run (`evals-nightly.yaml`) read people's verdicts on runs, as its own
+read-only role `wardens_eval`, with a DSN from OpenBao. It could not work yet: wardens-state-db is a ClusterIP in the
+`wardens` cluster and the ARC runner pod that runs the job is on `platform`. The owner was offered four ways in:
+
+- (a) a Traefik TCP route on the `wardens` load balancer's 443 with TLS and SNI to Postgres;
+- (b) a 5432 port on the k3d load balancer (a changed k3d config recreates the cluster);
+- (c) run the nightly job inside `wardens` (a runner scale set there, or a CronJob);
+- (d) a read-only endpoint on the operator console, which is already served over HTTPS, that CI calls instead.
+
+#### Decision
+
+**(d), chosen by the owner on 2026-11-19.** No database port is opened and CI holds no database credential.
+
+1. **The endpoint.** `GET /api/evals/feedback?agent=<name>&limit=<1..500>&after=<runId>` on the console
+   (`wardens_services.console.routes.eval_feedback`) answers a page of one agent's verdicts with only what the eval
+   report counts: run id, lifecycle stage, verdict, state and accepted case id, in run id order, with `next` when there
+   is more. Corrections, candidate cases and people's names never leave the console here; the strings it does serve
+   go through `redact_text`.
+2. **Least privilege on the database.** The console reads that page on its own connection as `wardens_eval`
+   (`WARDENS_EVAL_STATE_DSN`, migration 0015: `SELECT` on `run_verdicts` and `judge_samples`, nothing else), never as
+   its own role `wardens_console`, which also writes kill switches, verdicts and approvals. A bug in the route can't
+   write or read anything else. The `wardens_eval` role stays; only who holds its password changes (the console's
+   pod, from OpenBao `kv/wardens/wardens-state-db` `eval_password`, through an ExternalSecret).
+3. **A machine identity with no stored secret.** The job sends a GitHub Actions OIDC token, minted when the run reads
+   the feedback (audience `wardens-console-evals`). The console checks GitHub's signature against its JWKS, the issuer,
+   the audience, expiry, and the claims: `job_workflow_ref` is
+   `cloudutsukpilot/platform-wardens/.github/workflows/evals-nightly.yaml@refs/heads/main`, `ref` is
+   `refs/heads/main`, `runner_environment` is `self-hosted`, and `repository_owner_id` is the org's numeric id (the
+   same binding as the OpenBao CI roles). Anything else is a 401; an unconfigured console refuses every token (503).
+   A Keycloak client-credentials client was not used: it needs a client secret stored in GitHub.
+4. **The sign-in proxy lets only this path through.** The oauth2-proxy sidecar skips its session check for
+   `GET ^/api/evals/feedback$` (homelab-gitops `charts/wardens-web` `auth.skipAuthRoutes`, ADR 0113); the console
+   answers that path before it reads the proxy's user or groups headers, so a browser's headers count for nothing
+   there and every other route still needs a Keycloak session. The runner calls the internal name
+   `console.wardens.home.cloudutsuk.com` (the `wardens` load balancer), not the public name behind Cloudflare Access.
+5. **The switch stays `WARDENS_EVALS_STATE_DB`.** With it `true` (on `main`), `evals-nightly.yaml` sets
+   `WARDENS_EVAL_FEEDBACK_URL` and `WARDENS_EVAL_FEEDBACK_AUDIENCE`, and `wardens.eval.load_feedback` reads through
+   `wardens.eval.ConsoleFeedback` (every page, at most 20,000 verdicts per agent); any failure is "not checked" with
+   its reason, as before. A person's run by hand with `WARDENS_STATE_DSN` (the console's role) still reads Postgres.
+6. **Removed:** the job's OpenBao sign-in and DSN steps, the OpenBao role `wardens-evals`, its policy
+   `ci-wardens-evals` and the `kv/ci/wardens-evals` DSN (infra-local `host/openbao/configure-ci.sh`,
+   `WARDENS_EVALS_DB_HOST`): nothing reads them any more.
+7. **Judge calibration is not served.** The nightly run doesn't pass `--judge`; judging in the nightly run stays a
+   later choice (decision 0043), and would add its own page of `judge_samples` the same way.
+
+#### Considered options
+
+- **(a) and (b):** open a Postgres port beyond the cluster for one nightly read, and hand CI a database password; (b)
+  also recreates the cluster.
+- **(c):** keeps the database internal, but needs a second runner scale set (or a CronJob that can't post a GitHub job
+  summary) in `wardens`, which runs agents, not CI.
+- **The console's existing feedback API** (`/api/feedback/<agent>`): it needs a person's Keycloak session and the
+  editor role, and serves corrections and candidate cases the eval report doesn't use.
+- **A Keycloak client-credentials client:** a long-lived client secret in GitHub, and the console's proxy would need a
+  service account in a console group, which would give it a person's role on every route.
+
+#### Consequences
+
+- The nightly feedback depends on the console being up; when it isn't, the report says "not checked" (promotion
+  blocked, the gate unchanged).
+- The console fetches GitHub's JWKS over HTTPS (its egress already allows 443) and caches the keys.
+- A new machine caller of the console needs its own route and its own token check; this route is not a general API.
+
+#### Related
+
+- **Decided by:** the owner, 2026-11-19 (option (d) of the network choice decision 0043 decision 5 left open)
+- **Amends:** [0043](#adr-0043) decision 5
+- **Relates to:** plan repo-per-agent phase 3 step 14. homelab-gitops ADR 0113 (the
+
+## ADR-0045: The release job tags with a GitHub App token and finishes a release idempotently
+{: #adr-0045 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-19 · `platform-wardens`</span>
+
+#### Context
+
+The wardens 0.5.0 release run (44550983192, three attempts) built and signed `wardens-py:0.5.0`. Then its
+"Tag and GitHub release" step failed each time with `HTTP 403: Resource not accessible by integration` from
+`gh release create --target <sha>`, with `GITHUB_TOKEN` and `contents: write`. The owner created the tag and release by
+hand, and the job's bump never ran.
+
+The cause, from the evidence: GitHub refuses a ref (here a new tag) on a commit whose `.github/workflows` differ from
+what the repository already has unless the token has the `workflows` permission, which `GITHUB_TOKEN` never has
+(the same check that refuses a push of a workflow change; community reports describe it for tags on older commits).
+Main moved from the release commit 316deb7 to ca68c23 (#288, which changes two workflows) at 15:07:23Z, and the
+first release attempt started at 15:09:38Z. Every earlier release (0.2.0, 0.3.0, 0.4.0rc1, 0.4.0) ran while main was
+still at its release commit or at a commit with the same workflows, and all of them passed, even though their ranges
+since the last tag changed (0.2.0 to 0.3.0) and added (`pr.yaml`) workflow files. So it isn't the range since the last
+tag (the first guess, deletions in wardens-v0.4.0..316deb7), but the tagged commit's workflows against main's at the
+time. It needs only a workflow change merged in the minutes between a release merge and its release job.
+
+Two more gaps: a re-run or a dispatch after the tag existed did nothing (`wardens release plan --dispatch` treated an
+existing tag as "nothing to release", so the bump never ran), and a dispatch from a later main would have tagged that
+later commit and rebuilt the image from it, whose version tag already names another build (refused, ADR 0105).
+
+#### Decision
+
+1. **A GitHub App token for the tag and release.** A new App, `cloudutsuk-wardens-release` (contents and workflows
+   write, metadata read, no webhook), installed on platform-wardens only, key in OpenBao `kv/ci/wardens-release`,
+   read with role `wardens-release` (bound like `wardens-bump` to `wardens-py.yaml` at `refs/heads/main` on a
+   self-hosted runner; infra-local `host/openbao/configure-ci.sh`, `host/github/manifests/wardens-release.json`). The
+   job mints a token for this repository only, with contents and workflows write, when the repository variable
+   `WARDENS_RELEASE_APP` is `true`; otherwise it uses `GITHUB_TOKEN`, and a 403 prints the cause and the exact
+   commands. No existing App fits: the bump App is installed on the `warden-*` repositories only, and the Apps
+   installed everywhere (terraform-drift's, the targets refresh) belong to other jobs and have no workflows
+   permission, which the tag check needs. The App never changes a workflow; workflows write is there only for the tag.
+2. **Tag and document the release commit.** `wardens release plan` returns `commit`: the tag's commit when the tag
+   exists, else the oldest first-parent commit of the newest run that has the version. The release job checks out
+   that commit (CHANGELOG, `pdoc`) and creates the tag there, never at a later HEAD. The image is built only when the
+   release commit is the run's own; otherwise the release uses the digest of `wardens-py:<version>` from Zot, and
+   fails with what to re-run if there is none.
+3. **Idempotent.** A tag that exists at the release commit is kept (at another commit: fail, a tag never moves); a
+   release that exists gets only what it lacks (the API reference); then the bump runs. `wardens release plan
+   --dispatch` returns `finish=true` (with `release=false`) for the newest version whose tag exists, so a dispatch on
+   main finishes a release whose bump didn't run; the release and bump jobs run on `finish`. A push still releases
+   only when the version moves, and a dispatch for an older version than the newest tag finishes nothing.
+
+#### Consequences
+
+- Until the owner creates the App and sets the variable, a release whose window contains a workflow change still
+  fails at the tag; the owner tags by hand (the error prints the command) and dispatches the workflow, which finishes
+  the rest. After that, no hand-made tag.
+- The App can push to any branch of platform-wardens, workflow files included. Its key is readable only by
+  `wardens-py.yaml` on main, and the token is narrowed to this repository and revoked at the end of the job.
+- wardens 0.5.0's release lacked its API reference; it was added by hand from the release commit (the same `pdoc`
+  command, `uv.lock` at 316deb7).
+
+#### Related
+
+- **Status note:** (the App is waiting for the owner; until then the job uses `GITHUB_TOKEN` and says what to do)
+- **Decided by:** Claude, for the owner's request after wardens 0.5.0 ("fix the release job, so a release doesn't need a
+- **Amends:** plan repo-per-agent phase 4 step 2 (how `wardens-py.yaml` creates the tag
+- **Relates to:** [0040](#adr-0040) rule 6 (bumps), homelab-gitops ADR 0105
+
+## ADR-0046: The nightly evals run every agent repository from platform-wardens' `evals-nightly.yaml`
+{: #adr-0046 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-20 · `platform-wardens`</span>
+
+#### Context
+
+`evals-nightly.yaml` ran every agent folder under `agents/` live through LiteLLM each night, sent the eval gauges to
+Mimir (`WardensEvalSafetyFailure`, `BelowThreshold`, `Regression` and `Stale` alert on them) and read production
+feedback from the console (decision 0044). Phase 8 moved every agent to its own `warden-<agent>` repository, and #294
+removed the last folder, so the job found no agents: green every night, and no agent had a nightly result. Each
+agent's pull requests still run the deterministic tiers (test and recorded models) in homelab-gitops `agent-ci.yaml`;
+only the live nightly tier had no home.
+
+Two homes were possible:
+
+- **(a)** a reusable nightly workflow in homelab-gitops that each agent repository calls on its own schedule (the
+  agent-ci pattern), with a caller file in the copier template;
+- **(b)** platform-wardens' own `evals-nightly.yaml` checking out each agent repository and running its set with the
+  wardens wheel that repository pins.
+
+#### Decision
+
+**(b).** `evals-nightly.yaml` stays the one nightly eval run and goes over the agent repositories:
+
+1. **Which agents:** the directories of wardens-deploy `registry/` (every agent with a published entry, the list the
+   release job's bump uses), else a static list in the workflow. A new agent is in the nightly run once agent-ci has
+   published its first entry; nothing in its repository has to change.
+2. **Each agent as its repository's `main` and its own pin:** the job checks out `cloudutsukpilot/warden-<agent>` with
+   `REPO_READ_TOKEN`, fetches and verifies the wheel image its Dockerfile pins (homelab-gitops `wardens-wheel`, OpenBao
+   role `pr`, Zot pull only, the OpenBao token revoked before any agent code runs), `uv sync --frozen`, and runs
+   `wardens eval run .` there, live on the schedule and on `repository_dispatch litellm-models-changed`, recorded on a
+   dispatch by hand. The eval set, harness and thresholds are the agent's own, at the version of wardens it ships with.
+3. **Nothing in decision 0044's trust changes:** the OIDC token the console checks is still minted by
+   `platform-wardens/.github/workflows/evals-nightly.yaml@refs/heads/main`, so the console's
+   `WARDENS_EVAL_READER_WORKFLOW`, its egress and the sign-in proxy's skip route stay as they are, and the live runs
+   keep the one LiteLLM key (`WARDENS_EVAL_LITELLM_KEY`) with its own budget. No secret is copied into six
+   repositories and no OpenBao role is added.
+4. **One agent by hand:** `repository_dispatch` with event type `evals-run` and `client_payload` `{"agent": "<name>",
+   "model": "recorded" | "live"}` runs one agent (the name must be in the list above). `workflow_dispatch` keeps no
+   inputs (Checkov CKV_GHA_7).
+5. **No artifacts:** the report goes to the job summary and the gauges to Mimir, as before; nothing is uploaded.
+
+#### Considered options
+
+- **(a) a reusable workflow per agent repository.** Each repository would own its schedule, but every one would need
+  the LiteLLM key (six repository secrets, or an org secret every repository can read, or a new OpenBao role), and
+  the console would have to accept a reusable workflow's token from six repositories and bind each repository to its
+  own agent's verdicts: a console change, a redeploy and owner steps, for no gain in what is measured. Six schedules
+  also spread the live load over the night instead of one queue on the ARC runners.
+- **Running the agents' published images.** The images hold the agent and its wheel but not its eval set, harness
+  dependencies or recordings in the layout `wardens eval run` reads, and they run as a worker, not a CLI.
+
+#### Consequences
+
+- The agent's `main` code runs in a job that holds `id-token: write`, as the agents' code did in the monorepo: it can
+  mint this workflow's OIDC token, which only the console's feedback route and OpenBao role `pr` (Zot pull, any
+  repository of the org) accept. A new OpenBao role bound to `evals-nightly.yaml` would widen that; bind any such role
+  to another workflow.
+- `REPO_READ_TOKEN` must be able to read every `warden-*` repository and wardens-deploy (a run says which it could
+  not read, and that agent's job fails).
+- An agent with no eval harness (cicd-triage, cluster-upgrade-readiness today) passes with "no harness yet" and sends
+  no gauges, as before.
+
+#### Related
+
+- **Decided by:** the plan's owner session (the plan left the nightly run's home open after phase 8; no owner choice
+- **Relates to:** plan repo-per-agent phase 3 step 14 ("Live-model runs") and phase 8;
+
+#### Note (2026-11-20): owner decision A4a, the trust boundary stays as stated
+
+Owner decision of 2026-11-20 (A4a): the nightly run keeps the trust boundary this decision states. Each agent
+repository's `main` code runs in a job that holds `id-token: write` and the live LiteLLM key, as the agents' code did
+in the monorepo; the owner accepted that rather than splitting the run into a job without the token (or one per
+repository). What limits it stays as in the consequences above: the token is accepted only by the console's read-only
+feedback route and OpenBao role `pr` (Zot pull), the OpenBao token is revoked before any agent code runs, and any new
+OpenBao role must be bound to another workflow, never to `evals-nightly.yaml`. Revisit it if an agent repository gets a
+writer outside the owner and the org's apps, or if a new role or route would accept this workflow's token.
+
+## ADR-0047: terraform-drift merges its pull request, or runs a revert's apply, after a Slack approval (level 2)
+{: #adr-0047 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-21 · `platform-wardens`</span>
+
+#### Context
+
+terraform-drift stops at level 1. For a change the code should take (codify, import, remove or restore a deleted
+resource) it opens a draft pull request. For unauthorised drift it recommends a revert, which needs no code change:
+the fix is re-running the stack's apply, which `run_stack_apply` (`granted: false`) leaves to a person. Then it sends
+a Slack summary. Nobody is asked to approve anything, so a person has to find the PR, mark it ready and merge it, or
+start the apply by hand. On 2026-11-21 the owner asked why the run on infra-azure `azure/development/homelab-velero`
+(a hand-added `drift-test` tag, judged unauthorised drift, revert) opened no pull request and sent no approval
+request.
+
+Decision 0007 ships L0 and L1 only (`FRAMEWORK_MAX_LEVEL = 1`). It grants L2 per action after evidence floors
+(at least 30 real cases, zero safety failures in the window) and a Promote gate. terraform-drift is in `shadow`.
+The framework already has the L2 path: point 4 marks a level 2 action `needs-approval`, and the durable approval
+wait sends an approval card, waits for the `approval` signal until it expires (expiry is a denial) and audits every
+decision. Nothing uses it yet. Approving through Slack was ruled out in category 10 because a webhook can't tell
+who clicked. Team chat (0041) has since built signed button presses and a Slack-user-to-Keycloak-principal link that
+the console confirms.
+
+#### Decision
+
+1. **Merge on approval (L2).** terraform-drift gets two level 2 actions:
+   - `merge_drift_pr`: its own pull request for codify, import, remove or restore is marked ready and squash-merged.
+     The merge runs the stack's apply (terragrunt-cicd applies on `main`; on GitHub Free the "(Approval Required)" jobs
+     are labels, not gates).
+   - `apply_stack_revert`: for a revert, it dispatches terragrunt-cicd `apply` for that one stack on `main`.
+   Before acting it checks again that the approval names exactly this action, that the PR's head SHA (or, for a
+   revert, `main`'s SHA and the plan) is unchanged since the approval was requested, and that the kill switch is off.
+   Any difference means nothing is merged or applied, and the run says why.
+2. **Owner waiver of the evidence floors, development and qa only.** The framework ceiling goes to 2. terraform-drift
+   may use the two L2 actions only on stacks whose environment is `development` or `qa`, for 30 days or 30 approved
+   runs, whichever comes first. Then the 0007 floors and the Promote gate apply as written. Production, staging and
+   every other environment stay L1: draft PR or recommendation, with no approval request. The waiver is recorded in
+   the agent's manifest and in the eval report, not only here.
+3. **Approve and Deny buttons in Slack, from linked users.** The approval card goes to the devops Slack channel with
+   Approve and Deny buttons. A press counts only when it is a signed Slack request (as team chat checks today) and the
+   Slack user has an active link to a Keycloak principal (decision 0041) in the action's approver groups. The approver
+   is that principal, never a name in the request. Self-approval is allowed and recorded as `selfApproved`, because
+   the owner is also the reviewer here. The card also links the console's /approvals page, which works without Slack.
+4. **The card shows what will change, from the plan.** The approval card carries a plan summary, laid out like the
+   GitHub summary of the drift scan run (the shared module's `platform_as_code.reporting.plan_summary`):
+   - the stack and the counts line (`Plan: N to import, N to add, N to change, N to destroy`);
+   - each resource with its action (`+` create, `~` update, `-` destroy, `-/+` replace, `<=` import);
+   - for an update, the changed attributes before → after;
+   - links to the scan run's summary and to the PR.
+   Sensitive and unknown values show as `(sensitive)` and `(known after apply)`, never as values. The agent builds
+   the summary from the `tfplan.json` it already reads. The summary's hash is part of what is approved, so an Approve
+   press approves exactly the plan it showed. A revert's summary is the plan the apply will run: the same changes,
+   reversed back to the code.
+5. **The wait outlives the incident.** An approval waits up to 24 hours, which is longer than a drift incident's
+   deadline (2 hours). The incident ends after the PR and the approval request. The approval and the act then run in
+   their own durable workflow per proposed action, keyed by its idempotency key, which posts the result to the same
+   Slack thread and the PR.
+
+#### Considered options
+
+- **PR and Slack message, the person merges (L1):** rejected by the owner. It keeps the clicks in GitHub.
+- **Apply only for a revert:** rejected. PR fixes would still need a merge in GitHub.
+- **Build now, enable after the floors:** rejected for development and qa. The waiver gets real approvals now, and
+  production keeps the floors.
+- **Console-only approval:** kept as the fallback link on the card. Slack buttons were chosen as the main path.
+
+#### Consequences
+
+- The framework's `FRAMEWORK_MAX_LEVEL` is 2. Point 4 still caps every action at its own manifest level and the
+  task's ceiling, so no other agent changes until its manifest asks for level 2.
+- The drift GitHub App needs `actions: write` (dispatching the apply) on top of `contents: write` and
+  `pull_requests: write`. That is an owner step in the GitHub App settings, and each installation has to accept it.
+- The manifest's `never` list stops saying "Merges ... a pull request" for its own drift PRs after an approval. It
+  keeps "approves a pull request", "pushes to a default branch" and "edits a branch it did not create".
+- The registry entry is risk-raising (new act tools, higher level), so wardens-deploy needs a signed approval for it
+  (decision 0042).
+- To watch: a merge whose apply fails. The run reports the apply's conclusion and never retries an apply by itself.
+
+#### Related
+
+- **Decided by:** the owner, 2026-11-21 (three choices: merge on approval; an owner waiver for development and qa
+- **Relates to:** decisions [0007](#adr-0007) (autonomy levels), [0013](#adr-0013)
+
+## ADR-0048: Registry approvals are requested by CI and committed when a reviewer approves
+{: #adr-0048 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-22 · `platform-wardens`</span>
+
+#### Context
+
+A registry entry that raises risk over the agent's last one (decision 0040 rule 5) waits in a wardens-deploy pull
+request until it has a signed `approval.json`. Until now a person made that record by hand: open the console's
+Approvals page, paste the agent's current and new manifests, ask, approve (or self-approve as the owner), download
+`approval.json` and commit it beside the entry. The owner asked (2026-11-22, on terraform-drift 0.3.0) that none of
+that be manual: the manifests come from the publish itself, the console tells the reviewer a request is waiting, and
+pressing Approve is the last step.
+
+#### Decision
+
+1. **CI asks.** The registry publish in homelab-gitops `agent-ci.yaml` (`wardens-registry-publish`), after it opens
+   the pull request for a risk-raising entry, sends the agent's current entry (the highest version on wardens-deploy
+   `main`, or none) and the new manifest to the console's machine route `POST /api/registry-approvals`, with a GitHub
+   Actions OIDC token. The console checks the token (GitHub's issuer and keys, its own audience, the workflow
+   `homelab-gitops/.github/workflows/agent-ci.yaml` at `refs/heads/main`, `refs/heads/main` of the caller, the
+   organisation's id) and that the caller's repository is the agent's own (`cloudutsukpilot/warden-<name>`), then
+   opens the request with `registry_request`, which computes the risk items itself. The requester is that workflow
+   (`agent-ci:cloudutsukpilot/warden-<name>`), not a person, so any reviewer of the cell, the owner included, approves
+   it the usual way: requester ≠ approver holds and no self-approval is needed. Asking again for the same entry hash
+   returns the open or decided request (a re-run asks nothing new).
+2. **The console tells the reviewer.** The Approvals page lists the pending requests, those the signed-in person may
+   decide first ("Waiting for you"), and the console's header shows how many are waiting for them. A request links to
+   its pull request.
+3. **Approving is the last step.** A wardens-deploy workflow (`approvals-sync.yaml`, every five minutes and on demand)
+   reads the approved registry requests from the console's machine route `GET /api/registry-approvals/decided` with
+   its own OIDC token (audience, workflow `wardens-deploy/.github/workflows/approvals-sync.yaml` at `refs/heads/main`).
+   For each with an open pull request `registry/<agent>/<version>` that has no `approval.json`, it writes the signed
+   record beside the entry, runs `wardens registry verify-approval` and `wardens registry check` on the result, commits
+   it to the pull request's branch and squash-merges the pull request. A record that does not verify is not committed,
+   and the run fails with why. A rejection leaves the pull request open with the reviewer's comment on the console.
+4. **Nothing is trusted more than before.** The signing key stays in the console. wardens-deploy's check still verifies
+   every record against the entry's hash, so a record for a different entry than the one in the pull request fails.
+   Neither machine route reads the sign-in proxy's headers; both answer 401 to a bad token and 503 when not
+   configured, like the eval feedback route (decision 0044).
+
+#### Consequences
+
+- No copying manifests, downloading records or committing by hand; the reviewer's press is the only manual step, and a
+  merge follows within about five minutes.
+- The manual path (`/approvals`, paste, ask) stays for an entry published before this, or when CI can't reach the
+  console.
+- The sync merges to wardens-deploy `main` with that repository's own `GITHUB_TOKEN`; its commits start no other
+  workflow, which is why the sync runs the checks itself before merging.
+- Two more paths the sign-in proxy lets through without a session (homelab-gitops `wardens-web` `auth.skipAuthRoutes`).
+
+#### Related
+
+- **Amends:** [0040](#adr-0040) rule 5 (how the approval record is asked for
+- **Plan:** registry-approval-requests
+
+## ADR-0049: The console starts the approvals sync right after a registry approval
+{: #adr-0049 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-24 · `platform-wardens`</span>
+
+#### Context
+
+Decision 0048 has wardens-deploy's `approvals-sync.yaml` commit an approved registry record and merge the entry's pull
+request, on a `*/5` cron and on demand. GitHub starts scheduled workflows late and skips some under load: on
+2026-11-23 terraform-drift 0.3.2's entry (wardens-deploy #23) was approved in the console and its pull request still
+waited hours later, until the sync was dispatched by hand (merged 84763e4d). The reviewer's press was meant to be the
+last step; a wait of hours, with the agent's deploy blocked behind it, breaks that.
+
+Options considered:
+
+1. **Dispatch from the console on approval** with its own small GitHub App (Actions write, wardens-deploy only).
+2. **Reuse an existing App the console pods already hold** (the terraform-drift App, for the webhook and redelivery).
+   Its key is the agent's identity, installed on every repository; using it for the console's own action would widen
+   what that key does and blur the audit trail.
+3. **A tighter cron or a polling loop elsewhere** (a CronJob in the cluster calling the API). Still needs a token with
+   Actions write, adds a moving part, and only shortens the average wait.
+4. **Keep dispatching by hand.** Puts a person back in the loop 0048 removed.
+
+#### Decision
+
+1. After a reviewer **approves** a registry request, the console sends `workflow_dispatch` (ref `main`) to
+   `cloudutsukpilot/wardens-deploy` `.github/workflows/approvals-sync.yaml`. A rejection sends nothing: the sync
+   only commits approved records. It is the registry kind's `OnDecided` hook
+   (`wardens_services.approval_endpoint.registry_sync_hook`), run after the decision is stored.
+2. **Best-effort.** The dispatch waits at most 15 seconds; any failure (no App configured, a refused token, GitHub
+   unreachable) is logged as a warning and the approval stands. The cron stays as the fallback, so the worst case is
+   what it was before.
+3. **Its own identity.** A new GitHub App, `cloudutsuk-wardens-approvals-sync` (infra-local
+   `host/github/manifests/wardens-approvals-sync.json`): Actions write and metadata read, no events, installed on
+   wardens-deploy only. Its id, key and installation id live in OpenBao `kv/wardens/approvals-sync`; the console gets
+   them through an ExternalSecret as `WARDENS_APPROVALS_SYNC_APP_ID`, `WARDENS_APPROVALS_SYNC_APP_PRIVATE_KEY` and
+   `WARDENS_APPROVALS_SYNC_APP_INSTALLATION_ID`. Each token it mints is narrowed to `actions: write` on wardens-deploy.
+   Unset, nothing is sent.
+4. Nothing new is trusted: a dispatch only starts the same workflow at `main`, which reads the approved records with
+   its own OIDC token and verifies each one before committing it (0048 point 4). Starting it when there is nothing
+   to do costs one short run.
+
+#### Consequences
+
+- An approved entry merges within a few minutes of the press (the sync's own run time), not whenever GitHub runs the
+  cron.
+- One more App and secret to keep. The owner creates and installs it once (github-app-setup on the Spark).
+- A burst of approvals starts several runs; the workflow's `concurrency` group runs them one after another and the
+  later ones find nothing left to do.
+
+#### Related
+
+- **Amends:** [0048](#adr-0048) point 3 (when the sync
+- **Plan:** approvals-sync-dispatch
 
 {% endraw %}
 <!-- adr:end -->

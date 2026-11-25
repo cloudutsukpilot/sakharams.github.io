@@ -5,7 +5,8 @@
 name: Platform Wardens
 tag: Platform Wardens
 summary: 'A multi-agent framework for operations work: Pydantic AI agents on Temporal that observe, diagnose
-  and recommend for DevOps, SRE and DBA, with autonomy enforced in code and a person deciding every action.'
+  and recommend for DevOps, SRE and DBA, with autonomy enforced in code and a person approving every action
+  that changes anything.'
 status: In progress
 created: '2026-11-09'
 category: ai-automation
@@ -20,7 +21,7 @@ facts:
 - label: Hosting
   value: wardens k3d cluster on the Cloudutsuk homelab, via Argo CD
 - label: Autonomy
-  value: L0 observe and L1 recommend; a person decides
+  value: L0 observe, L1 recommend, L2 act after a Slack approval (terraform-drift on development stacks)
 - label: Architecture
   value: System diagram
   url: /posts/projects/platform-wardens/05-technical-architecture/#system-context-and-component-architecture

@@ -1,14 +1,14 @@
-# Ported from platform-wardens diagrams/wardens-call-map/diagram.yml (2026-11-09); icons mapped to the blog's logos
+# Ported from platform-wardens diagrams/wardens-call-map/diagram.yml (2026-11-25); icons mapped to the blog's logos
 # and the how-doc references dropped. Edit the source in platform-wardens and port again, so the two stay the same.
 # Call map: which Python function in an agent calls which function in the wardens framework, and which checks,
-# guardrails and LLM practices run on the way. Traced on platform-wardens main (2026-11-09) for two agents:
+# guardrails and LLM practices run on the way. Traced on platform-wardens main (2026-11-09; stack-author's breaker and tool guard updated 2026-11-16;
+# model stages through wardens.llm.stage, STAGE.run and Stage.toolset updated 2026-11-18) for two agents:
 # terraform-drift (started on drift by the GitHub webhook, deterministic stages plus two LLM stages) and stack-author (a chat with tools).
-# Every component's API line is the file and line of the function; paths under agents/ are short for
-# agents/devops/<agent>/src/<package>/, paths under wardens/ for framework/src/wardens/.
+# Every component's API line is the file and line of the function as it was in the monorepo; paths under agents/ are short for
+# agents/devops/<agent>/src/<package>/ (since 2026-11-19 each agent is its own warden-<agent> repository, src/<package>/),
+# paths under wardens/ for framework/src/wardens/.
 # Gaps the code shows today are drawn as stated limits, not as working paths:
 # - guardrail point 1 (check_submission) runs only in Console.build, so schedule-started tasks skip it;
-# - stack-author's model has no circuit breaker (model_from_env without agent=);
-# - stack-author's GuardedToolset gets no manifest or audit log, so tool bounds aren't checked and refusals aren't audited;
 # - no agent stage calls mcp_toolset yet (drift's manifest declares web search; the MCP plan's phase 5 is next).
 title: wardens call map
 description: "Which agent function calls which wardens function, and the checks, guardrails and LLM practices that run on the way, replayed as eight use cases."
@@ -67,9 +67,10 @@ nodes:
 
   - id: agents
     label: Agent code
-    sub: "agents/devops/*"
+    sub: "warden-<agent> repos"
     icon: code
     status: built
+    detail: "Traced when the agents were folders under agents/devops/ in platform-wardens (2026-11-09 to 11-18). Since 2026-11-19 each lives in its own warden-<agent> repository and pins a wardens release; the file and line numbers are the monorepo's."
     facts:
       summary: "Each agent is a small Python package: a worker, a deterministic workflow, activities, stages and tools."
       how: "Agents never import Temporal or a model SDK directly: they go through wardens.durable and wardens.llm (ADR 0040, 0042)."
@@ -199,8 +200,8 @@ nodes:
                 status: built
                 facts:
                   summary: "LLM stage: says for each changed attribute whether it is expected, a hotfix or unknown."
-                  how: "Agent(output_type=ClassifyOutput, retries=2), usage limits 4 requests and 60,000 tokens, evidence wrapped as untrusted data."
-                  api: "`agents/…/terraform_drift/stages/classify.py:87`"
+                  how: "STAGE = stage(\"classify\", output=ClassifyOutput, redact=redact_prompt, retries=2) at module level; classify() calls STAGE.run(prompt, deps=…, model=…). The manifest's limits.stages.classify (4 requests, 600 s per request) and the run's remaining budget (the token limit) bound it; evidence wrapped as untrusted data."
+                  api: "`agents/…/terraform_drift/stages/classify.py:100` (STAGE `:50`)"
               - id: d_gate
                 label: gate.evaluate()
                 icon: check
@@ -215,8 +216,8 @@ nodes:
                 status: built
                 facts:
                   summary: "LLM stage: one short explanation for a proposal the gate already decided."
-                  how: "Usage limits 2 requests and 20,000 tokens; on failure a fixed default rationale."
-                  api: "`agents/…/terraform_drift/stages/recommend.py:63`"
+                  how: "STAGE = stage(\"recommend\", output=Rationale, redact=redact_prompt, retries=1); STAGE.run(…). The manifest's limits.stages.recommend (2 requests) and the run's remaining budget bound it; the fallback is a fixed default rationale."
+                  api: "`agents/…/terraform_drift/stages/recommend.py:67` (STAGE `:57`)"
           - id: d_writer
             label: GitHubWriter.open_draft_pr()
             sub: "tools/draft_pr.py"
@@ -253,8 +254,8 @@ nodes:
             status: built
             facts:
               summary: "Builds the chat model, the catalog, the GitHub reader and writer, and binds the activities."
-              how: "_model calls model_from_env without agent=, so this model has no circuit breaker; require_price still applies."
-              api: "`agents/…/stack_author/worker.py:103`, `:125`"
+              how: "_model calls model_from_env(agent=NAME), so the model is behind the agent's breaker; require_price refuses an unpriced one."
+              api: "`agents/…/stack_author/worker.py:103`, `:126`"
           - id: a_workflow
             label: workflow.py
             icon: file
@@ -318,8 +319,8 @@ nodes:
             icon: file
             status: built
             facts:
-              summary: "The chat stage: budget, guarded read tools, the model, and a validator that prepares the diff."
-              how: "Agent(output_type=[Ask, Propose], retries=2); REQUEST_LIMIT 14 per turn."
+              summary: "The chat stage: declared once with stage(), its read tools, and a validator that prepares the diff."
+              how: "STAGE = stage(\"chat\", output=[Ask, Propose], fallback=_fallback, redact=redact_prompt, tools=_tools, tool_parameters=…, retries=2); the manifest's limits.stages.chat: 14 requests, 16 tool calls, 840 s per request, 4,000 output tokens."
               api: "`agents/…/stack_author/stages/chat.py`"
             children:
               - id: a_chat_turn
@@ -327,25 +328,25 @@ nodes:
                 icon: function
                 status: built
                 facts:
-                  summary: "Sets the turn's usage limits, runs the agent with the guarded toolset and records the model call."
-                  how: "CostCeilingReached becomes the reply \"This conversation has used its budget…\"."
-                  api: "`agents/…/stack_author/stages/chat.py:164`"
+                  summary: "Runs one turn: STAGE.run with the turn's history, recalled memory and the conversation's remaining budget."
+                  how: "ModelAccess(model, manifest, prices, audit, run ids); the library builds the limits, the guarded toolset and the ModelCall. A spent budget is the stage's fallback: the reply \"This conversation has used its budget…\"."
+                  api: "`agents/…/stack_author/stages/chat.py:217`"
               - id: a_toolset
-                label: _toolset()
+                label: _tools()
                 icon: function
                 status: built
                 facts:
-                  summary: "The six read tools the model may call, wrapped in GuardedToolset."
-                  how: "GuardedToolset(FunctionToolset(…), allowed=read_tools(manifest, …), agent=…); no manifest or audit is passed."
-                  api: "`agents/…/stack_author/stages/chat.py:95`"
+                  summary: "The six read tool functions for one turn (stage(tools=_tools)); the agent never wraps them itself."
+                  how: "Plain async functions over the catalog and reader. Stage.toolset() offers them only inside GuardedToolset, built from the manifest: bounds are checked and refusals audited."
+                  api: "`agents/…/stack_author/stages/chat.py:93`"
               - id: a_prepared
                 label: _prepared()
                 icon: check
                 status: built
                 facts:
                   summary: "Output validator: a proposal is prepared in code (real stack, real module inputs) before it reaches the person."
-                  how: "Errors raise ModelRetry with the reasons, so the model repairs the proposal (2 retries)."
-                  api: "`agents/…/stack_author/stages/chat.py:67`"
+                  how: "Errors, or an add or update for a module read_module didn't read in this turn, raise ModelRetry with the reasons, so the model repairs the proposal (2 retries)."
+                  api: "`agents/…/stack_author/stages/chat.py:110`"
           - id: a_tools
             label: tools/
             icon: file
@@ -509,7 +510,7 @@ nodes:
             facts:
               summary: "Turns a signed workflow_job delivery from the drift scan into a root task and starts the incident."
               how: "HMAC checked first; a matching DriftRule builds the request and calls Console.build."
-              api: "`framework/src/wardens/runtime/github_webhook.py:224`"
+              api: "`services/src/wardens_services/webhooks/github/receiver.py:224`"
           - id: w_console
             label: Console.build()
             icon: function
@@ -517,7 +518,7 @@ nodes:
             facts:
               summary: "The one place a root task is built for operators, webhooks and routing, with guardrail point 1."
               how: "create_root_task, narrow to the channel's grants, then check_submission; refused raises Refused."
-              api: "`framework/src/wardens/runtime/console.py:181`"
+              api: "`services/src/wardens_services/console/app.py:181`"
           - id: w_entry
             label: create_root_task()
             sub: "entry.py"
@@ -616,7 +617,7 @@ nodes:
         icon: cpu
         status: built
         facts:
-          summary: "The only way to a model: endpoint and breaker, prices and usage limits, guarded tools, call records."
+          summary: "The only way to a model: model stages (stage(), STAGE.run), endpoint and breaker, prices and usage limits, guarded tools, call records."
           how: "Pydantic AI models pointed at LiteLLM; the agent never holds a key or a provider SDK."
           api: "`framework/src/wardens/llm/`"
         children:
@@ -635,7 +636,7 @@ nodes:
                 status: built
                 facts:
                   summary: "The model an agent uses: the LiteLLM endpoint and deployment from the environment."
-                  how: "With agent=, wraps it in BreakerModel; without it (stack-author today), no breaker."
+                  how: "With agent=, wraps it in BreakerModel; both agents pass it."
                   api: "`framework/src/wardens/llm/providers.py:128`"
               - id: w_breaker
                 label: BreakerModel
@@ -661,7 +662,7 @@ nodes:
                 facts:
                   summary: "Refuses, at worker start, a model prices.yaml doesn't price: no unbounded turns."
                   how: "Raises UnpricedModelError."
-                  api: "`framework/src/wardens/llm/limits.py:47`"
+                  api: "`framework/src/wardens/llm/limits.py:65`"
               - id: w_usage
                 label: usage_limits()
                 icon: function
@@ -669,7 +670,7 @@ nodes:
                 facts:
                   summary: "Turns the remaining budget into Pydantic AI usage limits for one run."
                   how: "No budget left raises CostCeilingReached; a free model gets only a request limit; tokens priced at the dearer rate."
-                  api: "`framework/src/wardens/llm/limits.py:57`"
+                  api: "`framework/src/wardens/llm/limits.py:77`"
               - id: w_guarded
                 label: GuardedToolset
                 icon: shield
@@ -677,7 +678,7 @@ nodes:
                 facts:
                   summary: "Wraps a stage's tools: hides undeclared ones and runs point 2 on every call."
                   how: "Refusal → ModelRetry JSON (and an audit event when given an audit log); execute_tool span with redacted args; results capped at 20,000 characters."
-                  api: "`framework/src/wardens/llm/limits.py:78`"
+                  api: "`framework/src/wardens/llm/limits.py:111`"
               - id: w_read_tools
                 label: read_tools()
                 icon: function
@@ -685,16 +686,48 @@ nodes:
                 facts:
                   summary: "The manifest's read tools this stage may use, with their parameter names."
                   how: "Act tools are never included."
-                  api: "`framework/src/wardens/llm/limits.py:138`"
-          - id: w_model_call
-            label: model_call()
-            sub: "llm/__init__.py"
-            icon: function
+                  api: "`framework/src/wardens/llm/limits.py:243`"
+          - id: w_stage
+            label: stage.py
+            icon: file
             status: built
             facts:
-              summary: "Records one model call for the run record: stage, model, prompt version, tokens, or the failure."
-              how: "Called with result=None when the stage fell back."
-              api: "`framework/src/wardens/llm/__init__.py:24`"
+              summary: "Model stages defined by the library: an agent declares each stage once with stage() and runs it with STAGE.run(); it never builds a Pydantic AI agent, a model or a toolset."
+              how: "Every run: redaction (the agent's redact=, then the secret patterns), usage limits from the run's budget, tools only inside GuardedToolset, the ModelCall, live spans, and the fallback on any model failure."
+              api: "`framework/src/wardens/llm/stage.py`"
+            children:
+              - id: w_stage_def
+                label: stage()
+                icon: function
+                status: built
+                facts:
+                  summary: "Declares a stage at module level: name, prompt file, output type, fallback, redact=, tools, retries. Its limits come from the manifest's limits.stages.<stage>."
+                  how: "Reads the prompt file once (its hash is the prompt version) and builds the Pydantic AI agent inside the library."
+                  api: "`framework/src/wardens/llm/stage.py:436`"
+              - id: w_stage_run
+                label: STAGE.run()
+                icon: function
+                status: built
+                facts:
+                  summary: "Runs the stage once and returns a StageResult: the output (the model's or the fallback's), the ModelCall and the tool calls."
+                  how: "Refuses a stage without redact= above public data (MissingRedaction); no budget left (CostCeilingReached), a limit reached (requests, tool calls, request timeout) or any model failure returns the fallback with the reason. Never raises for a model problem."
+                  api: "`framework/src/wardens/llm/stage.py:329`"
+              - id: w_stage_toolset
+                label: Stage.toolset()
+                icon: shield
+                status: built
+                facts:
+                  summary: "The stage's tool functions for one run, wrapped in GuardedToolset with the manifest's read tools."
+                  how: "Needs ModelAccess(manifest=…); any extra toolset (MCP) must already be a GuardedToolset."
+                  api: "`framework/src/wardens/llm/stage.py:193`"
+              - id: w_stage_call
+                label: ModelCall
+                icon: chart
+                status: built
+                facts:
+                  summary: "The call for the run record: stage, model, prompt version, tokens, cost, each request and each tool call, or outcome fallback."
+                  how: "Built by the stage on success and on fallback; its cost is charged to the run's budget."
+                  api: "`framework/src/wardens/llm/stage.py:260`"
           - id: w_mcp
             label: mcp_toolset()
             sub: "mcp.py"
@@ -790,8 +823,8 @@ nodes:
         status: built
         facts:
           summary: "Plans a child task for another agent, or refuses with every reason."
-          how: "Default deny, by consent in both manifests: the source lists the capability in handoffs.mayRequest, and the target capability's acceptsHandoffs.from names the source (or any, only on an agent with no actions). There is no central pair list."
-          api: "`framework/src/wardens/handoff/policy.py`, `consent.py`"
+          how: "Default deny: both manifests must consent (source handoffs.mayRequest, target acceptsHandoffs.from) and the target be cleared for the source's data (decision 0040 rule 11)."
+          api: "`framework/src/wardens/handoff/policy.py`"
         children:
           - id: w_plan_child
             label: plan_child_task()
@@ -806,7 +839,7 @@ nodes:
               - {id: h_fn, label: plan_child_task(), icon: function, status: built,
                  facts: {summary: "Entry: parent task, chain, the finding, the target capability, spent and cost share.", how: "Raises HandoffRefused with every code, or returns the child task.", api: "`policy.py:56`"}}
               - {id: h_pair, label: Consent, icon: check, status: built,
-                 facts: {summary: "Source lists the capability in handoffs.mayRequest, target accepts the source in acceptsHandoffs.from, target's classification at least the source's (default deny).", how: "Codes not_requested, not_accepted, act_needs_named_source, classification.", api: "`consent.py`"}}
+                 facts: {summary: "The source's handoffs.mayRequest lists the target; the target's acceptsHandoffs.from names the source or is any (any only without actions); the target's classification is at least the source's.", how: "Codes not_requested, not_accepted, act_needs_named_source, classification.", api: "`consent.py`"}}
               - {id: h_route, label: Routable agent, icon: check, status: built,
                  facts: {summary: "The registry must resolve the capability to a routable agent.", how: "Code no_routable_agent.", api: "`policy.py:74`"}}
               - {id: h_hops, label: Hop budget, icon: check, status: built,
@@ -829,7 +862,7 @@ nodes:
         status: built
         facts:
           summary: "Sends the run's message to the channels configured for its audience."
-          how: "Slack incoming webhook; URLs from OpenBao through framework/config/notify.yaml."
+          how: "Slack incoming webhook; URLs from OpenBao through framework/src/wardens/config/defaults/notify.yaml."
           api: "`framework/src/wardens/notify/channels.py:370`"
 
   - id: pydai
@@ -970,23 +1003,27 @@ edges:
      why: "Before any prompt: sensitive values are replaced.", certs: {none: "In-process Python call."}}
   - {id: stack_classify, from: d_analyse_stack, to: d_classify, kind: request, label: classify(), view: llm, main: true,
      why: "Once per stack: the model classifies each changed attribute.", certs: {none: "In-process Python call."}}
-  - {id: classify_pyd, from: d_classify, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
-     why: "Each classify: typed output, 2 retries, 4 requests and 60,000 tokens at most.", certs: {none: "In-process Python call."}}
+  - {id: classify_pyd, from: d_classify, to: w_stage_run, kind: request, label: STAGE.run(), view: llm, main: true,
+     why: "Each classify: typed output, 2 retries, at most 4 requests; the run's budget sets the tokens.", certs: {none: "In-process Python call."}}
+  - {id: run_pyd, from: w_stage_run, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
+     why: "Every stage run of both agents: the library runs the Pydantic AI agent with the redacted prompt, limits and guarded tools.", certs: {none: "In-process Python call."}}
+  - {id: run_usage, from: w_stage_run, to: w_usage, kind: control, label: usage_limits(), view: llm, main: true,
+     why: "Every stage run: the run's remaining budget becomes request and token limits.", certs: {none: "In-process Python call."}}
+  - {id: run_record, from: w_stage_run, to: w_stage_call, kind: data, label: ModelCall, view: [llm, evidence],
+     why: "After every stage run, answer or fallback: the call is recorded for the run record.", certs: {none: "In-process Python call."}}
   - {id: pyd_breaker, from: pydai, to: w_breaker, kind: request, label: request(), view: llm, main: true,
-     why: "Each model request of terraform-drift: through the breaker.", certs: {none: "In-process Python call."}}
+     why: "Each model request of both agents: through the breaker.", certs: {none: "In-process Python call."}}
   - {id: breaker_lite, from: w_breaker, to: litellm, proto: HTTPS, port: 443, view: llm, main: true,
      why: "Each model request: OpenAI-compatible chat completion through LiteLLM to vLLM.", certs: le-home,
      detail: "The agent's LiteLLM virtual key is the bearer token."}
-  - {id: classify_mc, from: d_classify, to: w_model_call, kind: data, label: model_call(), view: [llm, evidence],
-     why: "After every classify, success or fallback: the call is recorded for the run record.", certs: {none: "In-process Python call."}}
   - {id: stack_gate, from: d_analyse_stack, to: d_gate, kind: control, label: evaluate(), view: guardrails, main: true,
      why: "Per proposal: the deterministic gate decides, not the model.", certs: {none: "In-process Python call."}}
   - {id: stack_rationale, from: d_analyse_stack, to: d_rationale, kind: request, label: rationale(), view: llm, main: true,
      why: "Per proposal the gate decided: one short explanation.", certs: {none: "In-process Python call."}}
-  - {id: rationale_pyd, from: d_rationale, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
-     why: "Per explanation: 2 requests and 20,000 tokens at most.", certs: {none: "In-process Python call."}}
+  - {id: rationale_pyd, from: d_rationale, to: w_stage_run, kind: request, label: STAGE.run(), view: llm, main: true,
+     why: "Per explanation: at most 2 requests; the run's budget sets the tokens.", certs: {none: "In-process Python call."}}
   - {id: classify_mcp, from: d_classify, to: w_mcp, kind: request, label: planned,
-     why: "Planned: drift's manifest declares web search, but no stage calls mcp_toolset yet; stack-author's chat is next.",
+     why: "Planned: drift's manifest declares web search, but no stage calls mcp_toolset yet (MCP plan, phase 5 next).",
      certs: {planned: "Planned: through LiteLLM /mcp with pinned tool hashes."}}
 
   # --- point 4 and the draft PR ---
@@ -1072,18 +1109,16 @@ edges:
      why: "Each turn: the bound activity runs.", certs: {none: "In-process Python call."}}
   - {id: chat_stage, from: a_chat, to: a_chat_turn, kind: request, label: chat_turn(),
      why: "Each turn: the stage gets the model, catalog, manifest and prices.", certs: {none: "In-process Python call."}}
-  - {id: stage_usage, from: a_chat_turn, to: w_usage, kind: control, label: usage_limits(), view: llm, main: true,
-     why: "Each turn: the remaining budget becomes request and token limits.", certs: {none: "In-process Python call."}}
-  - {id: stage_toolset, from: a_chat_turn, to: a_toolset, kind: request, label: _toolset(),
-     why: "Each turn: the read tools, wrapped.", certs: {none: "In-process Python call."}}
-  - {id: ts_read_tools, from: a_toolset, to: w_read_tools, kind: control, label: read_tools(), view: guardrails, main: true,
+  - {id: run_toolset, from: w_stage_run, to: w_stage_toolset, kind: request, label: Stage.toolset(),
+     why: "Each run of a stage with tools: the read tools, wrapped.", certs: {none: "In-process Python call."}}
+  - {id: toolset_tools, from: w_stage_toolset, to: a_toolset, kind: request, label: tools(deps),
+     why: "Each turn: the agent's tool functions for this turn.", certs: {none: "In-process Python call."}}
+  - {id: ts_read_tools, from: w_stage_toolset, to: w_read_tools, kind: control, label: read_tools(), view: guardrails, main: true,
      why: "Each turn: only the manifest's read tools are offered.", certs: {none: "In-process Python call."}}
-  - {id: ts_guarded, from: a_toolset, to: w_guarded, kind: control, label: GuardedToolset(), view: guardrails, main: true,
+  - {id: ts_guarded, from: w_stage_toolset, to: w_guarded, kind: control, label: GuardedToolset(), view: guardrails, main: true,
      why: "Each turn: every tool call will go through point 2.", certs: {none: "In-process Python call."}}
-  - {id: stage_pyd, from: a_chat_turn, to: pydai, kind: request, label: agent.run(), view: llm, main: true,
-     why: "Each turn: the agent loop with history, tools and limits.", certs: {none: "In-process Python call."}}
-  - {id: pyd_lite, from: pydai, to: litellm, proto: HTTPS, port: 443, view: llm, main: true,
-     why: "Each stack-author model request: straight to LiteLLM, with no breaker (model_from_env without agent=).", certs: le-home}
+  - {id: stage_pyd, from: a_chat_turn, to: w_stage_run, kind: request, label: STAGE.run(), view: llm, main: true,
+     why: "Each turn: the stage runs with the history, recalled memory, the conversation's remaining budget and its tools.", certs: {none: "In-process Python call."}}
   - {id: pyd_guarded, from: pydai, to: w_guarded, kind: request, label: call_tool(), view: guardrails, main: true,
      why: "When the model asks for a tool: the guarded toolset handles it.", certs: {none: "In-process Python call."}}
   - {id: guarded_tc, from: w_guarded, to: tc_fn, kind: control, label: point 2, view: guardrails,
@@ -1100,8 +1135,6 @@ edges:
      why: "Each read: the stack's files from the target repository.", certs: github-pub}
   - {id: pyd_prepared, from: pydai, to: a_prepared, kind: control, label: output validator, view: [guardrails, llm], main: true,
      why: "When the model proposes a change: it is prepared in code before anyone sees it.", certs: {none: "In-process Python call."}}
-  - {id: stage_mc, from: a_chat_turn, to: w_model_call, kind: data, label: model_call(), view: [llm, evidence],
-     why: "After every turn, answer or fallback: the call is recorded.", certs: {none: "In-process Python call."}}
   - {id: confirm_proxy, from: a_confirm, to: w_proxy, kind: request, label: acts.emit() · open_draft_pr(),
      why: "When the person confirms the diff: kill switch, point 4, then the PR, each an activity.", certs: {none: "In-process Python call."}}
   - {id: a_emit_ca, from: a_emit, to: ca_fn, kind: control, label: point 4, view: guardrails, main: true,
@@ -1139,7 +1172,7 @@ scenarios:
 
           **Why it matters:** the agent never holds a model API key or talks to a provider directly; every request goes through LiteLLM, the platform's model gateway. The breaker works like an electrical fuse: if the model keeps failing, the agent stops waiting on it and uses its fallback.
 
-          **How:** after 5 failures in a row the breaker opens and later requests fail at once (`CircuitOpen`). After 60 seconds it lets one trial request through to see if the model is back. stack-author doesn't pass `agent=` today, so its model has no breaker.
+          **How:** after 5 failures in a row the breaker opens and later requests fail at once (`CircuitOpen`). After 60 seconds it lets one trial request through to see if the model is back.
       - title: Refuse an unpriced model
         action: "_model() → require_price(): is the model in prices.yaml?"
         path: [model_price, ~model_price, ~rw_model]
@@ -1393,19 +1426,19 @@ scenarios:
 
           **How:** in the prompt, this evidence is wrapped in `<evidence>` tags and labelled untrusted data. So text hidden in a resource, such as a tag saying "ignore your instructions", is read as data, not as an order.
       - title: Ask the model
-        action: "classify() → agent.run() → BreakerModel → LiteLLM (443)"
-        path: [stack_classify, classify_pyd, pyd_breaker]
-        text: "Typed output (ClassifyOutput), 2 retries, at most 4 requests and 60,000 tokens."
+        action: "classify() → STAGE.run() → agent.run() → BreakerModel → LiteLLM (443)"
+        path: [stack_classify, classify_pyd, run_usage, ~run_usage, run_pyd, pyd_breaker]
+        text: "Typed output (ClassifyOutput), 2 retries, at most 4 requests; the run's remaining budget sets the tokens."
         detail: |
-          **What happens:** `classify()` asks the model, through Pydantic AI's `agent.run()`, whether each change looks intended (someone changed it on purpose), unauthorised, or unclear. The request goes through the breaker to LiteLLM.
+          **What happens:** `classify()` runs its stage, `STAGE.run()`, which asks the model, through Pydantic AI's `agent.run()` inside the library, whether each change looks intended (someone changed it on purpose), unauthorised, or unclear. The request goes through the breaker to LiteLLM.
 
-          **Why it matters:** the model must answer in a fixed format (`ClassifyOutput`), not free text, so code can check the answer. And the stage has hard caps on usage, whatever the model does.
+          **Why it matters:** the agent declares the stage once with `stage()` and never builds the Pydantic AI agent itself, so every stage gets the same redaction, limits, records and fallback. The model must answer in a fixed format (`ClassifyOutput`), not free text, so code can check the answer.
 
-          **How:** the stage allows at most 4 requests and 60,000 tokens (`USAGE_LIMITS`), and 2 retries for a bad answer. If the model is failing, the breaker makes the request fail fast instead of hanging until a timeout.
+          **How:** the stage allows at most 4 requests and 2 retries for a bad answer; `usage_limits()` turns what the run has left of its budget into the token limit. If the model is failing, the breaker makes the request fail fast instead of hanging until a timeout.
       - title: Validated answer
         when: ok
         action: "LiteLLM → BreakerModel → output validator _check → classify()"
-        path: [breaker_lite, ~breaker_lite, ~pyd_breaker, ~classify_pyd]
+        path: [breaker_lite, ~breaker_lite, ~pyd_breaker, ~run_pyd]
         text: "The validator checks the verdicts cover every changed attribute exactly once and invent no change record."
         detail: |
           **What happens:** the model's answer comes back, and the output validator `_check` compares it with the input, in code.
@@ -1416,7 +1449,7 @@ scenarios:
       - title: Breaker or timeout
         action: "BreakerModel: CircuitOpen or a failed request"
         when: down
-        path: [breaker_circuit, ~breaker_circuit, ~pyd_breaker, ~classify_pyd]
+        path: [breaker_circuit, ~breaker_circuit, ~pyd_breaker, ~run_pyd]
         text: "After 5 failures in a row the breaker is open: the next request fails at once instead of waiting on a timeout."
         detail: |
           **What happens:** the model endpoint is failing. `BreakerModel` either gets an error back or, after 5 failures in a row, refuses at once with `CircuitOpen`.
@@ -1425,22 +1458,22 @@ scenarios:
 
           **How:** the breaker is shared by the whole worker process, per agent. After 60 seconds it lets one trial request through; if that works, normal calls resume.
       - title: Record the call
-        action: "classify() → model_call(result=…) for the run record"
-        path: [classify_mc, ~classify_mc]
-        text: "Model, prompt version and tokens, or the failure, are recorded either way."
+        action: "STAGE.run() → ModelCall in the StageResult → classify() → the run record"
+        path: [run_record, ~run_record, ~classify_pyd]
+        text: "Model, prompt version, tokens, each request and the cost, or the fallback, are recorded either way."
         detail: |
-          **What happens:** `model_call()` records the call: which model, which prompt version, how many tokens, or the error if it failed.
+          **What happens:** the stage records the call as a `ModelCall`: which model, which prompt version, how many tokens, each request, its cost, or `outcome: fallback` if the model failed. `classify()` passes it on for the run record; agent code never builds one.
 
           **Why it matters:** every model call is accounted for. The run record later prices each call from `prices.yaml`, so the cost of each run is known, and a reviewer can see which prompt produced which answer.
 
           **How:** the record is kept during the run and written with the run record at the end (see "Run record and the message"). Failed calls are recorded too, so model outages show up in the evidence.
       - title: Fallback
         when: down
-        action: "classify() → fallback: every attribute unknown → gate says investigate"
+        action: "STAGE.run() → fallback: every attribute unknown → gate says investigate"
         path: [~stack_classify, stack_gate, ~stack_gate, ~analyse_stack, ~bind_analyse]
         text: "Any exception gives every attribute the verdict unknown, which the gate turns into investigate."
         detail: |
-          **What happens:** `classify()` catches the failure and calls `fallback()`, which marks every changed attribute "unknown". `gate.evaluate()` then turns "unknown" into "investigate".
+          **What happens:** `STAGE.run()` catches the failure and returns the stage's fallback, which marks every changed attribute "unknown". `gate.evaluate()` then turns "unknown" into "investigate".
 
           **Why it matters:** a model outage makes the explanation worse, never the action riskier. "Investigate" means a person is asked to look; no pull request is proposed from a guess.
 
@@ -1459,16 +1492,16 @@ scenarios:
 
           **How:** to codify, every change must be classified intended with at least 0.8 confidence, have a linked change record, map to a setting in the stack's YAML and not be sensitive. A value that looks like a secret, or a stack outside the agent's scope, means investigate. Only codify can become a draft PR.
       - title: Explain it
-        action: "rationale() → agent.run(): one short explanation"
+        action: "rationale() → STAGE.run() → agent.run(): one short explanation"
         when: ok
-        path: [stack_rationale, rationale_pyd, ~rationale_pyd, ~stack_rationale, ~analyse_stack, ~bind_analyse]
-        text: "At most 2 requests and 20,000 tokens; on failure a fixed default sentence."
+        path: [stack_rationale, rationale_pyd, run_pyd, ~run_pyd, ~rationale_pyd, ~stack_rationale, ~analyse_stack, ~bind_analyse]
+        text: "At most 2 requests, the tokens from the run's budget; on failure a fixed default sentence."
         detail: |
           **What happens:** `rationale()` asks the model for one short, plain explanation of the proposal, for the finding and the PR description.
 
           **Why it matters:** reviewers get a readable reason with each proposal. But the explanation can't change the proposal: the gate has already decided.
 
-          **How:** this stage is capped at 2 requests and 20,000 tokens. If the model fails, `default_rationale()` writes a fixed sentence ("Proposed to codify … based on the classification of each attribute"), so a run never stops for want of prose.
+          **How:** this stage is capped at 2 requests, and the run's remaining budget sets its token limit. If the model fails, its fallback, `default_rationale()`, writes a fixed sentence ("Proposed to codify … based on the classification of each attribute"), so a run never stops for want of prose.
         result: success
         outcome: "Proposals decided by the gate"
 
@@ -1607,16 +1640,16 @@ scenarios:
           **How:** each child may take up to half of what the parent task has left to spend (`cost_share` 0.5). `plan_handoff` calls `plan_child_task()`, which runs eight checks.
       - title: Checks 1 to 4
         when: planned
-        action: "plan_child_task(): consent, route, hops, cycle"
+        action: "plan_child_task(): pair, route, hops, cycle"
         path: [ph_fn, h1, h2, h3, h4]
-        text: "Both manifests must consent, the capability be routable, hops left, and the target not already on the chain."
+        text: "The pair must be enabled, the capability routable, hops left, and the target not already on the chain."
         detail: |
           **What happens:** `plan_child_task()` checks that the handoff is allowed and safe to route.
 
           **Why it matters:** these checks stop agents from sending work to each other freely, which could loop forever or spread a mistake.
 
           **How:** unlike point 4, every check runs and every reason is collected:
-          - **1.** both manifests consent: terraform-drift lists `change.correlate` in `handoffs.mayRequest`, and the Change Correlator's capability accepts handoffs from any agent (`acceptsHandoffs.from: any`, allowed because it has no actions). Everything else is denied by default;
+          - **1.** both manifests consent: terraform-drift's `handoffs.mayRequest` lists `change.correlate`, the correlator's `acceptsHandoffs.from` is `any`, and the correlator is cleared for terraform-drift's data (everything else is denied by default);
           - **2.** the registry finds an agent that takes `change.correlate`;
           - **3.** the parent has hops left (`hopBudget`);
           - **4.** the target isn't already in the chain, so two agents can't pass work back and forth.
@@ -1640,11 +1673,11 @@ scenarios:
         when: refused
         action: "plan_child_task(): all eight checks, every reason collected"
         path: [ph_fn, h1, h2, h3, h4, h5, h6, h7, h8, h_done]
-        text: "A handoff the manifests don't consent to, or any other failed check, raises HandoffRefused with every reason."
+        text: "A handoff a manifest doesn't consent to, or any other failed check, raises HandoffRefused with every reason."
         detail: |
-          **What happens:** a check fails, for example because the source's manifest doesn't list the capability in `handoffs.mayRequest`, and `plan_child_task()` raises `HandoffRefused` with every reason.
+          **What happens:** a check fails, for example because the source's `handoffs.mayRequest` doesn't list the target, and `plan_child_task()` raises `HandoffRefused` with every reason.
 
-          **Why it matters:** *default deny* means a new connection between agents has to be switched on deliberately, in both agents' reviewed manifests: the source says what it may ask for, the target says whom it accepts. Getting all the reasons at once shows everything that would need changing.
+          **Why it matters:** *default deny* means a new connection between agents has to be switched on deliberately, by both agents in their reviewed manifests. Getting all the reasons at once shows everything that would need changing.
 
           **How:** the incident keeps the parent's result. The drift findings still go out, just without the "who changed it" answer.
       - title: Count it
@@ -1790,22 +1823,22 @@ scenarios:
 
           **How:** the activity has a 15-minute limit and a single attempt. If the model fails, the person gets an error reply and can ask again; the conversation itself doesn't fail.
       - title: Set the budget
-        action: "chat_turn() → usage_limits(remaining_usd, REQUEST_LIMIT 14)"
-        path: [stage_usage, ~stage_usage]
+        action: "chat_turn() → STAGE.run(remaining_usd) → usage_limits(…, maxRequests 14)"
+        path: [stage_pyd, run_usage, ~run_usage]
         text: "What the conversation has left becomes token and request limits for this turn."
         detail: |
-          **What happens:** `usage_limits()` turns the money the conversation has left (`remaining_usd`) into limits for this turn: a token cap and at most 14 requests (`REQUEST_LIMIT`).
+          **What happens:** `chat_turn()` runs the stage with `STAGE.run()`, and the library's `usage_limits()` turns the money the conversation has left (`remaining_usd`, never more than the run's) into limits for this turn: a token cap and at most 14 requests (the manifest's `limits.stages.chat.maxRequests`).
 
           **Why it matters:** a chat can't run up an unbounded bill. Each turn can only spend what is left of the conversation's limit.
 
-          **How:** tokens are priced at the model's more expensive rate, so the limit is never underestimated. With nothing left, `CostCeilingReached` is raised before the model is called.
+          **How:** tokens are priced at the model's more expensive rate, so the limit is never underestimated. With nothing left, the stage takes its fallback (`CostCeilingReached`) before the model is called.
       - title: Budget spent
-        action: "chat_turn(): CostCeilingReached → fixed reply, call recorded"
+        action: "STAGE.run(): CostCeilingReached → the fallback's fixed reply, call recorded"
         when: budget
-        path: [stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
+        path: [run_record, ~run_record, ~stage_pyd, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
         text: "The person is told to start a new conversation; the model is never called."
         detail: |
-          **What happens:** `chat_turn()` catches `CostCeilingReached`, replies with a fixed message and records the turn.
+          **What happens:** the stage has no budget left, so it returns the stage's fallback (`failure.budget`), a fixed message, with a `ModelCall` marked fallback; `chat_turn()` replies with it.
 
           **Why it matters:** the limit is enforced in code, not by asking the model to stop, and the person is told plainly what happened.
 
@@ -1814,26 +1847,26 @@ scenarios:
         outcome: "Budget spent, no model call"
       - title: Guarded read tools
         when: ok
-        action: "_toolset() → read_tools() → GuardedToolset()"
-        path: [stage_toolset, ts_read_tools, ~ts_read_tools, ts_guarded, ~ts_guarded, ~stage_toolset]
+        action: "Stage.toolset() → _tools() → read_tools() → GuardedToolset()"
+        path: [run_toolset, toolset_tools, ~toolset_tools, ts_read_tools, ~ts_read_tools, ts_guarded, ~ts_guarded, ~run_toolset]
         text: "Only the manifest's read tools are offered, each call to go through point 2."
         detail: |
-          **What happens:** `_toolset()` builds the tools the model may use: `read_tools()` picks the manifest's read-only tools and `GuardedToolset()` wraps them.
+          **What happens:** the library's `Stage.toolset()` builds the tools the model may use: the agent's `_tools()` gives this turn's functions, `read_tools()` picks the manifest's read-only tools and `GuardedToolset()` wraps them. The agent never builds a toolset.
 
           **Why it matters:** the model can look things up (stacks, modules) but has no tool that writes. A write happens only after the person presses a button.
 
-          **How:** `GuardedToolset.get_tools` hides every tool not on the list, so the model can't even see an undeclared one. Known limit: stack-author builds the toolset without the manifest or the audit log, so tool bounds aren't checked and a refusal isn't written to the audit log.
+          **How:** `GuardedToolset.get_tools` hides every tool not on the list, so the model can't even see an undeclared one. It also gets the manifest, so a tool's `bounds` are checked, and the audit log with the run's ids, so a refusal is a `tool.refused` event.
       - title: Model asks for a tool
-        action: "chat_turn() → agent.run() → LiteLLM (443): read_stack"
+        action: "STAGE.run() → agent.run() → LiteLLM (443): read_stack"
         when: ok
-        path: [stage_pyd, pyd_lite, ~pyd_lite]
-        text: "stack-author's model goes straight to LiteLLM: model_from_env got no agent=, so there is no breaker."
+        path: [run_pyd, pyd_breaker, breaker_lite, ~breaker_lite, ~pyd_breaker]
+        text: "The request goes through the agent's breaker to LiteLLM, as terraform-drift's does."
         detail: |
-          **What happens:** `chat_turn()` runs the model with `agent.run()`. The model reads the message and asks to call `read_stack` to see the stack as it is.
+          **What happens:** the stage runs the model with `agent.run()`, inside the library. The model reads the redacted message and asks to call `read_stack` to see the stack as it is.
 
           **Why it matters:** the model works from the real files in the repository, not from memory, so its proposal starts from what is in the code today.
 
-          **How:** the request goes to LiteLLM, the platform's model gateway. Known gap: stack-author builds its model without `agent=`, so unlike terraform-drift it has no circuit breaker.
+          **How:** the request goes through `BreakerModel` to LiteLLM, the platform's model gateway. If the model keeps failing, the breaker opens and the turn's reply says the model couldn't answer, without waiting on timeouts.
       - title: Point 2
         when: ok
         action: "GuardedToolset.call_tool() → check_tool_call(caller=llm)"
@@ -1859,21 +1892,21 @@ scenarios:
       - title: Proposal prepared in code
         when: ok
         action: "LiteLLM → output validator _prepared(): prepare the diff"
-        path: [pyd_lite, ~pyd_lite, pyd_prepared, ~pyd_prepared]
+        path: [pyd_breaker, breaker_lite, ~breaker_lite, ~pyd_breaker, pyd_prepared, ~pyd_prepared]
         text: "A proposed change is prepared against the real stack and module inputs; errors send it back to the model."
         detail: |
           **What happens:** the model answers with a proposed change, and the output validator `_prepared()` runs `prepare()` in code to build the real diff.
 
           **Why it matters:** the model suggests; code checks. The change is applied to the real stack and checked against the module's real inputs, so a wrong field or a bad value is caught before a person sees it.
 
-          **How:** errors go back to the model as `ModelRetry` and it repairs the proposal, up to 2 retries. Only a prepared change, with its diff and hash (`patchSha256`), reaches the person.
+          **How:** errors go back to the model as `ModelRetry` and it repairs the proposal, up to 2 retries. An add or update for a module `read_module` didn't read in this turn goes back the same way, so the values come from the module's README and organisation preferences. Only a prepared change, with its diff and hash (`patchSha256`), reaches the person.
       - title: Reply
-        action: "chat_turn() → model_call() → activity → workflow → console"
+        action: "STAGE.run() → ModelCall → chat_turn() → activity → workflow → console"
         when: ok
-        path: [~stage_pyd, stage_mc, ~stage_mc, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
+        path: [~run_pyd, run_record, ~run_record, ~stage_pyd, ~chat_stage, ~bind_chat, ~t_bind, ~proxy_t, ~turn_proxy]
         text: "The call is recorded with its cost; the reply and the diff appear in the Author tab."
         detail: |
-          **What happens:** `chat_turn()` records the call with `model_call()`, and the reply and the diff go back through the activity and the workflow to the console.
+          **What happens:** the stage records the call as a `ModelCall` (with its cost, charged to the conversation's budget), and the reply and the diff go back through the activity and the workflow to the console.
 
           **Why it matters:** the person reviews an exact diff, not a description, and every turn's cost counts against the conversation's budget.
 

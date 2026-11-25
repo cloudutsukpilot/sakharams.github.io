@@ -32,3 +32,21 @@ adrs:
   - {id: "0029", title: "Routing is rules first, then a classifier, then a person", status: proposed, date: 2026-11-05, anchor: adr-0029, repos: [platform-wardens]}
   - {id: "0030", title: "Event Hubs at the ingress edge, Temporal as the work queue", status: proposed, date: 2026-11-06, anchor: adr-0030, repos: [platform-wardens]}
   - {id: "0031", title: "MCP calls go through a gateway that checks the agent per tool; no server forwards the agent's token, and each shared MCP server reaches its backend with its own identity", status: proposed, date: 2026-11-06, anchor: adr-0031, repos: [platform-wardens]}
+  - {id: "0032", title: "The terraform-drift agent runs on drift events only, with no schedule", status: accepted, date: 2026-11-09, anchor: adr-0032, repos: [platform-wardens]}
+  - {id: "0033", title: "Onboarding a new cloud or provider to the terraform-drift agent", status: accepted, date: 2026-11-10, anchor: adr-0033, repos: [platform-wardens]}
+  - {id: "0034", title: "Change evidence for GitHub on the Free plan: the events API, and a recorded webhook log", status: accepted, date: 2026-11-10, anchor: adr-0034, repos: [platform-wardens]}
+  - {id: "0035", title: "Change evidence for AWS: CloudTrail event history, through a federated read-only role", status: accepted, date: 2026-11-12, anchor: adr-0035, repos: [platform-wardens]}
+  - {id: "0036", title: "Jira tickets as change evidence in the Change Correlator", status: accepted, date: 2026-11-15, anchor: adr-0036, repos: [platform-wardens]}
+  - {id: "0037", title: "Deletion decisions in terraform-drift: remove from code or restore", status: accepted, date: 2026-11-15, anchor: adr-0037, repos: [platform-wardens]}
+  - {id: "0038", title: "The console's incident view, console sends through the ingress hub, and console roles", status: accepted, date: 2026-11-16, anchor: adr-0038, repos: [platform-wardens]}
+  - {id: "0039", title: "The accepted eval report lives in the agent's folder, and console conversations are their starter's alone", status: accepted, date: 2026-11-16, anchor: adr-0039, repos: [platform-wardens]}
+  - {id: "0040", title: "One repository per agent, with wardens as a versioned library", status: accepted, date: 2026-11-17, anchor: adr-0040, repos: [platform-wardens]}
+  - {id: "0041", title: "Team chat: one channel per cell, threads as durable sessions, Slack first", status: proposed, date: 2026-11-18, anchor: adr-0041, repos: [platform-wardens]}
+  - {id: "0042", title: "wardens-deploy: an immutable versioned registry, publish by commit or pull request, contract checks per version pair", status: accepted, date: 2026-11-19, anchor: adr-0042, repos: [platform-wardens]}
+  - {id: "0043", title: "Owner decisions of 2026-11-19: check-agent rule changes are breaking, the nightly evals read the state store, and four interim choices kept", status: accepted, date: 2026-11-19, anchor: adr-0043, repos: [platform-wardens]}
+  - {id: "0044", title: "The nightly evals read production feedback through a read-only console endpoint, not from Postgres", status: accepted, date: 2026-11-19, anchor: adr-0044, repos: [platform-wardens]}
+  - {id: "0045", title: "The release job tags with a GitHub App token and finishes a release idempotently", status: accepted, date: 2026-11-19, anchor: adr-0045, repos: [platform-wardens]}
+  - {id: "0046", title: "The nightly evals run every agent repository from platform-wardens' `evals-nightly.yaml`", status: accepted, date: 2026-11-20, anchor: adr-0046, repos: [platform-wardens]}
+  - {id: "0047", title: "terraform-drift merges its pull request, or runs a revert's apply, after a Slack approval (level 2)", status: accepted, date: 2026-11-21, anchor: adr-0047, repos: [platform-wardens]}
+  - {id: "0048", title: "Registry approvals are requested by CI and committed when a reviewer approves", status: accepted, date: 2026-11-22, anchor: adr-0048, repos: [platform-wardens]}
+  - {id: "0049", title: "The console starts the approvals sync right after a registry approval", status: accepted, date: 2026-11-24, anchor: adr-0049, repos: [platform-wardens]}
