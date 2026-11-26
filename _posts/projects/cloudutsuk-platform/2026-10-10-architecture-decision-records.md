@@ -5612,6 +5612,9 @@ The owner wants to assign a person's access in one place and have every app hono
   SSO stops at five users), and its fixed `litellm_role: proxy_admin` claim is gone; Hermes, Job Hunter,
   Headlamp, Temporal UI and the Wardens console stay admin-only. Velero UI and OpenBao need no gate (their
   own RBAC and bound claims decide).
+- **Update (2026-11-24):** Job Hunter admits `job-hunter-editor` too: the app gives each editor an account
+  of their own (own profiles, resume and queue, public sources only; job-hunter-agent ADR 0028), while
+  `platform-admins` and `job-hunter-admin` sign in as the owner. `job-hunter-viewer` stays refused.
 - **The legacy `viewers` group is retired.** It was empty; it is no longer created or mapped and is left in
   the realm until deleted by hand.
 - **Planned (2026-11-04):** the groups, gates and the `APP_ACCESS` table move to a Terragrunt stack (ADR 0079).
@@ -6221,6 +6224,16 @@ so each runner now has a `memory-gate` init container, like `homelab-iac`'s (ADR
 container's working set and limit from the host's cAdvisor (`172.30.0.1:9101`) and holds the pod until the node has
 2 GiB free, failing open if cAdvisor doesn't answer. Up to 16 runners across both scale sets can now be requested at once;
 the gates, not the scheduler, keep the node within its limit.
+
+#### Update 2026-11-26: an alert for jobs running over 15 minutes
+
+`GitHubActionsJobRunningTooLong` (warning, so Slack and the wardens receiver) fires for any job, in any
+repository and on any runner, that has run over 15 minutes, from the exporter's existing
+`github_actions_job_running_seconds`; it resolves when the job ends. It is per job, not per workflow run: the
+exporter reads jobs only, and a run's elapsed time would cost another request per run. Over the 14 days before
+it, 22 different jobs passed 15 minutes, a few of them every night (the wardens nightly evals, the
+infra-github summary report); they are left in on purpose, and an exclusion goes into the rule's matcher if
+one turns out to be noise (Cloudutsuk Platform roadmap Phase 1 step 1j).
 
 ## ADR-0087: LiteLLM's admin UI signs in through Keycloak only; the admin + master key login is off
 {: #adr-0087 }
@@ -6877,7 +6890,8 @@ Two gaps stood in the way:
   until GitHub refused hosted jobs over billing (2026-11-13), which blocked its image. Since 2026-11-14
   (job-hunter-agent#37) it runs on `homelab`: `scripts/local_supabase.py` starts Postgres 17 and PostgREST
   from their release binaries (pinned by sha256) with Supabase's API roles, about 30 s a run.
-- **Stay on GitHub-hosted:** the Copilot coding agent and Dependabot.
+- **Stay on GitHub-hosted:** the Copilot coding agent and Dependabot. (Dependabot version updates replaced by a
+  self-hosted Renovate on the homelab runners, ADR 0125, 2026-11-24: Dependabot can't reach Nexus.)
 
 #### Considered options
 
@@ -9238,6 +9252,120 @@ repository), so the Deployment's chart can't hash the config.
 - ADR 0069 (the `wardens` cluster), ADR 0072 (the `wardens-agent` chart), ADR 0074 (the `wardens-web` chart)
 - ADR 0104 (the router as its own app), ADR 0034 (Zot's pull-through mirrors)
 - platform-wardens decision 0042 (wardens-deploy holds the registry and the deploy config)
+
+## ADR-0125: Dependency update pull requests come from a self-hosted Renovate on the homelab runners, not Dependabot
+{: #adr-0125 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-24 · `homelab-gitops`, `infra-local`, `job-hunter-agent`, `platform-as-code`</span>
+
+#### Context
+
+Since ADR 0119 every package install goes through Nexus (`nexus.platform.home.cloudutsuk.com`): each repository's
+`pyproject.toml` declares the `nexus` index as the default, and `uv.lock` records Nexus URLs; `.npmrc` and
+`.yarnrc.yml` point npm and yarn at it. Any tool that resolves those projects goes to Nexus.
+
+GitHub's Dependabot runs on GitHub's machines. It reads the repository's files, so it also goes to Nexus, and fails
+twice: its proxy only allows registries listed under `registries:` in `dependabot.yml` ("egress not allowlisted"),
+and the Nexus host name only resolves inside the homelab. job-hunter-agent, the only repository with a
+`dependabot.yml`, has had every uv update run fail since it moved to Nexus (job-hunter-agent #70, 2026-11-22);
+its Docker and GitHub Actions updates still work. About twenty other repositories (the wardens agents,
+platform-wardens, platform-as-code, homelab-services, the npm and yarn sites, the IaC repositories) get no update
+pull requests at all, and Helm chart and Terraform provider versions are bumped by hand. ADR 0032 already named
+Renovate as part of the dependency checks; it was never set up.
+
+Two GitHub limits shape the answer. Dependabot on self-hosted runners needs a Linux x64 runner with a local Docker
+daemon, which the ARC runners don't have (ADR 0095: no Docker daemon, builds go to BuildKit). And the organisation
+doesn't let GitHub Actions create pull requests (`can_approve_pull_request_reviews: false`); even where allowed, a
+pull request opened with a workflow's `GITHUB_TOKEN` doesn't trigger the repository's CI.
+
+#### Decision
+
+1. **Renovate, self-hosted, opens every dependency update pull request** in the organisation. One scheduled workflow,
+   homelab-gitops `.github/workflows/renovate.yaml`, runs on the `homelab` runners every Monday 00:30 UTC (06:00 IST,
+   Dependabot's old slot) and on `workflow_dispatch` (one repository, or a dry run). It finds the repositories itself
+   (autodiscover, archived ones skipped). The Renovate CLI is pinned and installed from Nexus's npm group.
+2. **Dependabot version updates are turned off.** job-hunter-agent's `dependabot.yml` is removed once Renovate covers
+   it. Dependabot security alerts and the dependency graph stay on: they don't need Nexus. This replaces ADR 0095's
+   "stay on GitHub-hosted: Dependabot".
+3. **Renovate acts as a GitHub App of its own,** `cloudutsuk-renovate`, installed on all repositories, with contents,
+   pull requests, issues (the Dependency Dashboard), workflows (to update action pins in `.github/workflows`),
+   commit statuses and checks write, and Dependabot alerts and metadata read. Its key is in OpenBao `kv/ci/renovate`, readable only by the
+   OpenBao role `renovate`, which accepts only `renovate.yaml` on homelab-gitops `main` (ADR 0043). The workflow mints
+   a one-hour installation token per run. Pull requests the App opens run the repository's CI like any other.
+4. **Registries:** packages are looked up and locked through Nexus with the CI read account (`kv/ci/nexus-read`,
+   Renovate host rules), so lockfiles keep Nexus URLs. Docker images, GitHub Actions, Helm repositories and the
+   Terraform registry are looked up at their own registries (or Zot, with the `charts-reader` login from ADR 0123).
+5. **One shared configuration:** the rules live in a preset in homelab-gitops, `renovate/default.json`; each
+   repository's `renovate.json` only extends it (`github>cloudutsukpilot/homelab-gitops//renovate/default`), and
+   Renovate's onboarding pull request adds that file. The preset says:
+   - **Cooldown:** a release is offered only after 14 days (`minimumReleaseAge`), the homelab rule for images, charts
+     and packages. uv repositories also set `[tool.uv] exclude-newer = "14 days"`, so the packages a lock pulls in
+     indirectly follow the same rule.
+   - **Grouping:** minor and patch updates come as one pull request per package manager and repository; each major
+     version gets its own. Lock file maintenance (indirect dependencies) runs monthly.
+   - **Security fixes don't wait:** Renovate reads each repository's Dependabot alerts and opens a fix pull request at
+     once, without the 14-day cooldown, labelled `security`.
+   - **Nothing merges by itself.** Every pull request is reviewed and merged by a person; CI and the image build's
+     security gates run on each.
+   - **Left alone:** the app image digests that the build pipeline commits to homelab-gitops `apps/**` (CI owns them);
+     references to homelab-gitops' own reusable workflows and actions at `@main`; Python base images move only within
+     their minor version (a new Python is a deliberate change).
+   - **Backstage moves by release, by hand (added 2026-11-25):** Renovate skips every `@backstage/*` and
+     `@backstage-community/*` package. A Backstage release is a set of packages built against each other (the
+     backend's core and each plugin's backend must come from the same release), and Renovate updates packages one by
+     one or grouped by update type, never by Backstage release. Its grouped update self-service-portal #21 moved the
+     plugins' backends ahead of the core: the backend crashed at start, and one plugin's database migration had already
+     run, which the revert couldn't undo. The portal moves with `yarn backstage-cli versions:bump --release <version>`
+     instead, after a backup of its database. A Backstage security advisory still opens a Renovate pull request for the
+     one package; it is the signal to bump the release, not a pull request to merge. The portal's own `renovate.json`
+     also skips majors of the packages Backstage pins (Material UI v4, React Router 6, Express 4).
+     `versions:bump` alone isn't enough either (amended 2026-11-25): it writes caret ranges, and self-service-portal
+     #42 (1.56.1) resolved patches published for 1.57 beside 1.56's backend core and crashed at start the same way.
+     Every `@backstage/*` package is now pinned to the release manifest's exact version through `resolutions`
+     (`scripts/pin-backstage-release.mjs`), and CI starts the runtime image's backend and waits for readiness before
+     anything is pushed (#43).
+   - **Deploys:** a Helm chart or Argo CD application bump in homelab-gitops or infra-local is a deploy once merged
+     (Argo CD tracks `main`), so those pull requests are never grouped with others and carry the label `deploys`.
+6. **Package managers covered:** uv, pip requirements, npm, yarn 4, Dockerfile `FROM` lines (digests stay pinned),
+   GitHub Actions (SHA pins with their version comment), Helm charts (Argo CD applications in homelab-gitops, chart
+   versions in infra-local's `resources.yaml` through a custom regex manager) and Terraform (provider versions in
+   platform-as-code `config/providers.yaml` through a custom regex manager, and `required_providers` in modules).
+7. **Rollout** starts with job-hunter-agent (packages, Docker, Actions), then the other Python and JavaScript
+   repositories, then Helm and Terraform. Each step is in the plan
+   renovate-dependency-updates.md.
+
+#### Considered options
+
+1. **Self-hosted Renovate on the homelab runners (chosen):** one tool for every package manager used here, reaches
+   Nexus, has the cooldown, grouping and a dashboard built in, and its rules live in one preset.
+2. **Dependabot with a private registry entry and a secret:** doesn't work: GitHub's machines can't resolve or reach
+   Nexus.
+3. **Dependabot on self-hosted runners:** needs Linux x64 runners with a local Docker daemon (a new runner set the
+   homelab doesn't have) and covers fewer package managers (no Helm, no custom files). The plan requirements for a
+   private repository on GitHub Free aren't documented.
+4. **Mend's hosted Renovate app:** the same problem as Dependabot: it runs on Mend's machines, outside the homelab.
+5. **Our own update scripts per package manager:** full control, but grouping, majors, lockfile quirks and every new
+   package manager would be ours to build and maintain.
+6. **Let GitHub Actions open the pull requests (organisation setting):** the same setting lets workflows approve pull
+   requests, and pull requests opened with `GITHUB_TOKEN` don't run CI.
+
+#### Consequences
+
+- Good: every repository gets update pull requests again, through Nexus, with the same 14-day rule and grouping, and
+  Helm and Terraform versions stop being bumped by hand.
+- Good: the update pull requests run the same CI and security gates as any change, and none merges without review.
+- Bad: one more GitHub App and OpenBao role to keep; the workflow is the only holder of a token that can write to
+  every repository, so it runs only from homelab-gitops `main`.
+- Bad: a weekly run uses the homelab runners for a few minutes per repository, and Renovate needs the package
+  managers' own tools (uv, Node, yarn, Helm) on the runner to update lockfiles.
+- Bad: when ADR 0119's step 14 blocks direct egress to the public package registries, the Renovate job's lookups of
+  Docker, GitHub, Helm and Terraform registries must stay allowed (packages already go through Nexus).
+
+#### Related
+
+- ADR 0032 (security scanning: Renovate named for SCA), ADR 0043 (OpenBao sign-in from CI), ADR 0085 (an App per
+  automated writer), ADR 0095 (homelab runners; amended by decision 2), ADR 0119 (Nexus), ADR 0123 (chart registries)
+- Plan: renovate-dependency-updates.md
 
 {% endraw %}
 <!-- adr:end -->
