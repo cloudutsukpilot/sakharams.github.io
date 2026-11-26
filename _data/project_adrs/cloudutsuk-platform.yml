@@ -126,3 +126,4 @@ adrs:
   - {id: "0122", title: "platform-as-code modules are checked by mock-provider tests, not by planning consumer stacks", status: accepted, date: 2026-11-22, anchor: adr-0122, repos: [platform-as-code]}
   - {id: "0123", title: "Helm chart registries are declared in config.yaml and logged in outside Terraform; Zot charts need credentials", status: accepted, date: 2026-11-22, anchor: adr-0123, repos: [platform-as-code, infra-local]}
   - {id: "0124", title: "Wardens pods roll when wardens-deploy's config changes, through Stakater Reloader", status: accepted, date: 2026-11-23, anchor: adr-0124, repos: [homelab-gitops, wardens-deploy, platform-wardens]}
+  - {id: "0125", title: "Dependency update pull requests come from a self-hosted Renovate on the homelab runners, not Dependabot", status: accepted, date: 2026-11-24, anchor: adr-0125, repos: [homelab-gitops, infra-local, job-hunter-agent, platform-as-code]}

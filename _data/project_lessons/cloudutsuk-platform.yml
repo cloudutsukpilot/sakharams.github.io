@@ -1057,3 +1057,14 @@ lessons:
     fix: "Stakater Reloader on the wardens cluster rolls every Deployment that mounts the deploy config when that ConfigMap changes; the charts annotate exactly those Deployments. Its annotation strategy doesn't show as drift in Argo CD."
     lesson: "A mounted ConfigMap updates the file, not the process. For each process that reads config, decide how a change reaches it (re-read, or a roll) when you add the config, and check it once by changing the config, not only by deploying it fresh."
     adrs: ["0124"]
+
+  - id: L098
+    date: 2026-11-25
+    step: "Phase 6, step 42"
+    title: "Backstage's own upgrade command mixed two releases, and every check passed until the pod started"
+    tags: [backstage, dependencies, yarn, ci]
+    symptom: "To take a catalog security fix, the portal moved to the next Backstage release with backstage-cli versions:bump. Type-check, lint, unit tests and the image scans passed, and the new pod crashed at start with 'httpRouter.addWebSocketHandler is not a function'. The old pod kept serving. Two days earlier a grouped Renovate update had failed the same way."
+    cause: "versions:bump writes caret ranges. Yarn resolved patches published for the following release (a signals backend that calls a new router method, and a newer catalog backend) next to the requested release's backend core, which doesn't have that method. Nothing in CI started the backend. The crashed start had also run the newer catalog backend's database migrations, so no build of the requested release could start on that database any more."
+    fix: "Forward to the release that matches the migrated database, with every @backstage package pinned to that release's manifest through yarn resolutions (a small script reads versions.backstage.io). A CI stage now starts the runtime image's backend with a throwaway in-memory database and waits for its readiness endpoint before an image is pushed. The database was backed up before the first attempt."
+    lesson: "For a framework that ships as a release of interlocking packages, pin the whole release, not the ranges its upgrade tool writes, and make CI start the real image. A backend that migrates its database at start turns a failed rollout into a one-way door: back up first, and plan to go forward."
+    adrs: ["0125"]
