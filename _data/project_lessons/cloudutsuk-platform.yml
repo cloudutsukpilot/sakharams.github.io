@@ -1068,3 +1068,14 @@ lessons:
     fix: "Forward to the release that matches the migrated database, with every @backstage package pinned to that release's manifest through yarn resolutions (a small script reads versions.backstage.io). A CI stage now starts the runtime image's backend with a throwaway in-memory database and waits for its readiness endpoint before an image is pushed. The database was backed up before the first attempt."
     lesson: "For a framework that ships as a release of interlocking packages, pin the whole release, not the ranges its upgrade tool writes, and make CI start the real image. A backend that migrates its database at start turns a failed rollout into a one-way door: back up first, and plan to go forward."
     adrs: ["0125"]
+
+  - id: L099
+    date: 2026-11-28
+    step: "Phase 1, step 1j"
+    title: "A second Alertmanager route with continue quietly took every alert away from Slack"
+    tags: [alertmanager, alerting, slack, monitoring]
+    symptom: "A new alert for CI jobs running over 15 minutes fired 17 times in a day and nothing arrived in Slack. Alertmanager logged no Slack error, and its notification counters had no Slack series at all, only webhooks."
+    cause: "Slack was the top-level receiver, and a child route sent every warning and critical to the agents' webhook with continue: true. Alertmanager uses the parent's receiver only when no child route matched; continue lets later siblings match too, it doesn't fall back to the parent. From the day that route was added, about three weeks earlier, no alert reached Slack, and nothing failed, because nothing was ever sent."
+    fix: "Slack got its own child route with the same matchers, after the webhook route. amtool config routes test on the rendered config now shows both receivers for a warning and a critical, and only the dead man's switch for Watchdog."
+    lesson: "When you add a route, test the routing tree with amtool for each kind of alert you care about, not only that the config loads. A receiver that is never tried can't fail, so watch that each receiver sends something, not just that sends don't fail."
+    adrs: ["0084"]
