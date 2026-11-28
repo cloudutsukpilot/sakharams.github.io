@@ -1079,3 +1079,14 @@ lessons:
     fix: "Slack got its own child route with the same matchers, after the webhook route. amtool config routes test on the rendered config now shows both receivers for a warning and a critical, and only the dead man's switch for Watchdog."
     lesson: "When you add a route, test the routing tree with amtool for each kind of alert you care about, not only that the config loads. A receiver that is never tried can't fail, so watch that each receiver sends something, not just that sends don't fail."
     adrs: ["0084"]
+
+  - id: L100
+    date: 2026-11-28
+    step: "Phase 1, step 1l"
+    title: "Two runners hung on a job they had already been given, and stayed Running for 30 hours"
+    tags: [github-actions, arc, kubernetes, probes, ci]
+    symptom: "Jobs on the homelab runners waited 45 to 100 minutes even while CI was quiet. Two runner pods had been Running for over a day, their last log lines a job acknowledgement and a token request, with no job process. GitHub had cancelled their jobs within minutes and re-run them elsewhere, but the scale set still counted both pods as runners on those jobs, so new jobs queued behind them."
+    cause: "A known runner bug: after it acknowledges a job, the runner asks GitHub for the job's details, and the timeout covers only the response headers. During a stretch of slow connections to GitHub's Actions service the body stalled after the headers, and the runner waited forever on a connection that would never send more. Nothing else in the process can cancel that wait, and the newest runner release still has it."
+    fix: "Each runner container has a liveness probe. It never fails while a job process exists. Without one, it fails when the runner's own log shows a job acknowledged and never started and hasn't changed for 10 minutes, or hasn't changed for 90 minutes at all (an idle runner logs a token renewal every 50). The kubelet stops the runner and the controller replaces it. Each failure is written to the container's log, Loki's ruler counts those lines, and an alert tells Slack. Tested by freezing an idle runner with a faked acknowledgement: replaced in about 3 minutes, and Slack got the alert. A second alert covers a runner over 30 minutes old with no job while jobs wait for its scale set."
+    lesson: "A process that is alive is not a process that works: when a tool can block forever, give its pod a probe that checks for progress it can prove (a child process, a log that moves), and make sure the probe can't fire during real work. Look for the upstream issue before building a workaround: here it gave the exact cause and showed that no upgrade would fix it."
+    adrs: ["0127"]
