@@ -9367,6 +9367,102 @@ pull request opened with a workflow's `GITHUB_TOKEN` doesn't trigger the reposit
   automated writer), ADR 0095 (homelab runners; amended by decision 2), ADR 0119 (Nexus), ADR 0123 (chart registries)
 - Plan: renovate-dependency-updates.md
 
+## ADR-0127: A liveness probe on the runner container replaces ARC runners that hang without a job, and an alert reports it
+{: #adr-0127 }
+
+<span class="adr-status adr-status-accepted">Accepted</span> <span class="adr-meta text-muted">2026-11-28 · `homelab-gitops`</span>
+
+#### Context
+
+On 2026-11-27 two ephemeral runners of the `homelab` scale set (ARC 0.14.2, runner 2.337.0) each received a job
+(05:24 and 06:01 UTC), logged `Acknowledging runner request` and a token request, and then did nothing for 30
+hours: no `Runner.Worker`, no error, no exit. GitHub cancelled or failed their jobs after 10 minutes and re-ran
+them elsewhere, but the pods stayed Running and their EphemeralRunners kept the job IDs, so ARC counted them as
+runners on those jobs. From the early hours of 2026-11-28 the listener reported 2 jobs assigned, 0 running and 2
+runners desired: the two hung pods met that count, so new jobs that arrived while CI was quiet waited 45 to 100
+minutes for a runner. They were deleted by hand on 2026-11-28; when the pods were stopped, both logged a
+`TaskCanceledException` from `RunServer` inside `ChunkedEncodingReadStream.CopyToAsyncCore`: the `acquirejob`
+response's body had stalled after its headers.
+
+This is [actions/runner#4668](https://github.com/actions/runner/issues/4668): the runner's HTTP handler applies
+its timeout only until the response headers arrive, so a connection that goes quiet mid-body blocks the listener's
+main loop forever, and nothing else in the process can cancel it. Others hit it during packet loss to GitHub's
+Actions service; the second of our runners had logged timeouts to the same service a few minutes before. The fix
+([#4734](https://github.com/actions/runner/pull/4734)) is an open pull request; 2.338.2 (2026-10-26) doesn't
+have it, and no ARC release can fix it, because the hang is inside the runner.
+
+#### Decision
+
+1. **Every runner container gets a liveness probe** (all three scale sets, the same script). It never fails while
+   a `Runner.Worker` process exists, so it can't stop a job, however long. Without a worker it fails when the
+   listener's `_diag/Runner_*.log`:
+   - shows `Acknowledging runner request` and not `received job message`, and hasn't changed for 10 minutes (by
+     then GitHub has given up on the job), or
+   - hasn't changed for 90 minutes (an idle listener renews its token and logs it every 50 minutes, so a quiet log
+     means its loop is stuck too).
+
+   Period 60 s, 3 failures. The pods have `restartPolicy: Never`, so the kubelet stops the runner and the
+   controller deletes the EphemeralRunner (a runner with a job and a failed pod) or retries it, and the scale set
+   creates a runner if a job needs one.
+2. **The probe reports itself**: each failure writes `runner-liveness: failing: <reason>` to the container's own
+   log (`/proc/1/fd/1`). Loki's ruler counts those lines per pod (`loki:arc_runner_liveness_failures:count5m`),
+   and the Mimir alert `ARCRunnerHung` (warning, to Slack) fires for 30 minutes per replaced runner.
+3. Nothing else changes: no reaper service, no maximum pod age, the same ARC and runner versions. When a runner
+   release has the fix, upgrade as usual and keep the probe: it costs one `pgrep` a minute and catches other hangs
+   of the same shape.
+
+#### Update 2026-11-28: an alert on a runner's age
+
+The owner asked for an alert on any runner alive over 30 minutes. Two cases:
+
+- **A runner over 30 minutes on a job** is a long job, and `GitHubActionsJobRunningTooLong` (ADR 0086) already
+  reports every job past 15 minutes with its runner's name. No new rule.
+- **A runner over 30 minutes with no job** is `ARCRunnerOlderThan30mWithoutJob` (warning, Slack, per pod with its
+  scale set). An idle runner alone isn't a fault: `homelab-iac` keeps one warm, and about 60 `homelab` and
+  `homelab-cloud-iac` pods sat idle past 30 minutes in the week to 2026-11-27 waiting for their next job. So the
+  rule also needs a job for that scale set waiting over 10 minutes (ci-queue-exporter), which a healthy idle
+  runner would have taken; "no job" is no `github_actions_job_running_seconds` series for the pod's name. Held 10
+  minutes. Backtested on 2026-11-23 to 28, it found only the two hung runners: from 06:00 on 2026-11-27 and from
+  01:45 to 11:00 on 2026-11-28. It is the backstop if the probe ever misses a hang.
+
+Why the existing alerts didn't help on 2026-11-27 and 28: `GitHubActionsJobWaitingTooLong` fired from 06:00 on
+2026-11-27 for the waiting jobs, and `ARCJobsAssignedNoBusyRunners` fired from 02:00 to 11:00 on 2026-11-28 (2 jobs
+assigned, no busy runner). On 2026-11-27 nothing reached Slack: the agents' Alertmanager route had taken every alert
+from Slack since early November (L099), fixed at 19:11 UTC that day. From then Alertmanager
+sent to Slack again, including the 2026-11-28 firings. Both rules worked; they described the symptom (jobs waiting)
+and not the cause, which is what the two rules here add.
+
+#### Considered options
+
+1. **A liveness probe on the runner** (chosen): no new service, no credentials, runs where the evidence is (the
+   runner's own process list and log), and acts within about 13 minutes.
+2. **A CronJob reaper** that asks GitHub's API whether each runner is busy and deletes idle EphemeralRunners past
+   N minutes: needs a GitHub App token and RBAC in `arc-runners`, another image to pin and keep current, and
+   GitHub's `busy` flag is wrong in exactly this case (the hung runner had been assigned a job).
+3. **`activeDeadlineSeconds` or a maximum pod age**: kills long IaC applies, and idle `homelab` runners
+   legitimately wait for hours (10 hours seen in November) before taking a job.
+4. **Upgrade ARC to 0.15.1 or the runner to 2.338.2**: neither has a fix. The runner upgrade happens on its own
+   schedule (clusters/platform/README.md, Versions).
+5. **Alert on the listener's metrics** (`gha_assigned_jobs` above `gha_running_jobs`): during the incident the gap
+   was 0 while CI was busy and 2 only once it went quiet, and a real backlog makes the same gap; the existing
+   `GitHubActionsJobWaitingTooLong` already reports the waiting jobs.
+6. **Change `minRunners`/`maxRunners`**: more slots only hide hung runners for longer.
+
+#### Consequences
+
+- Good: a hung runner frees its slot about 13 minutes after it acknowledged the job, without a person, and the
+  owner hears about it in Slack.
+- Good: a running job is never touched, so long IaC applies are safe.
+- Bad: the probe depends on two log lines of the runner (`Acknowledging runner request`, `received job message`)
+  and its 50-minute token renewal. If a runner release renames them, the first check stops matching (the probe
+  goes quiet, it doesn't kill) and the 90-minute check still catches an idle hang. Check both strings when
+  upgrading the runner image.
+- Bad: three copies of the script, one per scale set, kept in step by hand like `listenerMetrics`.
+
+#### Related
+
+- ADR 0086 (runner alerts), ADR 0120 (Loki's ruler and log volume), ADR 0044 and 0059 (runner images)
+
 {% endraw %}
 <!-- adr:end -->
 
